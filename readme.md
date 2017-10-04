@@ -1,5 +1,7 @@
 # D-Wave Micro Client
 
+[![Build Status](https://travis-ci.org/dwavesystems/dwave_micro_client.svg?branch=master)](https://travis-ci.org/dwavesystems/dwave_micro_client)
+
 A minimal implementation of the REST interface used to communicate with D-Wave Solver API (SAPI) servers.
 
 SAPI is an application layer built to provide resource discovery, permissions, and scheduling for quantum annealing resources at D-Wave Systems. This package aims to provide a minimal Python interface to that layer that still captures some reasonable practices for interacting with SAPI.
