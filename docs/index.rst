@@ -61,10 +61,9 @@ Error Classes
 ``dwave_sapi2`` Compatibility
 -----------------------------
 
-Some classes introduced to allow some limited compatibility with code that makes
-simple use of features from ``dwave_sapi2.core`` and ``dwave_sapi2.remote``.
-Not all the features of those modules are exposed, only those that have
-a direct analog in this package.
+To provide limited compatibility for applications written based on
+``dwave_sapi2.core`` and ``dwave_sapi2.remote``, additional classes are included
+to expose some of the analogus features.
 
 .. code-block:: python
 
