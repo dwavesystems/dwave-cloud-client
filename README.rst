@@ -1,6 +1,18 @@
-# D-Wave Micro Client
+.. image:: https://travis-ci.org/dwavesystems/dwave_micro_client.svg?branch=master
+    :target: https://travis-ci.org/dwavesystems/dwave_micro_client
+    :alt: Travis Status
 
-[![Build Status](https://travis-ci.org/dwavesystems/dwave_micro_client.svg?branch=master)](https://travis-ci.org/dwavesystems/dwave_micro_client)
+.. image:: https://coveralls.io/repos/github/dwavesystems/dwave_micro_client/badge.svg?branch=master
+    :target: https://coveralls.io/github/dwavesystems/dwave_micro_client?branch=master
+    :alt: Coverage Report
+
+.. image:: https://readthedocs.org/projects/dwave_micro_client/badge/?version=latest
+    :target: http://dwave_micro_client.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
+
+.. inclusion-marker-do-not-remove
+
+# D-Wave Micro Client
 
 A minimal implementation of the REST interface used to communicate with D-Wave Solver API (SAPI) servers.
 
