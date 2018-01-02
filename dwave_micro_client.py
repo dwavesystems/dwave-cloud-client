@@ -175,7 +175,7 @@ class Connection:
         self.session.headers.update({'X-Auth-Token': self.token})
         self.session.proxies = proxies
         if permissive_ssl:
-            self.session.verfy = False
+            self.session.verify = False
 
         # Build the problem submission queue, start its workers
         self._submission_queue = queue.Queue()
