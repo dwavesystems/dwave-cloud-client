@@ -6,7 +6,7 @@ extras_require = {'test': ['requests_mock', 'mock', 'numpy']}
 setup(
     name='dwave_micro_client',
     py_modules=['dwave_micro_client'],
-    version='0.1.1',
+    version='0.2.0',
     description='A minimal client for interacting with SAPI servers.',
     url='https://github.com/dwavesystems/dwave_micro_client',
     install_requires=install_requires,

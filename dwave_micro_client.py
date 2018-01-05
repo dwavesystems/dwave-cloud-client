@@ -62,7 +62,7 @@ any future object is a blocking operation.
 # TODOS:
 #  - More testing for sample_qubo
 
-from __future__ import division, absolute_import, print_function, unicode_literals
+from __future__ import division, absolute_import
 
 import json
 import threading
