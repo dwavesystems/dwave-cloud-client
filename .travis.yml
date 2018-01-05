@@ -30,7 +30,8 @@ matrix:
     - source env/bin/activate
 
 install:
-- pip install .[test]
+- pip install -r requirements.txt
+- pip install .
 - pip install coveralls
 
 script:
