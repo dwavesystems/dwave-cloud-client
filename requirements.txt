@@ -1,0 +1,6 @@
+requests>=2.18
+six>=1.10
+requests_mock
+mock
+numpy
+coverage
