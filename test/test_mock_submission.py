@@ -131,7 +131,7 @@ class MockSubmission(_QueryTest):
         # con = mock.Mock()
         with dwave_micro_client.Connection('', '') as con:
             con.session = mock.Mock()
-            con.session.post = lambda a, _: choose_reply(a, {'/problems/': ''})
+            con.session.post = lambda a, _: choose_reply(a, {'problems/': ''})
             solver = dwave_micro_client.Solver(con, solver_data('abc123'))
 
             # Build a problem
@@ -148,8 +148,8 @@ class MockSubmission(_QueryTest):
         with dwave_micro_client.Connection('', '') as con:
             con.session = mock.Mock()
             con.session.post = lambda a, _: choose_reply(a, {
-                '/problems/': '[%s]' % complete_no_answer_reply('123', 'abc123')})
-            con.session.get = lambda a: choose_reply(a, {'/problems/123/': complete_reply('123', 'abc123')})
+                'problems/': '[%s]' % complete_no_answer_reply('123', 'abc123')})
+            con.session.get = lambda a: choose_reply(a, {'problems/123/': complete_reply('123', 'abc123')})
             solver = dwave_micro_client.Solver(con, solver_data('abc123'))
 
             # Build a problem
@@ -166,7 +166,7 @@ class MockSubmission(_QueryTest):
         with dwave_micro_client.Connection('', '') as con:
             con.session = mock.Mock()
             con.session.post = lambda a, _: choose_reply(a, {
-                '/problems/': '[%s]' % error_reply('123', 'abc123', error_body)})
+                'problems/': '[%s]' % error_reply('123', 'abc123', error_body)})
             solver = dwave_micro_client.Solver(con, solver_data('abc123'))
 
             # Build a problem
@@ -182,7 +182,7 @@ class MockSubmission(_QueryTest):
         """Handle a response for a canceled job."""
         with dwave_micro_client.Connection('', '') as con:
             con.session = mock.Mock()
-            con.session.post = lambda a, _: choose_reply(a, {'/problems/': '[%s]' % cancel_reply('123', 'abc123')})
+            con.session.post = lambda a, _: choose_reply(a, {'problems/': '[%s]' % cancel_reply('123', 'abc123')})
             solver = dwave_micro_client.Solver(con, solver_data('abc123'))
 
             # Build a problem
@@ -198,10 +198,10 @@ class MockSubmission(_QueryTest):
         """Handle polling for a complete problem."""
         with dwave_micro_client.Connection('', '') as con:
             con.session = mock.Mock()
-            con.session.post = lambda a, _: choose_reply(a, {'/problems/': '[%s]' % continue_reply('123', 'abc123')})
+            con.session.post = lambda a, _: choose_reply(a, {'problems/': '[%s]' % continue_reply('123', 'abc123')})
             con.session.get = lambda a: choose_reply(a, {
-                '/problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
-                '/problems/123/': complete_reply('123', 'abc123')
+                'problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
+                'problems/123/': complete_reply('123', 'abc123')
             })
             solver = dwave_micro_client.Solver(con, solver_data('abc123'))
 
@@ -217,9 +217,9 @@ class MockSubmission(_QueryTest):
         """Handle polling for an error message."""
         with dwave_micro_client.Connection('', '') as con:
             con.session = mock.Mock()
-            con.session.post = lambda a, _: choose_reply(a, {'/problems/': '[%s]' % continue_reply('123', 'abc123')})
+            con.session.post = lambda a, _: choose_reply(a, {'problems/': '[%s]' % continue_reply('123', 'abc123')})
             con.session.get = lambda a: choose_reply(a, {
-                '/problems/?id=123': '[%s]' % error_reply('123', 'abc123', "error message")})
+                'problems/?id=123': '[%s]' % error_reply('123', 'abc123', "error message")})
             solver = dwave_micro_client.Solver(con, solver_data('abc123'))
 
             # Build a problem
@@ -240,21 +240,21 @@ class MockSubmission(_QueryTest):
             con.session = mock.Mock()
             con.session.get = lambda a: choose_reply(a, {
                 # Wait until both problems are
-                '/problems/?id=1': '[%s]' % continue_reply('1', 'abc123'),
-                '/problems/?id=2': '[%s]' % continue_reply('2', 'abc123'),
-                '/problems/?id=2,1': '[' + complete_no_answer_reply('2', 'abc123') + ',' +
+                'problems/?id=1': '[%s]' % continue_reply('1', 'abc123'),
+                'problems/?id=2': '[%s]' % continue_reply('2', 'abc123'),
+                'problems/?id=2,1': '[' + complete_no_answer_reply('2', 'abc123') + ',' +
                                      error_reply('1', 'abc123', 'error') + ']',
-                '/problems/?id=1,2': '[' + error_reply('1', 'abc123', 'error') + ',' +
+                'problems/?id=1,2': '[' + error_reply('1', 'abc123', 'error') + ',' +
                                      complete_no_answer_reply('2', 'abc123') + ']',
-                '/problems/1/': error_reply('1', 'abc123', 'Error message'),
-                '/problems/2/': complete_reply('2', 'abc123')
+                'problems/1/': error_reply('1', 'abc123', 'Error message'),
+                'problems/2/': complete_reply('2', 'abc123')
             })
 
             def switch_post_reply(path, body):
                 message = json.loads(body)
                 if len(message) == 1:
                     con.session.post = lambda a, _: choose_reply(a, {
-                        '/problems/': '[%s]' % continue_reply('2', 'abc123')})
+                        'problems/': '[%s]' % continue_reply('2', 'abc123')})
                     return choose_reply('', {'': '[%s]' % continue_reply('1', 'abc123')})
                 else:
                     con.session.post = None
@@ -307,7 +307,7 @@ class MockCancel(unittest.TestCase):
         with dwave_micro_client.Connection('', '') as con:
             con.session = mock.Mock()
 
-            con.session.get = lambda a: choose_reply(a, {'/problems/?id={}'.format(submission_id): reply_body})
+            con.session.get = lambda a: choose_reply(a, {'problems/?id={}'.format(submission_id): reply_body})
             con.session.delete = DeleteEvent.handle
 
             solver = dwave_micro_client.Solver(con, solver_data('abc123'))
@@ -319,10 +319,10 @@ class MockCancel(unittest.TestCase):
                 future.samples
                 self.fail()
             except DeleteEvent as event:
-                if event.url == '/problems/':
+                if event.url == 'problems/':
                     self.assertEqual(event.body, '["{}"]'.format(submission_id))
                 else:
-                    self.assertEqual(event.url, '/problems/{}/'.format(submission_id))
+                    self.assertEqual(event.url, 'problems/{}/'.format(submission_id))
 
     def test_cancel_without_id(self):
         """Make sure the cancel method submits to the right endpoint.
@@ -336,11 +336,11 @@ class MockCancel(unittest.TestCase):
 
         with dwave_micro_client.Connection('', '') as con:
             con.session = mock.Mock()
-            con.session.get = lambda a: choose_reply(a, {'/problems/?id={}'.format(submission_id): reply_body})
+            con.session.get = lambda a: choose_reply(a, {'problems/?id={}'.format(submission_id): reply_body})
 
             def post(a, _):
                 release_reply.wait()
-                return choose_reply(a, {'/problems/'.format(submission_id): reply_body})
+                return choose_reply(a, {'problems/'.format(submission_id): reply_body})
             con.session.post = post
             con.session.delete = DeleteEvent.handle
 
@@ -356,7 +356,7 @@ class MockCancel(unittest.TestCase):
                 future.samples
                 self.fail()
             except DeleteEvent as event:
-                if event.url == '/problems/':
+                if event.url == 'problems/':
                     self.assertEqual(event.body, '["{}"]'.format(submission_id))
                 else:
-                    self.assertEqual(event.url, '/problems/{}/'.format(submission_id))
+                    self.assertEqual(event.url, 'problems/{}/'.format(submission_id))
