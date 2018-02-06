@@ -18,10 +18,10 @@ An example using the client:
     import random
 
     # Connect using explicit connection information
-    con = dwave_micro_client.Connection('https://sapi-url', 'token-string')
+    conn = dwave_micro_client.Connection('https://sapi-url', 'token-string')
 
     # Load a solver by name
-    solver = connection.get_solver('test-solver')
+    solver = conn.get_solver('test-solver')
 
     # Build a random Ising model on +1, -1. Build it to exactly fit the graph the solver provides
     linear = {index: random.choice([-1, 1]) for index in solver.nodes}
