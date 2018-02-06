@@ -267,7 +267,7 @@ class Connection:
                 return self.solvers.keys()
 
             log.debug("Requesting list of all solver data.")
-            response = self.session.get(self.base_url + '/solvers/remote/')
+            response = self.session.get(os.path.join(self.base_url, 'solvers/remote/'))
 
             if response.status_code == 401:
                 raise SolverAuthenticationError()
@@ -305,7 +305,7 @@ class Connection:
                 if self._all_solvers_ready:
                     raise KeyError(name)
 
-                response = self.session.get(self.base_url + '/solvers/remote/{}/'.format(name))
+                response = self.session.get(os.path.join(self.base_url, 'solvers/remote/{}/'.format(name)))
 
                 if response.status_code == 401:
                     raise SolverAuthenticationError()
@@ -350,7 +350,7 @@ class Connection:
                 log.debug("submitting {} problems".format(len(ready_problems)))
                 body = '[' + ','.join(mess.body for mess in ready_problems) + ']'
                 try:
-                    response = self.session.post(self.base_url + '/problems/', body)
+                    response = self.session.post(os.path.join(self.base_url, 'problems/'), body)
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()
@@ -473,7 +473,7 @@ class Connection:
                 # body of the delete query.
                 try:
                     body = [item[0] for item in item_list]
-                    self.session.delete(self.base_url + '/problems/', json=body)
+                    self.session.delete(os.path.join(self.base_url, 'problems/'), json=body)
                 except Exception as err:
                     for _, future in item_list:
                         if future is not None:
@@ -533,10 +533,10 @@ class Connection:
 
                 # Build a query string with block of ids
                 log.debug("Query on futures: %s", ', '.join(active_queries))
-                query_string = '/problems/?id=' + ','.join(active_queries)
+                query_string = 'problems/?id=' + ','.join(active_queries)
 
                 try:
-                    response = self.session.get(self.base_url + query_string)
+                    response = self.session.get(os.path.join(self.base_url, query_string))
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()
@@ -594,9 +594,9 @@ class Connection:
                 log.debug("Query for results: %s", future.id)
 
                 # Submit the query
-                query_string = '/problems/{}/'.format(future.id)
+                query_string = 'problems/{}/'.format(future.id)
                 try:
-                    response = self.session.get(self.base_url + query_string)
+                    response = self.session.get(os.path.join(self.base_url, query_string))
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()
