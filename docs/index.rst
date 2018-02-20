@@ -26,15 +26,15 @@ For the example, with the configuration file:
     connection-a|https://one.com,token-one
     connection-b|https://two.com,token-two
 
->>> con = dwave_micro_client.Connection()
+>>> conn = dwave_micro_client.Connection()
 # Will try to connect with the url `https://one.com` and the token `token-one`.
 
 It is also possible to create the connection using only the label or url, and the token will be retrived from the configuration.
 
->>> con = dwave_micro_client.Connection('connection-a')
+>>> conn = dwave_micro_client.Connection('connection-a')
 # Will try to connect with the url `https://one.com` and the token `token-one`.
 
->>> con = dwave_micro_client.Connection('https://two.com')
+>>> conn = dwave_micro_client.Connection('https://two.com')
 # Will try to connect with the url `https://two.com` and the token `token-two`.
 
 Classes
