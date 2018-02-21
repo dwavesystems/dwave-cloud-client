@@ -59,7 +59,7 @@ any future object is a blocking operation.
 
 """
 
-# TODOS:
+# TODO:
 #  - More testing for sample_qubo
 
 from __future__ import division, absolute_import
@@ -113,7 +113,7 @@ class CanceledFutureError(Exception):
     """An exception raised when code tries to read from a canceled future."""
 
     def __init__(self):
-        super(CanceledFutureError, self).__init__("An error occured reading results from a canceled request")
+        super(CanceledFutureError, self).__init__("An error occurred reading results from a canceled request")
 
 
 class Connection:
@@ -148,7 +148,7 @@ class Connection:
     _LOAD_THREAD_COUNT = 5
 
     def __init__(self, url=None, token=None, proxies=None, permissive_ssl=False):
-        """To setup the connection a pipeline of queues/workers is costructed.
+        """To setup the connection a pipeline of queues/workers is constructed.
 
         There are five interations with the server the connection manages:
         1. Downloading solver information.
@@ -157,9 +157,9 @@ class Connection:
         4. Downloading problem results.
         5. Canceling problems
 
-        Loading solver information is done syncronously. The other four tasks are
-        performed by asyncronous workers. For 2, 3, and 5 the workers gather
-        togeather tasks into in batches.
+        Loading solver information is done synchronously. The other four tasks are
+        performed by asynchronously workers. For 2, 3, and 5 the workers gather
+        tasks in batches.
         """
         # Use configuration from parameters passed, if parts are
         # missing, try the configuration function
@@ -402,7 +402,7 @@ class Connection:
             # The future may not have the ID set yet
             with future._single_cancel_lock:
                 # This handles the case where cancel has been called on a future
-                # before that future recived the problem id
+                # before that future received the problem id
                 if future._cancel_requested:
                     if not future._cancel_sent and status == self.STATUS_PENDING:
                         # The problem has been canceled but the status says its still in queue
@@ -462,7 +462,7 @@ class Connection:
         """
         try:
             while True:
-                # Pull as many problems as we can, block when none are avaialble.
+                # Pull as many problems as we can, block when none are available.
                 item_list = [self._cancel_queue.get()]
                 while True:
                     try:
@@ -515,7 +515,7 @@ class Connection:
                 else:
                     self._poll_queue.task_done()
 
-            # Remve a query from the active set
+            # Remove a query from the active set
             def remove(id_):
                 del futures[id_]
                 active_queries.remove(id_)
@@ -628,7 +628,7 @@ class Solver:
 
     Get solver objects by calling get_solver(name) on a connection object.
 
-    The solver has responsibilty for:
+    The solver has responsibility for:
     - Encoding problems submitted
     - Checking the submitted parameters
     - Add problems to the Connection's submission queue
@@ -861,7 +861,7 @@ class Future:
     The future will be block to resolve when any data value is accessed.
     The method :meth:`done` can be used to query for resolution without blocking.
     :meth:`wait`, and :meth:`wait_multiple` can be used to block for a variable
-    number of jobs for a given ammount of time.
+    number of jobs for a given amount of time.
 
     Note:
         Only constructed by :obj:`Solver` objects.
@@ -891,13 +891,13 @@ class Future:
         #: The id the server will use to identify this problem, None until the id is actually known
         self.id = id_
 
-        #: `datetime` corriesponding to the time when the problem was accepted by the server (None before then)
+        #: `datetime` corresponding to the time when the problem was accepted by the server (None before then)
         self.time_received = None
 
-        #: `datetime` corriesponding to the time when the problem was completed by the server (None before then)
+        #: `datetime` corresponding to the time when the problem was completed by the server (None before then)
         self.time_solved = None
 
-        #: `datetime` corriesponding to the time when the problem was completed by the server (None before then)
+        #: `datetime` corresponding to the time when the problem was completed by the server (None before then)
         self.time_solved = None
 
         # Track how long it took us to parse the data
@@ -933,7 +933,7 @@ class Future:
 
         Args:
             error: An error string or exception object.
-            exc_info: Stack trace info from sys module for reraising exceptions nicely.
+            exc_info: Stack trace info from sys module for re-raising exceptions nicely.
         """
         self.error = error
         self._exc_info = exc_info
@@ -959,7 +959,7 @@ class Future:
         """Wait for multiple Future objects to complete.
 
         Python doesn't provide a multi-wait, but we can jury rig something reasonably
-        efficent using an event object.
+        efficient using an event object.
 
         Args:
             futures (list of Future): list of objects to wait on
@@ -976,7 +976,7 @@ class Future:
         finish = time.time() + timeout
         done = 0
 
-        # Keep track of what futures havn't finished
+        # Keep track of what futures haven't finished
         remaining = list(futures)
 
         # Insert our event into all the futures
@@ -1520,7 +1520,7 @@ class AsyncInterfaceWrapper:
         """Get a dictionary containing information about the progress of the problem.
 
         This is a fairly minimal wrapper that doesn't reach all the possible states
-        of the original method, but is compatable.
+        of the original method, but is compatible.
 
         See the dwave_sapi2 documentation for details.
         """
