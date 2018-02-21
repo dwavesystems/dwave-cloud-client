@@ -97,6 +97,8 @@ except ImportError:
     _numpy = False
 
 
+# TODO: move exceptions to a submodule
+
 class SolverFailureError(Exception):
     """An exception raised when there is a remote failure calling a solver."""
     pass
@@ -114,6 +116,10 @@ class CanceledFutureError(Exception):
 
     def __init__(self):
         super(CanceledFutureError, self).__init__("An error occurred reading results from a canceled request")
+
+
+class InvalidAPIResponseError(Exception):
+    """Raised when an invalid/unexpected response from D-Wave Solver API is received."""
 
 
 class Connection:
@@ -643,15 +649,38 @@ class Solver:
 
     def __init__(self, connection, data):
         self.connection = connection
-        self.id = data['id']
         self.data = data
+
+        try:
+            self.id = data['id']
+        except KeyError:
+            raise InvalidAPIResponseError("Missing solver property: 'id'")
+
+        #: Properties of this solver the server presents: dict
+        try:
+            self.properties = data['properties']
+        except KeyError:
+            raise InvalidAPIResponseError("Missing solver property: 'properties'")
+
+        #: The set of extra parameters this solver will accept in sample_ising or sample_qubo: dict
+        try:
+            self.parameters = self.properties['parameters']
+        except KeyError:
+            raise InvalidAPIResponseError("Missing solver property: 'parameters'")
 
         #: When True the solution data will be returned as numpy matrices: False
         self.return_matrix = False
 
         # The exact sequence of nodes/edges is used in encoding problems and must be preserved
-        self._encoding_qubits = data['properties']['qubits']
-        self._encoding_couplers = [tuple(edge) for edge in data['properties']['couplers']]
+        try:
+            self._encoding_qubits = self.properties['qubits']
+        except KeyError:
+            raise InvalidAPIResponseError("Missing solver property: 'properties.qubits'")
+
+        try:
+            self._encoding_couplers = [tuple(edge) for edge in self.properties['couplers']]
+        except KeyError:
+            raise InvalidAPIResponseError("Missing solver property: 'properties.couplers'")
 
         #: The nodes in this solver's graph: set(int)
         self.nodes = self.variables = set(self._encoding_qubits)
@@ -663,18 +692,12 @@ class Solver:
         #: The edges in this solver's graph, each edge will only be represented once: set(tuple(int, int))
         self.undirected_edges = {edge for edge in self.edges if edge[0] < edge[1]}
 
-        #: Properties of this solver the server presents: dict
-        self.properties = data['properties']
-
-        #: The set of extra parameters this solver will accept in sample_ising or sample_qubo: dict
-        self.parameters = self.properties['parameters']
-
         # Create a set of default parameters for the queries
         self._params = {}
 
         # As a heuristic to guess if this is a hardware sampler check if
         # the 'annealing_time_range' property is set.
-        if 'annealing_time_range' in data['properties']:
+        if 'annealing_time_range' in self.properties:
             self._params[self._PARAMETER_ENABLE_HARDWARE] = True
 
     def sample_ising(self, linear, quadratic, **params):
