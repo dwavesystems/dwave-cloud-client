@@ -118,8 +118,14 @@ class CanceledFutureError(Exception):
         super(CanceledFutureError, self).__init__("An error occurred reading results from a canceled request")
 
 
+
 class InvalidAPIResponseError(Exception):
     """Raised when an invalid/unexpected response from D-Wave Solver API is received."""
+
+
+class UnsupportedSolverError(Exception):
+    """The solver we received from the API is not supported by the client."""
+
 
 
 class Connection:
@@ -284,10 +290,16 @@ class Connection:
 
             data = response.json()
 
-            for solver in data:
-                log.debug("Found solver: %s", solver['id'])
-                self.solvers[solver['id']] = Solver(self, solver)
+            for solver_desc in data:
+                try:
+                    solver = Solver(self, solver_desc)
+                    self.solvers[solver.id] = solver
+                    log.debug("Adding solver: %s", solver)
+                except UnsupportedSolverError as e:
+                    log.debug("Skipping solver due to %r", e)
+
             self._all_solvers_ready = True
+
             return self.solvers.keys()
 
     def get_solver(self, name=None):
@@ -647,28 +659,49 @@ class Solver:
     # Special flag to notify the system a solver needs access to special hardware
     _PARAMETER_ENABLE_HARDWARE = 'use_hardware'
 
+    # Classes of problems the remote solver has to support (at least one of these)
+    # in order for `Solver` to be able to abstract, or use, that solver
+    _HANDLED_PROBLEM_TYPES = {"ising", "qubo"}
+
     def __init__(self, connection, data):
         self.connection = connection
+
+        # data for each solver includes at least: id, description, and properties
         self.data = data
 
+        # Each solver has an ID field
         try:
             self.id = data['id']
         except KeyError:
             raise InvalidAPIResponseError("Missing solver property: 'id'")
 
-        #: Properties of this solver the server presents: dict
+        # Properties of this solver the server presents: dict
         try:
             self.properties = data['properties']
         except KeyError:
             raise InvalidAPIResponseError("Missing solver property: 'properties'")
 
-        #: The set of extra parameters this solver will accept in sample_ising or sample_qubo: dict
+        # Ensure this remote solver supports at least one of the problem types we know how to handle
+        try:
+            self.supported_problem_types = set(self.properties['supported_problem_types'])
+        except KeyError:
+            raise InvalidAPIResponseError(
+                "Missing solver property: 'properties.supported_problem_types'")
+
+        if self.supported_problem_types.isdisjoint(self._HANDLED_PROBLEM_TYPES):
+            raise UnsupportedSolverError(
+                "Remote solver {!r} supports {} problems, but Solver() handles only {}".format(
+                    self.id,
+                    list(self.supported_problem_types),
+                    list(self._HANDLED_PROBLEM_TYPES)))
+
+        # The set of extra parameters this solver will accept in sample_ising or sample_qubo: dict
         try:
             self.parameters = self.properties['parameters']
         except KeyError:
             raise InvalidAPIResponseError("Missing solver property: 'parameters'")
 
-        #: When True the solution data will be returned as numpy matrices: False
+        # When True the solution data will be returned as numpy matrices: False
         self.return_matrix = False
 
         # The exact sequence of nodes/edges is used in encoding problems and must be preserved
@@ -682,14 +715,14 @@ class Solver:
         except KeyError:
             raise InvalidAPIResponseError("Missing solver property: 'properties.couplers'")
 
-        #: The nodes in this solver's graph: set(int)
+        # The nodes in this solver's graph: set(int)
         self.nodes = self.variables = set(self._encoding_qubits)
 
-        #: The edges in this solver's graph, every edge will be present as (a, b) and (b, a): set(tuple(int, int))
+        # The edges in this solver's graph, every edge will be present as (a, b) and (b, a): set(tuple(int, int))
         self.edges = self.couplers = set(tuple(edge) for edge in self._encoding_couplers) | \
             set((edge[1], edge[0]) for edge in self._encoding_couplers)
 
-        #: The edges in this solver's graph, each edge will only be represented once: set(tuple(int, int))
+        # The edges in this solver's graph, each edge will only be represented once: set(tuple(int, int))
         self.undirected_edges = {edge for edge in self.edges if edge[0] < edge[1]}
 
         # Create a set of default parameters for the queries
@@ -699,6 +732,9 @@ class Solver:
         # the 'annealing_time_range' property is set.
         if 'annealing_time_range' in self.properties:
             self._params[self._PARAMETER_ENABLE_HARDWARE] = True
+
+    def __str__(self):
+        return "Solver(id={!r})".format(self.id)
 
     def sample_ising(self, linear, quadratic, **params):
         """Draw samples from the provided Ising model.
