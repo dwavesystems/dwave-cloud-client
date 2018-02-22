@@ -334,8 +334,11 @@ class Connection:
 
                 response.raise_for_status()
 
-                data = json.loads(response.text)
-                self.solvers[data['id']] = Solver(self, data)
+                solver = Solver(self, data=response.json())
+                if solver.id != name:
+                    raise InvalidAPIResponseError(
+                        "Asked for solver named {!r}, got {!r}".format(name, solver.id))
+                self.solvers[name] = solver
 
             return self.solvers[name]
 
