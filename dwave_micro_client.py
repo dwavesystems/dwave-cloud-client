@@ -1512,7 +1512,7 @@ def load_configuration(key=None):
             data = {index: value for index, value in enumerate(data.split(','))}
 
             if label == key or data[0] == key or key is None:
-                return data[0], data[1], data.get(2, ''), data.get(3, '')
+                return data[0] or None, data[1] or None, data.get(2), data.get(3)
         except:
             pass  # Just ignore any malformed lines
             # TODO issue a warning
