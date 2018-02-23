@@ -1200,107 +1200,14 @@ class Future:
             if self._message['type'] not in ['qubo', 'ising']:
                 raise ValueError('Unknown problem format used.')
 
-            # If no format is set we fall back to legacy encoding
-            if 'format' not in self._message['answer']:
-                if _numpy:
-                    return self._decode_legacy_numpy()
-                return self._decode_legacy()
-
             # If format is set, it must be qp
-            if self._message['answer']['format'] != 'qp':
+            if self._message.get('answer', {}).get('format') != 'qp':
                 raise ValueError('Data format returned by server not understood.')
             if _numpy:
                 return self._decode_qp_numpy()
             return self._decode_qp()
         finally:
             self.parse_time = time.time() - start
-
-    def _decode_legacy(self):
-        """Decode old format, without numpy.
-
-        The legacy format, included mostly for information and contrast, used
-        pure json for most of the data, with a dense encoding used for the
-        samples themselves.
-        """
-        # Most of the data can be used as is
-        self._result = self._message['answer']
-
-        # Measure the shape of the binary data returned
-        num_solutions = len(self._result['energies'])
-        active_variables = self._result['active_variables']
-        total_variables = self._result['num_variable']
-
-        # Decode the solutions, which will be a continuous run of bits.
-        # It was treated as a raw byte string and base64 encoded.
-        binary = base64.b64decode(self._result['solutions'])  # Undo the base64 encoding
-        byte_buffer = struct.unpack('B' * len(binary), binary)  # Read out the byte array
-        bits = []
-        for byte in byte_buffer:
-            bits.extend(reversed(self._decode_byte(byte)))  # Turn the bytes back into bits
-
-        # Figure out the null value for output
-        default = 3 if self._message['type'] == 'qubo' else 0
-
-        # Pull out a bit for each active variable, keep our spot in the
-        # bit array between solutions using `index`
-        index = 0
-        solutions = []
-        for solution_index in range(num_solutions):
-            # Use None for any values not active
-            solution = [default] * total_variables
-            for i in active_variables:
-                solution[i] = bits[index]
-                index += 1
-
-            # Make sure we are in the right variable space
-            if self._message['type'] == 'ising':
-                values = {0: -1, 1: 1}
-                solution = [values.get(v, None) for v in solution]
-            solutions.append(solution)
-
-        self._result['solutions'] = solutions
-
-    def _decode_legacy_numpy(self):
-        """Decode old format, using numpy.
-
-        Decodes the same format as _decode_legacy, but gains some speed using numpy.
-        """
-        # Load number lists into numpy buffers
-        res = self._result = self._message['answer']
-        if self.return_matrix:
-            res['energies'] = np.array(res['energies'], dtype=float)
-            if 'num_occurrences' in res:
-                res['num_occurrences'] = np.array(res['num_occurrences'], dtype=int)
-            res['active_variables'] = np.array(res['active_variables'], dtype=int)
-
-        # Measure the shape of the data
-        num_solutions = len(res['energies'])
-        active_variables = res['active_variables']
-        num_variables = len(active_variables)
-
-        # Decode the solutions, which will be a continuous run of bits
-        byte_type = np.dtype(np.uint8)
-        byte_type = byte_type.newbyteorder('<')
-        bits = np.unpackbits(np.frombuffer(base64.b64decode(res['solutions']), dtype=byte_type))
-
-        # Clip off the extra bits from encoding
-        bits = np.delete(bits, range(num_solutions * num_variables, bits.size))
-        bits = np.reshape(bits, (num_solutions, num_variables))
-
-        # Switch from bits to spins
-        default = 3
-        if self._message['type'] == 'ising':
-            bits = bits.astype(np.int8)
-            bits *= 2
-            bits -= 1
-            default = 0
-
-        # Fill in the missing variables
-        solutions = np.full((num_solutions, res['num_variables']), default, dtype=np.int8)
-        solutions[:, active_variables] = bits
-        res['solutions'] = solutions
-        if not res['solutions']:
-            res['solutions'] = res['solutions'].tolist()
 
     def _decode_qp(self):
         """Decode qp format, without numpy.
