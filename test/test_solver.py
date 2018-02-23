@@ -2,7 +2,7 @@
 Check the interface to the solver object.
 
 Note:
-    These are all agrigate tests, not really testing single units.
+    These are all aggregate tests, not really testing single units.
 """
 from __future__ import absolute_import, division
 
@@ -21,7 +21,7 @@ except:
 
 
 class PropertyLoading(unittest.TestCase):
-    """Ensure that the propreties of solvers can be retrieved."""
+    """Ensure that the properties of solvers can be retrieved."""
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_load_properties(self):
@@ -109,7 +109,7 @@ class Submission(_QueryTest):
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_submit_full_problem(self):
-        """Submit a problem with all supported coefficents set."""
+        """Submit a problem with all supported coefficients set."""
         # Connect
         con = dwave_micro_client.Connection(config_url, config_token)
         solver = con.get_solver(config_solver)
@@ -141,7 +141,7 @@ class Submission(_QueryTest):
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_submit_partial_problem(self):
-        """Submit a probem with only some of the terms set."""
+        """Submit a problem with only some of the terms set."""
         # Connect
         con = dwave_micro_client.Connection(config_url, config_token)
         solver = con.get_solver(config_solver)

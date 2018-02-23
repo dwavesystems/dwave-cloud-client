@@ -135,7 +135,7 @@ class MockSolverLoading(unittest.TestCase):
         with requests_mock.mock() as m:
             m.get(solver1_url, text=solver_object(solver_name, True))
             con = dwave_micro_client.Connection(url, token)
-            with self.assertRaises(KeyError):
+            with self.assertRaises(dwave_micro_client.InvalidAPIResponseError):
                 con.get_solver(solver_name)
 
     def test_load_solver_broken_response(self):
