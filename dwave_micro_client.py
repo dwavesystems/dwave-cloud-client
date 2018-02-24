@@ -1077,6 +1077,15 @@ class Future:
                 self._cancel_sent = True
                 self.solver.connection._cancel(self.id, self)
 
+    def result(self):
+        """Blocking call to retrieve the result.
+
+        Returns:
+            dict with the results. Should be considered read-only.
+        """
+        self._load_result()
+        return self._result
+
     @property
     def energies(self):
         """The energy buffer, blocks if needed.
@@ -1084,8 +1093,7 @@ class Future:
         Returns:
             list or numpy matrix of doubles.
         """
-        result = self._load_result()
-        return result['energies']
+        return self.result()['energies']
 
     @property
     def samples(self):
@@ -1094,8 +1102,7 @@ class Future:
         Returns:
             list of lists or numpy matrix.
         """
-        result = self._load_result()
-        return result['solutions']
+        return self.result()['solutions']
 
     @property
     def occurrences(self):
@@ -1104,13 +1111,13 @@ class Future:
         Returns:
             list or numpy matrix of doubles.
         """
-        result = self._load_result()
-        if 'num_occurrences' in result:
-            return result['num_occurrences']
+        self._load_result()
+        if 'num_occurrences' in self._result:
+            return self._result['num_occurrences']
         elif self.return_matrix:
-            return np.ones((len(result['solutions']),))
+            return np.ones((len(self._result['solutions']),))
         else:
-            return [1] * len(result['solutions'])
+            return [1] * len(self._result['solutions'])
 
     @property
     def timing(self):
@@ -1122,31 +1129,24 @@ class Future:
         Returns:
             dict
         """
-        result = self._load_result()
-        return result['timing']
+        return self.result()['timing']
 
     def __getitem__(self, key):
-        """Provide dwave_sapi2 compatible access to results.
+        """Provide a simple results item getter. Blocks if future is unresolved.
 
         Args:
             key: keywords for result fields.
         """
-        if key == 'energies':
-            return self.energies
-        elif key in ['solutions', 'samples']:
-            return self.samples
-        elif key in ['occurrences', 'num_occurrences']:
-            return self.occurrences
-        elif key == 'timing':
-            return self.timing
-        else:
+        self._load_result()
+        if key not in self._result:
             raise KeyError('{} is not a property of response object'.format(key))
+        return self._result[key]
 
     def _load_result(self):
         """Get the result, waiting and decoding as needed."""
         if self._result is None:
             # Wait for the query response
-            self._results_ready_event.wait()
+            self.wait(timeout=None)
 
             # Check for other error conditions
             if self.error is not None:
