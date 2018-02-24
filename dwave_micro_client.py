@@ -800,7 +800,6 @@ class Solver:
 
         # Encode the problem, use the newer format
         data = self._base64_format(self, linear, quadratic)
-        # data = self._text_format(solver, lin, quad)
 
         body = json.dumps({
             'solver': self.id,
@@ -850,35 +849,6 @@ class Solver:
         future = Future(self, id_, self.return_matrix, None)
         self.connection._poll(future)
         return future
-
-    def _text_format(self, solver, lin, quad):
-        """Perform the legacy problem encoding.
-
-        Deprecated encoding method; included only for reference.
-
-        Args:
-            solver: solver requested.
-            lin: linear terms of the model.
-            quad: Quadratic terms of the model.
-
-        Returns:
-            data: text formatted problem
-
-        """
-        data = ''
-        counter = 0
-        for index, value in _uniform_iterator(lin):
-            if value != 0:
-                data = data + '{} {} {}\n'.format(index, index, value)
-                counter += 1
-
-        for (index1, index2), value in six.iteritems(quad):
-            if value != 0:
-                data = data + '{} {} {}\n'.format(index1, index2, value)
-                counter += 1
-
-        data = '{} {}\n'.format(max(solver.nodes) + 1, counter) + data
-        return data
 
     def _base64_format(self, solver, lin, quad):
         """Encode the problem for submission to a given solver.
