@@ -1,38 +1,53 @@
+
 language: python
+
 matrix:
-  include:
-  - os: linux
-    sudo: required
-    python: '2.7'
-    env: TOXENV=py27
-  - os: linux
-    sudo: required
-    python: '3.6'
-    env: TOXENV=py36
-  - os: linux
-    sudo: required
-    python: nightly
-    env: TOXENV=pynightly
-  - os: osx
-    language: generic
-    env: TOXENV=py27
-    before_install:
-    - brew update
-    - virtualenv env -p python2
-    - source env/bin/activate
-  - os: osx
-    language: generic
-    env: TOXENV=py36
-    before_install:
-    - brew update
-    - brew install python3
-    - virtualenv env -p python3
-    - source env/bin/activate
+    include:
+        - os: linux
+          sudo: required
+          python: "nightly"
+          env: TOXENV=pynightly
+          deploy:
+        - os: linux
+          sudo: required
+          python: "3.6"
+          env: TOXENV=py36
+        - os: linux
+          sudo: required
+          python: "3.5"
+          env: TOXENV=py35
+          deploy:
+        - os: linux
+          sudo: required
+          python: "3.4"
+          env: TOXENV=py34
+          deploy:
+        - os: linux
+          sudo: required
+          python: "2.7"
+          env: TOXENV=py27
+          deploy:
+        - os: osx
+          language: generic
+          env: TOXENV=py36
+          before_install:
+            - brew update
+            - brew install python3
+            - virtualenv env -p python3
+            - source env/bin/activate
+          deploy:
+        - os: osx
+          language: generic
+          env: TOXENV=py27
+          before_install:
+            - brew update
+            - virtualenv env -p python2
+            - source env/bin/activate
+          deploy:
 
 install:
-- pip install -r requirements.txt
-- pip install .
-- pip install coveralls
+    - pip install -r requirements.txt
+    - pip install .
 
 script:
 - coverage run -m unittest discover
@@ -42,9 +57,9 @@ after_success:
 
 deploy:
   provider: pypi
-  user: dwtools
+  user: "dwtools"
   password:
-    secure: wsPd/OTCmXmiLpAbXv6pQMdFPZjXBcwEytzR5QWpzt/hDsbwEKFe4lK1FThn3F9e08bPXdBSnhQ7ms8hyH1HFbX86pMFAZb5BkHe9ziBUHidg5MO0CZNsJu6so4x2oS5oUgVcF2HLqttraib1p3I6qlu1OmB9T1z9+qPmpHt2QwbVf1ESmV9Qo89NTXm0DNC9UQwsuqsWojQWhqIsAoSrHaHgJJNcGjFUUBUjaglPFLjuubgwRsVS/GqkaTaWogDj47oybNmV1/LJwIPfFGZ3b7hxVBTqrEQnEcK7+Qr39HuBipzg3Zf4dKi5xXLdbq4dj/TskOBoP3ldEhxNZFLZVZqZgHip+wDyj7gvtxPiev8uoUZMpy5f8yOXOJrNFOQWcbjs2VHbGt16LtPYXpHjlAoRpRDpXDDtJ3DWspb0o6SmEpG/o7uM7u+4jdm/BgVpgpgGwMG/nIUDoypB6REzgAImHoZD6fQyNdXVllHmQFAuo3qBflAhhTBCed2ozSRZSUy1owFsMdgQH7lYfrkZK/iCLwGww6S2ttmv9NNs8J+j2DCJ2PpUDQ8xqBJcupExgN0oR/guiyKEcufxW1v8LxOaCah17x0qd7fKu3aO67hZbucAMl/071lVqTrHaXt9L75LLirVKOHdCA6KNKl9L2UOp0O/yxcCOEfF7/M/Ss=
-  distributions: sdist bdist_wheel
+    secure: "wsPd/OTCmXmiLpAbXv6pQMdFPZjXBcwEytzR5QWpzt/hDsbwEKFe4lK1FThn3F9e08bPXdBSnhQ7ms8hyH1HFbX86pMFAZb5BkHe9ziBUHidg5MO0CZNsJu6so4x2oS5oUgVcF2HLqttraib1p3I6qlu1OmB9T1z9+qPmpHt2QwbVf1ESmV9Qo89NTXm0DNC9UQwsuqsWojQWhqIsAoSrHaHgJJNcGjFUUBUjaglPFLjuubgwRsVS/GqkaTaWogDj47oybNmV1/LJwIPfFGZ3b7hxVBTqrEQnEcK7+Qr39HuBipzg3Zf4dKi5xXLdbq4dj/TskOBoP3ldEhxNZFLZVZqZgHip+wDyj7gvtxPiev8uoUZMpy5f8yOXOJrNFOQWcbjs2VHbGt16LtPYXpHjlAoRpRDpXDDtJ3DWspb0o6SmEpG/o7uM7u+4jdm/BgVpgpgGwMG/nIUDoypB6REzgAImHoZD6fQyNdXVllHmQFAuo3qBflAhhTBCed2ozSRZSUy1owFsMdgQH7lYfrkZK/iCLwGww6S2ttmv9NNs8J+j2DCJ2PpUDQ8xqBJcupExgN0oR/guiyKEcufxW1v8LxOaCah17x0qd7fKu3aO67hZbucAMl/071lVqTrHaXt9L75LLirVKOHdCA6KNKl9L2UOp0O/yxcCOEfF7/M/Ss="
+  distributions: "sdist bdist_wheel"
   on:
     tags: true
