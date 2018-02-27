@@ -1,8 +1,8 @@
-dwave\_micro\_client
-===========================
-.. py:currentmodule:: dwave_micro_client
+dwave.cloud
+===========
+.. py:currentmodule:: dwave.cloud
 
-.. automodule:: dwave_micro_client
+.. automodule:: dwave.cloud
 
 Configuration
 -------------
@@ -26,34 +26,30 @@ For the example, with the configuration file:
     connection-a|https://one.com,token-one
     connection-b|https://two.com,token-two
 
->>> conn = dwave_micro_client.Connection()
+>>> client = dwave.cloud.qpu.Client()
 # Will try to connect with the url `https://one.com` and the token `token-one`.
 
-It is also possible to create the connection using only the label or url, and the token will be retrived from the configuration.
+It is also possible to create the connection using only the label or url, and the token will be retrieved from the configuration.
 
->>> conn = dwave_micro_client.Connection('connection-a')
+>>> client = dwave.cloud.qpu.Client('connection-a')
 # Will try to connect with the url `https://one.com` and the token `token-one`.
 
->>> conn = dwave_micro_client.Connection('https://two.com')
+>>> client = dwave.cloud.qpu.Client('https://two.com')
 # Will try to connect with the url `https://two.com` and the token `token-two`.
 
 Classes
 -------
 
-.. autoclass:: Connection
+.. autoclass:: qpu.client.Client
     :members:
 
-.. autoclass:: Solver
+.. autoclass:: qpu.solver.Solver
     :members:
 
-.. autoclass:: Future
+.. autoclass:: qpu.computation.Future
     :members:
 
 Error Classes
 -------------
 
-.. autoclass :: SolverFailureError
-    :show-inheritance:
-
-.. autoclass :: CanceledFutureError
-    :show-inheritance:
+.. automodule:: dwave.cloud.exceptions

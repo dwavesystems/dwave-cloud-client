@@ -1,8 +1,8 @@
 """
 An implementation of the REST API exposed by D-Wave Solver API (SAPI) servers.
 
-This API lets you submit an Ising model and receive samples from a distribution over the model
-as defined by the solver you have selected.
+This API lets you submit an Ising model and receive samples from a distribution
+over the model as defined by the solver you have selected.
 
  - The SAPI servers provide authentication, queuing, and scheduling services, and
    provide a network interface to the solvers.
@@ -14,8 +14,8 @@ An example using the client:
 .. code-block:: python
     :linenos:
 
-    from dwave.cloud.qpu import Client
     import random
+    from dwave.cloud.qpu import Client
 
     # Connect using explicit connection information
     client = Client('https://sapi-url', 'token-string')
@@ -28,10 +28,10 @@ An example using the client:
     quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
 
     # Send the problem for sampling, include a solver specific parameter 'num_reads'
-    results = solver.sample_ising(linear, quad, num_reads=100)
+    computation = solver.sample_ising(linear, quad, num_reads=100)
 
     # Print out the first sample
-    print(results.samples[0])
+    print(computation.samples[0])
 
 Rough workflow within the SAPI server:
  1. Submitted problems enter an input queue. Each user has an input queue per solver.
