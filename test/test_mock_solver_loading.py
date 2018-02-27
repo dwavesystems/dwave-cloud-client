@@ -187,13 +187,13 @@ class MockConfiguration(unittest.TestCase):
         """With no values set, we should get an error when trying to open the config file."""
         m = mock.mock_open()
         m.side_effect = IOError
-        with mock.patch("dwave.cloud.config.open", m):
+        with mock.patch("dwave.cloud.config.open", m, create=True):
             with self.assertRaises(IOError):
                 Client()
 
     def test_explicit_with_file(self):
         """With arguments and a config file, the config file should be ignored."""
-        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body)):
+        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
             client = Client('arg-url', 'arg-token')
             client.session.get = GetEvent.handle
             try:
@@ -205,7 +205,7 @@ class MockConfiguration(unittest.TestCase):
 
     def test_only_file(self):
         """With no arguments or environment variables, the default connection from the config file should be used."""
-        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body)):
+        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
             client = Client()
             client.session.get = GetEvent.handle
             try:
@@ -217,7 +217,7 @@ class MockConfiguration(unittest.TestCase):
 
     def test_only_file_key(self):
         """If give a name from the config file the proper URL should be loaded."""
-        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body)):
+        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
             client = Client('alpha')
             client.session.get = GetEvent.handle
             try:
@@ -229,7 +229,7 @@ class MockConfiguration(unittest.TestCase):
 
     def test_env_with_file_set(self):
         """With environment variables and a config file, the config file should be ignored."""
-        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body)):
+        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
             with mock.patch.dict(os.environ, {'DW_INTERNAL__HTTPLINK': 'env-url', 'DW_INTERNAL__TOKEN': 'env-token'}):
                 client = Client()
                 client.session.get = GetEvent.handle
