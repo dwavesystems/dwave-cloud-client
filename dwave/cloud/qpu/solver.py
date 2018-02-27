@@ -1,25 +1,16 @@
 from __future__ import division, absolute_import
 
 import json
-import threading
 import base64
 import struct
-import time
-import sys
-import os
-import posixpath
-import types
 import logging
-import requests
-import collections
-import datetime
 
 from dwave.cloud.exceptions import *
 from dwave.cloud.utils import uniform_iterator, uniform_get
 from dwave.cloud.qpu.computation import Future
 
 
-log = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
 class Solver(object):
@@ -196,7 +187,7 @@ class Solver(object):
         else:
             future = Future(self, None, self.return_matrix, (type_, linear, quadratic, params))
 
-        log.debug("Submitting new problem to: %s", self.id)
+        _LOGGER.debug("Submitting new problem to: %s", self.id)
         self.client._submit(body, future)
         return future
 

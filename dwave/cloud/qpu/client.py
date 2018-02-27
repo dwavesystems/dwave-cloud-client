@@ -1,30 +1,22 @@
 from __future__ import division, absolute_import
 
-import json
 import threading
-import base64
-import struct
 import time
 import sys
-import os
 import posixpath
-import types
 import logging
 import requests
 import collections
 import datetime
-
-import six
-import six.moves.queue as queue
-range = six.moves.range
+from six.moves import queue, range
 
 from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_configuration
 from dwave.cloud.qpu.solver import Solver
 
-log = logging.getLogger(__name__)
-# log.setLevel(logging.DEBUG)
-# log.addHandler(logging.StreamHandler(sys.stdout))
+_LOGGER = logging.getLogger(__name__)
+# _LOGGER.setLevel(logging.DEBUG)
+# _LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 
 
 class Client(object):
@@ -77,7 +69,7 @@ class Client(object):
         self.default_solver = None
         if token is None:
             url, token, proxies, self.default_solver = load_configuration(url)
-        log.debug("Creating a connection to SAPI server: %s", url)
+        _LOGGER.debug("Creating a connection to SAPI server: %s", url)
 
         self.base_url = url
         self.token = token
@@ -139,13 +131,13 @@ class Client(object):
         while the connection is closing.
         """
         # Finish all the work that requires the connection
-        log.debug("Joining submission queue")
+        _LOGGER.debug("Joining submission queue")
         self._submission_queue.join()
-        log.debug("Joining cancel queue")
+        _LOGGER.debug("Joining cancel queue")
         self._cancel_queue.join()
-        log.debug("Joining poll queue")
+        _LOGGER.debug("Joining poll queue")
         self._poll_queue.join()
-        log.debug("Joining load queue")
+        _LOGGER.debug("Joining load queue")
         self._load_queue.join()
 
         # Kill off the worker threads, (which should now be blocking on the empty)
@@ -178,14 +170,14 @@ class Client(object):
             if self._all_solvers_ready:
                 return self.solvers.keys()
 
-            log.debug("Requesting list of all solver data.")
+            _LOGGER.debug("Requesting list of all solver data.")
             response = self.session.get(posixpath.join(self.base_url, 'solvers/remote/'))
 
             if response.status_code == 401:
                 raise SolverAuthenticationError()
             response.raise_for_status()
 
-            log.debug("Received list of all solver data.")
+            _LOGGER.debug("Received list of all solver data.")
 
             data = response.json()
 
@@ -193,9 +185,9 @@ class Client(object):
                 try:
                     solver = Solver(self, solver_desc)
                     self.solvers[solver.id] = solver
-                    log.debug("Adding solver: %s", solver)
+                    _LOGGER.debug("Adding solver: %s", solver)
                 except UnsupportedSolverError as e:
-                    log.debug("Skipping solver due to %r", e)
+                    _LOGGER.debug("Skipping solver due to %r", e)
 
             self._all_solvers_ready = True
 
@@ -211,7 +203,7 @@ class Client(object):
         Returns:
             :obj:`Solver`
         """
-        log.debug("Looking for solver: %s", name)
+        _LOGGER.debug("Looking for solver: %s", name)
         if name is None:
             if self.default_solver is not None:
                 name = self.default_solver
@@ -268,7 +260,7 @@ class Client(object):
                         break
 
                 # Submit the problems
-                log.debug("submitting {} problems".format(len(ready_problems)))
+                _LOGGER.debug("submitting {} problems".format(len(ready_problems)))
                 body = '[' + ','.join(mess.body for mess in ready_problems) + ']'
                 try:
                     response = self.session.post(posixpath.join(self.base_url, 'problems/'), body)
@@ -278,7 +270,7 @@ class Client(object):
                     response.raise_for_status()
 
                     message = response.json()
-                    log.debug("Finished submitting {} problems".format(len(ready_problems)))
+                    _LOGGER.debug("Finished submitting {} problems".format(len(ready_problems)))
                 except BaseException as exception:
                     if not isinstance(exception, SolverAuthenticationError):
                         exception = IOError(exception)
@@ -297,7 +289,7 @@ class Client(object):
                 time.sleep(0)
 
         except BaseException as err:
-            log.exception(err)
+            _LOGGER.exception(err)
 
     def _handle_problem_status(self, message, future, in_poll):
         """Handle the results of a problem submission or results request.
@@ -317,7 +309,7 @@ class Client(object):
         """
         try:
             status = message['status']
-            log.debug("Status: %s %s", message['id'], status)
+            _LOGGER.debug("Status: %s %s", message['id'], status)
 
             # The future may not have the ID set yet
             with future._single_cancel_lock:
@@ -407,7 +399,7 @@ class Client(object):
                 time.sleep(0)
 
         except Exception as err:
-            log.exception(err)
+            _LOGGER.exception(err)
 
     def _poll(self, future):
         """Enqueue a problem to poll the server for status.
@@ -453,7 +445,7 @@ class Client(object):
                     pass
 
                 # Build a query string with block of ids
-                log.debug("Query on futures: %s", ', '.join(active_queries))
+                _LOGGER.debug("Query on futures: %s", ', '.join(active_queries))
                 query_string = 'problems/?id=' + ','.join(active_queries)
 
                 try:
@@ -488,7 +480,7 @@ class Client(object):
                 time.sleep(0)
 
         except Exception as err:
-            log.exception(err)
+            _LOGGER.exception(err)
 
     def _load(self, future):
         """Enqueue a problem to download results from the server.
@@ -512,7 +504,7 @@ class Client(object):
             while True:
                 # Select a problem
                 future = self._load_queue.get()
-                log.debug("Query for results: %s", future.id)
+                _LOGGER.debug("Query for results: %s", future.id)
 
                 # Submit the query
                 query_string = 'problems/{}/'.format(future.id)
@@ -539,4 +531,4 @@ class Client(object):
                 time.sleep(0)
 
         except Exception as err:
-            log.error('Load result error: ' + str(err))
+            _LOGGER.error('Load result error: ' + str(err))

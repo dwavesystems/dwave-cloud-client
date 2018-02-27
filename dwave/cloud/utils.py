@@ -7,14 +7,11 @@ try:
     import numpy as np
     _numpy = True
 except ImportError:
-    # If numpy isn't available we can do the encoding slower in native python
     _numpy = False
 
 
 def evaluate_ising(linear, quad, state):
     """Calculate the energy of a state given the Hamiltonian.
-
-    This is used to debug energy decoding.
 
     Args:
         linear: Linear Hamiltonian terms.
@@ -38,7 +35,9 @@ def evaluate_ising(linear, quad, state):
 
 
 def uniform_iterator(sequence):
-    """Key, value iteration on a dict or list."""
+    """Uniform (key, value) iteration on a `dict`,
+    or (idx, value) on a `list`."""
+
     if isinstance(sequence, dict):
         return six.iteritems(sequence)
     else:
@@ -46,7 +45,9 @@ def uniform_iterator(sequence):
 
 
 def uniform_get(sequence, index, default=None):
-    """Get by key with default value for dict or list."""
+    """Uniform `dict`/`list` item getter, where `index` is interpreted as a key
+    for maps and as numeric index for lists."""
+
     if isinstance(sequence, dict):
         return sequence.get(index, default)
     else:

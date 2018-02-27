@@ -1,18 +1,9 @@
 from __future__ import division, absolute_import
 
-import json
 import threading
 import base64
 import struct
 import time
-import sys
-import os
-import posixpath
-import types
-import logging
-import requests
-import collections
-import datetime
 import six
 
 # Use numpy if available for fast decoding
@@ -22,8 +13,6 @@ try:
 except ImportError:
     # If numpy isn't available we can do the encoding slower in native python
     _numpy = False
-
-log = logging.getLogger(__name__)
 
 
 class Future(object):
