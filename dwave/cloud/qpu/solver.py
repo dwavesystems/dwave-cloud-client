@@ -24,18 +24,19 @@ log = logging.getLogger(__name__)
 
 class Solver(object):
     """
-    A solver enables sampling from an Ising model.
+    A solver enables sampling from an Ising model. It encapsulates the solver
+    description as returned by the D-Wave cloud API.
 
-    Get solver objects by calling get_solver(name) on a connection object.
+    Get solver objects by calling :meth:`get_solver` on a :class:`Client` object.
 
     The solver has responsibility for:
     - Encoding problems submitted
     - Checking the submitted parameters
-    - Add problems to the Connection's submission queue
+    - Add problems to the Client's submission queue
 
     Args:
-        connection (`Connection`): Connection through which the solver is accessed.
-        data: Data from the server describing this solver.
+        client (:class:`Client`): Client through which the solver is accessed.
+        data (`dict`): Data from the server describing this solver.
     """
 
     # Special flag to notify the system a solver needs access to special hardware
@@ -45,8 +46,9 @@ class Solver(object):
     # in order for `Solver` to be able to abstract, or use, that solver
     _HANDLED_PROBLEM_TYPES = {"ising", "qubo"}
 
-    def __init__(self, connection, data):
-        self.connection = connection
+    def __init__(self, client, data):
+        # client handles async api requests (via local thread pool)
+        self.client = client
 
         # data for each solver includes at least: id, description, and properties
         self.data = data
@@ -195,7 +197,7 @@ class Solver(object):
             future = Future(self, None, self.return_matrix, (type_, linear, quadratic, params))
 
         log.debug("Submitting new problem to: %s", self.id)
-        self.connection._submit(body, future)
+        self.client._submit(body, future)
         return future
 
     def check_problem(self, linear, quadratic):
@@ -226,7 +228,7 @@ class Solver(object):
             :obj: `Future`
         """
         future = Future(self, id_, self.return_matrix, None)
-        self.connection._poll(future)
+        self.client._poll(future)
         return future
 
     def _base64_format(self, solver, lin, quad):
