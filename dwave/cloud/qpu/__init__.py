@@ -14,14 +14,14 @@ An example using the client:
 .. code-block:: python
     :linenos:
 
-    import dwave_micro_client
+    from dwave.cloud.qpu import Client
     import random
 
     # Connect using explicit connection information
-    conn = dwave_micro_client.Connection('https://sapi-url', 'token-string')
+    client = Client('https://sapi-url', 'token-string')
 
     # Load a solver by name
-    solver = conn.get_solver('test-solver')
+    solver = client.get_solver('test-solver')
 
     # Build a random Ising model on +1, -1. Build it to exactly fit the graph the solver provides
     linear = {index: random.choice([-1, 1]) for index in solver.nodes}
@@ -55,6 +55,8 @@ any future object is a blocking operation.
     futures[0].wait()
 
     # Or we can wait on several futures
-    dwave_micro_client.Future.wait_multiple(futures)
+    dwave.cloud.qpu.computation.Future.wait_multiple(futures)
 
 """
+
+from .client import Client

@@ -6,12 +6,14 @@ import json
 import unittest
 import requests_mock
 
-import dwave_micro_client
-
 try:
     import unittest.mock as mock
 except ImportError:
     import mock
+
+from dwave.cloud.qpu import Client
+from dwave.cloud.exceptions import InvalidAPIResponseError
+
 
 url = 'https://dwavesys.com'
 token = 'abc123abc123abc123abc123abc123abc123'
@@ -74,23 +76,23 @@ class MockConnectivityTests(unittest.TestCase):
         with requests_mock.mock() as m:
             setup_server(m)
             with self.assertRaises(IOError):
-                con = dwave_micro_client.Connection(bad_url, token)
-                con.solver_names()
+                client = Client(bad_url, token)
+                client.solver_names()
 
     def test_bad_token(self):
         """Connect with a bad token."""
         with requests_mock.mock() as m:
             setup_server(m)
             with self.assertRaises(IOError):
-                con = dwave_micro_client.Connection(url, bad_token)
-                con.solver_names()
+                client = Client(url, bad_token)
+                client.solver_names()
 
     def test_good_connection(self):
         """Connect with a valid URL and token."""
         with requests_mock.mock() as m:
             setup_server(m)
-            con = dwave_micro_client.Connection(url, token)
-            self.assertTrue(len(con.solver_names()) > 0)
+            client = Client(url, token)
+            self.assertTrue(len(client.solver_names()) > 0)
 
 
 class MockSolverLoading(unittest.TestCase):
@@ -112,40 +114,40 @@ class MockSolverLoading(unittest.TestCase):
         """Load a single solver."""
         with requests_mock.mock() as m:
             setup_server(m)
-            con = dwave_micro_client.Connection(url, token)
-            con.get_solver(solver_name)
+            client = Client(url, token)
+            client.get_solver(solver_name)
 
     def test_load_two_solvers(self):
         """Load the list of solver names."""
         with requests_mock.mock() as m:
             setup_server(m)
-            con = dwave_micro_client.Connection(url, token)
-            self.assertEqual(len(con.solver_names()), 2)
+            client = Client(url, token)
+            self.assertEqual(len(client.solver_names()), 2)
 
     def test_load_missing_solver(self):
         """Try to load a solver that does not exist."""
         with requests_mock.mock() as m:
             m.get(requests_mock.ANY, status_code=404)
-            con = dwave_micro_client.Connection(url, token)
+            client = Client(url, token)
             with self.assertRaises(KeyError):
-                con.get_solver(solver_name)
+                client.get_solver(solver_name)
 
     def test_load_solver_missing_data(self):
         """Try to load a solver that has incomplete data."""
         with requests_mock.mock() as m:
             m.get(solver1_url, text=solver_object(solver_name, True))
-            con = dwave_micro_client.Connection(url, token)
-            with self.assertRaises(dwave_micro_client.InvalidAPIResponseError):
-                con.get_solver(solver_name)
+            client = Client(url, token)
+            with self.assertRaises(InvalidAPIResponseError):
+                client.get_solver(solver_name)
 
     def test_load_solver_broken_response(self):
         """Try to load a solver for which the server has returned a truncated response."""
         with requests_mock.mock() as m:
             body = solver_object(solver_name)
             m.get(solver1_url, text=body[0:len(body)//2])
-            con = dwave_micro_client.Connection(url, token)
+            client = Client(url, token)
             with self.assertRaises(ValueError):
-                con.get_solver(solver_name)
+                client.get_solver(solver_name)
 
 
 class GetEvent(Exception):
@@ -172,10 +174,10 @@ class MockConfiguration(unittest.TestCase):
 
     def test_explicit_only(self):
         """Specify information only through function arguments."""
-        con = dwave_micro_client.Connection('arg-url', 'arg-token')
-        con.session.get = GetEvent.handle
+        client = Client('arg-url', 'arg-token')
+        client.session.get = GetEvent.handle
         try:
-            con.get_solver('arg-solver')
+            client.get_solver('arg-solver')
         except GetEvent as event:
             self.assertTrue(event.url.startswith('arg-url'))
             return
@@ -185,17 +187,17 @@ class MockConfiguration(unittest.TestCase):
         """With no values set, we should get an error when trying to open the config file."""
         m = mock.mock_open()
         m.side_effect = IOError
-        with mock.patch("dwave_micro_client.open", m):
+        with mock.patch("dwave.cloud.config.open", m):
             with self.assertRaises(IOError):
-                dwave_micro_client.Connection()
+                Client()
 
     def test_explicit_with_file(self):
         """With arguments and a config file, the config file should be ignored."""
-        with mock.patch("dwave_micro_client.open", mock.mock_open(read_data=config_body)):
-            con = dwave_micro_client.Connection('arg-url', 'arg-token')
-            con.session.get = GetEvent.handle
+        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body)):
+            client = Client('arg-url', 'arg-token')
+            client.session.get = GetEvent.handle
             try:
-                con.get_solver('arg-solver')
+                client.get_solver('arg-solver')
             except GetEvent as event:
                 self.assertTrue(event.url.startswith('arg-url'))
                 return
@@ -203,11 +205,11 @@ class MockConfiguration(unittest.TestCase):
 
     def test_only_file(self):
         """With no arguments or environment variables, the default connection from the config file should be used."""
-        with mock.patch("dwave_micro_client.open", mock.mock_open(read_data=config_body)):
-            con = dwave_micro_client.Connection()
-            con.session.get = GetEvent.handle
+        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body)):
+            client = Client()
+            client.session.get = GetEvent.handle
             try:
-                con.get_solver('arg-solver')
+                client.get_solver('arg-solver')
             except GetEvent as event:
                 self.assertTrue(event.url.startswith('file-prod-url'))
                 return
@@ -215,11 +217,11 @@ class MockConfiguration(unittest.TestCase):
 
     def test_only_file_key(self):
         """If give a name from the config file the proper URL should be loaded."""
-        with mock.patch("dwave_micro_client.open", mock.mock_open(read_data=config_body)):
-            con = dwave_micro_client.Connection('alpha')
-            con.session.get = GetEvent.handle
+        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body)):
+            client = Client('alpha')
+            client.session.get = GetEvent.handle
             try:
-                con.get_solver('arg-solver')
+                client.get_solver('arg-solver')
             except GetEvent as event:
                 self.assertTrue(event.url.startswith('file-alpha-url'))
                 return
@@ -227,12 +229,12 @@ class MockConfiguration(unittest.TestCase):
 
     def test_env_with_file_set(self):
         """With environment variables and a config file, the config file should be ignored."""
-        with mock.patch("dwave_micro_client.open", mock.mock_open(read_data=config_body)):
+        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body)):
             with mock.patch.dict(os.environ, {'DW_INTERNAL__HTTPLINK': 'env-url', 'DW_INTERNAL__TOKEN': 'env-token'}):
-                con = dwave_micro_client.Connection()
-                con.session.get = GetEvent.handle
+                client = Client()
+                client.session.get = GetEvent.handle
                 try:
-                    con.get_solver('arg-solver')
+                    client.get_solver('arg-solver')
                 except GetEvent as event:
                     self.assertTrue(event.url.startswith('env-url'))
                     return
@@ -241,10 +243,10 @@ class MockConfiguration(unittest.TestCase):
     def test_env_args_set(self):
         """With arguments and environment variables, the environment variables should be ignored."""
         with mock.patch.dict(os.environ, {'DW_INTERNAL__HTTPLINK': 'env-url', 'DW_INTERNAL__TOKEN': 'env-token'}):
-            con = dwave_micro_client.Connection('args-url', 'args-token')
-            con.session.get = GetEvent.handle
+            client = Client('args-url', 'args-token')
+            client.session.get = GetEvent.handle
             try:
-                con.get_solver('arg-solver')
+                client.get_solver('arg-solver')
             except GetEvent as event:
                 self.assertTrue(event.url.startswith('args-url'))
                 return

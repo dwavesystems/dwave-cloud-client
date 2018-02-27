@@ -5,11 +5,16 @@ try:
     import unittest.mock as mock
 except ImportError:
     import mock
+
 import json
 import unittest
 import itertools
-import dwave_micro_client
 import threading
+
+from dwave.cloud.utils import evaluate_ising
+from dwave.cloud.qpu import Client
+from dwave.cloud.qpu.solver import Solver
+from dwave.cloud import exceptions
 
 
 def solver_data(id_, incomplete=False):
@@ -120,7 +125,7 @@ class _QueryTest(unittest.TestCase):
 
         # Make sure the number of occurrences and energies are all correct
         for energy, state in zip(results.energies, results.samples):
-            self.assertTrue(energy == dwave_micro_client._evaluate_ising(linear, quad, state))
+            self.assertTrue(energy == evaluate_ising(linear, quad, state))
 
 
 class MockSubmission(_QueryTest):
@@ -128,11 +133,10 @@ class MockSubmission(_QueryTest):
 
     def test_submit_null_reply(self):
         """Get an error when the server's response is incomplete."""
-        # con = mock.Mock()
-        with dwave_micro_client.Connection('', '') as con:
-            con.session = mock.Mock()
-            con.session.post = lambda a, _: choose_reply(a, {'problems/': ''})
-            solver = dwave_micro_client.Solver(con, solver_data('abc123'))
+        with Client('', '') as client:
+            client.session = mock.Mock()
+            client.session.post = lambda a, _: choose_reply(a, {'problems/': ''})
+            solver = Solver(client, solver_data('abc123'))
 
             # Build a problem
             linear = {index: 1 for index in solver.nodes}
@@ -145,12 +149,12 @@ class MockSubmission(_QueryTest):
 
     def test_submit_ok_reply(self):
         """Handle a normal query and response."""
-        with dwave_micro_client.Connection('', '') as con:
-            con.session = mock.Mock()
-            con.session.post = lambda a, _: choose_reply(a, {
+        with Client('', '') as client:
+            client.session = mock.Mock()
+            client.session.post = lambda a, _: choose_reply(a, {
                 'problems/': '[%s]' % complete_no_answer_reply('123', 'abc123')})
-            con.session.get = lambda a: choose_reply(a, {'problems/123/': complete_reply('123', 'abc123')})
-            solver = dwave_micro_client.Solver(con, solver_data('abc123'))
+            client.session.get = lambda a: choose_reply(a, {'problems/123/': complete_reply('123', 'abc123')})
+            solver = Solver(client, solver_data('abc123'))
 
             # Build a problem
             linear = {index: 1 for index in solver.nodes}
@@ -163,11 +167,11 @@ class MockSubmission(_QueryTest):
     def test_submit_error_reply(self):
         """Handle an error on problem submission."""
         error_body = 'An error message'
-        with dwave_micro_client.Connection('', '') as con:
-            con.session = mock.Mock()
-            con.session.post = lambda a, _: choose_reply(a, {
+        with Client('', '') as client:
+            client.session = mock.Mock()
+            client.session.post = lambda a, _: choose_reply(a, {
                 'problems/': '[%s]' % error_reply('123', 'abc123', error_body)})
-            solver = dwave_micro_client.Solver(con, solver_data('abc123'))
+            solver = Solver(client, solver_data('abc123'))
 
             # Build a problem
             linear = {index: 1 for index in solver.nodes}
@@ -175,15 +179,15 @@ class MockSubmission(_QueryTest):
             results = solver.sample_ising(linear, quad, num_reads=100)
 
             #
-            with self.assertRaises(dwave_micro_client.SolverFailureError):
+            with self.assertRaises(exceptions.SolverFailureError):
                 results.samples
 
     def test_submit_cancel_reply(self):
         """Handle a response for a canceled job."""
-        with dwave_micro_client.Connection('', '') as con:
-            con.session = mock.Mock()
-            con.session.post = lambda a, _: choose_reply(a, {'problems/': '[%s]' % cancel_reply('123', 'abc123')})
-            solver = dwave_micro_client.Solver(con, solver_data('abc123'))
+        with Client('', '') as client:
+            client.session = mock.Mock()
+            client.session.post = lambda a, _: choose_reply(a, {'problems/': '[%s]' % cancel_reply('123', 'abc123')})
+            solver = Solver(client, solver_data('abc123'))
 
             # Build a problem
             linear = {index: 1 for index in solver.nodes}
@@ -191,19 +195,19 @@ class MockSubmission(_QueryTest):
             results = solver.sample_ising(linear, quad, num_reads=100)
 
             #
-            with self.assertRaises(dwave_micro_client.CanceledFutureError):
+            with self.assertRaises(exceptions.CanceledFutureError):
                 results.samples
 
     def test_submit_continue_then_ok_reply(self):
         """Handle polling for a complete problem."""
-        with dwave_micro_client.Connection('', '') as con:
-            con.session = mock.Mock()
-            con.session.post = lambda a, _: choose_reply(a, {'problems/': '[%s]' % continue_reply('123', 'abc123')})
-            con.session.get = lambda a: choose_reply(a, {
+        with Client('', '') as client:
+            client.session = mock.Mock()
+            client.session.post = lambda a, _: choose_reply(a, {'problems/': '[%s]' % continue_reply('123', 'abc123')})
+            client.session.get = lambda a: choose_reply(a, {
                 'problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
                 'problems/123/': complete_reply('123', 'abc123')
             })
-            solver = dwave_micro_client.Solver(con, solver_data('abc123'))
+            solver = Solver(client, solver_data('abc123'))
 
             # Build a problem
             linear = {index: 1 for index in solver.nodes}
@@ -215,12 +219,12 @@ class MockSubmission(_QueryTest):
 
     def test_submit_continue_then_error_reply(self):
         """Handle polling for an error message."""
-        with dwave_micro_client.Connection('', '') as con:
-            con.session = mock.Mock()
-            con.session.post = lambda a, _: choose_reply(a, {'problems/': '[%s]' % continue_reply('123', 'abc123')})
-            con.session.get = lambda a: choose_reply(a, {
+        with Client('', '') as client:
+            client.session = mock.Mock()
+            client.session.post = lambda a, _: choose_reply(a, {'problems/': '[%s]' % continue_reply('123', 'abc123')})
+            client.session.get = lambda a: choose_reply(a, {
                 'problems/?id=123': '[%s]' % error_reply('123', 'abc123', "error message")})
-            solver = dwave_micro_client.Solver(con, solver_data('abc123'))
+            solver = Solver(client, solver_data('abc123'))
 
             # Build a problem
             linear = {index: 1 for index in solver.nodes}
@@ -228,17 +232,17 @@ class MockSubmission(_QueryTest):
             results = solver.sample_ising(linear, quad, num_reads=100)
 
             #
-            with self.assertRaises(dwave_micro_client.SolverFailureError):
+            with self.assertRaises(exceptions.SolverFailureError):
                 self._check(results, linear, quad, 100)
 
     def test_submit_continue_then_ok_and_error_reply(self):
         """Handle polling for the status of multiple problems."""
         # Reduce the number of poll threads to 1 so that the system can be tested
-        old_value = dwave_micro_client.Connection._POLL_THREAD_COUNT
-        dwave_micro_client.Connection._POLL_THREAD_COUNT = 1
-        with dwave_micro_client.Connection('', '') as con:
-            con.session = mock.Mock()
-            con.session.get = lambda a: choose_reply(a, {
+        old_value = Client._POLL_THREAD_COUNT
+        Client._POLL_THREAD_COUNT = 1
+        with Client('', '') as client:
+            client.session = mock.Mock()
+            client.session.get = lambda a: choose_reply(a, {
                 # Wait until both problems are
                 'problems/?id=1': '[%s]' % continue_reply('1', 'abc123'),
                 'problems/?id=2': '[%s]' % continue_reply('2', 'abc123'),
@@ -253,18 +257,18 @@ class MockSubmission(_QueryTest):
             def switch_post_reply(path, body):
                 message = json.loads(body)
                 if len(message) == 1:
-                    con.session.post = lambda a, _: choose_reply(a, {
+                    client.session.post = lambda a, _: choose_reply(a, {
                         'problems/': '[%s]' % continue_reply('2', 'abc123')})
                     return choose_reply('', {'': '[%s]' % continue_reply('1', 'abc123')})
                 else:
-                    con.session.post = None
+                    client.session.post = None
                     return choose_reply('', {
                         '': '[%s, %s]' % (continue_reply('1', 'abc123'), continue_reply('2', 'abc123'))
                     })
 
-            con.session.post = lambda a, body: switch_post_reply(a, body)
+            client.session.post = lambda a, body: switch_post_reply(a, body)
 
-            solver = dwave_micro_client.Solver(con, solver_data('abc123'))
+            solver = Solver(client, solver_data('abc123'))
             # Build a problem
             linear = {index: 1 for index in solver.nodes}
             quad = {key: -1 for key in solver.undirected_edges}
@@ -273,10 +277,10 @@ class MockSubmission(_QueryTest):
             results2 = solver.sample_ising(linear, quad, num_reads=100)
 
             #
-            with self.assertRaises(dwave_micro_client.SolverFailureError):
+            with self.assertRaises(exceptions.SolverFailureError):
                 self._check(results1, linear, quad, 100)
             self._check(results2, linear, quad, 100)
-        dwave_micro_client.Connection._POLL_THREAD_COUNT = old_value
+        Client._POLL_THREAD_COUNT = old_value
 
 
 class DeleteEvent(Exception):
@@ -304,13 +308,13 @@ class MockCancel(unittest.TestCase):
         submission_id = 'test-id'
         reply_body = '[%s]' % continue_reply(submission_id, 'solver')
 
-        with dwave_micro_client.Connection('', '') as con:
-            con.session = mock.Mock()
+        with Client('', '') as client:
+            client.session = mock.Mock()
 
-            con.session.get = lambda a: choose_reply(a, {'problems/?id={}'.format(submission_id): reply_body})
-            con.session.delete = DeleteEvent.handle
+            client.session.get = lambda a: choose_reply(a, {'problems/?id={}'.format(submission_id): reply_body})
+            client.session.delete = DeleteEvent.handle
 
-            solver = dwave_micro_client.Solver(con, solver_data('abc123'))
+            solver = Solver(client, solver_data('abc123'))
             future = solver.retrieve_problem(submission_id)
             future.cancel()
 
@@ -334,17 +338,17 @@ class MockCancel(unittest.TestCase):
 
         release_reply = threading.Event()
 
-        with dwave_micro_client.Connection('', '') as con:
-            con.session = mock.Mock()
-            con.session.get = lambda a: choose_reply(a, {'problems/?id={}'.format(submission_id): reply_body})
+        with Client('', '') as client:
+            client.session = mock.Mock()
+            client.session.get = lambda a: choose_reply(a, {'problems/?id={}'.format(submission_id): reply_body})
 
             def post(a, _):
                 release_reply.wait()
                 return choose_reply(a, {'problems/'.format(submission_id): reply_body})
-            con.session.post = post
-            con.session.delete = DeleteEvent.handle
+            client.session.post = post
+            client.session.delete = DeleteEvent.handle
 
-            solver = dwave_micro_client.Solver(con, solver_data('abc123'))
+            solver = Solver(client, solver_data('abc123'))
             # Build a problem
             linear = {index: 1 for index in solver.nodes}
             quad = {key: -1 for key in solver.undirected_edges}

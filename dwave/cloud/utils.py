@@ -11,7 +11,7 @@ except ImportError:
     _numpy = False
 
 
-def _evaluate_ising(linear, quad, state):
+def evaluate_ising(linear, quad, state):
     """Calculate the energy of a state given the Hamiltonian.
 
     This is used to debug energy decoding.
@@ -26,18 +26,18 @@ def _evaluate_ising(linear, quad, state):
     """
     # If we were given a numpy array cast to list
     if _numpy and isinstance(state, np.ndarray):
-        return _evaluate_ising(linear, quad, state.tolist())
+        return evaluate_ising(linear, quad, state.tolist())
 
     # Accumulate the linear and quadratic values
     energy = 0.0
-    for index, value in _uniform_iterator(linear):
+    for index, value in uniform_iterator(linear):
         energy += state[index] * value
     for (index_a, index_b), value in six.iteritems(quad):
         energy += value * state[index_a] * state[index_b]
     return energy
 
 
-def _uniform_iterator(sequence):
+def uniform_iterator(sequence):
     """Key, value iteration on a dict or list."""
     if isinstance(sequence, dict):
         return six.iteritems(sequence)
@@ -45,10 +45,9 @@ def _uniform_iterator(sequence):
         return enumerate(sequence)
 
 
-def _uniform_get(sequence, index, default=None):
+def uniform_get(sequence, index, default=None):
     """Get by key with default value for dict or list."""
     if isinstance(sequence, dict):
         return sequence.get(index, default)
     else:
         return sequence[index] if index < len(sequence) else default
-

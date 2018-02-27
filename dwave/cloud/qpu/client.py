@@ -20,6 +20,7 @@ range = six.moves.range
 
 from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_configuration
+from dwave.cloud.qpu.solver import Solver
 
 log = logging.getLogger(__name__)
 # log.setLevel(logging.DEBUG)

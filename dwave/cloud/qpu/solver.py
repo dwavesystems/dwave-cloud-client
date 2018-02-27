@@ -15,6 +15,11 @@ import collections
 import datetime
 
 from dwave.cloud.exceptions import *
+from dwave.cloud.utils import uniform_iterator, uniform_get
+from dwave.cloud.qpu.computation import Future
+
+
+log = logging.getLogger(__name__)
 
 
 class Solver:
@@ -144,8 +149,8 @@ class Solver:
         """
         # In a QUBO the linear and quadratic terms in the objective are mixed into
         # a matrix. For the sake of encoding, we will separate them before calling `_sample`
-        linear = {i1: v for (i1, i2), v in _uniform_iterator(qubo) if i1 == i2}
-        quadratic = {(i1, i2): v for (i1, i2), v in _uniform_iterator(qubo) if i1 != i2}
+        linear = {i1: v for (i1, i2), v in uniform_iterator(qubo) if i1 == i2}
+        quadratic = {(i1, i2): v for (i1, i2), v in uniform_iterator(qubo) if i1 != i2}
         return self._sample('qubo', linear, quadratic, params)
 
     def _sample(self, type_, linear, quadratic, params, reuse_future=None):
@@ -203,10 +208,10 @@ class Solver:
         Returns:
             boolean
         """
-        for key, value in _uniform_iterator(linear):
+        for key, value in uniform_iterator(linear):
             if value != 0 and key not in self.nodes:
                 return False
-        for key, value in _uniform_iterator(quadratic):
+        for key, value in uniform_iterator(quadratic):
             if value != 0 and tuple(key) not in self.edges:
                 return False
         return True
@@ -241,7 +246,7 @@ class Solver:
         # This array is then base64 encoded into a string safe for json.
         # The order of the terms is determined by the _encoding_qubits property
         # specified by the server.
-        lin = [_uniform_get(lin, qubit, 0) for qubit in solver._encoding_qubits]
+        lin = [uniform_get(lin, qubit, 0) for qubit in solver._encoding_qubits]
         lin = base64.b64encode(struct.pack('<' + ('d' * len(lin)), *lin))
 
         # Encode the coefficients of the quadratic terms of the objective

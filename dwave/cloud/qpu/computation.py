@@ -23,6 +23,8 @@ except ImportError:
     # If numpy isn't available we can do the encoding slower in native python
     _numpy = False
 
+log = logging.getLogger(__name__)
+
 
 class Future:
     """An object for a pending SAPI call.
