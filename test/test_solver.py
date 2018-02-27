@@ -9,10 +9,15 @@ from __future__ import absolute_import, division
 import unittest
 import random
 
-import dwave_micro_client
+from dwave.cloud.utils import evaluate_ising
+from dwave.cloud.config import load_configuration
+from dwave.cloud.qpu import Client
+from dwave.cloud.exceptions import CanceledFutureError
+import dwave.cloud.qpu.computation
+
 
 try:
-    config_url, config_token, _, config_solver = dwave_micro_client.load_configuration()
+    config_url, config_token, _, config_solver = load_configuration()
     if None in [config_url, config_token, config_solver]:
         raise ValueError()
     skip_live = False
@@ -26,22 +31,22 @@ class PropertyLoading(unittest.TestCase):
     @unittest.skipIf(skip_live, "No live server available.")
     def test_load_properties(self):
         """Ensure that the propreties are populated."""
-        con = dwave_micro_client.Connection(config_url, config_token)
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        solver = client.get_solver(config_solver)
         self.assertTrue(len(solver.properties) > 0)
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_load_parameters(self):
         """Make sure the parameters are populated."""
-        con = dwave_micro_client.Connection(config_url, config_token)
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        solver = client.get_solver(config_solver)
         self.assertTrue(len(solver.parameters) > 0)
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_submit_invalid_parameter(self):
         """Ensure that the parameters are populated."""
-        con = dwave_micro_client.Connection(config_url, config_token)
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        solver = client.get_solver(config_solver)
         assert 'not_a_parameter' not in solver.parameters
         with self.assertRaises(KeyError):
             solver.sample_ising({}, {}, not_a_parameter=True)
@@ -49,8 +54,8 @@ class PropertyLoading(unittest.TestCase):
     @unittest.skipIf(skip_live, "No live server available.")
     def test_read_connectivity(self):
         """Ensure that the edge set is populated."""
-        con = dwave_micro_client.Connection(config_url, config_token)
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        solver = client.get_solver(config_solver)
         self.assertTrue(len(solver.edges) > 0)
 
 
@@ -63,7 +68,7 @@ class _QueryTest(unittest.TestCase):
 
         # Make sure the number of occurrences and energies are all correct
         for energy, state in zip(results.energies, results.samples):
-            self.assertTrue(energy == dwave_micro_client._evaluate_ising(linear, quad, state))
+            self.assertTrue(energy == evaluate_ising(linear, quad, state))
 
         return results
 
@@ -75,8 +80,8 @@ class Submission(_QueryTest):
     def test_submit_extra_qubit(self):
         """Submit a defective problem with an unsupported variable."""
         # Connect
-        con = dwave_micro_client.Connection(config_url, config_token)
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        solver = client.get_solver(config_solver)
 
         # Build a linear problem
         linear = [0] * (max(solver.nodes) + 1)
@@ -95,8 +100,8 @@ class Submission(_QueryTest):
     def test_submit_linear_problem(self):
         """Submit a problem with all the linear terms populated."""
         # Connect
-        con = dwave_micro_client.Connection(config_url, config_token)
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        solver = client.get_solver(config_solver)
 
         # Build a linear problem
         linear = [0] * (max(solver.nodes) + 1)
@@ -111,8 +116,8 @@ class Submission(_QueryTest):
     def test_submit_full_problem(self):
         """Submit a problem with all supported coefficients set."""
         # Connect
-        con = dwave_micro_client.Connection(config_url, config_token)
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        solver = client.get_solver(config_solver)
 
         # Build a linear problem
         linear = [0] * (max(solver.nodes) + 1)
@@ -129,8 +134,8 @@ class Submission(_QueryTest):
     def test_submit_dict_problem(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
-        con = dwave_micro_client.Connection(config_url, config_token)
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        solver = client.get_solver(config_solver)
 
         # Build a problem
         linear = {index: random.choice([-1, 1]) for index in solver.nodes}
@@ -143,8 +148,8 @@ class Submission(_QueryTest):
     def test_submit_partial_problem(self):
         """Submit a problem with only some of the terms set."""
         # Connect
-        con = dwave_micro_client.Connection(config_url, config_token)
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        solver = client.get_solver(config_solver)
 
         # Build a linear problem
         linear = [0] * (max(solver.nodes) + 1)
@@ -167,8 +172,8 @@ class Submission(_QueryTest):
     def test_submit_batch(self):
         """Submit batch of problems."""
         # Connect
-        con = dwave_micro_client.Connection(config_url, config_token)
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        solver = client.get_solver(config_solver)
 
         result_list = []
         for _ in range(100):
@@ -190,14 +195,14 @@ class Submission(_QueryTest):
 
             # Make sure the number of occurrences and energies are all correct
             for energy, state in zip(results.energies, results.samples):
-                self.assertTrue(energy == dwave_micro_client._evaluate_ising(linear, quad, state))
+                self.assertTrue(energy == evaluate_ising(linear, quad, state))
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_cancel_batch(self):
         """Submit batch of problems, then cancel them."""
         # Connect
-        with dwave_micro_client.Connection(config_url, config_token) as con:
-            solver = con.get_solver(config_solver)
+        with Client(config_url, config_token) as client:
+            solver = client.get_solver(config_solver)
 
             # Build a linear problem
             linear = [0] * (max(solver.nodes) + 1)
@@ -222,16 +227,16 @@ class Submission(_QueryTest):
 
                     # Make sure the number of occurrences and energies are all correct
                     for energy, state in zip(results.energies, results.samples):
-                        self.assertTrue(energy == dwave_micro_client._evaluate_ising(linear, quad, state))
-                except dwave_micro_client.CanceledFutureError:
+                        self.assertTrue(energy == evaluate_ising(linear, quad, state))
+                except CanceledFutureError:
                     pass
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_wait_many(self):
         """Submit a batch of problems then use `wait_multiple` to wait on all of them."""
         # Connect
-        con = dwave_micro_client.Connection(config_url, config_token)
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        solver = client.get_solver(config_solver)
 
         # Build a linear problem
         linear = [0] * (max(solver.nodes) + 1)
@@ -247,7 +252,7 @@ class Submission(_QueryTest):
             results = solver.sample_ising(linear, quad, num_reads=40)
             result_list.append([results, linear, quad])
 
-        dwave_micro_client.Future.wait_multiple([f[0] for f in result_list])
+        dwave.cloud.qpu.computation.Future.wait_multiple([f[0] for f in result_list])
 
         for results, _, _ in result_list:
             self.assertTrue(results.done())
@@ -258,7 +263,7 @@ class Submission(_QueryTest):
 
             # Make sure the number of occurrences and energies are all correct
             for energy, state in zip(results.energies, results.samples):
-                self.assertTrue(energy == dwave_micro_client._evaluate_ising(linear, quad, state))
+                self.assertTrue(energy == evaluate_ising(linear, quad, state))
 
 
 class DecodingMethod(_QueryTest):
@@ -271,21 +276,21 @@ class DecodingMethod(_QueryTest):
     def setUp(self):
         """Reload the future module to undo any changes."""
         from six.moves import reload_module
-        reload_module(dwave_micro_client)
+        reload_module(dwave.cloud.qpu.computation)
 
     @classmethod
     def tearDownClass(cls):
         """Reload the future module to undo any changes."""
         from six.moves import reload_module
-        reload_module(dwave_micro_client)
+        reload_module(dwave.cloud.qpu.computation)
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_request_matrix_with_no_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
-        con = dwave_micro_client.Connection(config_url, config_token)
-        dwave_micro_client._numpy = False
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        dwave.cloud.qpu.computation._numpy = False
+        solver = client.get_solver(config_solver)
         solver.return_matrix = True
 
         # Build a problem
@@ -301,9 +306,9 @@ class DecodingMethod(_QueryTest):
         """Submit a problem using a dict for the linear terms."""
         # Connect
         import numpy
-        con = dwave_micro_client.Connection(config_url, config_token)
-        assert dwave_micro_client._numpy
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        assert dwave.cloud.qpu.computation._numpy
+        solver = client.get_solver(config_solver)
         solver.return_matrix = True
 
         # Build a problem
@@ -320,9 +325,9 @@ class DecodingMethod(_QueryTest):
     def test_request_list_with_no_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
-        con = dwave_micro_client.Connection(config_url, config_token)
-        dwave_micro_client._numpy = False
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        dwave.cloud.qpu.computation._numpy = False
+        solver = client.get_solver(config_solver)
         solver.return_matrix = False
 
         # Build a problem
@@ -336,9 +341,9 @@ class DecodingMethod(_QueryTest):
     def test_request_list_with_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
-        con = dwave_micro_client.Connection(config_url, config_token)
-        assert dwave_micro_client._numpy
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        assert dwave.cloud.qpu.computation._numpy
+        solver = client.get_solver(config_solver)
         solver.return_matrix = False
 
         # Build a problem
@@ -352,9 +357,9 @@ class DecodingMethod(_QueryTest):
     def test_request_raw_matrix_with_no_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
-        con = dwave_micro_client.Connection(config_url, config_token)
-        dwave_micro_client._numpy = False
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        dwave.cloud.qpu.computation._numpy = False
+        solver = client.get_solver(config_solver)
         solver.return_matrix = True
 
         # Build a problem
@@ -370,9 +375,9 @@ class DecodingMethod(_QueryTest):
         """Submit a problem using a dict for the linear terms."""
         # Connect
         import numpy
-        con = dwave_micro_client.Connection(config_url, config_token)
-        assert dwave_micro_client._numpy
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        assert dwave.cloud.qpu.computation._numpy
+        solver = client.get_solver(config_solver)
         solver.return_matrix = True
 
         # Build a problem
@@ -389,9 +394,9 @@ class DecodingMethod(_QueryTest):
     def test_request_raw_list_with_no_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
-        con = dwave_micro_client.Connection(config_url, config_token)
-        dwave_micro_client._numpy = False
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        dwave.cloud.qpu.computation._numpy = False
+        solver = client.get_solver(config_solver)
         solver.return_matrix = False
 
         # Build a problem
@@ -405,9 +410,9 @@ class DecodingMethod(_QueryTest):
     def test_request_raw_list_with_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
-        con = dwave_micro_client.Connection(config_url, config_token)
-        assert dwave_micro_client._numpy
-        solver = con.get_solver(config_solver)
+        client = Client(config_url, config_token)
+        assert dwave.cloud.qpu.computation._numpy
+        solver = client.get_solver(config_solver)
         solver.return_matrix = False
 
         # Build a problem

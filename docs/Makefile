@@ -4,7 +4,7 @@
 # You can set these variables from the command line.
 SPHINXOPTS    =
 SPHINXBUILD   = python -msphinx
-SPHINXPROJ    = dwave_micro_client
+SPHINXPROJ    = dwave
 SOURCEDIR     = .
 BUILDDIR      = _build
 GH_PAGES_SOURCES = docs dwave_micro_client.py LICENCE
