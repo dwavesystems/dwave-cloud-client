@@ -22,7 +22,7 @@ from dwave.cloud.qpu.computation import Future
 log = logging.getLogger(__name__)
 
 
-class Solver:
+class Solver(object):
     """
     A solver enables sampling from an Ising model.
 

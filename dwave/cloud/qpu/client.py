@@ -27,7 +27,7 @@ log = logging.getLogger(__name__)
 # log.addHandler(logging.StreamHandler(sys.stdout))
 
 
-class Client:
+class Client(object):
     """
     Connect to a SAPI server to expose the solvers that the server advertises.
 

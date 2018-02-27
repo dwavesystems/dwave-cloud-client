@@ -26,7 +26,7 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 
-class Future:
+class Future(object):
     """An object for a pending SAPI call.
 
     Waits for a request to complete and parses the message returned.
