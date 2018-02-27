@@ -204,7 +204,7 @@ class Future(object):
             # gets a status update for this problem (in the case where the id hasn't been set yet)
             if self.id is not None and not self._cancel_sent:
                 self._cancel_sent = True
-                self.solver.connection._cancel(self.id, self)
+                self.solver.client._cancel(self.id, self)
 
     def result(self):
         """Blocking call to retrieve the result.
