@@ -259,7 +259,6 @@ class Submission(_QueryTest):
 
         result_list = []
         for _ in range(100):
-
             results = solver.sample_ising(linear, quad, num_reads=40)
             result_list.append([results, linear, quad])
 
@@ -274,6 +273,31 @@ class Submission(_QueryTest):
 
             # Make sure the number of occurrences and energies are all correct
             for energy, state in zip(results.energies, results.samples):
+                self.assertTrue(energy == evaluate_ising(linear, quad, state))
+
+    @unittest.skipIf(skip_live, "No live server available.")
+    def test_as_completed(self):
+        """Submit a batch of problems then use `as_completed` to iterate over
+        all of them."""
+
+        # Connect
+        client = Client(config_url, config_token)
+        solver = client.get_solver(config_solver)
+
+        # Build a problem
+        linear = [0] * (max(solver.nodes) + 1)
+        for index in solver.nodes:
+            linear[index] = random.choice([-1, 1])
+        quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
+
+        # Sample the solution 100x40 times
+        computations = [solver.sample_ising(linear, quad, num_reads=40) for _ in range(100)]
+
+        # Go over computations, one by one, as they're done and check they're OK
+        for computation in dwave.cloud.qpu.computation.Future.as_completed(computations):
+            self.assertTrue(computation.done())
+            self.assertTrue(40 == sum(computation.occurrences))
+            for energy, state in zip(computation.energies, computation.samples):
                 self.assertTrue(energy == evaluate_ising(linear, quad, state))
 
 

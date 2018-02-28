@@ -61,3 +61,4 @@ any future object is a blocking operation.
 
 from .client import Client
 from .solver import Solver
+from .computation import Future

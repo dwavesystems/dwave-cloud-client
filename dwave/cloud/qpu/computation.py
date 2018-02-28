@@ -6,6 +6,8 @@ import struct
 import time
 import six
 
+from concurrent.futures import TimeoutError
+
 # Use numpy if available for fast decoding
 try:
     import numpy as np
@@ -172,6 +174,23 @@ class Future(object):
         # Clean up after ourselves
         [f._remove_event(event) for f in futures]
         return done, remaining
+
+    @staticmethod
+    def as_completed(fs, timeout=None):
+        """Emulate `concurrent.futures.as_completed()` behavior.
+
+        Returns an iterator over the list of out `Future` instances given by
+        `fs` that yields futures as they complete (finished or were cancelled).
+
+        The `concurrent.futures.TimeoutError` is raised if per-future timeout is
+        exceeded at any point.
+        """
+        while any(not f.done() for f in fs):
+            done, not_done = Future.wait_multiple(fs, min_done=1, timeout=timeout)
+            if not done:
+                raise TimeoutError
+            for f in done:
+                yield f
 
     def wait(self, timeout=None):
         """Wait for the results to be available.
