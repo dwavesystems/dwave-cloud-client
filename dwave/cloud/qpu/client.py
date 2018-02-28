@@ -8,6 +8,7 @@ import logging
 import requests
 import collections
 import datetime
+from itertools import chain
 from six.moves import queue, range
 
 from dwave.cloud.exceptions import *
@@ -88,6 +89,7 @@ class Client(object):
             worker = threading.Thread(target=self._do_submit_problems)
             worker.daemon = True
             worker.start()
+            self._submission_workers.append(worker)
 
         # Build the cancel problem queue, start its workers
         self._cancel_queue = queue.Queue()
@@ -96,6 +98,7 @@ class Client(object):
             worker = threading.Thread(target=self._do_cancel_problems)
             worker.daemon = True
             worker.start()
+            self._cancel_workers.append(worker)
 
         # Build the problem status polling queue, start its workers
         self._poll_queue = queue.Queue()
@@ -104,6 +107,7 @@ class Client(object):
             worker = threading.Thread(target=self._do_poll_problems)
             worker.daemon = True
             worker.start()
+            self._poll_workers.append(worker)
 
         # Build the result loading queue, start its workers
         self._load_queue = queue.Queue()
@@ -112,6 +116,7 @@ class Client(object):
             worker = threading.Thread(target=self._do_load_results)
             worker.daemon = True
             worker.start()
+            self._load_workers.append(worker)
 
         # Prepare an empty set of solvers
         self.solvers = {}
@@ -140,13 +145,24 @@ class Client(object):
         _LOGGER.debug("Joining load queue")
         self._load_queue.join()
 
-        # Kill off the worker threads, (which should now be blocking on the empty)
-        [worker.kill() for worker in self._submission_workers]
-        [worker.kill() for worker in self._cancel_workers]
-        [worker.kill() for worker in self._poll_workers]
-        [worker.kill() for worker in self._load_workers]
+        # Send kill-task to all worker threads
+        # Note: threads can't be 'killed' in Python, they have to die by
+        # natural causes
+        for _ in self._submission_workers:
+            self._submission_queue.put(None)
+        for _ in self._cancel_workers:
+            self._cancel_queue.put(None)
+        for _ in self._poll_workers:
+            self._poll_queue.put(None)
+        for _ in self._load_workers:
+            self._load_queue.put(None)
 
-        # Close the connection pool
+        # Wait for threads to die
+        for worker in chain(self._submission_workers, self._cancel_workers,
+                            self._poll_workers, self._load_workers):
+            worker.join()
+
+        # Close the requests session
         self.session.close()
 
     def __enter__(self):
@@ -252,7 +268,13 @@ class Client(object):
                 # Pull as many problems as we can, block on the first one,
                 # but once we have one problem, switch to non-blocking then
                 # submit without blocking again.
-                ready_problems = [self._submission_queue.get()]
+
+                # `None` task is used to signal thread termination
+                item = self._submission_queue.get()
+                if item is None:
+                    break
+
+                ready_problems = [item]
                 while True:
                     try:
                         ready_problems.append(self._submission_queue.get_nowait())
@@ -375,7 +397,13 @@ class Client(object):
         try:
             while True:
                 # Pull as many problems as we can, block when none are available.
-                item_list = [self._cancel_queue.get()]
+
+                # `None` task is used to signal thread termination
+                item = self._cancel_queue.get()
+                if item is None:
+                    break
+
+                item_list = [item]
                 while True:
                     try:
                         item_list.append(self._cancel_queue.get_nowait())
@@ -421,11 +449,15 @@ class Client(object):
 
             # Add a query to the active queries
             def add(ftr):
+                # `None` task signifies thread termination
+                if ftr is None:
+                    return False
                 if ftr.id not in futures and not ftr.done():
                     active_queries.add(ftr.id)
                     futures[ftr.id] = ftr
                 else:
                     self._poll_queue.task_done()
+                return True
 
             # Remove a query from the active set
             def remove(id_):
@@ -437,10 +469,12 @@ class Client(object):
                 try:
                     # If we have no active queries, wait on the status queue
                     while len(active_queries) == 0:
-                        add(self._poll_queue.get())
+                        if not add(self._poll_queue.get()):
+                            return
                     # Once there is any active queries try to fill up the set and move on
                     while len(active_queries) < self._STATUS_QUERY_SIZE:
-                        add(self._poll_queue.get_nowait())
+                        if not add(self._poll_queue.get_nowait()):
+                            return
                 except queue.Empty:
                     pass
 
@@ -504,6 +538,9 @@ class Client(object):
             while True:
                 # Select a problem
                 future = self._load_queue.get()
+                # `None` task signifies thread termination
+                if future is None:
+                    break
                 _LOGGER.debug("Query for results: %s", future.id)
 
                 # Submit the query
