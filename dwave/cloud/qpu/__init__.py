@@ -55,7 +55,7 @@ any future object is a blocking operation.
     futures[0].wait()
 
     # Or we can wait on several futures
-    dwave.cloud.qpu.computation.Future.wait_multiple(futures)
+    dwave.cloud.qpu.computation.Future.wait_multiple(futures, min_done=3)
 
 """
 

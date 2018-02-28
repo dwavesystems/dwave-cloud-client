@@ -116,7 +116,7 @@ class Future(object):
         self._other_events.remove(event)
 
     @staticmethod
-    def wait_multiple(futures, min_done=None, timeout=float('inf')):
+    def wait_multiple(futures, min_done=None, timeout=None):
         """Wait for multiple Future objects to complete.
 
         Python doesn't provide a multi-wait, but we can jury rig something reasonably
@@ -125,17 +125,20 @@ class Future(object):
         Args:
             futures (list of Future): list of objects to wait on
             min_done (int): Stop waiting when this many results are ready
-            timeout (float): Maximum number of seconds to wait
+            timeout (float): Maximum number of seconds to wait, `None` for indefinite wait.
 
         Returns:
-            boolean: True if the minimum number of results have been reached.
+            2-tuple of futures done and not_done, similar to `concurrent.futures.wait()`
         """
         if min_done is None:
             min_done = len(futures)
 
+        if timeout is None:
+            timeout = float('inf')
+
         # Track the exit conditions
         finish = time.time() + timeout
-        done = 0
+        done = []
 
         # Keep track of what futures haven't finished
         remaining = list(futures)
@@ -145,7 +148,7 @@ class Future(object):
         [f._add_event(event) for f in remaining]
 
         # Check the exit conditions
-        while done < min_done and finish > time.time():
+        while len(done) < min_done and finish > time.time():
             # Prepare to wait on any of the jobs finishing
             event.clear()
 
@@ -158,7 +161,7 @@ class Future(object):
                 event.set()
 
                 # Update our exit conditions
-                done += len(finished_futures)
+                done.extend(finished_futures)
                 remaining = [f for f in remaining if f not in finished_futures]
                 continue
 
@@ -168,7 +171,7 @@ class Future(object):
 
         # Clean up after ourselves
         [f._remove_event(event) for f in futures]
-        return done >= min_done
+        return done, remaining
 
     def wait(self, timeout=None):
         """Wait for the results to be available.
