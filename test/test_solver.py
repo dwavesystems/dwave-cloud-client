@@ -77,6 +77,17 @@ class Submission(_QueryTest):
     """Submit some sample problems."""
 
     @unittest.skipIf(skip_live, "No live server available.")
+    def test_result_structure(self):
+        client = Client(config_url, config_token)
+        solver = client.get_solver(config_solver)
+        computation = solver.sample_ising({}, {})
+        result = computation.result()
+        self.assertIn('samples', result)
+        self.assertIn('energies', result)
+        self.assertIn('occurrences', result)
+        self.assertIn('timing', result)
+
+    @unittest.skipIf(skip_live, "No live server available.")
     def test_submit_extra_qubit(self):
         """Submit a defective problem with an unsupported variable."""
         # Connect
