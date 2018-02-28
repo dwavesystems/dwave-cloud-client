@@ -231,7 +231,7 @@ class Future(object):
         Returns:
             list of lists or numpy matrix.
         """
-        return self.result()['solutions']
+        return self.result()['samples']
 
     @property
     def occurrences(self):
@@ -241,12 +241,12 @@ class Future(object):
             list or numpy matrix of doubles.
         """
         self._load_result()
-        if 'num_occurrences' in self._result:
-            return self._result['num_occurrences']
+        if 'occurrences' in self._result:
+            return self._result['occurrences']
         elif self.return_matrix:
-            return np.ones((len(self._result['solutions']),))
+            return np.ones((len(self._result['samples']),))
         else:
-            return [1] * len(self._result['solutions'])
+            return [1] * len(self._result['samples'])
 
     @property
     def timing(self):
@@ -294,19 +294,39 @@ class Future(object):
 
     def _decode(self):
         """Choose the right decoding method based on format and environment."""
-        start = time.time()
-        try:
-            if self._message['type'] not in ['qubo', 'ising']:
-                raise ValueError('Unknown problem format used.')
 
-            # If format is set, it must be qp
-            if self._message.get('answer', {}).get('format') != 'qp':
-                raise ValueError('Data format returned by server not understood.')
-            if _numpy:
-                return self._decode_qp_numpy()
-            return self._decode_qp()
-        finally:
-            self.parse_time = time.time() - start
+        if self._message['type'] not in ['qubo', 'ising']:
+            raise ValueError('Unknown problem format used.')
+
+        # If format is set, it must be qp
+        if self._message.get('answer', {}).get('format') != 'qp':
+            raise ValueError('Data format returned by server not understood.')
+
+        # prefer numpy decoding, but fallback to python
+        start = time.time()
+        if _numpy:
+            self._decode_qp_numpy()
+        else:
+            self._decode_qp()
+        self.parse_time = time.time() - start
+
+        self._alias_result()
+        return self._result
+
+    def _alias_result(self):
+        """Create aliases for some of the keys in the results dict. Eventually,
+        those will be renamed on the server side.
+        """
+        if not self._result:
+            return
+
+        aliases = {'samples': 'solutions',
+                   'occurrences': 'num_occurrences'}
+        for alias, original in aliases.items():
+            if original in self._result and alias not in self._result:
+                self._result[alias] = self._result[original]
+
+        return self._result
 
     def _decode_qp(self):
         """Decode qp format, without numpy.
