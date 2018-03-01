@@ -185,8 +185,9 @@ class Future(object):
         The `concurrent.futures.TimeoutError` is raised if per-future timeout is
         exceeded at any point.
         """
-        while any(not f.done() for f in fs):
-            done, not_done = Future.wait_multiple(fs, min_done=1, timeout=timeout)
+        not_done = fs
+        while not_done:
+            done, not_done = Future.wait_multiple(not_done, min_done=1, timeout=timeout)
             if not done:
                 raise TimeoutError
             for f in done:
