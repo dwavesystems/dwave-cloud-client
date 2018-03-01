@@ -1,7 +1,11 @@
 from setuptools import setup
 
 install_requires = ['requests>=2.18', 'six>=1.10']
-extras_require = {'test': ['requests_mock', 'mock', 'numpy']}
+
+extras_require = {
+    'test': ['requests_mock', 'mock', 'numpy'],
+    ':python_version == "2.7"': ['futures']
+}
 
 setup(
     name='dwave_micro_client',
