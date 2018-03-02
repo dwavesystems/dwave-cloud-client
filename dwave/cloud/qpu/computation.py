@@ -1,12 +1,12 @@
 from __future__ import division, absolute_import
 
 import threading
-import base64
-import struct
 import time
 import six
-
 from concurrent.futures import TimeoutError
+
+from dwave.cloud.coders import decode_qp, decode_qp_numpy
+
 
 # Use numpy if available for fast decoding
 try:
@@ -326,11 +326,13 @@ class Future(object):
             raise ValueError('Data format returned by server not understood.')
 
         # prefer numpy decoding, but fallback to python
+        # TODO: we should really be explicit about numpy usage
         start = time.time()
         if _numpy:
-            self._decode_qp_numpy()
+            self._result = decode_qp_numpy(self._message,
+                                           return_matrix=self.return_matrix)
         else:
-            self._decode_qp()
+            self._result = decode_qp(self._message)
         self.parse_time = time.time() - start
 
         self._alias_result()
@@ -350,148 +352,3 @@ class Future(object):
                 self._result[alias] = self._result[original]
 
         return self._result
-
-    def _decode_qp(self):
-        """Decode qp format, without numpy.
-
-        The 'qp' format is the current encoding used for problems and samples.
-        In this encoding the reply is generally json, but the samples, energy,
-        and histogram data (the occurrence count of each solution), are all
-        base64 encoded arrays.
-        """
-        # Decode the simple buffers
-        res = self._result = self._message['answer']
-        res['active_variables'] = self._decode_ints(res['active_variables'])
-        active_variables = res['active_variables']
-        if 'num_occurrences' in res:
-            res['num_occurrences'] = self._decode_ints(res['num_occurrences'])
-        res['energies'] = self._decode_doubles(res['energies'])
-
-        # Measure out the size of the binary solution data
-        num_solutions = len(res['energies'])
-        num_variables = len(res['active_variables'])
-        solution_bytes = -(-num_variables // 8)  # equivalent to int(math.ceil(num_variables / 8.))
-        total_variables = res['num_variables']
-
-        # Figure out the null value for output
-        default = 3 if self._message['type'] == 'qubo' else 0
-
-        # Decode the solutions, which will be byte aligned in binary format
-        binary = base64.b64decode(res['solutions'])
-        solutions = []
-        for solution_index in range(num_solutions):
-            # Grab the section of the buffer related to the current
-            buffer_index = solution_index * solution_bytes
-            solution_buffer = binary[buffer_index:buffer_index + solution_bytes]
-            bytes = struct.unpack('B' * solution_bytes, solution_buffer)
-
-            # Assume None values
-            solution = [default] * total_variables
-            index = 0
-            for byte in bytes:
-                # Parse each byte and read how ever many bits can be
-                values = self._decode_byte(byte)
-                for _ in range(min(8, len(active_variables) - index)):
-                    i = active_variables[index]
-                    index += 1
-                    solution[i] = values.pop()
-
-            # Switch to the right variable space
-            if self._message['type'] == 'ising':
-                values = {0: -1, 1: 1}
-                solution = [values.get(v, default) for v in solution]
-            solutions.append(solution)
-
-        res['solutions'] = solutions
-
-    def _decode_byte(self, byte):
-        """Helper for _decode_qp, turns a single byte into a list of bits.
-
-        Args:
-            byte: byte to be decoded
-
-        Returns:
-            list of bits corresponding to byte
-        """
-        bits = []
-        for _ in range(8):
-            bits.append(byte & 1)
-            byte >>= 1
-        return bits
-
-    def _decode_ints(self, message):
-        """Helper for _decode_qp, decodes an int array.
-
-        The int array is stored as little endian 32 bit integers.
-        The array has then been base64 encoded. Since we are decoding we do these
-        steps in reverse.
-        """
-        binary = base64.b64decode(message)
-        return struct.unpack('<' + ('i' * (len(binary) // 4)), binary)
-
-    def _decode_doubles(self, message):
-        """Helper for _decode_qp, decodes a double array.
-
-        The double array is stored as little endian 64 bit doubles.
-        The array has then been base64 encoded. Since we are decoding we do these
-        steps in reverse.
-        Args:
-            message: the double array
-
-        Returns:
-            decoded double array
-        """
-        binary = base64.b64decode(message)
-        return struct.unpack('<' + ('d' * (len(binary) // 8)), binary)
-
-    def _decode_qp_numpy(self):
-        """Decode qp format, with numpy."""
-        res = self._result = self._message['answer']
-
-        # Build some little endian type encodings
-        double_type = np.dtype(np.double)
-        double_type = double_type.newbyteorder('<')
-        int_type = np.dtype(np.int32)
-        int_type = int_type.newbyteorder('<')
-
-        # Decode the simple buffers
-        res['energies'] = np.frombuffer(base64.b64decode(res['energies']), dtype=double_type)
-        if 'num_occurrences' in res:
-            res['num_occurrences'] = np.frombuffer(base64.b64decode(res['num_occurrences']), dtype=int_type)
-        res['active_variables'] = np.frombuffer(base64.b64decode(res['active_variables']), dtype=int_type)
-
-        # Measure out the binary data size
-        num_solutions = len(res['energies'])
-        active_variables = res['active_variables']
-        num_variables = len(active_variables)
-        total_variables = res['num_variables']
-
-        # Decode the solutions, which will be a continuous run of bits
-        byte_type = np.dtype(np.uint8)
-        byte_type = byte_type.newbyteorder('<')
-        bits = np.unpackbits(np.frombuffer(base64.b64decode(res['solutions']), dtype=byte_type))
-
-        # Clip off the extra bits from encoding
-        bits = np.reshape(bits, (num_solutions, bits.size // num_solutions))
-        bits = np.delete(bits, range(num_variables, bits.shape[1]), 1)
-
-        # Switch from bits to spins
-        default = 3
-        if self._message['type'] == 'ising':
-            bits = bits.astype(np.int8)
-            bits *= 2
-            bits -= 1
-            default = 0
-
-        # Fill in the missing variables
-        solutions = np.full((num_solutions, total_variables), default, dtype=np.int8)
-        solutions[:, active_variables] = bits
-        res['solutions'] = solutions
-
-        # If the final result shouldn't be numpy formats switch back to python objects
-        if not self.return_matrix:
-            res['energies'] = res['energies'].tolist()
-            if 'num_occurrences' in res:
-                res['num_occurrences'] = res['num_occurrences'].tolist()
-            res['active_variables'] = res['active_variables'].tolist()
-            res['solutions'] = res['solutions'].tolist()
