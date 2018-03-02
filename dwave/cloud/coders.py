@@ -7,16 +7,21 @@ from dwave.cloud.utils import uniform_iterator, uniform_get
 
 
 def encode_bqm_as_qp(solver, linear, quadratic):
-    """Encode the problem for submission to a given solver.
+    """Encode the binary quadratic problem for submission to a given solver,
+    using the `qp` format for data.
 
     Args:
-        solver: solver requested.
-        lin: linear terms of the model.
-        quad: Quadratic terms of the model.
+        solver (:class:`dwave.cloud.qpu.solver.Solver`):
+            The solver used.
+
+        linear (dict[variable, bias]/list[variable, bias]):
+            Linear terms of the model.
+
+        quadratic (dict[(variable, variable), bias]):
+            Quadratic terms of the model.
 
     Returns:
         encoded submission dictionary
-
     """
 
     # Encode linear terms. The coefficients of the linear terms of the objective
