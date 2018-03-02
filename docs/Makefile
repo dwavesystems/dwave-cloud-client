@@ -7,7 +7,7 @@ SPHINXBUILD   = python -msphinx
 SPHINXPROJ    = dwave
 SOURCEDIR     = .
 BUILDDIR      = _build
-GH_PAGES_SOURCES = docs dwave_micro_client.py LICENCE
+GH_PAGES_SOURCES = docs LICENCE
 
 # Put it first so that "make" without argument is like "make help".
 help:
