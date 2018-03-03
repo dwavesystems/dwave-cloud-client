@@ -11,7 +11,7 @@ try:
 except ImportError:
     import mock
 
-from dwave.cloud.qpu import Client
+from dwave.cloud.qpu import Client, Solver
 from dwave.cloud.exceptions import InvalidAPIResponseError
 
 
@@ -77,7 +77,7 @@ class MockConnectivityTests(unittest.TestCase):
             setup_server(m)
             with self.assertRaises(IOError):
                 client = Client(bad_url, token)
-                client.solver_names()
+                client.get_solvers()
 
     def test_bad_token(self):
         """Connect with a bad token."""
@@ -85,14 +85,14 @@ class MockConnectivityTests(unittest.TestCase):
             setup_server(m)
             with self.assertRaises(IOError):
                 client = Client(url, bad_token)
-                client.solver_names()
+                client.get_solvers()
 
     def test_good_connection(self):
         """Connect with a valid URL and token."""
         with requests_mock.mock() as m:
             setup_server(m)
             client = Client(url, token)
-            self.assertTrue(len(client.solver_names()) > 0)
+            self.assertTrue(len(client.get_solvers()) > 0)
 
 
 class MockSolverLoading(unittest.TestCase):
@@ -114,15 +114,41 @@ class MockSolverLoading(unittest.TestCase):
         """Load a single solver."""
         with requests_mock.mock() as m:
             setup_server(m)
-            client = Client(url, token)
-            client.get_solver(solver_name)
 
-    def test_load_two_solvers(self):
+            # test default, cached solver get
+            client = Client(url, token)
+            solver = client.get_solver(solver_name)
+            self.assertEqual(solver.id, solver_name)
+
+            # fetch solver not present in cache
+            client._solvers = {}
+            self.assertEqual(client.get_solver(solver_name).id, solver_name)
+
+            # re-fetch solver present in cache
+            solver = client.get_solver(solver_name)
+            solver.id = 'different-solver'
+            self.assertEqual(client.get_solver(solver_name, refresh=True).id, solver_name)
+
+    def test_load_all_solvers(self):
         """Load the list of solver names."""
         with requests_mock.mock() as m:
             setup_server(m)
+
+            # test default case, fetch all solvers for the first time
             client = Client(url, token)
-            self.assertEqual(len(client.solver_names()), 2)
+            self.assertEqual(len(client.get_solvers()), 2)
+
+            # test default refresh
+            client._solvers = {}
+            self.assertEqual(len(client.get_solvers()), 0)
+
+            # test no refresh
+            client._solvers = {}
+            self.assertEqual(len(client.get_solvers(refresh=False)), 0)
+
+            # test refresh
+            client._solvers = {}
+            self.assertEqual(len(client.get_solvers(refresh=True)), 2)
 
     def test_load_missing_solver(self):
         """Try to load a solver that does not exist."""
@@ -148,6 +174,11 @@ class MockSolverLoading(unittest.TestCase):
             client = Client(url, token)
             with self.assertRaises(ValueError):
                 client.get_solver(solver_name)
+
+    def test_solver_filtering_in_client(self):
+        self.assertTrue(Client.is_solver_handled(Solver(None, json.loads(solver_object('test')))))
+        self.assertFalse(Client.is_solver_handled(Solver(None, json.loads(solver_object('c4-sw_')))))
+        self.assertFalse(None)
 
 
 class GetEvent(Exception):
