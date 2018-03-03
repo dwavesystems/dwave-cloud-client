@@ -119,7 +119,7 @@ class Client(object):
             self._load_workers.append(worker)
 
         # Prepare an empty set of solvers
-        self.solvers = {}
+        self._solvers = {}
         self._solvers_lock = threading.RLock()
         self._all_solvers_ready = False
 
@@ -174,50 +174,61 @@ class Client(object):
         self.close()
         return False
 
-    def solver_names(self):
-        """List all the solvers this connection can provide, and load the data about the solvers.
+    def get_solvers(self, refresh=False):
+        """List all the solvers this connection can provide,
+        and load the data about the solvers.
 
         To get all solver data: ``GET /solvers/remote/``
 
+        Args:
+            refresh (bool, default=False):
+                By default, ``get_solvers`` caches the list of solvers it
+                receives from the API. Use this parameter to force refresh.
+
         Returns:
-            list of str
+            dict[id, solver]: a mapping of solver name/id to :class:`.Solver`
         """
         with self._solvers_lock:
-            if self._all_solvers_ready:
-                return self.solvers.keys()
+            if self._all_solvers_ready and not refresh:
+                return self._solvers
 
             _LOGGER.debug("Requesting list of all solver data.")
-            response = self.session.get(posixpath.join(self.base_url, 'solvers/remote/'))
+            response = self.session.get(
+                posixpath.join(self.base_url, 'solvers/remote/'))
 
             if response.status_code == 401:
-                raise SolverAuthenticationError()
+                raise SolverAuthenticationError
             response.raise_for_status()
 
             _LOGGER.debug("Received list of all solver data.")
-
             data = response.json()
 
             for solver_desc in data:
                 try:
                     solver = Solver(self, solver_desc)
-                    self.solvers[solver.id] = solver
+                    self._solvers[solver.id] = solver
                     _LOGGER.debug("Adding solver: %s", solver)
                 except UnsupportedSolverError as e:
                     _LOGGER.debug("Skipping solver due to %r", e)
 
             self._all_solvers_ready = True
+            return self._solvers
 
-            return self.solvers.keys()
-
-    def get_solver(self, name=None):
+    def get_solver(self, name=None, refresh=False):
         """Load the configuration for a single solver.
 
         To get specific solver data: ``GET /solvers/remote/{solver_name}/``
 
         Args:
-            name (str): Id of the requested solver. None will return the default solver.
+            name (str):
+                Id of the requested solver. `None` will return the default solver.
+
+            refresh (bool):
+                Return solver from cache (if cached with ``get_solvers()``),
+                unless set to `True`.
+
         Returns:
-            :obj:`Solver`
+            :class:`.Solver`
         """
         _LOGGER.debug("Looking for solver: %s", name)
         if name is None:
@@ -227,14 +238,12 @@ class Client(object):
                 raise ValueError("No name or default name provided when loading solver.")
 
         with self._solvers_lock:
-            if name not in self.solvers:
-                if self._all_solvers_ready:
-                    raise KeyError(name)
-
-                response = self.session.get(posixpath.join(self.base_url, 'solvers/remote/{}/'.format(name)))
+            if refresh or name not in self._solvers:
+                response = self.session.get(
+                    posixpath.join(self.base_url, 'solvers/remote/{}/'.format(name)))
 
                 if response.status_code == 401:
-                    raise SolverAuthenticationError()
+                    raise SolverAuthenticationError
 
                 if response.status_code == 404:
                     raise KeyError("No solver with the name {} was available".format(name))
@@ -245,9 +254,9 @@ class Client(object):
                 if solver.id != name:
                     raise InvalidAPIResponseError(
                         "Asked for solver named {!r}, got {!r}".format(name, solver.id))
-                self.solvers[name] = solver
+                self._solvers[name] = solver
 
-            return self.solvers[name]
+            return self._solvers[name]
 
     def _submit(self, body, future):
         """Enqueue a problem for submission to the server.

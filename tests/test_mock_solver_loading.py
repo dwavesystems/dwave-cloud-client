@@ -77,7 +77,7 @@ class MockConnectivityTests(unittest.TestCase):
             setup_server(m)
             with self.assertRaises(IOError):
                 client = Client(bad_url, token)
-                client.solver_names()
+                client.get_solvers()
 
     def test_bad_token(self):
         """Connect with a bad token."""
@@ -85,14 +85,14 @@ class MockConnectivityTests(unittest.TestCase):
             setup_server(m)
             with self.assertRaises(IOError):
                 client = Client(url, bad_token)
-                client.solver_names()
+                client.get_solvers()
 
     def test_good_connection(self):
         """Connect with a valid URL and token."""
         with requests_mock.mock() as m:
             setup_server(m)
             client = Client(url, token)
-            self.assertTrue(len(client.solver_names()) > 0)
+            self.assertTrue(len(client.get_solvers()) > 0)
 
 
 class MockSolverLoading(unittest.TestCase):
@@ -122,7 +122,7 @@ class MockSolverLoading(unittest.TestCase):
         with requests_mock.mock() as m:
             setup_server(m)
             client = Client(url, token)
-            self.assertEqual(len(client.solver_names()), 2)
+            self.assertEqual(len(client.get_solvers()), 2)
 
     def test_load_missing_solver(self):
         """Try to load a solver that does not exist."""

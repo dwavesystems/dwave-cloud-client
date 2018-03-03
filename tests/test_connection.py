@@ -29,20 +29,20 @@ class ConnectivityTests(unittest.TestCase):
         """Connect with a bad URL."""
         with self.assertRaises(IOError):
             client = Client("not-a-url", config_token)
-            client.solver_names()
+            client.get_solvers()
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_bad_token(self):
         """Connect with a bad token."""
         with self.assertRaises(SolverAuthenticationError):
             client = Client(config_url, 'not-a-token')
-            client.solver_names()
+            client.get_solvers()
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_good_connection(self):
         """Connect with a valid URL and token."""
         client = Client(config_url, config_token)
-        self.assertTrue(len(client.solver_names()) > 0)
+        self.assertTrue(len(client.get_solvers()) > 0)
 
 
 class SolverLoading(unittest.TestCase):
@@ -52,13 +52,13 @@ class SolverLoading(unittest.TestCase):
     def test_list_all_solvers(self):
         """List all the solvers."""
         client = Client(config_url, config_token)
-        self.assertTrue(len(client.solver_names()) > 0)
+        self.assertTrue(len(client.get_solvers()) > 0)
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_load_all_solvers(self):
         """List and retrieve all the solvers."""
         client = Client(config_url, config_token)
-        for name in client.solver_names():
+        for name in client.get_solvers():
             client.get_solver(name)
 
     @unittest.skipIf(skip_live, "No live server available.")
@@ -70,7 +70,7 @@ class SolverLoading(unittest.TestCase):
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_load_any_solver(self):
-        """Load a single solver without calling solver_names (which caches data)."""
+        """Load a single solver without calling get_solvers (which caches data)."""
         client = Client(config_url, config_token)
         client.get_solver(config_solver)
 
