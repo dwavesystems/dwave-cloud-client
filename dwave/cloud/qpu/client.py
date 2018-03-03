@@ -51,6 +51,7 @@ class Client(object):
     _POLL_THREAD_COUNT = 2
     _LOAD_THREAD_COUNT = 5
 
+
     def __init__(self, url=None, token=None, proxies=None, permissive_ssl=False):
         """To setup the connection a pipeline of queues/workers is constructed.
 
@@ -174,6 +175,20 @@ class Client(object):
         self.close()
         return False
 
+    @staticmethod
+    def is_solver_handled(solver):
+        """Predicate function that determines if the given solver should be
+        handled by this client.
+
+        Can be overridden in a subclass to specialize the client for a
+        particular type of solvers.
+
+        Default implementation skips software solvers.
+        """
+        if not solver:
+            return False
+        return not solver.id.startswith('c4-sw_')
+
     def get_solvers(self, refresh=False):
         """List all the solvers this connection can provide,
         and load the data about the solvers.
@@ -206,8 +221,12 @@ class Client(object):
             for solver_desc in data:
                 try:
                     solver = Solver(self, solver_desc)
-                    self._solvers[solver.id] = solver
-                    _LOGGER.debug("Adding solver: %s", solver)
+                    if self.is_solver_handled(solver):
+                        self._solvers[solver.id] = solver
+                        _LOGGER.debug("Adding solver %r", solver)
+                    else:
+                        _LOGGER.debug("Skipping solver %r inappropriate for client", solver)
+
                 except UnsupportedSolverError as e:
                     _LOGGER.debug("Skipping solver due to %r", e)
 

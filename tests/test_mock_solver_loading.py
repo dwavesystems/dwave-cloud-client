@@ -11,7 +11,7 @@ try:
 except ImportError:
     import mock
 
-from dwave.cloud.qpu import Client
+from dwave.cloud.qpu import Client, Solver
 from dwave.cloud.exceptions import InvalidAPIResponseError
 
 
@@ -174,6 +174,11 @@ class MockSolverLoading(unittest.TestCase):
             client = Client(url, token)
             with self.assertRaises(ValueError):
                 client.get_solver(solver_name)
+
+    def test_solver_filtering_in_client(self):
+        self.assertTrue(Client.is_solver_handled(Solver(None, json.loads(solver_object('test')))))
+        self.assertFalse(Client.is_solver_handled(Solver(None, json.loads(solver_object('c4-sw_')))))
+        self.assertFalse(None)
 
 
 class GetEvent(Exception):
