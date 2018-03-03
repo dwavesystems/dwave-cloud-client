@@ -9,7 +9,7 @@ extras_require = {
 
 # Only include packages under the 'dwave' namespace. Do not include tests,
 # benchmarks, etc.
-packages = [package for package in find_packages() if package.startswith('dwave.')]
+packages = [package for package in find_packages() if package.startswith('dwave')]
 
 setup(
     name='dwave-cloud-client',
@@ -17,7 +17,7 @@ setup(
     description='A minimal client for interacting with SAPI servers.',
     url='https://github.com/dwavesystems/dwave-cloud-client',
     packages=packages,
-    namespace_packages=['dwave'],
     install_requires=install_requires,
-    extras_require=extras_require
+    extras_require=extras_require,
+    zip_safe=False
 )
