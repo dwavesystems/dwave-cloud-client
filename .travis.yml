@@ -46,11 +46,12 @@ matrix:
           deploy:
 
 install:
-    - pip install -r requirements.txt
-    - pip install .
+  - pip install --upgrade setuptools
+  - pip install -r requirements.txt
+  - pip install .
 
 script:
-- coverage run -m unittest discover
+  - coverage run -m unittest discover
 
 after_success:
   - coveralls
