@@ -1,5 +1,6 @@
 from __future__ import absolute_import, print_function
 
+import os
 import unittest
 import textwrap
 
@@ -71,3 +72,20 @@ class TestConfig(unittest.TestCase):
             profile = load_profile(name="alpha", filename="filename")
             self.assertEqual(profile['token'], 'alpha-token')
             self.assertRaises(KeyError, load_profile, name="non-existing-section", filename="filename")
+
+    def test_config_file_detection_cwd(self):
+        configpath = "./dwave.conf"
+        with mock.patch("os.path.exists", lambda path: path == configpath):
+            self.assertEqual(detect_configfile_path(), configpath)
+
+    def test_config_file_detection_user(self):
+        # assume Unix, XDG Base spec
+        configpath = os.path.expanduser("~/.config/dwave/dwave.conf")
+        with mock.patch("os.path.exists", lambda path: path == configpath):
+            self.assertEqual(detect_configfile_path(), configpath)
+
+    def test_config_file_detection_system(self):
+        # assume Unix, XDG Base spec
+        configpath = "/etc/xdg/dwave/dwave.conf"
+        with mock.patch("os.path.exists", lambda path: path == configpath):
+            self.assertEqual(detect_configfile_path(), configpath)
