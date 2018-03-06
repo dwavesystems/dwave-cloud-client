@@ -8,7 +8,7 @@ def detect_configfile_path():
     candidates, and `None` if the list was exhausted, but no candidate config
     file exists.
 
-    For details, see :func:`load_config`.
+    For details, see :func:`load_config_from_file`.
     """
     app = "dwave"
     author = "dwavesystem"
@@ -35,7 +35,7 @@ def detect_configfile_path():
     return None
 
 
-def load_config(filename=None):
+def load_config_from_file(filename=None):
     """Load D-Wave cloud client configuration from `filename`.
 
     The format of the config file is the standard Windows INI-like format,
@@ -104,7 +104,7 @@ def load_config(filename=None):
 
 def load_profile(name, filename=None):
     """Load profile with `name` from `filename` config file."""
-    return load_config(filename)[name]
+    return load_config_from_file(filename)[name]
 
 
 def load_configuration(key=None):

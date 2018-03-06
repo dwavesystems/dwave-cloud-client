@@ -29,7 +29,7 @@ except ImportError:
     configparser_open_namespace = "backports.configparser.open"
 
 
-from dwave.cloud.config import detect_configfile_path, load_config, load_profile
+from dwave.cloud.config import detect_configfile_path, load_config_from_file, load_profile
 
 
 class TestConfig(unittest.TestCase):
@@ -56,17 +56,17 @@ class TestConfig(unittest.TestCase):
 
     def test_config_load(self):
         with mock.patch(configparser_open_namespace, iterable_mock_open(self.config_body), create=True):
-            config = load_config(filename="filename")
+            config = load_config_from_file(filename="filename")
             self.assertEqual(config.sections(), ['dw2000', 'software', 'alpha'])
             self.assertEqual(config['dw2000']['client'], 'qpu')
             self.assertEqual(config['software']['client'], 'sw')
 
     def test_no_config_detected(self):
         with mock.patch("dwave.cloud.config.detect_configfile_path", lambda: None):
-            self.assertRaises(ValueError, load_config)
+            self.assertRaises(ValueError, load_config_from_file)
 
     def test_invalid_filename_given(self):
-        self.assertRaises(ValueError, load_config, filename='/path/to/non/existing/config')
+        self.assertRaises(ValueError, load_config_from_file, filename='/path/to/non/existing/config')
 
     def test_config_load_profile(self):
         with mock.patch(configparser_open_namespace, iterable_mock_open(self.config_body), create=True):
