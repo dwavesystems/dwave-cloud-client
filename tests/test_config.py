@@ -59,9 +59,12 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(config['dw2000']['client'], 'qpu')
             self.assertEqual(config['software']['client'], 'sw')
 
-    def test_no_config(self):
+    def test_no_config_detected(self):
         with mock.patch("dwave.cloud.config.detect_configfile_path", lambda: None):
             self.assertRaises(ValueError, load_config)
+
+    def test_invalid_filename_given(self):
+        self.assertRaises(ValueError, load_config, filename='/path/to/non/existing/config')
 
     def test_config_load_profile(self):
         with mock.patch(configparser_open_namespace, iterable_mock_open(self.config_body), create=True):
