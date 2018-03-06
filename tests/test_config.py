@@ -61,7 +61,7 @@ class TestConfig(unittest.TestCase):
 
     def test_no_config(self):
         with mock.patch("dwave.cloud.config.detect_configfile_path", lambda: None):
-            self.assertRaises(IOError, load_config)
+            self.assertRaises(ValueError, load_config)
 
     def test_config_load_profile(self):
         with mock.patch(configparser_open_namespace, iterable_mock_open(self.config_body), create=True):

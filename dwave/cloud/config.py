@@ -84,10 +84,13 @@ def load_config(filename=None):
     if filename is None:
         filename = detect_configfile_path()
         if not filename:
-            raise IOError("Config filename not given, and could not be detected")
+            raise ValueError("Config filename not given, and could not be detected")
 
     config = configparser.ConfigParser(default_section="defaults")
-    config.read(filename)
+    if not config.read(filename):
+        raise ValueError("Failed to parse the config file "\
+                         "given or detected: {}".format(filename))
+
     return config
 
 
