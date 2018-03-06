@@ -12,19 +12,26 @@ def detect_configfile_path():
     """
     app = "dwave"
     author = "dwavesystem"
-    filename = "config"
+    filename = "dwave.conf"
 
-    candidates = ["{}.{}".format(app, filename)]
+    # look for `./dwave.conf`
+    candidates = ["."]
+
+    # then for something like `~/.config/dwave/dwave.conf`
     candidates.append(homebase.user_config_dir(
         app_author=author, app_name=app, roaming=False,
         use_virtualenv=False, create=False))
+
+    # and finally for e.g. `/etc/dwave/dwave.conf`
     candidates.extend(homebase.site_config_dir_list(
         app_author=author, app_name=app,
         use_virtualenv=False, create=False))
+
     for base in candidates:
         path = os.path.join(base, filename)
         if os.path.exists(path):
             return path
+
     return None
 
 
@@ -59,19 +66,20 @@ def load_config(filename=None):
         filename (str, default=None):
             D-Wave cloud client configuration file location.
 
-            If unspecified, config file is searched for in current directory,
-            then in user-local config dir, and then in all system-wide config
-            dirs. For example, on Unix, we try to load the config from these
-            paths (in order) and possibly others (depending on Unix flavour)::
+            If unspecified, config file named ``dwave.conf`` is searched for in
+            the current directory, then in the user-local config dir, and then
+            in all system-wide config dirs. For example, on Unix, we try to load
+            the config from these paths (in order) and possibly others
+            (depending on your Unix flavour)::
 
-                ./dwave.config
-                ~/.config/dwave/config
-                /usr/local/share/dwave/config
-                /usr/share/dwave/config
+                ./dwave.conf
+                ~/.config/dwave/dwave.conf
+                /usr/local/share/dwave/dwave.conf
+                /usr/share/dwave/dwave.conf
 
             On Windows, config file should be located in:
-            ``C:\\Users\\<username>\\AppData\\Local\\dwave\\client\\config``,
-            and on MacOS in: `~/Library/Application Support/dwave/config`.
+            ``C:\\Users\\<username>\\AppData\\Local\\dwave\\client\\dwave.conf``,
+            and on MacOS in: ``~/Library/Application Support/dwave/dwave.conf``.
             For details on user/system config paths see homebase_.
 
             .. _homebase: https://github.com/dwavesystems/homebase
