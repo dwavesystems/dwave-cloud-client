@@ -1,7 +1,8 @@
+six>=1.10
 requests>=2.18
+homebase>=1.0.0
 requests_mock
 mock
 numpy
-six==1.10
 coverage
 coveralls

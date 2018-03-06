@@ -4,7 +4,7 @@ install_requires = ['requests>=2.18', 'six>=1.10']
 
 extras_require = {
     'test': ['requests_mock', 'mock', 'numpy'],
-    ':python_version == "2.7"': ['futures']
+    ':python_version == "2.7"': ['futures', 'configparser']
 }
 
 # Only include packages under the 'dwave' namespace. Do not include tests,

@@ -1,4 +1,97 @@
 import os
+import configparser
+import homebase
+
+
+def detect_configfile_path():
+    """Returns the first existing file that finds in a list of possible
+    candidates, and `None` if the list was exhausted, but no candidate config
+    file exists.
+
+    For details, see :func:`load_config`.
+    """
+    filename = "config"
+    candidates = [filename]
+    candidates.append(homebase.user_config_dir(
+        app_author="dwavesystem", app_name="dwave", roaming=False, 
+        use_virtualenv=False, create=False))
+    candidates.extend(homebase.site_config_dir_list(
+        app_author="dwavesystem", app_name="dwave",
+        use_virtualenv=False, create=False))
+    for base in candidates:
+        path = os.path.join(base, filename)
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def load_config(filename=None):
+    """Load D-Wave cloud client configuration from `filename`.
+
+    The format of the config file is the standard Windows INI-like format,
+    parsable with the Python's `configparser`.
+
+    The section containing default values inherited by other sections is called
+    ``defaults``. For example::
+
+        [defaults]
+        url = https://cloud.dwavesys.com/sapi
+        client = qpu
+
+        [dw2000]
+        solver = DW_2000Q_1
+        token = ...
+
+        [software]
+        client = sw
+        solver = c4-sw_sample
+        token = ...
+
+        [alpha]
+        url = https://url.to.alpha/api
+        proxy = http://user:pass@myproxy.com:8080/
+        token = ...
+
+    Args:
+        filename (str, default=None):
+            D-Wave cloud client configuration file location.
+
+            If unspecified, config file is searched for current directory, then
+            in user-local config dir, and then in all system-wide config dirs.
+            For example, on Unix, we try to load the config from these paths
+            (in order)::
+
+                ./config
+                ~/.config/dwave/config
+                /usr/local/share/dwave/config
+                /usr/share/dwave/config
+
+            On Windows, config file should be located in:
+            ``C:\\Users\\<username>\\AppData\\Local\\dwave\\client\\config``,
+            and on MacOS in: `~/Library/Application Support/dwave/config`.
+            For details on user/system config paths see homebase_.
+
+            .. _homebase: https://github.com/dwavesystems/homebase
+
+    Returns:
+        :obj:`configparser.ConfigParser`:
+            A `dict`-like mapping of config sections (profiles) to mapping of
+            per-profile keys holding values.
+    """
+    if filename is None:
+        filename = detect_configfile_path()
+        if not filename:
+            raise IOError("Config filename not given, but could not be detected")
+
+    config = configparser.ConfigParser(default_section="defaults")
+    config.read(filename)
+    return config
+
+
+def load_profile(name, filename=None):
+    """Load profile with `name` from `filename` config file."""
+    return load_config(filename).get(name, None)
+
 
 def load_configuration(key=None):
     """Load the configured URLs and token for the SAPI server.
