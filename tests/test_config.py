@@ -58,3 +58,9 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(config.sections(), ['dw2000', 'software', 'alpha'])
             self.assertEqual(config['dw2000']['client'], 'qpu')
             self.assertEqual(config['software']['client'], 'sw')
+
+    def test_config_load_profile(self):
+        with mock.patch(configparser_open_namespace, iterable_mock_open(self.config_body), create=True):
+            profile = load_profile(name="alpha", filename="filename")
+            self.assertEqual(profile['token'], 'alpha-token')
+            self.assertRaises(KeyError, load_profile, name="non-existing-section", filename="filename")

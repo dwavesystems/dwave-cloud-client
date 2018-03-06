@@ -90,7 +90,7 @@ def load_config(filename=None):
 
 def load_profile(name, filename=None):
     """Load profile with `name` from `filename` config file."""
-    return load_config(filename).get(name, None)
+    return load_config(filename)[name]
 
 
 def load_configuration(key=None):
