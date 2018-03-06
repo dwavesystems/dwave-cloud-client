@@ -10,13 +10,16 @@ def detect_configfile_path():
 
     For details, see :func:`load_config`.
     """
+    app = "dwave"
+    author = "dwavesystem"
     filename = "config"
-    candidates = [filename]
+
+    candidates = ["{}.{}".format(app, filename)]
     candidates.append(homebase.user_config_dir(
-        app_author="dwavesystem", app_name="dwave", roaming=False, 
+        app_author=author, app_name=app, roaming=False,
         use_virtualenv=False, create=False))
     candidates.extend(homebase.site_config_dir_list(
-        app_author="dwavesystem", app_name="dwave",
+        app_author=author, app_name=app,
         use_virtualenv=False, create=False))
     for base in candidates:
         path = os.path.join(base, filename)
@@ -56,12 +59,12 @@ def load_config(filename=None):
         filename (str, default=None):
             D-Wave cloud client configuration file location.
 
-            If unspecified, config file is searched for current directory, then
-            in user-local config dir, and then in all system-wide config dirs.
-            For example, on Unix, we try to load the config from these paths
-            (in order)::
+            If unspecified, config file is searched for in current directory,
+            then in user-local config dir, and then in all system-wide config
+            dirs. For example, on Unix, we try to load the config from these
+            paths (in order) and possibly others (depending on Unix flavour)::
 
-                ./config
+                ./dwave.config
                 ~/.config/dwave/config
                 /usr/local/share/dwave/config
                 /usr/share/dwave/config
@@ -81,7 +84,7 @@ def load_config(filename=None):
     if filename is None:
         filename = detect_configfile_path()
         if not filename:
-            raise IOError("Config filename not given, but could not be detected")
+            raise IOError("Config filename not given, and could not be detected")
 
     config = configparser.ConfigParser(default_section="defaults")
     config.read(filename)
