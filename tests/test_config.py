@@ -89,3 +89,7 @@ class TestConfig(unittest.TestCase):
         configpath = "/etc/xdg/dwave/dwave.conf"
         with mock.patch("os.path.exists", lambda path: path == configpath):
             self.assertEqual(detect_configfile_path(), configpath)
+
+    def test_config_file_detection_nonexisting(self):
+        with mock.patch("os.path.exists", lambda path: False):
+            self.assertEqual(detect_configfile_path(), None)
