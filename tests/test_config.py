@@ -1,6 +1,7 @@
 from __future__ import absolute_import, print_function
 
 import os
+import sys
 import unittest
 import textwrap
 
@@ -79,14 +80,26 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(detect_configfile_path(), configpath)
 
     def test_config_file_detection_user(self):
-        # assume Unix, XDG Base spec
-        configpath = os.path.expanduser("~/.config/dwave/dwave.conf")
+        if sys.platform == 'win32':
+            # TODO
+            pass
+        elif sys.platform == 'darwin':
+            configpath = os.path.expanduser("~/Library/Application Support/dwave/dwave.conf")
+        else:
+            configpath = os.path.expanduser("~/.config/dwave/dwave.conf")
+
         with mock.patch("os.path.exists", lambda path: path == configpath):
             self.assertEqual(detect_configfile_path(), configpath)
 
     def test_config_file_detection_system(self):
-        # assume Unix, XDG Base spec
-        configpath = "/etc/xdg/dwave/dwave.conf"
+        if sys.platform == 'win32':
+            # TODO
+            pass
+        elif sys.platform == 'darwin':
+            configpath = os.path.expanduser("/Library/Application Support/dwave/dwave.conf")
+        else:
+            configpath = "/etc/xdg/dwave/dwave.conf"
+
         with mock.patch("os.path.exists", lambda path: path == configpath):
             self.assertEqual(detect_configfile_path(), configpath)
 
