@@ -52,7 +52,7 @@ class Client(object):
     _LOAD_THREAD_COUNT = 5
 
 
-    def __init__(self, endpoint=None, token=None, proxy=None, permissive_ssl=False):
+    def __init__(self, endpoint=None, token=None, proxy=None, permissive_ssl=False, profile=None):
         """To setup the connection a pipeline of queues/workers is constructed.
 
         There are five interations with the server the connection manages:
@@ -70,7 +70,7 @@ class Client(object):
         # missing, try the configuration function
         self.default_solver = None
         if token is None:
-            endpoint, token, proxy, self.default_solver = load_configuration()
+            endpoint, token, proxy, self.default_solver = load_configuration(profile)
         _LOGGER.debug("Creating a connection to SAPI server: %s", endpoint)
 
         self.base_url = endpoint
