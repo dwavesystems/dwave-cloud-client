@@ -144,7 +144,7 @@ def load_config(config_file=None, profile=None, client=None,
     }
 
 
-def load_configuration(key=None):
+def legacy_load_config(key=None):
     """Load the configured URLs and token for the SAPI server.
 
     First, this method tries to read from environment variables.

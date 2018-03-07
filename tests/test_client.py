@@ -7,13 +7,13 @@ from __future__ import absolute_import
 
 import unittest
 
-from dwave.cloud.config import load_configuration
+from dwave.cloud.config import legacy_load_config
 from dwave.cloud.qpu import Client
 from dwave.cloud.exceptions import SolverAuthenticationError
 
 
 try:
-    config_url, config_token, _, config_solver = load_configuration()
+    config_url, config_token, _, config_solver = legacy_load_config()
     if None in [config_url, config_token, config_solver]:
         raise ValueError()
     skip_live = False

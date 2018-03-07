@@ -12,7 +12,7 @@ from itertools import chain
 from six.moves import queue, range
 
 from dwave.cloud.exceptions import *
-from dwave.cloud.config import load_configuration
+from dwave.cloud.config import legacy_load_config
 from dwave.cloud.qpu.solver import Solver
 
 _LOGGER = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ class Client(object):
         # missing, try the configuration function
         self.default_solver = None
         if token is None:
-            endpoint, token, proxy, self.default_solver = load_configuration(profile)
+            endpoint, token, proxy, self.default_solver = legacy_load_config(profile)
         _LOGGER.debug("Creating a connection to SAPI server: %s", endpoint)
 
         self.base_url = endpoint
