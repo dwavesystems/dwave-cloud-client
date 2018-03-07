@@ -111,7 +111,7 @@ def load_profile(name, filename=None):
     return load_config_from_file(filename)[name]
 
 
-def load_config(config_file=None, profile=None,
+def load_config(config_file=None, profile=None, client=None,
                 endpoint=None, token=None, solver=None, proxy=None):
     """Load config. Explicitly supplied values override environment values, and
     environment values override config file values.
@@ -138,6 +138,7 @@ def load_config(config_file=None, profile=None,
     return {
         'endpoint': endpoint or os.getenv("DWAVE_API_ENDPOINT", section.get('endpoint')),
         'token': token or os.getenv("DWAVE_API_TOKEN", section.get('token')),
+        'client': client or os.getenv("DWAVE_API_CLIENT", section.get('client')),
         'solver': solver or os.getenv("DWAVE_API_SOLVER", section.get('solver')),
         'proxy': proxy or os.getenv("DWAVE_API_PROXY", section.get('proxy')),
     }
