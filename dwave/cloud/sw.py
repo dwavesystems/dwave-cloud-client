@@ -5,10 +5,10 @@ Software samplers emulate the QPU behavior.
 """
 from __future__ import absolute_import
 
-from dwave.cloud.client import Client as _QPUClient
+from dwave.cloud.client import BaseClient
 
 
-class Client(_QPUClient):
+class Client(BaseClient):
 
     @staticmethod
     def is_solver_handled(solver):

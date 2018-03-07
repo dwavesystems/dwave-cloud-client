@@ -59,6 +59,6 @@ any future object is a blocking operation.
 
 """
 
-from dwave.cloud.client import Client
+from dwave.cloud.client import BaseClient as Client
 from dwave.cloud.solver import Solver
 from dwave.cloud.computation import Future
