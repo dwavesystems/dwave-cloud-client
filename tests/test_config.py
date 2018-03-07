@@ -37,7 +37,7 @@ from dwave.cloud.config import (
 
 class TestConfig(unittest.TestCase):
 
-    config_body = """
+    config_body = u"""
         [defaults]
         endpoint = https://cloud.dwavesys.com/sapi
         client = qpu
