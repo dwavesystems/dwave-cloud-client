@@ -25,9 +25,9 @@ class Client(object):
     Connect to a SAPI server to expose the solvers that the server advertises.
 
     Args:
-        url (str): URL of the SAPI server.
+        endpoint (str): solver API endpoint URL
         token (str): Authentication token from the SAPI server.
-        proxies (dict): Mapping from the connection scheme (http[s]) to the proxy server address.
+        proxy (str): Proxy URL to be used for accessing the D-Wave API
         permissive_ssl (boolean; false by default): Disables SSL verification.
     """
 
@@ -52,7 +52,7 @@ class Client(object):
     _LOAD_THREAD_COUNT = 5
 
 
-    def __init__(self, url=None, token=None, proxies=None, permissive_ssl=False):
+    def __init__(self, endpoint=None, token=None, proxy=None, permissive_ssl=False):
         """To setup the connection a pipeline of queues/workers is constructed.
 
         There are five interations with the server the connection manages:
@@ -70,16 +70,16 @@ class Client(object):
         # missing, try the configuration function
         self.default_solver = None
         if token is None:
-            url, token, proxies, self.default_solver = load_configuration(url)
-        _LOGGER.debug("Creating a connection to SAPI server: %s", url)
+            endpoint, token, proxy, self.default_solver = load_configuration()
+        _LOGGER.debug("Creating a connection to SAPI server: %s", endpoint)
 
-        self.base_url = url
+        self.base_url = endpoint
         self.token = token
 
         # Create a :mod:`requests` session. `requests` will manage our url parsing, https, etc.
         self.session = requests.Session()
         self.session.headers.update({'X-Auth-Token': self.token})
-        self.session.proxies = proxies
+        self.session.proxies = {'http': proxy, 'https': proxy}
         if permissive_ssl:
             self.session.verify = False
 
