@@ -59,6 +59,22 @@ any future object is a blocking operation.
 
 """
 
-from dwave.cloud.client import BaseClient as Client
+from __future__ import absolute_import
+
+from dwave.cloud.client import BaseClient
 from dwave.cloud.solver import Solver
 from dwave.cloud.computation import Future
+
+
+class Client(BaseClient):
+
+    @staticmethod
+    def is_solver_handled(solver):
+        """Predicate function that determines if the given solver should be
+        handled by this client.
+
+        In QPU client we're handling only QPU solvers.
+        """
+        if not solver:
+            return False
+        return not solver.id.startswith('c4-sw_')

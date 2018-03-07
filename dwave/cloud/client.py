@@ -197,11 +197,9 @@ class BaseClient(object):
         Can be overridden in a subclass to specialize the client for a
         particular type of solvers.
 
-        Default implementation skips software solvers.
+        Default implementation accepts all solvers.
         """
-        if not solver:
-            return False
-        return not solver.id.startswith('c4-sw_')
+        return True
 
     def get_solvers(self, refresh=False):
         """List all the solvers this connection can provide,
