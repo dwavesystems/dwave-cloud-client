@@ -45,7 +45,7 @@ def load_config_from_file(filename=None):
     ``defaults``. For example::
 
         [defaults]
-        url = https://cloud.dwavesys.com/sapi
+        endpoint = https://cloud.dwavesys.com/sapi
         client = qpu
 
         [dw2000]
@@ -58,7 +58,7 @@ def load_config_from_file(filename=None):
         token = ...
 
         [alpha]
-        url = https://url.to.alpha/api
+        endpoint = https://url.to.alpha/api
         proxy = http://user:pass@myproxy.com:8080/
         token = ...
 
@@ -88,6 +88,10 @@ def load_config_from_file(filename=None):
         :obj:`configparser.ConfigParser`:
             A `dict`-like mapping of config sections (profiles) to mapping of
             per-profile keys holding values.
+
+    Raises:
+        :exc:`ValueError`:
+            Config file not found, or format invalid (parsing failed).
     """
     if filename is None:
         filename = detect_configfile_path()
@@ -105,6 +109,38 @@ def load_config_from_file(filename=None):
 def load_profile(name, filename=None):
     """Load profile with `name` from `filename` config file."""
     return load_config_from_file(filename)[name]
+
+
+def load_config(config_file=None, profile=None,
+                endpoint=None, token=None, solver=None, proxy=None):
+    """Load config. Explicitly supplied values override environment values, and
+    environment values override config file values.
+    """
+    # load config file
+    # lookup priority: explicitly specified, environment specified, auto-detected
+    if config_file is None:
+        config_file = os.getenv("DWAVE_CONFIG_FILE")
+    try:
+        config = load_config_from_file(config_file)
+    except ValueError:
+        config = {}
+
+    if profile is None:
+        profile = os.getenv("DWAVE_PROFILE")
+    if profile:
+        try:
+            section = dict(config[profile])
+        except KeyError:
+            raise ValueError("Profile {!r} not defined in config file".format(profile))
+    else:
+        section = {}
+
+    return {
+        'endpoint': endpoint or os.getenv("DWAVE_API_ENDPOINT", section.get('endpoint')),
+        'token': token or os.getenv("DWAVE_API_TOKEN", section.get('token')),
+        'solver': solver or os.getenv("DWAVE_API_SOLVER", section.get('solver')),
+        'proxy': proxy or os.getenv("DWAVE_API_PROXY", section.get('proxy')),
+    }
 
 
 def load_configuration(key=None):

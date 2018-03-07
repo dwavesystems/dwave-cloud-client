@@ -36,7 +36,7 @@ class TestConfig(unittest.TestCase):
 
     config_body = """
         [defaults]
-        url = https://cloud.dwavesys.com/sapi
+        endpoint = https://cloud.dwavesys.com/sapi
         client = qpu
 
         [dw2000]
@@ -49,7 +49,7 @@ class TestConfig(unittest.TestCase):
         token = ...
 
         [alpha]
-        url = https://url.to.alpha/api
+        endpoint = https://url.to.alpha/api
         proxy = http://user:pass@myproxy.com:8080/
         token = alpha-token
     """
