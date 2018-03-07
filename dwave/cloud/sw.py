@@ -5,7 +5,7 @@ Software samplers emulate the QPU behavior.
 """
 from __future__ import absolute_import
 
-from dwave.cloud.qpu import Client as _QPUClient
+from dwave.cloud.client import Client as _QPUClient
 
 
 class Client(_QPUClient):

@@ -55,10 +55,10 @@ any future object is a blocking operation.
     futures[0].wait()
 
     # Or we can wait on several futures
-    dwave.cloud.qpu.computation.Future.wait_multiple(futures, min_done=3)
+    dwave.cloud.computation.Future.wait_multiple(futures, min_done=3)
 
 """
 
-from .client import Client
-from .solver import Solver
-from .computation import Future
+from dwave.cloud.client import Client
+from dwave.cloud.solver import Solver
+from dwave.cloud.computation import Future

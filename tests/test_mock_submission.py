@@ -12,8 +12,7 @@ import itertools
 import threading
 
 from dwave.cloud.utils import evaluate_ising
-from dwave.cloud.qpu import Client
-from dwave.cloud.qpu.solver import Solver
+from dwave.cloud.qpu import Client, Solver
 from dwave.cloud import exceptions
 
 

@@ -13,7 +13,7 @@ from six.moves import queue, range
 
 from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config
-from dwave.cloud.qpu.solver import Solver
+from dwave.cloud.solver import Solver
 
 _LOGGER = logging.getLogger(__name__)
 # _LOGGER.setLevel(logging.DEBUG)

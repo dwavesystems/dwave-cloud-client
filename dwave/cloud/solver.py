@@ -6,7 +6,7 @@ import logging
 from dwave.cloud.exceptions import *
 from dwave.cloud.coders import encode_bqm_as_qp
 from dwave.cloud.utils import uniform_iterator, uniform_get
-from dwave.cloud.qpu.computation import Future
+from dwave.cloud.computation import Future
 
 
 _LOGGER = logging.getLogger(__name__)

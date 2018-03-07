@@ -11,7 +11,7 @@ def encode_bqm_as_qp(solver, linear, quadratic):
     using the `qp` format for data.
 
     Args:
-        solver (:class:`dwave.cloud.qpu.solver.Solver`):
+        solver (:class:`dwave.cloud.solver.Solver`):
             The solver used.
 
         linear (dict[variable, bias]/list[variable, bias]):

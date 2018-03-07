@@ -13,7 +13,7 @@ from dwave.cloud.utils import evaluate_ising
 from dwave.cloud.config import legacy_load_config
 from dwave.cloud.qpu import Client
 from dwave.cloud.exceptions import CanceledFutureError
-import dwave.cloud.qpu.computation
+import dwave.cloud.computation
 
 
 try:
@@ -262,7 +262,7 @@ class Submission(_QueryTest):
             results = solver.sample_ising(linear, quad, num_reads=40)
             result_list.append([results, linear, quad])
 
-        dwave.cloud.qpu.computation.Future.wait_multiple([f[0] for f in result_list])
+        dwave.cloud.computation.Future.wait_multiple([f[0] for f in result_list])
 
         for results, _, _ in result_list:
             self.assertTrue(results.done())
@@ -294,7 +294,7 @@ class Submission(_QueryTest):
         computations = [solver.sample_ising(linear, quad, num_reads=40) for _ in range(100)]
 
         # Go over computations, one by one, as they're done and check they're OK
-        for computation in dwave.cloud.qpu.computation.Future.as_completed(computations):
+        for computation in dwave.cloud.computation.Future.as_completed(computations):
             self.assertTrue(computation.done())
             self.assertTrue(40 == sum(computation.occurrences))
             for energy, state in zip(computation.energies, computation.samples):
@@ -311,20 +311,20 @@ class DecodingMethod(_QueryTest):
     def setUp(self):
         """Reload the future module to undo any changes."""
         from six.moves import reload_module
-        reload_module(dwave.cloud.qpu.computation)
+        reload_module(dwave.cloud.computation)
 
     @classmethod
     def tearDownClass(cls):
         """Reload the future module to undo any changes."""
         from six.moves import reload_module
-        reload_module(dwave.cloud.qpu.computation)
+        reload_module(dwave.cloud.computation)
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_request_matrix_with_no_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
         client = Client(config_url, config_token)
-        dwave.cloud.qpu.computation._numpy = False
+        dwave.cloud.computation._numpy = False
         solver = client.get_solver(config_solver)
         solver.return_matrix = True
 
@@ -342,7 +342,7 @@ class DecodingMethod(_QueryTest):
         # Connect
         import numpy
         client = Client(config_url, config_token)
-        assert dwave.cloud.qpu.computation._numpy
+        assert dwave.cloud.computation._numpy
         solver = client.get_solver(config_solver)
         solver.return_matrix = True
 
@@ -361,7 +361,7 @@ class DecodingMethod(_QueryTest):
         """Submit a problem using a dict for the linear terms."""
         # Connect
         client = Client(config_url, config_token)
-        dwave.cloud.qpu.computation._numpy = False
+        dwave.cloud.computation._numpy = False
         solver = client.get_solver(config_solver)
         solver.return_matrix = False
 
@@ -377,7 +377,7 @@ class DecodingMethod(_QueryTest):
         """Submit a problem using a dict for the linear terms."""
         # Connect
         client = Client(config_url, config_token)
-        assert dwave.cloud.qpu.computation._numpy
+        assert dwave.cloud.computation._numpy
         solver = client.get_solver(config_solver)
         solver.return_matrix = False
 
@@ -393,7 +393,7 @@ class DecodingMethod(_QueryTest):
         """Submit a problem using a dict for the linear terms."""
         # Connect
         client = Client(config_url, config_token)
-        dwave.cloud.qpu.computation._numpy = False
+        dwave.cloud.computation._numpy = False
         solver = client.get_solver(config_solver)
         solver.return_matrix = True
 
@@ -411,7 +411,7 @@ class DecodingMethod(_QueryTest):
         # Connect
         import numpy
         client = Client(config_url, config_token)
-        assert dwave.cloud.qpu.computation._numpy
+        assert dwave.cloud.computation._numpy
         solver = client.get_solver(config_solver)
         solver.return_matrix = True
 
@@ -430,7 +430,7 @@ class DecodingMethod(_QueryTest):
         """Submit a problem using a dict for the linear terms."""
         # Connect
         client = Client(config_url, config_token)
-        dwave.cloud.qpu.computation._numpy = False
+        dwave.cloud.computation._numpy = False
         solver = client.get_solver(config_solver)
         solver.return_matrix = False
 
@@ -446,7 +446,7 @@ class DecodingMethod(_QueryTest):
         """Submit a problem using a dict for the linear terms."""
         # Connect
         client = Client(config_url, config_token)
-        assert dwave.cloud.qpu.computation._numpy
+        assert dwave.cloud.computation._numpy
         solver = client.get_solver(config_solver)
         solver.return_matrix = False
 
