@@ -249,7 +249,7 @@ class MockConfiguration(unittest.TestCase):
     def test_only_file_key(self):
         """If give a name from the config file the proper URL should be loaded."""
         with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
-            client = Client('alpha')
+            client = Client(profile='alpha')
             client.session.get = GetEvent.handle
             try:
                 client.get_solver('arg-solver')

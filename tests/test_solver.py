@@ -10,14 +10,14 @@ import unittest
 import random
 
 from dwave.cloud.utils import evaluate_ising
-from dwave.cloud.config import load_configuration
+from dwave.cloud.config import legacy_load_config
 from dwave.cloud.qpu import Client
 from dwave.cloud.exceptions import CanceledFutureError
 import dwave.cloud.qpu.computation
 
 
 try:
-    config_url, config_token, _, config_solver = load_configuration()
+    config_url, config_token, _, config_solver = legacy_load_config()
     if None in [config_url, config_token, config_solver]:
         raise ValueError()
     skip_live = False

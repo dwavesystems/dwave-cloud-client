@@ -1,6 +1,150 @@
 import os
+import configparser
+import homebase
 
-def load_configuration(key=None):
+
+def detect_configfile_path():
+    """Returns the first existing file that finds in a list of possible
+    candidates, and `None` if the list was exhausted, but no candidate config
+    file exists.
+
+    For details, see :func:`load_config_from_file`.
+    """
+    app = "dwave"
+    author = "dwavesystem"
+    filename = "dwave.conf"
+
+    # look for `./dwave.conf`
+    candidates = ["."]
+
+    # then for something like `~/.config/dwave/dwave.conf`
+    candidates.append(homebase.user_config_dir(
+        app_author=author, app_name=app, roaming=False,
+        use_virtualenv=False, create=False))
+
+    # and finally for e.g. `/etc/dwave/dwave.conf`
+    candidates.extend(homebase.site_config_dir_list(
+        app_author=author, app_name=app,
+        use_virtualenv=False, create=False))
+
+    for base in candidates:
+        path = os.path.join(base, filename)
+        if os.path.exists(path):
+            return path
+
+    return None
+
+
+def load_config_from_file(filename=None):
+    """Load D-Wave cloud client configuration from `filename`.
+
+    The format of the config file is the standard Windows INI-like format,
+    parsable with the Python's `configparser`.
+
+    The section containing default values inherited by other sections is called
+    ``defaults``. For example::
+
+        [defaults]
+        endpoint = https://cloud.dwavesys.com/sapi
+        client = qpu
+
+        [dw2000]
+        solver = DW_2000Q_1
+        token = ...
+
+        [software]
+        client = sw
+        solver = c4-sw_sample
+        token = ...
+
+        [alpha]
+        endpoint = https://url.to.alpha/api
+        proxy = http://user:pass@myproxy.com:8080/
+        token = ...
+
+    Args:
+        filename (str, default=None):
+            D-Wave cloud client configuration file location.
+
+            If unspecified, config file named ``dwave.conf`` is searched for in
+            the current directory, then in the user-local config dir, and then
+            in all system-wide config dirs. For example, on Unix, we try to load
+            the config from these paths (in order) and possibly others
+            (depending on your Unix flavour)::
+
+                ./dwave.conf
+                ~/.config/dwave/dwave.conf
+                /usr/local/share/dwave/dwave.conf
+                /usr/share/dwave/dwave.conf
+
+            On Windows, config file should be located in:
+            ``C:\\Users\\<username>\\AppData\\Local\\dwave\\client\\dwave.conf``,
+            and on MacOS in: ``~/Library/Application Support/dwave/dwave.conf``.
+            For details on user/system config paths see homebase_.
+
+            .. _homebase: https://github.com/dwavesystems/homebase
+
+    Returns:
+        :obj:`configparser.ConfigParser`:
+            A `dict`-like mapping of config sections (profiles) to mapping of
+            per-profile keys holding values.
+
+    Raises:
+        :exc:`ValueError`:
+            Config file not found, or format invalid (parsing failed).
+    """
+    if filename is None:
+        filename = detect_configfile_path()
+        if not filename:
+            raise ValueError("Config filename not given, and could not be detected")
+
+    config = configparser.ConfigParser(default_section="defaults")
+    if not config.read(filename):
+        raise ValueError("Failed to parse the config file "\
+                         "given or detected: {}".format(filename))
+
+    return config
+
+
+def load_profile(name, filename=None):
+    """Load profile with `name` from `filename` config file."""
+    return load_config_from_file(filename)[name]
+
+
+def load_config(config_file=None, profile=None, client=None,
+                endpoint=None, token=None, solver=None, proxy=None):
+    """Load config. Explicitly supplied values override environment values, and
+    environment values override config file values.
+    """
+    # load config file
+    # lookup priority: explicitly specified, environment specified, auto-detected
+    if config_file is None:
+        config_file = os.getenv("DWAVE_CONFIG_FILE")
+    try:
+        config = load_config_from_file(config_file)
+    except ValueError:
+        config = {}
+
+    if profile is None:
+        profile = os.getenv("DWAVE_PROFILE")
+    if profile:
+        try:
+            section = dict(config[profile])
+        except KeyError:
+            raise ValueError("Profile {!r} not defined in config file".format(profile))
+    else:
+        section = {}
+
+    return {
+        'endpoint': endpoint or os.getenv("DWAVE_API_ENDPOINT", section.get('endpoint')),
+        'token': token or os.getenv("DWAVE_API_TOKEN", section.get('token')),
+        'client': client or os.getenv("DWAVE_API_CLIENT", section.get('client')),
+        'solver': solver or os.getenv("DWAVE_API_SOLVER", section.get('solver')),
+        'proxy': proxy or os.getenv("DWAVE_API_PROXY", section.get('proxy')),
+    }
+
+
+def legacy_load_config(key=None):
     """Load the configured URLs and token for the SAPI server.
 
     First, this method tries to read from environment variables.

@@ -12,7 +12,7 @@ from itertools import chain
 from six.moves import queue, range
 
 from dwave.cloud.exceptions import *
-from dwave.cloud.config import load_configuration
+from dwave.cloud.config import load_config, legacy_load_config
 from dwave.cloud.qpu.solver import Solver
 
 _LOGGER = logging.getLogger(__name__)
@@ -25,9 +25,9 @@ class Client(object):
     Connect to a SAPI server to expose the solvers that the server advertises.
 
     Args:
-        url (str): URL of the SAPI server.
+        endpoint (str): solver API endpoint URL
         token (str): Authentication token from the SAPI server.
-        proxies (dict): Mapping from the connection scheme (http[s]) to the proxy server address.
+        proxy (str): Proxy URL to be used for accessing the D-Wave API
         permissive_ssl (boolean; false by default): Disables SSL verification.
     """
 
@@ -52,7 +52,8 @@ class Client(object):
     _LOAD_THREAD_COUNT = 5
 
 
-    def __init__(self, url=None, token=None, proxies=None, permissive_ssl=False):
+    def __init__(self, endpoint=None, token=None, proxy=None, permissive_ssl=False,
+                 profile=None, solver=None):
         """To setup the connection a pipeline of queues/workers is constructed.
 
         There are five interations with the server the connection manages:
@@ -66,20 +67,33 @@ class Client(object):
         performed by asynchronously workers. For 2, 3, and 5 the workers gather
         tasks in batches.
         """
-        # Use configuration from parameters passed, if parts are
-        # missing, try the configuration function
-        self.default_solver = None
-        if token is None:
-            url, token, proxies, self.default_solver = load_configuration(url)
-        _LOGGER.debug("Creating a connection to SAPI server: %s", url)
 
-        self.base_url = url
-        self.token = token
+        # load configuration from `dwave.conf`, but failback to legacy `.dwrc`
+        try:
+            config = load_config(
+                config_file=None, client=None, profile=profile,
+                endpoint=endpoint, token=token, solver=solver, proxy=proxy)
+        except ValueError:
+            config = dict(endpoint=endpoint, token=token, proxy=proxy, solver=solver)
+        #print("my config: %r" % config)
+        # TODO: FIX: legacy config loading is broken in so many ways
+        if config.get('token') is None:
+            _endpoint, _token, _proxy, _solver = legacy_load_config(profile)
+            config = dict(endpoint=_endpoint, token=_token, proxy=_proxy, solver=_solver)
+
+        if 'endpoint' not in config or 'token' not in config:
+            raise ValueError("Endpoint URL and/or token not defined")
+
+        _LOGGER.debug("Creating a client with params: %r", config)
+
+        self.base_url = config['endpoint']
+        self.token = config['token']
+        self.default_solver = config.get('solver')
 
         # Create a :mod:`requests` session. `requests` will manage our url parsing, https, etc.
         self.session = requests.Session()
         self.session.headers.update({'X-Auth-Token': self.token})
-        self.session.proxies = proxies
+        self.session.proxies = {'http': config.get('proxy'), 'https': config.get('proxy')}
         if permissive_ssl:
             self.session.verify = False
 

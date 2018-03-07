@@ -133,9 +133,9 @@ class MockSubmission(_QueryTest):
 
     def test_submit_null_reply(self):
         """Get an error when the server's response is incomplete."""
-        with Client('', '') as client:
+        with Client('endpoint', 'token') as client:
             client.session = mock.Mock()
-            client.session.post = lambda a, _: choose_reply(a, {'problems/': ''})
+            client.session.post = lambda a, _: choose_reply(a, {'endpoint/problems/': ''})
             solver = Solver(client, solver_data('abc123'))
 
             # Build a problem
@@ -149,11 +149,11 @@ class MockSubmission(_QueryTest):
 
     def test_submit_ok_reply(self):
         """Handle a normal query and response."""
-        with Client('', '') as client:
+        with Client('endpoint', 'token') as client:
             client.session = mock.Mock()
             client.session.post = lambda a, _: choose_reply(a, {
-                'problems/': '[%s]' % complete_no_answer_reply('123', 'abc123')})
-            client.session.get = lambda a: choose_reply(a, {'problems/123/': complete_reply('123', 'abc123')})
+                'endpoint/problems/': '[%s]' % complete_no_answer_reply('123', 'abc123')})
+            client.session.get = lambda a: choose_reply(a, {'endpoint/problems/123/': complete_reply('123', 'abc123')})
             solver = Solver(client, solver_data('abc123'))
 
             # Build a problem
@@ -167,10 +167,10 @@ class MockSubmission(_QueryTest):
     def test_submit_error_reply(self):
         """Handle an error on problem submission."""
         error_body = 'An error message'
-        with Client('', '') as client:
+        with Client('endpoint', 'token') as client:
             client.session = mock.Mock()
             client.session.post = lambda a, _: choose_reply(a, {
-                'problems/': '[%s]' % error_reply('123', 'abc123', error_body)})
+                'endpoint/problems/': '[%s]' % error_reply('123', 'abc123', error_body)})
             solver = Solver(client, solver_data('abc123'))
 
             # Build a problem
@@ -184,9 +184,9 @@ class MockSubmission(_QueryTest):
 
     def test_submit_cancel_reply(self):
         """Handle a response for a canceled job."""
-        with Client('', '') as client:
+        with Client('endpoint', 'token') as client:
             client.session = mock.Mock()
-            client.session.post = lambda a, _: choose_reply(a, {'problems/': '[%s]' % cancel_reply('123', 'abc123')})
+            client.session.post = lambda a, _: choose_reply(a, {'endpoint/problems/': '[%s]' % cancel_reply('123', 'abc123')})
             solver = Solver(client, solver_data('abc123'))
 
             # Build a problem
@@ -200,12 +200,12 @@ class MockSubmission(_QueryTest):
 
     def test_submit_continue_then_ok_reply(self):
         """Handle polling for a complete problem."""
-        with Client('', '') as client:
+        with Client('endpoint', 'token') as client:
             client.session = mock.Mock()
-            client.session.post = lambda a, _: choose_reply(a, {'problems/': '[%s]' % continue_reply('123', 'abc123')})
+            client.session.post = lambda a, _: choose_reply(a, {'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123')})
             client.session.get = lambda a: choose_reply(a, {
-                'problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
-                'problems/123/': complete_reply('123', 'abc123')
+                'endpoint/problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
+                'endpoint/problems/123/': complete_reply('123', 'abc123')
             })
             solver = Solver(client, solver_data('abc123'))
 
@@ -219,11 +219,11 @@ class MockSubmission(_QueryTest):
 
     def test_submit_continue_then_error_reply(self):
         """Handle polling for an error message."""
-        with Client('', '') as client:
+        with Client('endpoint', 'token') as client:
             client.session = mock.Mock()
-            client.session.post = lambda a, _: choose_reply(a, {'problems/': '[%s]' % continue_reply('123', 'abc123')})
+            client.session.post = lambda a, _: choose_reply(a, {'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123')})
             client.session.get = lambda a: choose_reply(a, {
-                'problems/?id=123': '[%s]' % error_reply('123', 'abc123', "error message")})
+                'endpoint/problems/?id=123': '[%s]' % error_reply('123', 'abc123', "error message")})
             solver = Solver(client, solver_data('abc123'))
 
             # Build a problem
@@ -240,30 +240,30 @@ class MockSubmission(_QueryTest):
         # Reduce the number of poll threads to 1 so that the system can be tested
         old_value = Client._POLL_THREAD_COUNT
         Client._POLL_THREAD_COUNT = 1
-        with Client('', '') as client:
+        with Client('endpoint', 'token') as client:
             client.session = mock.Mock()
             client.session.get = lambda a: choose_reply(a, {
                 # Wait until both problems are
-                'problems/?id=1': '[%s]' % continue_reply('1', 'abc123'),
-                'problems/?id=2': '[%s]' % continue_reply('2', 'abc123'),
-                'problems/?id=2,1': '[' + complete_no_answer_reply('2', 'abc123') + ',' +
+                'endpoint/problems/?id=1': '[%s]' % continue_reply('1', 'abc123'),
+                'endpoint/problems/?id=2': '[%s]' % continue_reply('2', 'abc123'),
+                'endpoint/problems/?id=2,1': '[' + complete_no_answer_reply('2', 'abc123') + ',' +
                                      error_reply('1', 'abc123', 'error') + ']',
-                'problems/?id=1,2': '[' + error_reply('1', 'abc123', 'error') + ',' +
+                'endpoint/problems/?id=1,2': '[' + error_reply('1', 'abc123', 'error') + ',' +
                                      complete_no_answer_reply('2', 'abc123') + ']',
-                'problems/1/': error_reply('1', 'abc123', 'Error message'),
-                'problems/2/': complete_reply('2', 'abc123')
+                'endpoint/problems/1/': error_reply('1', 'abc123', 'Error message'),
+                'endpoint/problems/2/': complete_reply('2', 'abc123')
             })
 
             def switch_post_reply(path, body):
                 message = json.loads(body)
                 if len(message) == 1:
                     client.session.post = lambda a, _: choose_reply(a, {
-                        'problems/': '[%s]' % continue_reply('2', 'abc123')})
+                        'endpoint/problems/': '[%s]' % continue_reply('2', 'abc123')})
                     return choose_reply('', {'': '[%s]' % continue_reply('1', 'abc123')})
                 else:
                     client.session.post = None
-                    return choose_reply('', {
-                        '': '[%s, %s]' % (continue_reply('1', 'abc123'), continue_reply('2', 'abc123'))
+                    return choose_reply('endpoint/', {
+                        'endpoint/': '[%s, %s]' % (continue_reply('1', 'abc123'), continue_reply('2', 'abc123'))
                     })
 
             client.session.post = lambda a, body: switch_post_reply(a, body)
@@ -308,10 +308,10 @@ class MockCancel(unittest.TestCase):
         submission_id = 'test-id'
         reply_body = '[%s]' % continue_reply(submission_id, 'solver')
 
-        with Client('', '') as client:
+        with Client('endpoint', 'token') as client:
             client.session = mock.Mock()
 
-            client.session.get = lambda a: choose_reply(a, {'problems/?id={}'.format(submission_id): reply_body})
+            client.session.get = lambda a: choose_reply(a, {'endpoint/problems/?id={}'.format(submission_id): reply_body})
             client.session.delete = DeleteEvent.handle
 
             solver = Solver(client, solver_data('abc123'))
@@ -323,10 +323,10 @@ class MockCancel(unittest.TestCase):
                 future.samples
                 self.fail()
             except DeleteEvent as event:
-                if event.url == 'problems/':
+                if event.url == 'endpoint/problems/':
                     self.assertEqual(event.body, '["{}"]'.format(submission_id))
                 else:
-                    self.assertEqual(event.url, 'problems/{}/'.format(submission_id))
+                    self.assertEqual(event.url, 'endpoint/problems/{}/'.format(submission_id))
 
     def test_cancel_without_id(self):
         """Make sure the cancel method submits to the right endpoint.
@@ -338,13 +338,13 @@ class MockCancel(unittest.TestCase):
 
         release_reply = threading.Event()
 
-        with Client('', '') as client:
+        with Client('endpoint', 'token') as client:
             client.session = mock.Mock()
-            client.session.get = lambda a: choose_reply(a, {'problems/?id={}'.format(submission_id): reply_body})
+            client.session.get = lambda a: choose_reply(a, {'endpoint/problems/?id={}'.format(submission_id): reply_body})
 
             def post(a, _):
                 release_reply.wait()
-                return choose_reply(a, {'problems/'.format(submission_id): reply_body})
+                return choose_reply(a, {'endpoint/problems/'.format(submission_id): reply_body})
             client.session.post = post
             client.session.delete = DeleteEvent.handle
 
@@ -360,7 +360,7 @@ class MockCancel(unittest.TestCase):
                 future.samples
                 self.fail()
             except DeleteEvent as event:
-                if event.url == 'problems/':
+                if event.url == 'endpoint/problems/':
                     self.assertEqual(event.body, '["{}"]'.format(submission_id))
                 else:
-                    self.assertEqual(event.url, 'problems/{}/'.format(submission_id))
+                    self.assertEqual(event.url, 'endpoint/problems/{}/'.format(submission_id))
