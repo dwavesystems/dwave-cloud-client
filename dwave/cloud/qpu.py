@@ -55,10 +55,26 @@ any future object is a blocking operation.
     futures[0].wait()
 
     # Or we can wait on several futures
-    dwave.cloud.qpu.computation.Future.wait_multiple(futures, min_done=3)
+    dwave.cloud.computation.Future.wait_multiple(futures, min_done=3)
 
 """
 
-from .client import Client
-from .solver import Solver
-from .computation import Future
+from __future__ import absolute_import
+
+from dwave.cloud.client import Client as BaseClient
+from dwave.cloud.solver import Solver
+from dwave.cloud.computation import Future
+
+
+class Client(BaseClient):
+
+    @staticmethod
+    def is_solver_handled(solver):
+        """Predicate function that determines if the given solver should be
+        handled by this client.
+
+        In QPU client we're handling only QPU solvers.
+        """
+        if not solver:
+            return False
+        return not solver.id.startswith('c4-sw_')

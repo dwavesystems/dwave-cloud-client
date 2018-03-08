@@ -14,6 +14,8 @@ except ImportError:
 from dwave.cloud.qpu import Client, Solver
 from dwave.cloud.exceptions import InvalidAPIResponseError
 
+from .test_config import iterable_mock_open, configparser_open_namespace
+
 
 url = 'https://dwavesys.com'
 token = 'abc123abc123abc123abc123abc123abc123'
@@ -203,9 +205,19 @@ alpha|file-alpha-url,file-alpha-token,,alpha-solver
 class MockConfiguration(unittest.TestCase):
     """Ensure that the precedence of configuration sources is followed."""
 
+    env = {'DWAVE_CONFIG_FILE': None, 'DWAVE_PROFILE': None,
+           'DWAVE_API_CLIENT': None, 'DWAVE_API_ENDPOINT': None,
+           'DWAVE_API_TOKEN': None, 'DWAVE_API_SOLVER': None,
+           'DWAVE_API_PROXY': None}
+
+    def setUp(self):
+        for key in self.env.keys():
+            os.environ.pop(key, None)
+
     def test_explicit_only(self):
         """Specify information only through function arguments."""
-        client = Client('arg-url', 'arg-token')
+        client = Client.from_config(config_file='nonexisting',
+                                    endpoint='arg-url', token='arg-token')
         client.session.get = GetEvent.handle
         try:
             client.get_solver('arg-solver')
@@ -215,17 +227,14 @@ class MockConfiguration(unittest.TestCase):
         self.fail()
 
     def test_nothing(self):
-        """With no values set, we should get an error when trying to open the config file."""
-        m = mock.mock_open()
-        m.side_effect = IOError
-        with mock.patch("dwave.cloud.config.open", m, create=True):
-            with self.assertRaises(IOError):
-                Client()
+        """With no values set, we should get an error when trying to create Client."""
+        with self.assertRaises(ValueError):
+            Client.from_config(config_file='nonexisting')
 
     def test_explicit_with_file(self):
         """With arguments and a config file, the config file should be ignored."""
         with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
-            client = Client('arg-url', 'arg-token')
+            client = Client.from_config(endpoint='arg-url', token='arg-token')
             client.session.get = GetEvent.handle
             try:
                 client.get_solver('arg-solver')
@@ -237,7 +246,7 @@ class MockConfiguration(unittest.TestCase):
     def test_only_file(self):
         """With no arguments or environment variables, the default connection from the config file should be used."""
         with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
-            client = Client()
+            client = Client.from_config()
             client.session.get = GetEvent.handle
             try:
                 client.get_solver('arg-solver')
@@ -249,20 +258,23 @@ class MockConfiguration(unittest.TestCase):
     def test_only_file_key(self):
         """If give a name from the config file the proper URL should be loaded."""
         with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
-            client = Client(profile='alpha')
-            client.session.get = GetEvent.handle
-            try:
-                client.get_solver('arg-solver')
-            except GetEvent as event:
-                self.assertTrue(event.url.startswith('file-alpha-url'))
-                return
-            self.fail()
+            with mock.patch(configparser_open_namespace, iterable_mock_open(config_body), create=True):
+                # this will try parsing legacy format as new, fail,
+                # then try parsing it as legacy config
+                client = Client.from_config(profile='alpha')
+                client.session.get = GetEvent.handle
+                try:
+                    client.get_solver('arg-solver')
+                except GetEvent as event:
+                    self.assertTrue(event.url.startswith('file-alpha-url'))
+                    return
+                self.fail()
 
     def test_env_with_file_set(self):
         """With environment variables and a config file, the config file should be ignored."""
         with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
             with mock.patch.dict(os.environ, {'DW_INTERNAL__HTTPLINK': 'env-url', 'DW_INTERNAL__TOKEN': 'env-token'}):
-                client = Client()
+                client = Client.from_config()
                 client.session.get = GetEvent.handle
                 try:
                     client.get_solver('arg-solver')
@@ -274,7 +286,7 @@ class MockConfiguration(unittest.TestCase):
     def test_env_args_set(self):
         """With arguments and environment variables, the environment variables should be ignored."""
         with mock.patch.dict(os.environ, {'DW_INTERNAL__HTTPLINK': 'env-url', 'DW_INTERNAL__TOKEN': 'env-token'}):
-            client = Client('args-url', 'args-token')
+            client = Client.from_config(endpoint='args-url', token='args-token')
             client.session.get = GetEvent.handle
             try:
                 client.get_solver('arg-solver')

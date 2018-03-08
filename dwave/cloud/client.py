@@ -13,7 +13,7 @@ from six.moves import queue, range
 
 from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config
-from dwave.cloud.qpu.solver import Solver
+from dwave.cloud.solver import Solver
 
 _LOGGER = logging.getLogger(__name__)
 # _LOGGER.setLevel(logging.DEBUG)
@@ -22,13 +22,26 @@ _LOGGER = logging.getLogger(__name__)
 
 class Client(object):
     """
-    Connect to a SAPI server to expose the solvers that the server advertises.
+    Base client for all D-Wave API clients.
+
+    Implements workers (and handles thread pools) for problem submittal, task
+    cancellation, problem status polling and results downloading.
 
     Args:
-        endpoint (str): solver API endpoint URL
-        token (str): Authentication token from the SAPI server.
-        proxy (str): Proxy URL to be used for accessing the D-Wave API
-        permissive_ssl (boolean; false by default): Disables SSL verification.
+        endpoint (str):
+            D-Wave API endpoint URL.
+
+        token (str):
+            Authentication token for the D-Wave API.
+
+        solver (str):
+            Default solver.
+
+        proxy (str):
+            Proxy URL to be used for accessing the D-Wave API.
+
+        permissive_ssl (bool, default=False):
+            Disables SSL verification.
     """
 
     # The status flags that a problem can have
@@ -51,9 +64,38 @@ class Client(object):
     _POLL_THREAD_COUNT = 2
     _LOAD_THREAD_COUNT = 5
 
+    @classmethod
+    def from_config(cls, config_file=None, profile=None, client=None,
+                    endpoint=None, token=None, solver=None, proxy=None):
 
-    def __init__(self, endpoint=None, token=None, proxy=None, permissive_ssl=False,
-                 profile=None, solver=None):
+        # try loading configuration from a preferred new config subsystem
+        # (`./dwave.conf`, `~/.config/dwave/dwave.conf`, etc)
+        try:
+            config = load_config(
+                config_file=config_file, profile=profile, client=client,
+                endpoint=endpoint, token=token, solver=solver, proxy=proxy)
+        except ValueError:
+            config = dict(
+                endpoint=endpoint, token=token, solver=solver, proxy=proxy,
+                client=client)
+
+        # and failback to the legacy `.dwrc`
+        if config.get('token') is None or config.get('endpoint') is None:
+            try:
+                _endpoint, _token, _proxy, _solver = legacy_load_config(profile)
+                config = dict(
+                    endpoint=_endpoint, token=_token, solver=_solver, proxy=_proxy,
+                    client=client)
+            except (ValueError, IOError):
+                pass
+
+        from dwave.cloud import qpu, sw
+        _clients = {'qpu': qpu.Client, 'sw': sw.Client}
+        _client = config.pop('client') or 'qpu'
+        return _clients[_client](**config)
+
+    def __init__(self, endpoint=None, token=None, solver=None, proxy=None,
+                 permissive_ssl=False):
         """To setup the connection a pipeline of queues/workers is constructed.
 
         There are five interations with the server the connection manages:
@@ -63,37 +105,23 @@ class Client(object):
         4. Downloading problem results.
         5. Canceling problems
 
-        Loading solver information is done synchronously. The other four tasks are
-        performed by asynchronously workers. For 2, 3, and 5 the workers gather
-        tasks in batches.
+        Loading solver information is done synchronously. The other four tasks
+        are performed by asynchronously workers. For 2, 3, and 5 the workers
+        gather tasks in batches.
         """
-
-        # load configuration from `dwave.conf`, but failback to legacy `.dwrc`
-        try:
-            config = load_config(
-                config_file=None, client=None, profile=profile,
-                endpoint=endpoint, token=token, solver=solver, proxy=proxy)
-        except ValueError:
-            config = dict(endpoint=endpoint, token=token, proxy=proxy, solver=solver)
-        #print("my config: %r" % config)
-        # TODO: FIX: legacy config loading is broken in so many ways
-        if config.get('token') is None:
-            _endpoint, _token, _proxy, _solver = legacy_load_config(profile)
-            config = dict(endpoint=_endpoint, token=_token, proxy=_proxy, solver=_solver)
-
-        if 'endpoint' not in config or 'token' not in config:
+        if not endpoint or not token:
             raise ValueError("Endpoint URL and/or token not defined")
 
-        _LOGGER.debug("Creating a client with params: %r", config)
+        _LOGGER.debug("Creating a client for endpoint: %r", endpoint)
 
-        self.base_url = config['endpoint']
-        self.token = config['token']
-        self.default_solver = config.get('solver')
+        self.base_url = endpoint
+        self.token = token
+        self.default_solver = solver
 
         # Create a :mod:`requests` session. `requests` will manage our url parsing, https, etc.
         self.session = requests.Session()
         self.session.headers.update({'X-Auth-Token': self.token})
-        self.session.proxies = {'http': config.get('proxy'), 'https': config.get('proxy')}
+        self.session.proxies = {'http': proxy, 'https': proxy}
         if permissive_ssl:
             self.session.verify = False
 
@@ -197,11 +225,9 @@ class Client(object):
         Can be overridden in a subclass to specialize the client for a
         particular type of solvers.
 
-        Default implementation skips software solvers.
+        Default implementation accepts all solvers.
         """
-        if not solver:
-            return False
-        return not solver.id.startswith('c4-sw_')
+        return True
 
     def get_solvers(self, refresh=False):
         """List all the solvers this connection can provide,

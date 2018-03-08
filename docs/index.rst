@@ -40,13 +40,19 @@ It is also possible to create the connection using only the label or url, and th
 Classes
 -------
 
-.. autoclass:: qpu.client.Client
+.. autoclass:: dwave.cloud.client.Client
     :members:
 
-.. autoclass:: qpu.solver.Solver
+.. autoclass:: dwave.cloud.qpu.Client
     :members:
 
-.. autoclass:: qpu.computation.Future
+.. autoclass:: dwave.cloud.sw.Client
+    :members:
+
+.. autoclass:: dwave.cloud.solver.Solver
+    :members:
+
+.. autoclass:: dwave.cloud.computation.Future
     :members:
 
 Error Classes
