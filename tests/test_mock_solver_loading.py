@@ -14,6 +14,8 @@ except ImportError:
 from dwave.cloud.qpu import Client, Solver
 from dwave.cloud.exceptions import InvalidAPIResponseError
 
+from .test_config import iterable_mock_open, configparser_open_namespace
+
 
 url = 'https://dwavesys.com'
 token = 'abc123abc123abc123abc123abc123abc123'
@@ -255,16 +257,17 @@ class MockConfiguration(unittest.TestCase):
     def test_only_file_key(self):
         """If give a name from the config file the proper URL should be loaded."""
         with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
-            # this will try parsing legacy format as new, fail,
-            # then try parsing it as legacy config
-            client = Client.from_config(profile='alpha')
-            client.session.get = GetEvent.handle
-            try:
-                client.get_solver('arg-solver')
-            except GetEvent as event:
-                self.assertTrue(event.url.startswith('file-alpha-url'))
-                return
-            self.fail()
+            with mock.patch(configparser_open_namespace, iterable_mock_open(config_body), create=True):
+                # this will try parsing legacy format as new, fail,
+                # then try parsing it as legacy config
+                client = Client.from_config(profile='alpha')
+                client.session.get = GetEvent.handle
+                try:
+                    client.get_solver('arg-solver')
+                except GetEvent as event:
+                    self.assertTrue(event.url.startswith('file-alpha-url'))
+                    return
+                self.fail()
 
     def test_env_with_file_set(self):
         """With environment variables and a config file, the config file should be ignored."""
