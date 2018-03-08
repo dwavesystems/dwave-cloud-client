@@ -171,6 +171,7 @@ class TestConfig(unittest.TestCase):
             self._assert_config_valid(load_config())
 
     def test_config_load_configfile_env_profile_env_key_arg(self):
+        """Explicitly provided values should override env/file."""
         with mock.patch("dwave.cloud.config.load_config_from_file",
                         partial(self._load_config_from_file, provided='myfile')):
             os.environ = {'DWAVE_CONFIG_FILE': 'myfile', 'DWAVE_PROFILE': 'alpha'}
@@ -179,6 +180,16 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(load_config(client='manual')['client'], 'manual')
             self.assertEqual(load_config(solver='manual')['solver'], 'manual')
             self.assertEqual(load_config(proxy='manual')['proxy'], 'manual')
+
+    def test_config_load__profile_arg_nonexisting(self):
+        """load_config should fail if the profile specified in kwargs or env in
+        non-existing.
+        """
+        with mock.patch("dwave.cloud.config.load_config_from_file",
+                        partial(self._load_config_from_file, provided=None)):
+            self.assertRaises(ValueError, load_config, profile="nonexisting")
+            with mock.patch.dict(os.environ, {'DWAVE_PROFILE': 'nonexisting'}):
+                self.assertRaises(ValueError, load_config)
 
     def test_config_load_configfile_arg_profile_default(self):
         """Check the right profile is loaded when `profile` specified only in
