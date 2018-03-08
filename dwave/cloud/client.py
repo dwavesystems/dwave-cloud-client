@@ -70,15 +70,20 @@ class Client(object):
 
         # try loading configuration from a preferred new config subsystem
         # (`./dwave.conf`, `~/.config/dwave/dwave.conf`, etc)
-        config = load_config(
-            config_file=config_file, profile=profile, client=client,
-            endpoint=endpoint, token=token, solver=solver, proxy=proxy)
+        try:
+            config = load_config(
+                config_file=config_file, profile=profile, client=client,
+                endpoint=endpoint, token=token, solver=solver, proxy=proxy)
+        except ValueError:
+            config = dict(
+                endpoint=endpoint, token=token, solver=solver, proxy=proxy,
+                client=client)
 
         # and failback to the legacy `.dwrc`
         if config.get('token') is None or config.get('endpoint') is None:
             _endpoint, _token, _proxy, _solver = legacy_load_config(profile)
             config = dict(
-                endpoint=_endpoint, token=_token, proxy=_proxy, solver=_solver,
+                endpoint=_endpoint, token=_token, solver=_solver, proxy=_proxy,
                 client=client)
 
         from dwave.cloud import qpu, sw
