@@ -202,6 +202,8 @@ alpha|file-alpha-url,file-alpha-token,,alpha-solver
 """
 
 
+# patch the new config loading mechanism, to test only legacy config loading
+@mock.patch("dwave.cloud.config.detect_configfile_path", lambda: None)
 class MockConfiguration(unittest.TestCase):
     """Ensure that the precedence of configuration sources is followed."""
 
