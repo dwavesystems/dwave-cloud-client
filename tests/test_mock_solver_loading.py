@@ -211,7 +211,8 @@ class MockConfiguration(unittest.TestCase):
            'DWAVE_API_PROXY': None}
 
     def setUp(self):
-        os.environ.update(self.env)
+        for key in self.env.keys():
+            os.environ.pop(key, None)
 
     def test_explicit_only(self):
         """Specify information only through function arguments."""
