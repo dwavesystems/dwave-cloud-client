@@ -41,6 +41,7 @@ class TestConfig(unittest.TestCase):
         [defaults]
         endpoint = https://cloud.dwavesys.com/sapi
         client = qpu
+        profile = software
 
         [dw2000]
         solver = DW_2000Q_1
@@ -60,7 +61,7 @@ class TestConfig(unittest.TestCase):
     def parse_config_string(self, text):
         config = configparser.ConfigParser(default_section="defaults")
         config.read_string(text)
-        return dict(config)
+        return config
 
     def test_config_load_from_file(self):
         with mock.patch(configparser_open_namespace, iterable_mock_open(self.config_body), create=True):
@@ -117,14 +118,16 @@ class TestConfig(unittest.TestCase):
 
 
     def _assert_config_valid(self, config):
-        # profile is loaded
+        # profile 'alpha' is loaded
         self.assertEqual(config['endpoint'], "https://url.to.alpha/api")
         # default values are inherited
         self.assertEqual(config['client'], "qpu")
 
-    def _load_config_from_file(self, asked, provided):
+    def _load_config_from_file(self, asked, provided, data=None):
         self.assertEqual(asked, provided)
-        return self.parse_config_string(self.config_body)
+        if data is None:
+            data = self.config_body
+        return self.parse_config_string(data)
 
 
     def test_config_load_configfile_arg(self):
@@ -164,3 +167,28 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(load_config(client='manual')['client'], 'manual')
             self.assertEqual(load_config(solver='manual')['solver'], 'manual')
             self.assertEqual(load_config(proxy='manual')['proxy'], 'manual')
+
+    def test_config_load_configfile_arg_profile_default(self):
+        """Check the right profile is loaded when `profile` specified only in
+        [defaults] section.
+        """
+        with mock.patch("dwave.cloud.config.load_config_from_file",
+                        partial(self._load_config_from_file, provided='myfile')):
+            profile = load_config(config_file='myfile')
+            self.assertEqual(profile['solver'], 'c4-sw_sample')
+
+    def test_config_load_configfile_arg_profile_default_nonexisting(self):
+        """load_config should fail if the profile specified in the defaults
+        section is non-existing.
+        """
+        myconfig = u"""
+            [defaults]
+            profile = nonexisting
+
+            [some]
+            solver = DW_2000Q_1
+        """
+        with mock.patch("dwave.cloud.config.load_config_from_file",
+                        partial(self._load_config_from_file,
+                                provided='myfile', data=myconfig)):
+            self.assertRaises(ValueError, load_config, config_file='myfile')

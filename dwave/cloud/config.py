@@ -128,7 +128,7 @@ def load_config(config_file=None, profile=None, client=None,
     ``defaults``.
 
     If the location of `config_file` is not specified, an auto-detection is
-    performed (looking first for `dwave.conf` in process' current working
+    performed (looking first for ``dwave.conf`` in process' current working
     directory, then in user-local config directories, and finally in system-wide
     config dirs). For details on format and location detection, see
     :func:`load_config_from_file`.
@@ -166,7 +166,9 @@ def load_config(config_file=None, profile=None, client=None,
 
         profile (str, default=None):
             Profile name (config file section name). If undefined (by default),
-            config file values are not used at all.
+            it is inferred from ``DWAVE_PROFILE`` environment variable, and if
+            that variable is not present, ``profile`` key is looked-up in the
+            ``[defaults]`` config section.
 
         client (str, default=None):
             Client (selected by name) to use for accessing the API. Use ``qpu``
@@ -222,11 +224,13 @@ def load_config(config_file=None, profile=None, client=None,
         config_file = os.getenv("DWAVE_CONFIG_FILE")
     try:
         config = load_config_from_file(config_file)
+        default_profile = config.defaults().get('profile')
     except ValueError:
         config = {}
+        default_profile = None
 
     if profile is None:
-        profile = os.getenv("DWAVE_PROFILE")
+        profile = os.getenv("DWAVE_PROFILE", default_profile)
     if profile:
         try:
             section = dict(config[profile])
