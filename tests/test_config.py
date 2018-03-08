@@ -37,6 +37,11 @@ from dwave.cloud.config import (
 
 class TestConfig(unittest.TestCase):
 
+    env = {'DWAVE_CONFIG_FILE': None, 'DWAVE_PROFILE': None,
+           'DWAVE_API_CLIENT': None, 'DWAVE_API_ENDPOINT': None,
+           'DWAVE_API_TOKEN': None, 'DWAVE_API_SOLVER': None,
+           'DWAVE_API_PROXY': None}
+
     config_body = u"""
         [defaults]
         endpoint = https://cloud.dwavesys.com/sapi
@@ -69,6 +74,12 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(config.sections(), ['dw2000', 'software', 'alpha'])
             self.assertEqual(config['dw2000']['client'], 'qpu')
             self.assertEqual(config['software']['client'], 'sw')
+
+    def setUp(self):
+        # clear `config_load`-relevant environment variables before testing, so
+        # we only need to patch the ones that we are currently testing
+        for key in self.env.keys():
+            os.environ.pop(key, None)
 
     def test_config_load_from_file__invalid_format__duplicate_sections(self):
         """Config loading should fail with `ValueError` on file load error."""
@@ -150,8 +161,8 @@ class TestConfig(unittest.TestCase):
     def test_config_load_configfile_env(self):
         with mock.patch("dwave.cloud.config.load_config_from_file",
                         partial(self._load_config_from_file, provided='myfile')):
-            os.environ = {'DWAVE_CONFIG_FILE': 'myfile'}
-            self._assert_config_valid(load_config(config_file=None, profile='alpha'))
+            with mock.patch.dict(os.environ, {'DWAVE_CONFIG_FILE': 'myfile'}):
+                self._assert_config_valid(load_config(config_file=None, profile='alpha'))
 
     def test_config_load_configfile_detect(self):
         with mock.patch("dwave.cloud.config.load_config_from_file",
@@ -161,25 +172,27 @@ class TestConfig(unittest.TestCase):
     def test_config_load_configfile_detect_profile_env(self):
         with mock.patch("dwave.cloud.config.load_config_from_file",
                         partial(self._load_config_from_file, provided=None)):
-            os.environ = {'DWAVE_PROFILE': 'alpha'}
-            self._assert_config_valid(load_config())
+            with mock.patch.dict(os.environ, {'DWAVE_PROFILE': 'alpha'}):
+                self._assert_config_valid(load_config())
 
     def test_config_load_configfile_env_profile_env(self):
         with mock.patch("dwave.cloud.config.load_config_from_file",
                         partial(self._load_config_from_file, provided='myfile')):
-            os.environ = {'DWAVE_CONFIG_FILE': 'myfile', 'DWAVE_PROFILE': 'alpha'}
-            self._assert_config_valid(load_config())
+            with mock.patch.dict(os.environ, {'DWAVE_CONFIG_FILE': 'myfile',
+                                              'DWAVE_PROFILE': 'alpha'}):
+                self._assert_config_valid(load_config())
 
     def test_config_load_configfile_env_profile_env_key_arg(self):
         """Explicitly provided values should override env/file."""
         with mock.patch("dwave.cloud.config.load_config_from_file",
                         partial(self._load_config_from_file, provided='myfile')):
-            os.environ = {'DWAVE_CONFIG_FILE': 'myfile', 'DWAVE_PROFILE': 'alpha'}
-            self.assertEqual(load_config(endpoint='manual')['endpoint'], 'manual')
-            self.assertEqual(load_config(token='manual')['token'], 'manual')
-            self.assertEqual(load_config(client='manual')['client'], 'manual')
-            self.assertEqual(load_config(solver='manual')['solver'], 'manual')
-            self.assertEqual(load_config(proxy='manual')['proxy'], 'manual')
+            with mock.patch.dict(os.environ, {'DWAVE_CONFIG_FILE': 'myfile',
+                                              'DWAVE_PROFILE': 'alpha'}):
+                self.assertEqual(load_config(endpoint='manual')['endpoint'], 'manual')
+                self.assertEqual(load_config(token='manual')['token'], 'manual')
+                self.assertEqual(load_config(client='manual')['client'], 'manual')
+                self.assertEqual(load_config(solver='manual')['solver'], 'manual')
+                self.assertEqual(load_config(proxy='manual')['proxy'], 'manual')
 
     def test_config_load__profile_arg_nonexisting(self):
         """load_config should fail if the profile specified in kwargs or env in
