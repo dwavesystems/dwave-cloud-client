@@ -213,6 +213,21 @@ class TestConfig(unittest.TestCase):
             profile = load_config(config_file='myfile')
             self.assertEqual(profile['solver'], 'c4-sw_sample')
 
+    def test_config_load__profile_first_section(self):
+        """load_config should fail if the profile specified as the first section
+        if not otherwise specified.
+        """
+        myconfig = u"""
+            [first]
+            solver = DW_2000Q_1
+        """
+        with mock.patch("dwave.cloud.config.load_config_from_file",
+                        partial(self._load_config_from_file,
+                                provided=None, data=myconfig)):
+            profile = load_config()
+            self.assertIn('solver', profile)
+            self.assertEqual(profile['solver'], 'DW_2000Q_1')
+
     def test_config_load_configfile_arg_profile_default_nonexisting(self):
         """load_config should fail if the profile specified in the defaults
         section is non-existing.

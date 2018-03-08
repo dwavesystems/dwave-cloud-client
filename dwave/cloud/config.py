@@ -224,7 +224,11 @@ def load_config(config_file=None, profile=None, client=None,
         config_file = os.getenv("DWAVE_CONFIG_FILE")
     try:
         config = load_config_from_file(config_file)
-        default_profile = config.defaults().get('profile')
+        # last-resort profile name:
+        #  (1) profile key under [defaults],
+        #  (2) first non-[defaults] section
+        first_section = next(iter(config.sections() + [None]))
+        default_profile = config.defaults().get('profile', first_section)
     except ValueError:
         config = {}
         default_profile = None
