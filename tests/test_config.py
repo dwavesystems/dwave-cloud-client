@@ -37,11 +37,6 @@ from dwave.cloud.config import (
 
 class TestConfig(unittest.TestCase):
 
-    env = {'DWAVE_CONFIG_FILE': None, 'DWAVE_PROFILE': None,
-           'DWAVE_API_CLIENT': None, 'DWAVE_API_ENDPOINT': None,
-           'DWAVE_API_TOKEN': None, 'DWAVE_API_SOLVER': None,
-           'DWAVE_API_PROXY': None}
-
     config_body = u"""
         [defaults]
         endpoint = https://cloud.dwavesys.com/sapi
@@ -78,8 +73,9 @@ class TestConfig(unittest.TestCase):
     def setUp(self):
         # clear `config_load`-relevant environment variables before testing, so
         # we only need to patch the ones that we are currently testing
-        for key in self.env.keys():
-            os.environ.pop(key, None)
+        for key in frozenset(os.environ.keys()):
+            if key.startswith("DWAVE_") or key.startswith("DW_INTERNAL__"):
+                os.environ.pop(key, None)
 
     def test_config_load_from_file__invalid_format__duplicate_sections(self):
         """Config loading should fail with `ValueError` on file load error."""
