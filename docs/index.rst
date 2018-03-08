@@ -40,7 +40,7 @@ It is also possible to create the connection using only the label or url, and th
 Classes
 -------
 
-.. autoclass:: dwave.cloud.client.BaseClient
+.. autoclass:: dwave.cloud.client.Client
     :members:
 
 .. autoclass:: dwave.cloud.qpu.Client

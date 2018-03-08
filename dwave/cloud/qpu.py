@@ -61,7 +61,7 @@ any future object is a blocking operation.
 
 from __future__ import absolute_import
 
-from dwave.cloud.client import BaseClient
+from dwave.cloud.client import Client as BaseClient
 from dwave.cloud.solver import Solver
 from dwave.cloud.computation import Future
 

@@ -20,15 +20,28 @@ _LOGGER = logging.getLogger(__name__)
 # _LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 
 
-class BaseClient(object):
+class Client(object):
     """
-    Connect to a SAPI server to expose the solvers that the server advertises.
+    Base client for all D-Wave API clients.
+
+    Implements workers (and handles thread pools) for problem submittal, task
+    cancellation, problem status polling and results downloading.
 
     Args:
-        endpoint (str): solver API endpoint URL
-        token (str): Authentication token from the SAPI server.
-        proxy (str): Proxy URL to be used for accessing the D-Wave API
-        permissive_ssl (boolean; false by default): Disables SSL verification.
+        endpoint (str):
+            D-Wave API endpoint URL.
+
+        token (str):
+            Authentication token for the D-Wave API.
+
+        solver (str):
+            Default solver.
+
+        proxy (str):
+            Proxy URL to be used for accessing the D-Wave API.
+
+        permissive_ssl (bool, default=False):
+            Disables SSL verification.
     """
 
     # The status flags that a problem can have
@@ -84,9 +97,9 @@ class BaseClient(object):
         4. Downloading problem results.
         5. Canceling problems
 
-        Loading solver information is done synchronously. The other four tasks are
-        performed by asynchronously workers. For 2, 3, and 5 the workers gather
-        tasks in batches.
+        Loading solver information is done synchronously. The other four tasks
+        are performed by asynchronously workers. For 2, 3, and 5 the workers
+        gather tasks in batches.
         """
         if not endpoint or not token:
             raise ValueError("Endpoint URL and/or token not defined")
