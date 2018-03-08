@@ -113,8 +113,103 @@ def load_profile(name, filename=None):
 
 def load_config(config_file=None, profile=None, client=None,
                 endpoint=None, token=None, solver=None, proxy=None):
-    """Load config. Explicitly supplied values override environment values, and
-    environment values override config file values.
+    """Load D-Wave cloud client configuration from `config_file` (either
+    explicitly specified, or auto-detected) for `profile`, but override the
+    values from config file with values defined in process environment, and
+    override those with values specified with keyword arguments.
+
+    Config file uses the standard Windows INI format, with one profile per
+    section. A section providing default values for all other sections is called
+    ``defaults``.
+
+    If the location of `config_file` is not specified, an auto-detection is
+    performed (looking first for `dwave.conf` in process' current working
+    directory, then in user-local config directories, and finally in system-wide
+    config dirs). For details on format and location detection, see
+    :func:`load_config_from_file`.
+
+    Environment variables:
+        ``DWAVE_CONFIG_FILE``:
+            Config file path used if `config_file` not specified.
+
+        ``DWAVE_PROFILE``:
+            Name of config profile (section) to use if `profile` not specified.
+
+        ``DWAVE_API_CLIENT``:
+            API client class used (can be: ``qpu`` or ``sw``). Overrides values
+            from config file, but is overridden with `client`.
+
+        ``DWAVE_API_ENDPOINT``:
+            API endpoint URL to use instead of the URL given in config file,
+            if `endpoint` not given.
+
+        ``DWAVE_API_TOKEN``:
+            API authorization token. Overrides values from config file, but is
+            overridden with `token`.
+
+        ``DWAVE_API_SOLVER``:
+            Default solver. Overrides values from config file, but is overridden
+            with `solver`.
+
+        ``DWAVE_API_PROXY``:
+            URL for proxy to use in connections to D-Wave API. Overrides values
+            from config file, but is overridden with `proxy`.
+
+    Args:
+        config_file (str, default=None):
+            Path to config file. Auto-detected by default.
+
+        profile (str, default=None):
+            Profile name (config file section name). If undefined (by default),
+            config file values are not used at all.
+
+        client (str, default=None):
+            Client (selected by name) to use for accessing the API. Use ``qpu``
+            to specify the :class:`dwave.cloud.qpu.Client` and ``sw`` for
+            :class:`dwave.cloud.sw.Client`.
+
+        endpoint (str, default=None):
+            API endpoint URL.
+
+        token (str, default=None):
+            API authorization token.
+
+        solver (str, default=None):
+            Default solver to use in :meth:`dwave.cloud.qpu.Client.get_solver()`
+            or :meth:`dwave.cloud.sw.Client.get_solver()`. If undefined, you'll
+            have to explicitly specify the solver in calls to ``get_solver()``.
+
+        proxy (str, default=None):
+            URL for proxy to use in connections to D-Wave API. Can include
+            username/password, port, scheme, etc. If undefined, client will
+            connect directly to the API (unless you use a system-level proxy).
+
+        Returns:
+            :obj:`dict`:
+                Mapping of config keys to config values, for a specific profile
+                (section), as read from the config file, overridden with
+                environment values, overridden with immediate keyword arguments.
+
+                A set of keys guaranteed to be present: ``client``,
+                ``endpoint``, ``token``, ``solver``, ``proxy``.
+
+                Example::
+
+                    {
+                        'client': 'qpu'
+                        'endpoint': 'https://cloud.dwavesys.com/sapi',
+                        'token': '123',
+                        'solver': None,
+                        'proxy': None
+                    }
+
+        Raises:
+            Nothing, except in unexpected circumstances.
+
+            Cases of invalid config file, file/disk read error, invalid
+            environment values, etc. are handled and result in `None` values
+            for one or all of the keys in the result.
+
     """
     # load config file
     # lookup priority: explicitly specified, environment specified, auto-detected
@@ -136,9 +231,9 @@ def load_config(config_file=None, profile=None, client=None,
         section = {}
 
     return {
+        'client': client or os.getenv("DWAVE_API_CLIENT", section.get('client')),
         'endpoint': endpoint or os.getenv("DWAVE_API_ENDPOINT", section.get('endpoint')),
         'token': token or os.getenv("DWAVE_API_TOKEN", section.get('token')),
-        'client': client or os.getenv("DWAVE_API_CLIENT", section.get('client')),
         'solver': solver or os.getenv("DWAVE_API_SOLVER", section.get('solver')),
         'proxy': proxy or os.getenv("DWAVE_API_PROXY", section.get('proxy')),
     }
