@@ -99,7 +99,12 @@ def load_config_from_file(filename=None):
             raise ValueError("Config filename not given, and could not be detected")
 
     config = configparser.ConfigParser(default_section="defaults")
-    if not config.read(filename):
+    try:
+        files_read = config.read(filename)
+    except configparser.Error:
+        files_read = []
+
+    if not files_read:
         raise ValueError("Failed to parse the config file "\
                          "given or detected: {}".format(filename))
 
