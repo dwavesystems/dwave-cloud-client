@@ -70,6 +70,18 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(config['dw2000']['client'], 'qpu')
             self.assertEqual(config['software']['client'], 'sw')
 
+    def test_config_load_from_file__invalid_format__duplicate_sections(self):
+        """Config loading should fail with `ValueError` on file load error."""
+        myconfig = u"""
+            [section]
+            key = val
+            [section]
+            key = val
+        """
+        with mock.patch(configparser_open_namespace, iterable_mock_open(myconfig), create=True):
+            self.assertRaises(ValueError, load_config_from_file, filename="filename")
+            self.assertRaises(ValueError, load_config, config_file="filename", profile="section")
+
     def test_no_config_detected(self):
         with mock.patch("dwave.cloud.config.detect_configfile_path", lambda: None):
             self.assertRaises(ValueError, load_config_from_file)
