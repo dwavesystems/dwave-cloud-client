@@ -210,11 +210,27 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(profile['solver'], 'c4-sw_sample')
 
     def test_config_load__profile_first_section(self):
-        """load_config should fail if the profile specified as the first section
-        if not otherwise specified.
+        """load_config should load the first section for profile, if profile
+        is nowhere else specified.
         """
         myconfig = u"""
             [first]
+            solver = DW_2000Q_1
+        """
+        with mock.patch("dwave.cloud.config.load_config_from_file",
+                        partial(self._load_config_from_file,
+                                provided=None, data=myconfig)):
+            profile = load_config()
+            self.assertIn('solver', profile)
+            self.assertEqual(profile['solver'], 'DW_2000Q_1')
+
+    def test_config_load__profile_from_defaults(self):
+        """load_config should promote [defaults] section to profile, if profile
+        is nowhere else specified *and* not even a single non-[defaults] section
+        exists.
+        """
+        myconfig = u"""
+            [defaults]
             solver = DW_2000Q_1
         """
         with mock.patch("dwave.cloud.config.load_config_from_file",

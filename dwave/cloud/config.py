@@ -168,7 +168,10 @@ def load_config(config_file=None, profile=None, client=None,
             Profile name (config file section name). If undefined (by default),
             it is inferred from ``DWAVE_PROFILE`` environment variable, and if
             that variable is not present, ``profile`` key is looked-up in the
-            ``[defaults]`` config section.
+            ``[defaults]`` config section. If ``profile`` is not defined under
+            ``[defaults]``, the first section is used. If no other sections are
+            defined besides ``[defaults]``, the ``[defaults]`` section is
+            promoted to profile.
 
         client (str, default=None):
             Client (selected by name) to use for accessing the API. Use ``qpu``
@@ -228,9 +231,11 @@ def load_config(config_file=None, profile=None, client=None,
         #  (1) profile key under [defaults],
         #  (2) first non-[defaults] section
         first_section = next(iter(config.sections() + [None]))
-        default_profile = config.defaults().get('profile', first_section)
+        config_defaults = config.defaults()
+        default_profile = config_defaults.get('profile', first_section)
     except ValueError:
         config = {}
+        config_defaults = {}
         default_profile = None
 
     if profile is None:
@@ -241,7 +246,12 @@ def load_config(config_file=None, profile=None, client=None,
         except KeyError:
             raise ValueError("Profile {!r} not defined in config file".format(profile))
     else:
-        section = {}
+        # as the very last resort (unspecified profile name and
+        # no profiles defined in config), try to use [defaults]
+        if config_defaults:
+            section = config_defaults
+        else:
+            section = {}
 
     return {
         'client': client or os.getenv("DWAVE_API_CLIENT", section.get('client')),
