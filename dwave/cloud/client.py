@@ -81,10 +81,13 @@ class Client(object):
 
         # and failback to the legacy `.dwrc`
         if config.get('token') is None or config.get('endpoint') is None:
-            _endpoint, _token, _proxy, _solver = legacy_load_config(profile)
-            config = dict(
-                endpoint=_endpoint, token=_token, solver=_solver, proxy=_proxy,
-                client=client)
+            try:
+                _endpoint, _token, _proxy, _solver = legacy_load_config(profile)
+                config = dict(
+                    endpoint=_endpoint, token=_token, solver=_solver, proxy=_proxy,
+                    client=client)
+            except (ValueError, IOError):
+                pass
 
         from dwave.cloud import qpu, sw
         _clients = {'qpu': qpu.Client, 'sw': sw.Client}
