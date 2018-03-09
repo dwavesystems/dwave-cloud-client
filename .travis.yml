@@ -36,6 +36,7 @@ matrix:
             - pip install virtualenv
             - virtualenv env -p python
             - source env/bin/activate
+          deploy:
         - os: osx
           language: generic
           env: TOXENV=py27
