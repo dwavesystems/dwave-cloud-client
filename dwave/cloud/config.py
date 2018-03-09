@@ -128,7 +128,7 @@ def load_config(config_file=None, profile=None, client=None,
     ``defaults``.
 
     If the location of `config_file` is not specified, an auto-detection is
-    performed (looking first for `dwave.conf` in process' current working
+    performed (looking first for ``dwave.conf`` in process' current working
     directory, then in user-local config directories, and finally in system-wide
     config dirs). For details on format and location detection, see
     :func:`load_config_from_file`.
@@ -166,7 +166,12 @@ def load_config(config_file=None, profile=None, client=None,
 
         profile (str, default=None):
             Profile name (config file section name). If undefined (by default),
-            config file values are not used at all.
+            it is inferred from ``DWAVE_PROFILE`` environment variable, and if
+            that variable is not present, ``profile`` key is looked-up in the
+            ``[defaults]`` config section. If ``profile`` is not defined under
+            ``[defaults]``, the first section is used. If no other sections are
+            defined besides ``[defaults]``, the ``[defaults]`` section is
+            promoted to profile.
 
         client (str, default=None):
             Client (selected by name) to use for accessing the API. Use ``qpu``
@@ -222,18 +227,31 @@ def load_config(config_file=None, profile=None, client=None,
         config_file = os.getenv("DWAVE_CONFIG_FILE")
     try:
         config = load_config_from_file(config_file)
+        # last-resort profile name:
+        #  (1) profile key under [defaults],
+        #  (2) first non-[defaults] section
+        first_section = next(iter(config.sections() + [None]))
+        config_defaults = config.defaults()
+        default_profile = config_defaults.get('profile', first_section)
     except ValueError:
         config = {}
+        config_defaults = {}
+        default_profile = None
 
     if profile is None:
-        profile = os.getenv("DWAVE_PROFILE")
+        profile = os.getenv("DWAVE_PROFILE", default_profile)
     if profile:
         try:
             section = dict(config[profile])
         except KeyError:
             raise ValueError("Profile {!r} not defined in config file".format(profile))
     else:
-        section = {}
+        # as the very last resort (unspecified profile name and
+        # no profiles defined in config), try to use [defaults]
+        if config_defaults:
+            section = config_defaults
+        else:
+            section = {}
 
     return {
         'client': client or os.getenv("DWAVE_API_CLIENT", section.get('client')),

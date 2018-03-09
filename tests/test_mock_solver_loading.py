@@ -202,17 +202,17 @@ alpha|file-alpha-url,file-alpha-token,,alpha-solver
 """
 
 
+# patch the new config loading mechanism, to test only legacy config loading
+@mock.patch("dwave.cloud.config.detect_configfile_path", lambda: None)
 class MockConfiguration(unittest.TestCase):
     """Ensure that the precedence of configuration sources is followed."""
 
-    env = {'DWAVE_CONFIG_FILE': None, 'DWAVE_PROFILE': None,
-           'DWAVE_API_CLIENT': None, 'DWAVE_API_ENDPOINT': None,
-           'DWAVE_API_TOKEN': None, 'DWAVE_API_SOLVER': None,
-           'DWAVE_API_PROXY': None}
-
     def setUp(self):
-        for key in self.env.keys():
-            os.environ.pop(key, None)
+        # clear `config_load`-relevant environment variables before testing, so
+        # we only need to patch the ones that we are currently testing
+        for key in frozenset(os.environ.keys()):
+            if key.startswith("DWAVE_") or key.startswith("DW_INTERNAL__"):
+                os.environ.pop(key, None)
 
     def test_explicit_only(self):
         """Specify information only through function arguments."""
