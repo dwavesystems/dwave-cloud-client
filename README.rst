@@ -12,11 +12,11 @@
 
 .. inclusion-marker-do-not-remove
 
-D-Wave Micro Client
+D-Wave Cloud Client
 ===================
 
 A minimal implementation of the REST interface used to communicate with
-D-Wave Solver API (SAPI) servers.
+D-Wave Sampler API (SAPI) servers.
 
 SAPI is an application layer built to provide resource discovery, permissions,
 and scheduling for quantum annealing resources at D-Wave Systems.
@@ -29,10 +29,10 @@ Example
 .. code-block:: python
 
     import random
-    from dwave.cloud.qpu import Client
+    from dwave.cloud import Client
 
     # Connect using the default or environment connection information
-    client = Client()
+    client = Client.from_config()
 
     # Load the default solver
     solver = client.get_solver()
