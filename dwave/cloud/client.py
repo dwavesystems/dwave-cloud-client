@@ -82,7 +82,9 @@ class Client(object):
         # and failback to the legacy `.dwrc`
         if config.get('token') is None or config.get('endpoint') is None:
             try:
-                _endpoint, _token, _proxy, _solver = legacy_load_config(profile)
+                _endpoint, _token, _proxy, _solver = legacy_load_config(
+                    key=profile,
+                    endpoint=endpoint, token=token, solver=solver, proxy=proxy)
                 config = dict(
                     endpoint=_endpoint, token=_token, solver=_solver, proxy=_proxy,
                     client=client)
