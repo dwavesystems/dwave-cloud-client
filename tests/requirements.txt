@@ -1,0 +1,6 @@
+-r ../requirements.txt
+numpy
+mock
+requests_mock
+coverage
+coveralls
