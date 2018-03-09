@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-install_requires = ['requests>=2.18', 'six>=1.10']
+install_requires = ['requests>=2.18', 'six>=1.10', 'homebase>=1.0']
 
 extras_require = {
     'test': ['requests_mock', 'mock', 'numpy'],
@@ -13,7 +13,7 @@ packages = [package for package in find_packages() if package.startswith('dwave'
 
 setup(
     name='dwave-cloud-client',
-    version='0.3.0',
+    version='0.3.1',
     author='D-Wave Systems Inc.',
     description='A minimal client for interacting with D-Wave cloud resources',
     url='https://github.com/dwavesystems/dwave-cloud-client',
