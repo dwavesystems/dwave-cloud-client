@@ -262,7 +262,7 @@ def load_config(config_file=None, profile=None, client=None,
     }
 
 
-def legacy_load_config(key=None):
+def legacy_load_config(key=None, endpoint=None, token=None, solver=None, proxy=None):
     """Load the configured URLs and token for the SAPI server.
 
     First, this method tries to read from environment variables.
@@ -274,7 +274,6 @@ def legacy_load_config(key=None):
      - ``DW_INTERNAL__TOKEN``
      - ``DW_INTERNAL__HTTPPROXY`` (optional)
      - ``DW_INTERNAL__SOLVER`` (optional)
-
 
     The configuration file is text file where each line encodes a connection as:
 
@@ -289,16 +288,33 @@ def legacy_load_config(key=None):
     the default. Any commas in the urls are percent encoded.
 
     Args:
-        key: The name or URL of the SAPI connection.
+        key (str):
+            The name or profile in the legacy config file.
+
+        endpoint (str, default=None):
+            API endpoint URL. Overrides environment/config file.
+
+        token (str, default=None):
+            API authorization token. Overrides environment/config file.
+
+        solver (str, default=None):
+            Default solver to use in :meth:`dwave.cloud.qpu.Client.get_solver()`
+            or :meth:`dwave.cloud.sw.Client.get_solver()`. If undefined, you'll
+            have to explicitly specify the solver in calls to ``get_solver()``.
+
+        proxy (str, default=None):
+            URL for proxy to use in connections to D-Wave API. Can include
+            username/password, port, scheme, etc. If undefined, client will
+            connect directly to the API (unless you use a system-level proxy).
 
     Returns:
         A tuple of SAPI info, as (url, token, proxy, default_solver_name)
     """
     # Try to load environment variables
-    url = os.environ.get('DW_INTERNAL__HTTPLINK')
-    token = os.environ.get('DW_INTERNAL__TOKEN')
-    proxy = os.environ.get('DW_INTERNAL__HTTPPROXY')
-    solver = os.environ.get('DW_INTERNAL__SOLVER')
+    url = endpoint or os.environ.get('DW_INTERNAL__HTTPLINK')
+    token = token or os.environ.get('DW_INTERNAL__TOKEN')
+    proxy = proxy or os.environ.get('DW_INTERNAL__HTTPPROXY')
+    solver = solver or os.environ.get('DW_INTERNAL__SOLVER')
 
     if url is not None and token is not None:
         return url, token, proxy, solver
@@ -326,7 +342,10 @@ def legacy_load_config(key=None):
             data = {index: value for index, value in enumerate(data.split(','))}
 
             if label == key or data[0] == key or key is None:
-                return data[0] or None, data[1] or None, data.get(2), data.get(3)
+                return (endpoint or data[0] or None,
+                        token or data[1] or None,
+                        proxy or data.get(2),
+                        solver or data.get(3))
         except:
             pass  # Just ignore any malformed lines
             # TODO issue a warning
