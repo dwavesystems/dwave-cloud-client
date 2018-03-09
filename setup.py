@@ -13,8 +13,9 @@ packages = [package for package in find_packages() if package.startswith('dwave'
 
 setup(
     name='dwave-cloud-client',
-    version='0.3.0.dev2',
-    description='A minimal client for interacting with SAPI servers.',
+    version='0.3.0',
+    author='D-Wave Systems Inc.',
+    description='A minimal client for interacting with D-Wave cloud resources',
     url='https://github.com/dwavesystems/dwave-cloud-client',
     packages=packages,
     install_requires=install_requires,
