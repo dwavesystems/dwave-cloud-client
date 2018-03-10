@@ -67,6 +67,31 @@ class Client(object):
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None,
                     endpoint=None, token=None, solver=None, proxy=None):
+        """Client factory method which loads configuration from file(s),
+        process environment variables and explicitly provided values, creating
+        and returning the appropriate client instance
+        (:class:`dwave.cloud.qpu.Client` or :class:`dwave.cloud.sw.Client`).
+
+        Usage example:
+
+            Create ``dwave.conf`` in your current directory or
+            ``~/.config/dwave/dwave.conf``::
+
+                [prod]
+                endpoint = https://cloud.dwavesys.com/sapi
+                token = DW-123123-secret
+                solver = DW_2000Q_1
+
+            Run:
+                >>> from dwave.cloud import Client
+                >>> client = Client.from_config(profile='prod')
+                >>> solver = client.get_solver()
+                >>> computation = solver.submit({}, {})
+                >>> samples = computation.result()
+
+        TODO: describe config loading, new config in broad strokes, refer to
+        actual loaders' doc; include examples for config and usage.
+        """
 
         # try loading configuration from a preferred new config subsystem
         # (`./dwave.conf`, `~/.config/dwave/dwave.conf`, etc)
