@@ -13,6 +13,7 @@ except ImportError:
 
 from dwave.cloud.qpu import Client, Solver
 from dwave.cloud.exceptions import InvalidAPIResponseError
+from dwave.cloud.config import legacy_load_config
 
 from .test_config import iterable_mock_open, configparser_open_namespace
 
@@ -294,3 +295,15 @@ class MockConfiguration(unittest.TestCase):
                 self.assertTrue(event.url.startswith('args-url'))
                 return
             self.fail()
+
+    def test_file_read_error(self):
+        """On config file read error, we should fail with `IOError`."""
+        with mock.patch("dwave.cloud.config.open", side_effect=OSError, create=True):
+            self.assertRaises(IOError, legacy_load_config)
+
+    def test_file_format_error(self):
+        """Config parsing error should be suppressed."""
+        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data="|\na|b,c"), create=True):
+            self.assertEqual(legacy_load_config(key='a'), ('b', 'c', None, None))
+        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data="|"), create=True):
+            self.assertRaises(ValueError, legacy_load_config)
