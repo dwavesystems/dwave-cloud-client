@@ -304,6 +304,6 @@ class MockConfiguration(unittest.TestCase):
     def test_file_format_error(self):
         """Config parsing error should be suppressed."""
         with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data="|\na|b,c"), create=True):
-            self.assertEquals(legacy_load_config(key='a'), ('b', 'c', None, None))
+            self.assertEqual(legacy_load_config(key='a'), ('b', 'c', None, None))
         with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data="|"), create=True):
             self.assertRaises(ValueError, legacy_load_config)

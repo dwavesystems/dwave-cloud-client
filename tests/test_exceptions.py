@@ -11,10 +11,10 @@ class TestExceptions(unittest.TestCase):
         try:
             raise SolverAuthenticationError
         except Exception as e:
-            self.assertEquals(e.message, "Token not accepted for that action.")
+            self.assertEqual(str(e), "Token not accepted for that action.")
 
     def test_canceled_future_error_msg(self):
         try:
             raise CanceledFutureError
         except Exception as e:
-            self.assertEquals(e.message, "An error occurred reading results from a canceled request")
+            self.assertEqual(str(e), "An error occurred reading results from a canceled request")
