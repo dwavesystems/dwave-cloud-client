@@ -134,6 +134,7 @@ def load_config(config_file=None, profile=None, client=None,
     :func:`load_config_from_file`.
 
     Environment variables:
+
         ``DWAVE_CONFIG_FILE``:
             Config file path used if `config_file` not specified.
 
@@ -161,6 +162,7 @@ def load_config(config_file=None, profile=None, client=None,
             from config file, but is overridden with `proxy`.
 
     Args:
+
         config_file (str, default=None):
             Path to config file. Auto-detected by default.
 
@@ -194,31 +196,31 @@ def load_config(config_file=None, profile=None, client=None,
             username/password, port, scheme, etc. If undefined, client will
             connect directly to the API (unless you use a system-level proxy).
 
-        Returns:
-            :obj:`dict`:
-                Mapping of config keys to config values, for a specific profile
-                (section), as read from the config file, overridden with
-                environment values, overridden with immediate keyword arguments.
+    Returns:
+        :obj:`dict`:
+            Mapping of config keys to config values, for a specific profile
+            (section), as read from the config file, overridden with
+            environment values, overridden with immediate keyword arguments.
 
-                A set of keys guaranteed to be present: ``client``,
-                ``endpoint``, ``token``, ``solver``, ``proxy``.
+            A set of keys guaranteed to be present: ``client``,
+            ``endpoint``, ``token``, ``solver``, ``proxy``.
 
-                Example::
+            Example::
 
-                    {
-                        'client': 'qpu'
-                        'endpoint': 'https://cloud.dwavesys.com/sapi',
-                        'token': '123',
-                        'solver': None,
-                        'proxy': None
-                    }
+                {
+                    'client': 'qpu'
+                    'endpoint': 'https://cloud.dwavesys.com/sapi',
+                    'token': '123',
+                    'solver': None,
+                    'proxy': None
+                }
 
-        Raises:
-            Nothing, except in unexpected circumstances.
+    Raises:
+        Nothing, except in unexpected circumstances.
 
-            Cases of invalid config file, file/disk read error, invalid
-            environment values, etc. are handled and result in `None` values
-            for one or all of the keys in the result.
+        Cases of invalid config file, file/disk read error, invalid
+        environment values, etc. are handled and result in `None` values
+        for one or all of the keys in the result.
 
     """
     # load config file
@@ -265,6 +267,9 @@ def load_config(config_file=None, profile=None, client=None,
 def legacy_load_config(key=None, endpoint=None, token=None, solver=None, proxy=None):
     """Load the configured URLs and token for the SAPI server.
 
+    .. warning:: Included only for backward compatibility, please use
+        :func:`load_config` instead.
+
     First, this method tries to read from environment variables.
     If these are not set, it tries to load a configuration file from ``~/.dwrc``.
 
@@ -275,17 +280,35 @@ def legacy_load_config(key=None, endpoint=None, token=None, solver=None, proxy=N
      - ``DW_INTERNAL__HTTPPROXY`` (optional)
      - ``DW_INTERNAL__SOLVER`` (optional)
 
-    The configuration file is text file where each line encodes a connection as:
+    The configuration file format is a modified CSV where the first comma is
+    replaced with a bar character '|'. Each line encodes a single connection as.
+
+    The columns are::
 
         {connection_name}|{sapi_url},{authentication_token},{proxy_url},{default_solver_name}
 
-    An example configuration file::
-
-        prod|https://qubist.dwavesys.com/sapi,prodtokenstring,,DW2X
-        alpha|https://alpha.server.url/sapi,alphatokenstring,https://alpha.proxy.url,dummy-solver
+    Everything after the ``authentication_token`` is optional.
 
     When there are multiple connections in a file, the first one is taken to be
     the default. Any commas in the urls are percent encoded.
+
+    Example:
+
+        For the configuration file::
+
+            connection-a|https://one.com,token-one
+            connection-b|https://two.com,token-two
+
+        Assuming the new config file (`dwave.conf`) is not found, then:
+
+        >>> client = dwave.cloud.Client.from_config()
+        # Will try to connect with the url `https://one.com` and the token `token-one`.
+
+        >>> client = dwave.cloud.Client.from_config(profile='connection-b')
+        # Will try to connect with the url `https://two.com` and the token `token-two`.
+
+        >>> client = dwave.cloud.Client.from_config(profile='connection-b', token='new-token')
+        # Will try to connect with the url `https://two.com` and the token `new-token`.
 
     Args:
         key (str):
