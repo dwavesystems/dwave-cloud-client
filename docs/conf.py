@@ -8,12 +8,13 @@ from sphinx.ext.autodoc import ClassLevelDocumenter, InstanceAttributeDocumenter
 def iad_add_directive_header(self, sig):
     ClassLevelDocumenter.add_directive_header(self, sig)
 
-
 InstanceAttributeDocumenter.add_directive_header = iad_add_directive_header
 
 
-# Add autodoc and napoleon to the extensions list
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon',
+              'sphinx.ext.intersphinx']
+
+intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
 
 master_doc = 'index'
 html_theme = "sphinx_rtd_theme"
