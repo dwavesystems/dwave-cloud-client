@@ -67,12 +67,11 @@ from dwave.cloud.computation import Future
 
 
 class Client(BaseClient):
+    """D-Wave API client specialized to work with the QPU solvers (samplers)."""
 
     @staticmethod
     def is_solver_handled(solver):
-        """Predicate function that determines if the given solver should be
-        handled by this client.
-
+        """Predicate function used from superclass to filter solvers.
         In QPU client we're handling only QPU solvers.
         """
         if not solver:

@@ -72,8 +72,7 @@ class Client(object):
         and returning the appropriate client instance
         (:class:`dwave.cloud.qpu.Client` or :class:`dwave.cloud.sw.Client`).
 
-        Usage example:
-
+        Example:
             Create ``dwave.conf`` in your current directory or
             ``~/.config/dwave/dwave.conf``::
 
@@ -82,12 +81,13 @@ class Client(object):
                 token = DW-123123-secret
                 solver = DW_2000Q_1
 
-            Run:
-                >>> from dwave.cloud import Client
-                >>> client = Client.from_config(profile='prod')
-                >>> solver = client.get_solver()
-                >>> computation = solver.submit({}, {})
-                >>> samples = computation.result()
+            Run::
+
+                from dwave.cloud import Client
+                client = Client.from_config(profile='prod')
+                solver = client.get_solver()
+                computation = solver.submit({}, {})
+                samples = computation.result()
 
         TODO: describe config loading, new config in broad strokes, refer to
         actual loaders' doc; include examples for config and usage.
@@ -257,10 +257,17 @@ class Client(object):
         return True
 
     def get_solvers(self, refresh=False):
-        """List all the solvers this connection can provide,
-        and load the data about the solvers.
+        """List all the solvers this client can provide, and load the data
+        about the solvers.
 
-        To get all solver data: ``GET /solvers/remote/``
+        This is a blocking web call to `{endpoint}/solvers/remote/`` that
+        caches the result and populates a list of available solvers described
+        through :class:`.Solver` instances.
+
+        To submit a sampling problem to the D-Wave API, filter the list returned
+        and execute a ``sampling_*`` method on the solver of interest.
+        Alternatively, if you know the solver name (or it's defined in config),
+        use the :meth:`.get_solver` method.
 
         Args:
             refresh (bool, default=False):
@@ -301,17 +308,20 @@ class Client(object):
             return self._solvers
 
     def get_solver(self, name=None, refresh=False):
-        """Load the configuration for a single solver.
+        """Load the configuration for a single solver, as publicized by the API
+        on ``{endpoint}/solvers/remote/{solver_name}/``.
 
-        To get specific solver data: ``GET /solvers/remote/{solver_name}/``
+        This is a blocking web call that returns a :class:`.Solver` instance,
+        which in turn can be used to submit sampling problems to the D-Wave API
+        and fetch the results.
 
         Args:
             name (str):
-                Id of the requested solver. `None` will return the default solver.
+                Id of the requested solver. ``None`` will return the default solver.
 
             refresh (bool):
                 Return solver from cache (if cached with ``get_solvers()``),
-                unless set to `True`.
+                unless set to ``True``.
 
         Returns:
             :class:`.Solver`
