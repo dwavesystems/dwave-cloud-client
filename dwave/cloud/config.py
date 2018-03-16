@@ -3,6 +3,11 @@ import configparser
 import homebase
 
 
+CONF_APP = "dwave"
+CONF_AUTHOR = "dwavesystem"
+CONF_FILENAME = "dwave.conf"
+
+
 def detect_configfile_path():
     """Returns the first existing file that it finds in a list of possible
     candidates, and `None` if the list was exhausted, but no candidate config
@@ -10,29 +15,35 @@ def detect_configfile_path():
 
     For details, see :func:`load_config_from_file`.
     """
-    app = "dwave"
-    author = "dwavesystem"
-    filename = "dwave.conf"
-
     # look for `./dwave.conf`
     candidates = ["."]
 
     # then for something like `~/.config/dwave/dwave.conf`
     candidates.append(homebase.user_config_dir(
-        app_author=author, app_name=app, roaming=False,
+        app_author=CONF_AUTHOR, app_name=CONF_APP, roaming=False,
         use_virtualenv=False, create=False))
 
     # and finally for e.g. `/etc/dwave/dwave.conf`
     candidates.extend(homebase.site_config_dir_list(
-        app_author=author, app_name=app,
+        app_author=CONF_AUTHOR, app_name=CONF_APP,
         use_virtualenv=False, create=False))
 
     for base in candidates:
-        path = os.path.join(base, filename)
+        path = os.path.join(base, CONF_FILENAME)
         if os.path.exists(path):
             return path
 
     return None
+
+
+def get_default_configfile_path():
+    """Returns the preferred config file path: a user-local config, e.g:
+    ``~/.config/dwave/dwave.conf``."""
+    base = homebase.user_config_dir(
+        app_author=CONF_AUTHOR, app_name=CONF_APP, roaming=False,
+        use_virtualenv=False, create=False)
+    path = os.path.join(base, CONF_FILENAME)
+    return path
 
 
 def load_config_from_file(filename=None):
@@ -108,6 +119,35 @@ def load_config_from_file(filename=None):
         raise ValueError("Failed to parse the config file "\
                          "given or detected: {}".format(filename))
 
+    return config
+
+
+def get_default_config():
+    config = configparser.ConfigParser(default_section="defaults")
+    config.read_string("""
+        [defaults]
+        # This section provides default values for some variables.
+        # Any of these can be overridden in a profile definition below.
+
+        # D-Wave solver API endpoint URL defaults to a production endpoint
+        endpoint = https://cloud.dwavesys.com/sapi
+
+        # Default client is for the QPU resource (QPU sampler)
+        # Possible values: qpu, sw
+        client = qpu
+
+        # Profile name to use if otherwise unspecified.
+        # If undefined, the first section below will be used as the default profile.
+        #profile = prod
+
+        # Solver name used for sampling. If defining the solver in config,
+        # make sure that solver is provided on the endpoint used.
+        #solver = DW_2000Q_1
+
+        # Proxy URL (including authentication credentials) that shall be used
+        # for all requests to D-Wave API endpoint URL.
+        #proxy = http://user:pass@proxy.org:8080/
+    """)
     return config
 
 
