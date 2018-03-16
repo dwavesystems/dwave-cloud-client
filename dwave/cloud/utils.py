@@ -1,6 +1,7 @@
 from __future__ import division, absolute_import
 
 import six
+import readline
 
 # Use numpy if available for fast decoding
 try:
@@ -52,3 +53,13 @@ def uniform_get(sequence, index, default=None):
         return sequence.get(index, default)
     else:
         return sequence[index] if index < len(sequence) else default
+
+
+def readline_input(prompt, prefill=''):
+    """Provide an editable default for ``input()``."""
+    # see: https://stackoverflow.com/q/2533120/
+    readline.set_startup_hook(lambda: readline.insert_text(prefill))
+    try:
+        return six.moves.input(prompt)
+    finally:
+        readline.set_startup_hook()
