@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 import click
-from pprint import pprint
+from timeit import default_timer as timer
 
 from dwave.cloud.qpu import Client
 from dwave.cloud.utils import readline_input
@@ -83,7 +83,9 @@ def configure(config_file, profile):
 def ping():
     """Ping the QPU by submitting a single-qubit problem."""
     client = Client.from_config()
+    print("Using endpoint:", client.endpoint)
 
+    t0 = timer()
     try:
         solvers = client.get_solvers()
     except SolverAuthenticationError:
@@ -104,8 +106,17 @@ def ping():
             print("No solvers available.")
             return 1
 
+    t1 = timer()
     print("Using solver: {}".format(solver.id))
 
     timing = solver.sample_ising({0: 1}, {}).timing
-    pprint(timing)
+    t2 = timer()
+
+    print("\nWall clock time:")
+    print(" * Solver definition fetch web request: {:.3f} ms".format((t1-t0)*1000.0))
+    print(" * Problem submit and results fetch: {:.3f} ms".format((t2-t1)*1000.0))
+    print(" * Total: {:.3f} ms".format((t2-t0)*1000.0))
+    print("\nQPU timing:")
+    for component, duration in timing.items():
+        print(" * {} = {} us".format(component, duration))
     return 0
