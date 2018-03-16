@@ -71,7 +71,9 @@ def configure(config_file, profile):
 
     with open(config_file, 'w') as fp:
         config.write(fp)
+
     print("Config saved.")
+    return 0
 
 
 @cli.command()

@@ -124,7 +124,7 @@ def load_config_from_file(filename=None):
 
 def get_default_config():
     config = configparser.ConfigParser(default_section="defaults")
-    config.read_string("""
+    config.read_string(u"""
         [defaults]
         # This section provides default values for some variables.
         # Any of these can be overridden in a profile definition below.
