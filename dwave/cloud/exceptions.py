@@ -1,8 +1,12 @@
-class SolverFailureError(Exception):
+class SolverError(Exception):
+    """Generic base class for all solver-related errors."""
+
+
+class SolverFailureError(SolverError):
     """An exception raised when there is a remote failure calling a solver."""
 
 
-class SolverAuthenticationError(Exception):
+class SolverAuthenticationError(SolverError):
     """An exception raised when there is an authentication error."""
 
     def __init__(self):
@@ -20,5 +24,5 @@ class InvalidAPIResponseError(Exception):
     """Raised when an invalid/unexpected response from D-Wave Solver API is received."""
 
 
-class UnsupportedSolverError(Exception):
+class UnsupportedSolverError(SolverError):
     """The solver we received from the API is not supported by the client."""
