@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-install_requires = ['requests>=2.18', 'six>=1.10', 'homebase>=1.0']
+install_requires = ['requests>=2.18', 'six>=1.10', 'homebase>=1.0', 'click>=6.7']
 
 extras_require = {
     'test': ['requests_mock', 'mock', 'numpy'],
@@ -20,5 +20,10 @@ setup(
     packages=packages,
     install_requires=install_requires,
     extras_require=extras_require,
-    zip_safe=False
+    zip_safe=False,
+    entry_points={
+        'console_scripts': [
+            'dwave = dwave.cloud.cli:cli'
+        ]
+    }
 )
