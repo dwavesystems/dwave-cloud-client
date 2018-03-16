@@ -1,9 +1,12 @@
 from __future__ import print_function
 
 import click
+from timeit import default_timer as timer
 
 from dwave.cloud.qpu import Client
 from dwave.cloud.utils import readline_input
+from dwave.cloud.exceptions import (
+    SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError)
 from dwave.cloud.config import (
     load_config_from_file, get_default_config,
     detect_configfile_path, get_default_configfile_path)
@@ -17,7 +20,7 @@ def cli():
 @cli.command()
 @click.option('--config-file', default=None, help='Config file path')
 @click.option('--profile', default=None,
-              help='Connection profile name (config section name).')
+              help='Connection profile name (config section name)')
 def configure(config_file, profile):
     """Create and/or update cloud client configuration file."""
 
@@ -77,5 +80,54 @@ def configure(config_file, profile):
 
 
 @cli.command()
-def ping():
+@click.option('--config-file', default=None, help='Config file path')
+@click.option('--profile', default=None, help='Connection profile name')
+def ping(config_file, profile):
     """Ping the QPU by submitting a single-qubit problem."""
+
+    try:
+        client = Client.from_config(config_file=config_file, profile=profile)
+    except Exception as e:
+        print("Invalid config: {}".format(e))
+        return 1
+    if config_file:
+        print("Using config file:", config_file)
+    if profile:
+        print("Using profile:", profile)
+    print("Using endpoint:", client.endpoint)
+
+    t0 = timer()
+    try:
+        solvers = client.get_solvers()
+    except SolverAuthenticationError:
+        print("Authentication error. Check credentials in your config file.")
+        return 1
+    except (InvalidAPIResponseError, UnsupportedSolverError):
+        print("Invalid or unexpected API response.")
+        return 2
+
+    try:
+        client.get_solver()
+    except (ValueError, KeyError):
+        # if not otherwise defined (ValueError), or unavailable (KeyError),
+        # just use the first solver
+        if solvers:
+            _, solver = next(iter(solvers.items()))
+        else:
+            print("No solvers available.")
+            return 1
+
+    t1 = timer()
+    print("Using solver: {}".format(solver.id))
+
+    timing = solver.sample_ising({0: 1}, {}).timing
+    t2 = timer()
+
+    print("\nWall clock time:")
+    print(" * Solver definition fetch web request: {:.3f} ms".format((t1-t0)*1000.0))
+    print(" * Problem submit and results fetch: {:.3f} ms".format((t2-t1)*1000.0))
+    print(" * Total: {:.3f} ms".format((t2-t0)*1000.0))
+    print("\nQPU timing:")
+    for component, duration in timing.items():
+        print(" * {} = {} us".format(component, duration))
+    return 0
