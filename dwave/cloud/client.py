@@ -86,7 +86,7 @@ class Client(object):
                 from dwave.cloud import Client
                 client = Client.from_config(profile='prod')
                 solver = client.get_solver()
-                computation = solver.submit({}, {})
+                computation = solver.sample_ising({}, {})
                 samples = computation.result()
 
         TODO: describe config loading, new config in broad strokes, refer to
@@ -328,7 +328,7 @@ class Client(object):
         """
         _LOGGER.debug("Looking for solver: %s", name)
         if name is None:
-            if self.default_solver is not None:
+            if self.default_solver:
                 name = self.default_solver
             else:
                 raise ValueError("No name or default name provided when loading solver.")
