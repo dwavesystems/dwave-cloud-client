@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import click
+from pprint import pprint
 
 from dwave.cloud.qpu import Client
 from dwave.cloud.utils import readline_input
@@ -79,3 +80,18 @@ def configure(config_file, profile):
 @cli.command()
 def ping():
     """Ping the QPU by submitting a single-qubit problem."""
+    client = Client.from_config()
+    try:
+        client.get_solver()
+    except ValueError:
+        solvers = client.get_solvers()
+        if solvers:
+            # just use the first
+            solver = next(iter(solvers.items()))[1]
+        else:
+            print("No solvers available.")
+            return 1
+
+    timing = solver.sample_ising({0: 1}, {}).timing
+    pprint(timing)
+    return 0
