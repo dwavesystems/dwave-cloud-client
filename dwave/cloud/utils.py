@@ -7,7 +7,7 @@ import readline
 try:
     import numpy as np
     _numpy = True
-except ImportError:
+except ImportError:  # pragma: no cover
     _numpy = False
 
 
