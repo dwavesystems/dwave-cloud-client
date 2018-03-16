@@ -26,7 +26,6 @@ class TestCli(unittest.TestCase):
                 result = runner.invoke(cli, [
                     'configure', '--config-file', config_file, '--profile', profile
                 ], input='\n'.join(values))
-                self.assertEqual(result.exit_code, 0)
 
                 config = load_config(config_file, profile=profile)
                 for val in values:
