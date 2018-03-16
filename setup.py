@@ -13,7 +13,7 @@ packages = [package for package in find_packages() if package.startswith('dwave'
 
 setup(
     name='dwave-cloud-client',
-    version='0.3.1',
+    version='0.3.2',
     author='D-Wave Systems Inc.',
     description='A minimal client for interacting with D-Wave cloud resources',
     url='https://github.com/dwavesystems/dwave-cloud-client',
