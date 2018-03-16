@@ -20,7 +20,7 @@ def cli():
 @cli.command()
 @click.option('--config-file', default=None, help='Config file path')
 @click.option('--profile', default=None,
-              help='Connection profile name (config section name).')
+              help='Connection profile name (config section name)')
 def configure(config_file, profile):
     """Create and/or update cloud client configuration file."""
 
@@ -80,9 +80,12 @@ def configure(config_file, profile):
 
 
 @cli.command()
-def ping():
+@click.option('--config-file', default=None, help='Config file path')
+@click.option('--profile', default=None, help='Connection profile name')
+def ping(config_file, profile):
     """Ping the QPU by submitting a single-qubit problem."""
-    client = Client.from_config()
+
+    client = Client.from_config(config_file=config_file, profile=profile)
     print("Using endpoint:", client.endpoint)
 
     t0 = timer()
