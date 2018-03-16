@@ -5,6 +5,8 @@ from pprint import pprint
 
 from dwave.cloud.qpu import Client
 from dwave.cloud.utils import readline_input
+from dwave.cloud.exceptions import (
+    SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError)
 from dwave.cloud.config import (
     load_config_from_file, get_default_config,
     detect_configfile_path, get_default_configfile_path)
@@ -81,16 +83,28 @@ def configure(config_file, profile):
 def ping():
     """Ping the QPU by submitting a single-qubit problem."""
     client = Client.from_config()
+
+    try:
+        solvers = client.get_solvers()
+    except SolverAuthenticationError:
+        print("Authentication error. Check credentials in your config file.")
+        return 1
+    except (InvalidAPIResponseError, UnsupportedSolverError):
+        print("Invalid or unexpected API response.")
+        return 2
+
     try:
         client.get_solver()
-    except ValueError:
-        solvers = client.get_solvers()
+    except (ValueError, KeyError):
+        # if not otherwise defined (ValueError), or unavailable (KeyError),
+        # just use the first solver
         if solvers:
-            # just use the first
-            solver = next(iter(solvers.items()))[1]
+            _, solver = next(iter(solvers.items()))
         else:
             print("No solvers available.")
             return 1
+
+    print("Using solver: {}".format(solver.id))
 
     timing = solver.sample_ising({0: 1}, {}).timing
     pprint(timing)
