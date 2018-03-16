@@ -85,7 +85,15 @@ def configure(config_file, profile):
 def ping(config_file, profile):
     """Ping the QPU by submitting a single-qubit problem."""
 
-    client = Client.from_config(config_file=config_file, profile=profile)
+    try:
+        client = Client.from_config(config_file=config_file, profile=profile)
+    except Exception as e:
+        print("Invalid config: {}".format(e))
+        return 1
+    if config_file:
+        print("Using config file:", config_file)
+    if profile:
+        print("Using profile:", profile)
     print("Using endpoint:", client.endpoint)
 
     t0 = timer()
