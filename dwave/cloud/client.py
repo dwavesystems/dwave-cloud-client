@@ -66,7 +66,8 @@ class Client(object):
 
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None,
-                    endpoint=None, token=None, solver=None, proxy=None):
+                    endpoint=None, token=None, solver=None, proxy=None,
+                    permissive_ssl=None):
         """Client factory method which loads configuration from file(s),
         process environment variables and explicitly provided values, creating
         and returning the appropriate client instance
@@ -115,6 +116,10 @@ class Client(object):
                     client=client)
             except (ValueError, IOError):
                 pass
+
+        # allow ssl verification to be skipped if user is explicit
+        if permissive_ssl is not None:
+            config['permissive_ssl'] = permissive_ssl
 
         from dwave.cloud import qpu, sw
         _clients = {'qpu': qpu.Client, 'sw': sw.Client}
