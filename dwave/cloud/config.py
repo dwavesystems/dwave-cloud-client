@@ -294,13 +294,15 @@ def load_config(config_file=None, profile=None, client=None,
         else:
             section = {}
 
-    return {
-        'client': client or os.getenv("DWAVE_API_CLIENT", section.get('client')),
-        'endpoint': endpoint or os.getenv("DWAVE_API_ENDPOINT", section.get('endpoint')),
-        'token': token or os.getenv("DWAVE_API_TOKEN", section.get('token')),
-        'solver': solver or os.getenv("DWAVE_API_SOLVER", section.get('solver')),
-        'proxy': proxy or os.getenv("DWAVE_API_PROXY", section.get('proxy')),
-    }
+    # override (or defined) a selected subset of values via env or kwargs,
+    # pass-through the rest unmodified
+    section['client'] = client or os.getenv("DWAVE_API_CLIENT", section.get('client'))
+    section['endpoint'] = endpoint or os.getenv("DWAVE_API_ENDPOINT", section.get('endpoint'))
+    section['token'] = token or os.getenv("DWAVE_API_TOKEN", section.get('token'))
+    section['solver'] = solver or os.getenv("DWAVE_API_SOLVER", section.get('solver'))
+    section['proxy'] = proxy or os.getenv("DWAVE_API_PROXY", section.get('proxy'))
+
+    return section
 
 
 def legacy_load_config(key=None, endpoint=None, token=None, solver=None, proxy=None):

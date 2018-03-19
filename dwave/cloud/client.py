@@ -127,7 +127,7 @@ class Client(object):
         return _clients[_client](**config)
 
     def __init__(self, endpoint=None, token=None, solver=None, proxy=None,
-                 permissive_ssl=False):
+                 permissive_ssl=False, **kwargs):
         """To setup the connection a pipeline of queues/workers is constructed.
 
         There are five interations with the server the connection manages:
