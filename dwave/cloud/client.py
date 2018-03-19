@@ -67,7 +67,7 @@ class Client(object):
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None,
                     endpoint=None, token=None, solver=None, proxy=None,
-                    permissive_ssl=None):
+                    **kwargs):
         """Client factory method which loads configuration from file(s),
         process environment variables and explicitly provided values, creating
         and returning the appropriate client instance
@@ -92,6 +92,9 @@ class Client(object):
 
         TODO: describe config loading, new config in broad strokes, refer to
         actual loaders' doc; include examples for config and usage.
+
+        TODO: mention kwargs include `permissive_ssl`, but are not limited to
+        that.
         """
 
         # try loading configuration from a preferred new config subsystem
@@ -117,9 +120,9 @@ class Client(object):
             except (ValueError, IOError):
                 pass
 
-        # allow ssl verification to be skipped if user is explicit
-        if permissive_ssl is not None:
-            config['permissive_ssl'] = permissive_ssl
+        # manual override of other (client-custom) arguments
+        for var, val in kwargs.items():
+            config[var] = val
 
         from dwave.cloud import qpu, sw
         _clients = {'qpu': qpu.Client, 'sw': sw.Client}
@@ -127,7 +130,7 @@ class Client(object):
         return _clients[_client](**config)
 
     def __init__(self, endpoint=None, token=None, solver=None, proxy=None,
-                 permissive_ssl=False):
+                 permissive_ssl=False, **kwargs):
         """To setup the connection a pipeline of queues/workers is constructed.
 
         There are five interations with the server the connection manages:
