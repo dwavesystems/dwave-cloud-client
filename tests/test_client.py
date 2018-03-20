@@ -90,6 +90,25 @@ class ClientFactory(unittest.TestCase):
             client = dwave.cloud.Client.from_config()
             self.assertEqual(client.endpoint, 'endpoint')
             self.assertEqual(client.token, 'token')
+            self.assertIsInstance(client, dwave.cloud.qpu.Client)
+            self.assertNotIsInstance(client, dwave.cloud.sw.Client)
+
+    def test_custom_kwargs(self):
+        conf = {k: k for k in 'endpoint token'.split()}
+        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+            with mock.patch("dwave.cloud.client.Client.__init__", return_value=None) as init:
+                dwave.cloud.Client.from_config(custom='custom')
+                init.assert_called_once_with(
+                    endpoint='endpoint', token='token', custom='custom')
+
+    def test_custom_kwargs_overrides_config(self):
+        conf = {k: k for k in 'endpoint token custom'.split()}
+        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+            with mock.patch("dwave.cloud.client.Client.__init__", return_value=None) as init:
+                dwave.cloud.Client.from_config(custom='new-custom')
+                init.assert_called_once_with(
+                    endpoint='endpoint', token='token', custom='new-custom')
+
 
 if __name__ == '__main__':
     unittest.main()
