@@ -7,9 +7,15 @@ from __future__ import absolute_import
 
 import unittest
 
+try:
+    import unittest.mock as mock
+except ImportError:
+    import mock
+
 from dwave.cloud.config import legacy_load_config
 from dwave.cloud.qpu import Client
 from dwave.cloud.exceptions import SolverAuthenticationError
+import dwave.cloud
 
 
 try:
@@ -74,6 +80,16 @@ class SolverLoading(unittest.TestCase):
         client = Client(config_url, config_token)
         client.get_solver(config_solver)
 
+
+class ClientFactory(unittest.TestCase):
+    """Test client factory."""
+
+    def test_default(self):
+        conf = {k: k for k in 'endpoint token'.split()}
+        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+            client = dwave.cloud.Client.from_config()
+            self.assertEqual(client.endpoint, 'endpoint')
+            self.assertEqual(client.token, 'token')
 
 if __name__ == '__main__':
     unittest.main()
