@@ -126,7 +126,7 @@ class Client(object):
 
         from dwave.cloud import qpu, sw
         _clients = {'qpu': qpu.Client, 'sw': sw.Client}
-        _client = config.pop('client') or 'qpu'
+        _client = config.pop('client', None) or 'qpu'
         return _clients[_client](**config)
 
     def __init__(self, endpoint=None, token=None, solver=None, proxy=None,
