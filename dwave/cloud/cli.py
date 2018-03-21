@@ -18,7 +18,8 @@ def cli():
 
 
 @cli.command()
-@click.option('--config-file', default=None, help='Config file path')
+@click.option('--config-file', default=None, help='Config file path',
+              type=click.Path(exists=True, dir_okay=False))
 @click.option('--profile', default=None,
               help='Connection profile name (config section name)')
 def configure(config_file, profile):
@@ -80,7 +81,8 @@ def configure(config_file, profile):
 
 
 @cli.command()
-@click.option('--config-file', default=None, help='Config file path')
+@click.option('--config-file', default=None, help='Config file path',
+              type=click.Path(exists=True, dir_okay=False))
 @click.option('--profile', default=None, help='Connection profile name')
 def ping(config_file, profile):
     """Ping the QPU by submitting a single-qubit problem."""
