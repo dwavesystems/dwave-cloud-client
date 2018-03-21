@@ -1,3 +1,6 @@
+.. image:: https://img.shields.io/pypi/v/dwave-cloud-client.svg
+    :target: https://pypi.python.org/pypi/dwave-cloud-client
+
 .. image:: https://travis-ci.org/dwavesystems/dwave-cloud-client.svg?branch=master
     :target: https://travis-ci.org/dwavesystems/dwave-cloud-client
     :alt: Travis Status
