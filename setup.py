@@ -16,6 +16,7 @@ setup(
     version='0.3.3',
     author='D-Wave Systems Inc.',
     description='A minimal client for interacting with D-Wave cloud resources',
+    long_description=open('README.rst').read(),
     url='https://github.com/dwavesystems/dwave-cloud-client',
     packages=packages,
     install_requires=install_requires,
