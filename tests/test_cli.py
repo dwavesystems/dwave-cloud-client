@@ -13,6 +13,12 @@ from dwave.cloud.cli import cli
 from dwave.cloud.config import load_config
 
 
+def touch(path):
+    """Implements UNIX `touch`."""
+    with open(path, 'a'):
+        os.utime(path, None)
+
+
 class TestCli(unittest.TestCase):
 
     def test_configure(self):
@@ -23,6 +29,7 @@ class TestCli(unittest.TestCase):
         with mock.patch("six.moves.input", side_effect=values, create=True):
             runner = CliRunner()
             with runner.isolated_filesystem():
+                touch(config_file)
                 result = runner.invoke(cli, [
                     'configure', '--config-file', config_file, '--profile', profile
                 ], input='\n'.join(values))

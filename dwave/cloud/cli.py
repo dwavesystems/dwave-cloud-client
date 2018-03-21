@@ -18,7 +18,8 @@ def cli():
 
 
 @cli.command()
-@click.option('--config-file', default=None, help='Config file path')
+@click.option('--config-file', default=None, help='Config file path',
+              type=click.Path(exists=True, dir_okay=False))
 @click.option('--profile', default=None,
               help='Connection profile name (config section name)')
 def configure(config_file, profile):
@@ -35,7 +36,7 @@ def configure(config_file, profile):
         else:
             config_file = get_default_configfile_path()
             print("Config file not found, the default location is:", config_file)
-        config_file = readline_input("Confirm config file path: ", config_file)
+        config_file = readline_input("Confirm config file path (editable): ", config_file)
 
     # try loading existing config, or use defaults
     try:
@@ -64,8 +65,9 @@ def configure(config_file, profile):
 
     # fill out the profile variables
     variables = 'endpoint token client solver proxy'.split()
-    prompts = ['API endpoint URL: ', 'Auth token: ', 'Client class (qpu or sw): ',
-               'Solver (can be left blank): ', 'Proxy URL (can be left blank): ']
+    prompts = ['API endpoint URL (editable): ', 'Auth token (editable): ',
+               'Client class (qpu or sw): ', 'Solver (can be left blank): ',
+               'Proxy URL (can be left blank): ']
     for var, prompt in zip(variables, prompts):
         default_val = config.get(profile, var, fallback=None)
         val = readline_input(prompt, default_val)
@@ -80,7 +82,8 @@ def configure(config_file, profile):
 
 
 @cli.command()
-@click.option('--config-file', default=None, help='Config file path')
+@click.option('--config-file', default=None, help='Config file path',
+              type=click.Path(exists=True, dir_okay=False))
 @click.option('--profile', default=None, help='Connection profile name')
 def ping(config_file, profile):
     """Ping the QPU by submitting a single-qubit problem."""
