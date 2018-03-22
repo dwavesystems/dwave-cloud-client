@@ -110,7 +110,7 @@ def ping(config_file, profile):
         return 2
 
     try:
-        client.get_solver()
+        solver = client.get_solver()
     except (ValueError, KeyError):
         # if not otherwise defined (ValueError), or unavailable (KeyError),
         # just use the first solver
