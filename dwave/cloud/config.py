@@ -88,9 +88,9 @@ def load_config_from_file(filename=None):
                 /usr/local/share/dwave/dwave.conf
                 /usr/share/dwave/dwave.conf
 
-            On Windows, config file should be located in:
-            ``C:\\Users\\<username>\\AppData\\Local\\dwave\\client\\dwave.conf``,
-            and on MacOS in: ``~/Library/Application Support/dwave/dwave.conf``.
+            On Windows 7+, config file should be located in:
+            ``C:\\Users\\<username>\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf``,
+            and on Mac OS X in: ``~/Library/Application Support/dwave/dwave.conf``.
             For details on user/system config paths see homebase_.
 
             .. _homebase: https://github.com/dwavesystems/homebase
