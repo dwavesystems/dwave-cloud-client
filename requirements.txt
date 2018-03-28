@@ -1,5 +1,6 @@
 six>=1.10
 requests>=2.18
 homebase>=1.0.0
+pyreadline>=2.1
 futures; python_version=="2.7"
 configparser; python_version=="2.7"

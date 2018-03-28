@@ -1,6 +1,7 @@
 from setuptools import setup, find_packages
 
-install_requires = ['requests>=2.18', 'six>=1.10', 'homebase>=1.0', 'click>=6.7']
+install_requires = ['requests>=2.18', 'six>=1.10', 'homebase>=1.0', 'click>=6.7',
+                    'pyreadline>=2.1']
 
 extras_require = {
     'test': ['requests_mock', 'mock', 'numpy'],
