@@ -35,17 +35,17 @@ Example
     from dwave.cloud import Client
 
     # Connect using the default or environment connection information
-    client = Client.from_config()
+    with Client.from_config() as client:
 
-    # Load the default solver
-    solver = client.get_solver()
+        # Load the default solver
+        solver = client.get_solver()
 
-    # Build a random Ising model on +1, -1. Build it to exactly fit the graph the solver provides
-    linear = {index: random.choice([-1, 1]) for index in solver.nodes}
-    quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
+        # Build a random Ising model on +1, -1. Build it to exactly fit the graph the solver provides
+        linear = {index: random.choice([-1, 1]) for index in solver.nodes}
+        quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
 
-    # Send the problem for sampling, include a solver specific parameter 'num_reads'
-    computation = solver.sample_ising(linear, quad, num_reads=100)
+        # Send the problem for sampling, include a solver specific parameter 'num_reads'
+        computation = solver.sample_ising(linear, quad, num_reads=100)
 
-    # Print out the first sample
-    print(computation.samples[0])
+        # Print out the first sample
+        print(computation.samples[0])
