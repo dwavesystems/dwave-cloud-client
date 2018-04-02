@@ -133,7 +133,7 @@ class Client(object):
                  permissive_ssl=False, **kwargs):
         """To setup the connection a pipeline of queues/workers is constructed.
 
-        There are five interations with the server the connection manages:
+        There are five interactions with the server the connection manages:
         1. Downloading solver information.
         2. Submitting problem data.
         3. Polling problem status.
