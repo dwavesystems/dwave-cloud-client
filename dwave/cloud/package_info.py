@@ -1,0 +1,8 @@
+__packagename__ = 'dwave-cloud-client'
+__title__ = 'D-Wave Cloud Client'
+__version__ = '0.3.3'
+__author__ = 'D-Wave Systems Inc.'
+__description__ = 'A minimal client for interacting with D-Wave cloud resources.'
+__url__ = 'https://github.com/dwavesystems/dwave-cloud-client'
+__license__ = 'Apache 2.0'
+__copyright__ = '2017, D-Wave Systems Inc.'
