@@ -49,3 +49,28 @@ Example
 
         # Print out the first sample
         print(computation.samples[0])
+
+Installation
+------------
+
+.. installation-start-marker
+
+Compatible with Python 2 and 3:
+
+.. code-block:: bash
+
+    pip install dwave-cloud-client
+
+To install from source:
+
+.. code-block:: bash
+
+    pip install -r requirements.txt
+    python setup.py install
+
+.. installation-end-marker
+
+License
+-------
+
+Released under the Apache License 2.0. See LICENSE file.
