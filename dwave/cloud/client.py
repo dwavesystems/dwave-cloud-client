@@ -67,11 +67,18 @@ class Client(object):
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None,
                     endpoint=None, token=None, solver=None, proxy=None,
-                    **kwargs):
+                    legacy_config_fallback=True, **kwargs):
         """Client factory method which loads configuration from file(s),
         process environment variables and explicitly provided values, creating
         and returning the appropriate client instance
         (:class:`dwave.cloud.qpu.Client` or :class:`dwave.cloud.sw.Client`).
+
+        Args:
+            TODO
+
+            legacy_config_fallback (bool, default=True):
+                If loading from a ``dwave.conf`` config file fails, try
+                loading the ``.dwrc`` legacy config.
 
         Example:
             Create ``dwave.conf`` in your current directory or
@@ -108,8 +115,9 @@ class Client(object):
                 endpoint=endpoint, token=token, solver=solver, proxy=proxy,
                 client=client)
 
-        # and failback to the legacy `.dwrc`
-        if config.get('token') is None or config.get('endpoint') is None:
+        # and fallback to the legacy `.dwrc`
+        if legacy_config_fallback and (
+                config.get('token') is None or config.get('endpoint') is None):
             try:
                 _endpoint, _token, _proxy, _solver = legacy_load_config(
                     key=profile,
