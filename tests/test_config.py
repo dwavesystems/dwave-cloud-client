@@ -64,7 +64,7 @@ class TestConfig(unittest.TestCase):
         return config
 
     def test_config_load_from_file(self):
-        with mock.patch(configparser_open_namespace, iterable_mock_open(self.config_body), create=True):
+        with mock.patch('dwave.cloud.config.open', iterable_mock_open(self.config_body), create=True):
             config = load_config_from_file(filename="filename")
             self.assertEqual(config.sections(), ['dw2000', 'software', 'alpha'])
             self.assertEqual(config['dw2000']['client'], 'qpu')
@@ -85,7 +85,7 @@ class TestConfig(unittest.TestCase):
             [section]
             key = val
         """
-        with mock.patch(configparser_open_namespace, iterable_mock_open(myconfig), create=True):
+        with mock.patch('dwave.cloud.config.open', iterable_mock_open(myconfig), create=True):
             self.assertRaises(ValueError, load_config_from_file, filename="filename")
             self.assertRaises(ValueError, load_config, config_file="filename", profile="section")
 
@@ -94,10 +94,10 @@ class TestConfig(unittest.TestCase):
             self.assertRaises(ValueError, load_config_from_file)
 
     def test_invalid_filename_given(self):
-        self.assertRaises(ValueError, load_config_from_file, filename='/path/to/non/existing/config')
+        self.assertRaises(OSError, load_config_from_file, filename='/path/to/non/existing/config')
 
     def test_config_load_profile(self):
-        with mock.patch(configparser_open_namespace, iterable_mock_open(self.config_body), create=True):
+        with mock.patch('dwave.cloud.config.open', iterable_mock_open(self.config_body), create=True):
             profile = load_profile(name="alpha", filename="filename")
             self.assertEqual(profile['token'], 'alpha-token')
             self.assertRaises(KeyError, load_profile, name="non-existing-section", filename="filename")

@@ -97,6 +97,11 @@ class Client(object):
                     computation = solver.sample_ising({}, {})
                     samples = computation.result()
 
+        Raises:
+            :exc:`OSError`:
+                Config load failed for explicitly specified config file (through
+                argument or environment)
+
         TODO: describe config loading, new config in broad strokes, refer to
         actual loaders' doc; include examples for config and usage.
 

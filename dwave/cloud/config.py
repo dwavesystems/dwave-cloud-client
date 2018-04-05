@@ -102,7 +102,13 @@ def load_config_from_file(filename=None):
 
     Raises:
         :exc:`ValueError`:
-            Config file not found, or format invalid (parsing failed).
+            Config file location could not be auto-detected, or it has invalid
+            format (parsing failed).
+
+        :exc:`OSError`:
+            Opening or reading of config file failed. It can happen for
+            non-existing explicitly specified ``filename``, or for an unreadable
+            auto-detected config file (perhaps no read permission).
     """
     if filename is None:
         filename = detect_configfile_path()
@@ -111,11 +117,12 @@ def load_config_from_file(filename=None):
 
     config = configparser.ConfigParser(default_section="defaults")
     try:
-        files_read = config.read(filename)
+        with open(filename, 'r') as f:
+            config.read_file(f, filename)
+    except (IOError, OSError):
+        raise OSError("Failed to load the config file explicitly "\
+                      "specified: {!r}".format(filename))
     except configparser.Error:
-        files_read = []
-
-    if not files_read:
         raise ValueError("Failed to parse the config file "\
                          "given or detected: {}".format(filename))
 
@@ -172,6 +179,20 @@ def load_config(config_file=None, profile=None, client=None,
     directory, then in user-local config directories, and finally in system-wide
     config dirs). For details on format and location detection, see
     :func:`load_config_from_file`.
+
+    If location of ``config_file`` is explicitly specified (via arguments or
+    environment variable), config loading will fail with :exc:`OSError` if that
+    file does not exist, or it's not readable.
+
+    Similarly, if ``profile`` is explicitly specified (via arguments or
+    environment variable), config loading will fail with :exc:`ValueError` if
+    that profile is not present in the config loaded. If config file is not
+    specified explicitly, nor detected on file system, not defined via
+    environment, resulting in an empty config, explicit profile selection will
+    also fail.
+
+    If profile is not explicitly specified, selection of profile is described
+    under ``profile`` argument below.
 
     Environment variables:
 
@@ -256,11 +277,13 @@ def load_config(config_file=None, profile=None, client=None,
                 }
 
     Raises:
-        Nothing, except in unexpected circumstances.
-            Cases of invalid config file, file/disk read error, invalid
-            environment values, etc. are handled and result in `None` values
-            for one or all of the keys in the result.
+        :exc:`ValueError`:
+            Invalid (non-existing) profile name.
 
+        :exc:`OSError`:
+            Explicitly given ``config_file`` unreadable. In cases when config
+            file is auto-detected, read errors are silenced, and ``None`` values
+            are returned in place of missing values.
     """
     # load config file
     # lookup priority: explicitly specified, environment specified, auto-detected
@@ -275,6 +298,10 @@ def load_config(config_file=None, profile=None, client=None,
         config_defaults = config.defaults()
         default_profile = config_defaults.get('profile', first_section)
     except ValueError:
+        # fail if we couldn't read explicitly specified config file
+        if config_file:
+            raise
+        # but, default to null-config otherwise (and override later)
         config = {}
         config_defaults = {}
         default_profile = None
@@ -294,7 +321,7 @@ def load_config(config_file=None, profile=None, client=None,
         else:
             section = {}
 
-    # override (or defined) a selected subset of values via env or kwargs,
+    # override a selected subset of values via env or kwargs,
     # pass-through the rest unmodified
     section['client'] = client or os.getenv("DWAVE_API_CLIENT", section.get('client'))
     section['endpoint'] = endpoint or os.getenv("DWAVE_API_ENDPOINT", section.get('endpoint'))
@@ -417,4 +444,4 @@ def legacy_load_config(key=None, endpoint=None, token=None, solver=None, proxy=N
             pass  # Just ignore any malformed lines
             # TODO issue a warning
 
-    raise ValueError("No configuration for the connection could be discovered.")
+    raise ValueError("No configuration for the client could be discovered.")
