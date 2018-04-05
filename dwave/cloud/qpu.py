@@ -18,20 +18,22 @@ An example using the client:
     from dwave.cloud.qpu import Client
 
     # Connect using explicit connection information
-    client = Client('https://sapi-url', 'token-string')
+    # Also, note the use context manager, which ensures the resources (thread
+    # pools used by Client) are freed as soon as we're done with using client.
+    with Client('https://sapi-url', 'token-string') as client:
 
-    # Load a solver by name
-    solver = client.get_solver('test-solver')
+        # Load a solver by name
+        solver = client.get_solver('test-solver')
 
-    # Build a random Ising model on +1, -1. Build it to exactly fit the graph the solver provides
-    linear = {index: random.choice([-1, 1]) for index in solver.nodes}
-    quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
+        # Build a random Ising model on +1, -1. Build it to exactly fit the graph the solver provides
+        linear = {index: random.choice([-1, 1]) for index in solver.nodes}
+        quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
 
-    # Send the problem for sampling, include a solver specific parameter 'num_reads'
-    computation = solver.sample_ising(linear, quad, num_reads=100)
+        # Send the problem for sampling, include a solver specific parameter 'num_reads'
+        computation = solver.sample_ising(linear, quad, num_reads=100)
 
-    # Print out the first sample
-    print(computation.samples[0])
+        # Print out the first sample (out of a hundred)
+        print(computation.samples[0])
 
 Rough workflow within the SAPI server:
  1. Submitted problems enter an input queue. Each user has an input queue per solver.

@@ -79,23 +79,23 @@ class MockConnectivityTests(unittest.TestCase):
         with requests_mock.mock() as m:
             setup_server(m)
             with self.assertRaises(IOError):
-                client = Client(bad_url, token)
-                client.get_solvers()
+                with Client(bad_url, token) as client:
+                    client.get_solvers()
 
     def test_bad_token(self):
         """Connect with a bad token."""
         with requests_mock.mock() as m:
             setup_server(m)
             with self.assertRaises(IOError):
-                client = Client(url, bad_token)
-                client.get_solvers()
+                with Client(url, bad_token) as client:
+                    client.get_solvers()
 
     def test_good_connection(self):
         """Connect with a valid URL and token."""
         with requests_mock.mock() as m:
             setup_server(m)
-            client = Client(url, token)
-            self.assertTrue(len(client.get_solvers()) > 0)
+            with Client(url, token) as client:
+                self.assertTrue(len(client.get_solvers()) > 0)
 
 
 class MockSolverLoading(unittest.TestCase):
@@ -119,18 +119,18 @@ class MockSolverLoading(unittest.TestCase):
             setup_server(m)
 
             # test default, cached solver get
-            client = Client(url, token)
-            solver = client.get_solver(solver_name)
-            self.assertEqual(solver.id, solver_name)
+            with Client(url, token) as client:
+                solver = client.get_solver(solver_name)
+                self.assertEqual(solver.id, solver_name)
 
-            # fetch solver not present in cache
-            client._solvers = {}
-            self.assertEqual(client.get_solver(solver_name).id, solver_name)
+                # fetch solver not present in cache
+                client._solvers = {}
+                self.assertEqual(client.get_solver(solver_name).id, solver_name)
 
-            # re-fetch solver present in cache
-            solver = client.get_solver(solver_name)
-            solver.id = 'different-solver'
-            self.assertEqual(client.get_solver(solver_name, refresh=True).id, solver_name)
+                # re-fetch solver present in cache
+                solver = client.get_solver(solver_name)
+                solver.id = 'different-solver'
+                self.assertEqual(client.get_solver(solver_name, refresh=True).id, solver_name)
 
     def test_load_all_solvers(self):
         """Load the list of solver names."""
@@ -138,45 +138,45 @@ class MockSolverLoading(unittest.TestCase):
             setup_server(m)
 
             # test default case, fetch all solvers for the first time
-            client = Client(url, token)
-            self.assertEqual(len(client.get_solvers()), 2)
+            with Client(url, token) as client:
+                self.assertEqual(len(client.get_solvers()), 2)
 
-            # test default refresh
-            client._solvers = {}
-            self.assertEqual(len(client.get_solvers()), 0)
+                # test default refresh
+                client._solvers = {}
+                self.assertEqual(len(client.get_solvers()), 0)
 
-            # test no refresh
-            client._solvers = {}
-            self.assertEqual(len(client.get_solvers(refresh=False)), 0)
+                # test no refresh
+                client._solvers = {}
+                self.assertEqual(len(client.get_solvers(refresh=False)), 0)
 
-            # test refresh
-            client._solvers = {}
-            self.assertEqual(len(client.get_solvers(refresh=True)), 2)
+                # test refresh
+                client._solvers = {}
+                self.assertEqual(len(client.get_solvers(refresh=True)), 2)
 
     def test_load_missing_solver(self):
         """Try to load a solver that does not exist."""
         with requests_mock.mock() as m:
             m.get(requests_mock.ANY, status_code=404)
-            client = Client(url, token)
-            with self.assertRaises(KeyError):
-                client.get_solver(solver_name)
+            with Client(url, token) as client:
+                with self.assertRaises(KeyError):
+                    client.get_solver(solver_name)
 
     def test_load_solver_missing_data(self):
         """Try to load a solver that has incomplete data."""
         with requests_mock.mock() as m:
             m.get(solver1_url, text=solver_object(solver_name, True))
-            client = Client(url, token)
-            with self.assertRaises(InvalidAPIResponseError):
-                client.get_solver(solver_name)
+            with Client(url, token) as client:
+                with self.assertRaises(InvalidAPIResponseError):
+                    client.get_solver(solver_name)
 
     def test_load_solver_broken_response(self):
         """Try to load a solver for which the server has returned a truncated response."""
         with requests_mock.mock() as m:
             body = solver_object(solver_name)
             m.get(solver1_url, text=body[0:len(body)//2])
-            client = Client(url, token)
-            with self.assertRaises(ValueError):
-                client.get_solver(solver_name)
+            with Client(url, token) as client:
+                with self.assertRaises(ValueError):
+                    client.get_solver(solver_name)
 
     def test_solver_filtering_in_client(self):
         self.assertTrue(Client.is_solver_handled(Solver(None, json.loads(solver_object('test')))))
@@ -217,25 +217,8 @@ class MockConfiguration(unittest.TestCase):
 
     def test_explicit_only(self):
         """Specify information only through function arguments."""
-        client = Client.from_config(config_file='nonexisting',
-                                    endpoint='arg-url', token='arg-token')
-        client.session.get = GetEvent.handle
-        try:
-            client.get_solver('arg-solver')
-        except GetEvent as event:
-            self.assertTrue(event.url.startswith('arg-url'))
-            return
-        self.fail()
-
-    def test_nothing(self):
-        """With no values set, we should get an error when trying to create Client."""
-        with self.assertRaises(ValueError):
-            Client.from_config(config_file='nonexisting')
-
-    def test_explicit_with_file(self):
-        """With arguments and a config file, the config file should be ignored."""
-        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
-            client = Client.from_config(endpoint='arg-url', token='arg-token')
+        with Client.from_config(config_file='nonexisting',
+                                endpoint='arg-url', token='arg-token') as client:
             client.session.get = GetEvent.handle
             try:
                 client.get_solver('arg-solver')
@@ -244,17 +227,35 @@ class MockConfiguration(unittest.TestCase):
                 return
             self.fail()
 
+    def test_nothing(self):
+        """With no values set, we should get an error when trying to create Client."""
+        with self.assertRaises(ValueError):
+            with Client.from_config(config_file='nonexisting') as client:
+                pass
+
+    def test_explicit_with_file(self):
+        """With arguments and a config file, the config file should be ignored."""
+        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
+            with Client.from_config(endpoint='arg-url', token='arg-token') as client:
+                client.session.get = GetEvent.handle
+                try:
+                    client.get_solver('arg-solver')
+                except GetEvent as event:
+                    self.assertTrue(event.url.startswith('arg-url'))
+                    return
+                self.fail()
+
     def test_only_file(self):
         """With no arguments or environment variables, the default connection from the config file should be used."""
         with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
-            client = Client.from_config()
-            client.session.get = GetEvent.handle
-            try:
-                client.get_solver('arg-solver')
-            except GetEvent as event:
-                self.assertTrue(event.url.startswith('file-prod-url'))
-                return
-            self.fail()
+            with Client.from_config() as client:
+                client.session.get = GetEvent.handle
+                try:
+                    client.get_solver('arg-solver')
+                except GetEvent as event:
+                    self.assertTrue(event.url.startswith('file-prod-url'))
+                    return
+                self.fail()
 
     def test_only_file_key(self):
         """If give a name from the config file the proper URL should be loaded."""
@@ -262,39 +263,39 @@ class MockConfiguration(unittest.TestCase):
             with mock.patch(configparser_open_namespace, iterable_mock_open(config_body), create=True):
                 # this will try parsing legacy format as new, fail,
                 # then try parsing it as legacy config
-                client = Client.from_config(profile='alpha')
-                client.session.get = GetEvent.handle
-                try:
-                    client.get_solver('arg-solver')
-                except GetEvent as event:
-                    self.assertTrue(event.url.startswith('file-alpha-url'))
-                    return
-                self.fail()
+                with Client.from_config(profile='alpha') as client:
+                    client.session.get = GetEvent.handle
+                    try:
+                        client.get_solver('arg-solver')
+                    except GetEvent as event:
+                        self.assertTrue(event.url.startswith('file-alpha-url'))
+                        return
+                    self.fail()
 
     def test_env_with_file_set(self):
         """With environment variables and a config file, the config file should be ignored."""
         with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
             with mock.patch.dict(os.environ, {'DW_INTERNAL__HTTPLINK': 'env-url', 'DW_INTERNAL__TOKEN': 'env-token'}):
-                client = Client.from_config()
-                client.session.get = GetEvent.handle
-                try:
-                    client.get_solver('arg-solver')
-                except GetEvent as event:
-                    self.assertTrue(event.url.startswith('env-url'))
-                    return
-                self.fail()
+                with Client.from_config() as client:
+                    client.session.get = GetEvent.handle
+                    try:
+                        client.get_solver('arg-solver')
+                    except GetEvent as event:
+                        self.assertTrue(event.url.startswith('env-url'))
+                        return
+                    self.fail()
 
     def test_env_args_set(self):
         """With arguments and environment variables, the environment variables should be ignored."""
         with mock.patch.dict(os.environ, {'DW_INTERNAL__HTTPLINK': 'env-url', 'DW_INTERNAL__TOKEN': 'env-token'}):
-            client = Client.from_config(endpoint='args-url', token='args-token')
-            client.session.get = GetEvent.handle
-            try:
-                client.get_solver('arg-solver')
-            except GetEvent as event:
-                self.assertTrue(event.url.startswith('args-url'))
-                return
-            self.fail()
+            with Client.from_config(endpoint='args-url', token='args-token') as client:
+                client.session.get = GetEvent.handle
+                try:
+                    client.get_solver('arg-solver')
+                except GetEvent as event:
+                    self.assertTrue(event.url.startswith('args-url'))
+                    return
+                self.fail()
 
     def test_file_read_error(self):
         """On config file read error, we should fail with `IOError`."""
