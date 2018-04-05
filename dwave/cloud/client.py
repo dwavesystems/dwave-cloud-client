@@ -85,10 +85,10 @@ class Client(object):
             Run::
 
                 from dwave.cloud import Client
-                client = Client.from_config(profile='prod')
-                solver = client.get_solver()
-                computation = solver.sample_ising({}, {})
-                samples = computation.result()
+                with Client.from_config(profile='prod') as client:
+                    solver = client.get_solver()
+                    computation = solver.sample_ising({}, {})
+                    samples = computation.result()
 
         TODO: describe config loading, new config in broad strokes, refer to
         actual loaders' doc; include examples for config and usage.
