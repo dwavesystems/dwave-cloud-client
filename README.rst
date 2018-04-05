@@ -13,7 +13,7 @@
     :target: http://dwave-cloud-client.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
 
-.. inclusion-marker-do-not-remove
+.. index-start-marker
 
 D-Wave Cloud Client
 ===================
@@ -25,6 +25,7 @@ SAPI is an application layer built to provide resource discovery, permissions,
 and scheduling for quantum annealing resources at D-Wave Systems.
 This package aims to provide a minimal Python interface to that layer that
 still captures some reasonable practices for interacting with SAPI.
+
 
 Example
 -------
@@ -47,5 +48,40 @@ Example
         # Send the problem for sampling, include a solver specific parameter 'num_reads'
         computation = solver.sample_ising(linear, quad, num_reads=100)
 
-        # Print out the first sample
+        # Print out the first sample (out of a hundred)
         print(computation.samples[0])
+
+.. index-end-marker
+
+
+Installation
+------------
+
+.. installation-start-marker
+
+Compatible with Python 2 and 3:
+
+.. code-block:: bash
+
+    pip install dwave-cloud-client
+
+To install from source:
+
+.. code-block:: bash
+
+    pip install -r requirements.txt
+    python setup.py install
+
+.. installation-end-marker
+
+
+License
+-------
+
+Released under the Apache License 2.0. See LICENSE file.
+
+
+Contribution
+------------
+
+See CONTRIBUTING.rst file.

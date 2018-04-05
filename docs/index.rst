@@ -1,53 +1,42 @@
-D-Wave Cloud Client
-===================
+..  -*- coding: utf-8 -*-
+
+.. _contents:
+
+.. include:: ../README.rst
+  :start-after: index-start-marker
+  :end-before: index-end-marker
 
 
-Configuration
+Documentation
 -------------
 
-.. automodule:: dwave.cloud.config
-    :members: load_config_from_file, load_config, legacy_load_config,
-        load_profile, detect_configfile_path
+.. only:: html
+
+  :Release: |version|
+  :Date: |today|
+
+.. toctree::
+  :maxdepth: 1
+
+  reference/index
+  installation
+  license
+  bibliography
+
+.. toctree::
+  :caption: D-Wave's Ocean Software
+  :maxdepth: 1
+
+  dwave
+  ocean
+  contributing
+  glossary
 
 
-Resources
----------
+Indices and tables
+------------------
 
-Base Client
-^^^^^^^^^^^
-
-.. autoclass:: dwave.cloud.client.Client
-    :members:
-
-QPU Client
-^^^^^^^^^^
-
-.. autoclass:: dwave.cloud.qpu.Client
-    :members:
-
-Software Samplers Client
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. autoclass:: dwave.cloud.sw.Client
-    :members:
-
-
-Solver
-------
-
-.. autoclass:: dwave.cloud.solver.Solver
-    :members:
-
-
-Computation
------------
-
-.. autoclass:: dwave.cloud.computation.Future
-    :members:
-
-
-Exceptions
-----------
-
-.. automodule:: dwave.cloud.exceptions
-    :members:
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
+* :ref:`glossary`
