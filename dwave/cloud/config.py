@@ -2,6 +2,7 @@ import os
 import configparser
 import homebase
 
+from dwave.cloud.exceptions import ConfigFileReadError, ConfigFileParseError
 
 CONF_APP = "dwave"
 CONF_AUTHOR = "dwavesystem"
@@ -102,22 +103,29 @@ def load_config_from_file(filename=None):
 
     Raises:
         :exc:`ValueError`:
-            Config file not found, or format invalid (parsing failed).
+            Config file location unspecified and undetected.
+
+        :exc:`~dwave.cloud.exceptions.ConfigFileReadError`:
+            Config file specified or detected could not be opened or read.
+
+        :exc:`~dwave.cloud.exceptions.ConfigFileParseError`:
+            Config file parse failed.
     """
     if filename is None:
         filename = detect_configfile_path()
         if not filename:
-            raise ValueError("Config filename not given, and could not be detected")
+            raise ValueError("Config file not given, and could not be detected")
 
     config = configparser.ConfigParser(default_section="defaults")
     try:
-        files_read = config.read(filename)
-    except configparser.Error:
-        files_read = []
+        with open(filename, 'r') as f:
+            config.read_file(f, filename)
 
-    if not files_read:
-        raise ValueError("Failed to parse the config file "\
-                         "given or detected: {}".format(filename))
+    except (IOError, OSError):
+        raise ConfigFileReadError("Failed to read {!r}".format(filename))
+
+    except configparser.Error:
+        raise ConfigFileParseError("Failed to parse {!r}".format(filename))
 
     return config
 
@@ -172,6 +180,23 @@ def load_config(config_file=None, profile=None, client=None,
     directory, then in user-local config directories, and finally in system-wide
     config dirs). For details on format and location detection, see
     :func:`load_config_from_file`.
+
+    If location of ``config_file`` is explicitly specified (via arguments or
+    environment variable), but the file does not exits, or is not readable,
+    config loading will fail with
+    :exc:`~dwave.cloud.exceptions.ConfigFileReadError`. Config loading will fail
+    with :exc:`~dwave.cloud.exceptions.ConfigFileParseError` if file is
+    readable, but it's not a valid config file.
+
+    Similarly, if ``profile`` is explicitly specified (via arguments or
+    environment variable), config loading will fail with :exc:`ValueError` if
+    that profile is not present in the config loaded. If config file is not
+    specified explicitly, nor detected on file system, not defined via
+    environment, resulting in an empty config, explicit profile selection will
+    also fail.
+
+    If profile is not explicitly specified, selection of profile is described
+    under ``profile`` argument below.
 
     Environment variables:
 
@@ -256,28 +281,33 @@ def load_config(config_file=None, profile=None, client=None,
                 }
 
     Raises:
-        Nothing, except in unexpected circumstances.
-            Cases of invalid config file, file/disk read error, invalid
-            environment values, etc. are handled and result in `None` values
-            for one or all of the keys in the result.
+        :exc:`ValueError`:
+            Invalid (non-existing) profile name.
 
+        :exc:`~dwave.cloud.exceptions.ConfigFileReadError`:
+            Config file specified or detected could not be opened or read.
+
+        :exc:`~dwave.cloud.exceptions.ConfigFileParseError`:
+            Config file parse failed.
     """
-    # load config file
-    # lookup priority: explicitly specified, environment specified, auto-detected
     if config_file is None:
         config_file = os.getenv("DWAVE_CONFIG_FILE")
     try:
         config = load_config_from_file(config_file)
-        # last-resort profile name:
+        # determine profile name fallback:
         #  (1) profile key under [defaults],
         #  (2) first non-[defaults] section
         first_section = next(iter(config.sections() + [None]))
         config_defaults = config.defaults()
         default_profile = config_defaults.get('profile', first_section)
     except ValueError:
+        # config file not specified, or not detected: start with null-config
         config = {}
         config_defaults = {}
         default_profile = None
+    except (ConfigFileReadError, ConfigFileParseError):
+        # unable to access/read/parse config file(s): explicitly fail
+        raise
 
     if profile is None:
         profile = os.getenv("DWAVE_PROFILE", default_profile)
@@ -285,7 +315,7 @@ def load_config(config_file=None, profile=None, client=None,
         try:
             section = dict(config[profile])
         except KeyError:
-            raise ValueError("Profile {!r} not defined in config file".format(profile))
+            raise ValueError("Config profile {!r} not found".format(profile))
     else:
         # as the very last resort (unspecified profile name and
         # no profiles defined in config), try to use [defaults]
@@ -294,7 +324,7 @@ def load_config(config_file=None, profile=None, client=None,
         else:
             section = {}
 
-    # override (or defined) a selected subset of values via env or kwargs,
+    # override a selected subset of values via env or kwargs,
     # pass-through the rest unmodified
     section['client'] = client or os.getenv("DWAVE_API_CLIENT", section.get('client'))
     section['endpoint'] = endpoint or os.getenv("DWAVE_API_ENDPOINT", section.get('endpoint'))
@@ -417,4 +447,4 @@ def legacy_load_config(key=None, endpoint=None, token=None, solver=None, proxy=N
             pass  # Just ignore any malformed lines
             # TODO issue a warning
 
-    raise ValueError("No configuration for the connection could be discovered.")
+    raise ValueError("No configuration for the client could be discovered.")

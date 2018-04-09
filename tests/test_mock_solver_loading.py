@@ -12,7 +12,7 @@ except ImportError:
     import mock
 
 from dwave.cloud.qpu import Client, Solver
-from dwave.cloud.exceptions import InvalidAPIResponseError
+from dwave.cloud.exceptions import InvalidAPIResponseError, ConfigFileReadError
 from dwave.cloud.config import legacy_load_config
 
 from .test_config import iterable_mock_open, configparser_open_namespace
@@ -217,8 +217,7 @@ class MockConfiguration(unittest.TestCase):
 
     def test_explicit_only(self):
         """Specify information only through function arguments."""
-        with Client.from_config(config_file='nonexisting',
-                                endpoint='arg-url', token='arg-token') as client:
+        with Client.from_config(endpoint='arg-url', token='arg-token') as client:
             client.session.get = GetEvent.handle
             try:
                 client.get_solver('arg-solver')
@@ -227,10 +226,10 @@ class MockConfiguration(unittest.TestCase):
                 return
             self.fail()
 
-    def test_nothing(self):
+    def test_nonexisting_file(self):
         """With no values set, we should get an error when trying to create Client."""
-        with self.assertRaises(ValueError):
-            with Client.from_config(config_file='nonexisting') as client:
+        with self.assertRaises(ConfigFileReadError):
+            with Client.from_config(config_file='nonexisting', legacy_config_fallback=False) as client:
                 pass
 
     def test_explicit_with_file(self):

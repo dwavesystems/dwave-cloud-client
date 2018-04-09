@@ -109,6 +109,21 @@ class ClientFactory(unittest.TestCase):
                 init.assert_called_once_with(
                     endpoint='endpoint', token='token', custom='new-custom')
 
+    def test_legacy_config_load_fallback(self):
+        conf = 'endpoint token proxy solver'.split()
+        with mock.patch("dwave.cloud.client.load_config", return_value={}):
+            with mock.patch("dwave.cloud.client.legacy_load_config", lambda **kwargs: conf):
+                # test fallback works (legacy config is loaded)
+                with dwave.cloud.Client.from_config(legacy_config_fallback=True) as client:
+                    self.assertEqual(client.endpoint, 'endpoint')
+                    self.assertEqual(client.token, 'token')
+                    self.assertEqual(client.default_solver, 'solver')
+                    self.assertEqual(client.session.proxies['http'], 'proxy')
+
+                # test fallback is avoided (legacy config skipped)
+                self.assertRaises(
+                    ValueError, dwave.cloud.Client.from_config, legacy_config_fallback=False)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,3 +1,11 @@
+class ConfigFileReadError(Exception):
+    """Non-existing or unreadable config file specified or implied."""
+
+
+class ConfigFileParseError(Exception):
+    """Invalid format of config file."""
+
+
 class SolverError(Exception):
     """Generic base class for all solver-related errors."""
 
