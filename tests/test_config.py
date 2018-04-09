@@ -4,8 +4,9 @@ import os
 import sys
 import unittest
 import configparser
-
 from functools import partial
+
+from dwave.cloud.exceptions import ConfigFileParseError, ConfigFileReadError
 
 try:
     # python 3
@@ -78,7 +79,8 @@ class TestConfig(unittest.TestCase):
                 os.environ.pop(key, None)
 
     def test_config_load_from_file__invalid_format__duplicate_sections(self):
-        """Config loading should fail with `ValueError` on file load error."""
+        """Config loading should fail with ``ConfigFileParseError`` for invalid
+        config files."""
         myconfig = u"""
             [section]
             key = val
@@ -86,15 +88,15 @@ class TestConfig(unittest.TestCase):
             key = val
         """
         with mock.patch('dwave.cloud.config.open', iterable_mock_open(myconfig), create=True):
-            self.assertRaises(ValueError, load_config_from_file, filename="filename")
-            self.assertRaises(ValueError, load_config, config_file="filename", profile="section")
+            self.assertRaises(ConfigFileParseError, load_config_from_file, filename="filename")
+            self.assertRaises(ConfigFileParseError, load_config, config_file="filename", profile="section")
 
     def test_no_config_detected(self):
         with mock.patch("dwave.cloud.config.detect_configfile_path", lambda: None):
             self.assertRaises(ValueError, load_config_from_file)
 
     def test_invalid_filename_given(self):
-        self.assertRaises(OSError, load_config_from_file, filename='/path/to/non/existing/config')
+        self.assertRaises(ConfigFileReadError, load_config_from_file, filename='/path/to/non/existing/config')
 
     def test_config_load_profile(self):
         with mock.patch('dwave.cloud.config.open', iterable_mock_open(self.config_body), create=True):

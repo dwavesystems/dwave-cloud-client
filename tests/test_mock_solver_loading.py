@@ -12,10 +12,10 @@ except ImportError:
     import mock
 
 from dwave.cloud.qpu import Client, Solver
-from dwave.cloud.exceptions import InvalidAPIResponseError
+from dwave.cloud.exceptions import InvalidAPIResponseError, ConfigFileReadError
 from dwave.cloud.config import legacy_load_config
 
-from .test_config import iterable_mock_open, configparser_open_namespace
+from test_config import iterable_mock_open, configparser_open_namespace
 
 
 url = 'https://dwavesys.com'
@@ -228,7 +228,7 @@ class MockConfiguration(unittest.TestCase):
 
     def test_nonexisting_file(self):
         """With no values set, we should get an error when trying to create Client."""
-        with self.assertRaises(OSError):
+        with self.assertRaises(ConfigFileReadError):
             with Client.from_config(config_file='nonexisting', legacy_config_fallback=False) as client:
                 pass
 
