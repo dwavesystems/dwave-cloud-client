@@ -98,9 +98,11 @@ class Client(object):
                     samples = computation.result()
 
         Raises:
-            :exc:`OSError`:
-                Config load failed for explicitly specified config file (through
-                argument or environment)
+            :exc:`~dwave.cloud.exceptions.ConfigFileReadError`:
+                Config file specified or detected could not be opened or read.
+
+            :exc:`~dwave.cloud.exceptions.ConfigFileParseError`:
+                Config file parse failed.
 
         TODO: describe config loading, new config in broad strokes, refer to
         actual loaders' doc; include examples for config and usage.
