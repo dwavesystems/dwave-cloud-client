@@ -15,7 +15,7 @@ from dwave.cloud.qpu import Client, Solver
 from dwave.cloud.exceptions import InvalidAPIResponseError, ConfigFileReadError
 from dwave.cloud.config import legacy_load_config
 
-from test_config import iterable_mock_open, configparser_open_namespace
+from .test_config import iterable_mock_open, configparser_open_namespace
 
 
 url = 'https://dwavesys.com'
