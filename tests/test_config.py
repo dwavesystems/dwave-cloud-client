@@ -33,7 +33,7 @@ except ImportError:
 
 
 from dwave.cloud.config import (
-    detect_configfile_path, load_config_from_file, load_profile, load_config)
+    detect_existing_configfile_paths, load_config_from_files, load_config)
 
 
 class TestConfig(unittest.TestCase):
@@ -66,7 +66,7 @@ class TestConfig(unittest.TestCase):
 
     def test_config_load_from_file(self):
         with mock.patch('dwave.cloud.config.open', iterable_mock_open(self.config_body), create=True):
-            config = load_config_from_file(filename="filename")
+            config = load_config_from_files(filenames=["filename"])
             self.assertEqual(config.sections(), ['dw2000', 'software', 'alpha'])
             self.assertEqual(config['dw2000']['client'], 'qpu')
             self.assertEqual(config['software']['client'], 'sw')
@@ -88,26 +88,22 @@ class TestConfig(unittest.TestCase):
             key = val
         """
         with mock.patch('dwave.cloud.config.open', iterable_mock_open(myconfig), create=True):
-            self.assertRaises(ConfigFileParseError, load_config_from_file, filename="filename")
+            self.assertRaises(ConfigFileParseError, load_config_from_files, filenames=["filename"])
             self.assertRaises(ConfigFileParseError, load_config, config_file="filename", profile="section")
 
     def test_no_config_detected(self):
-        with mock.patch("dwave.cloud.config.detect_configfile_path", lambda: None):
-            self.assertRaises(ValueError, load_config_from_file)
+        """When no config file detected, `load_config_from_files` should return
+        empty config."""
+        with mock.patch("dwave.cloud.config.detect_existing_configfile_paths", lambda: []):
+            self.assertFalse(load_config_from_files().sections())
 
     def test_invalid_filename_given(self):
-        self.assertRaises(ConfigFileReadError, load_config_from_file, filename='/path/to/non/existing/config')
-
-    def test_config_load_profile(self):
-        with mock.patch('dwave.cloud.config.open', iterable_mock_open(self.config_body), create=True):
-            profile = load_profile(name="alpha", filename="filename")
-            self.assertEqual(profile['token'], 'alpha-token')
-            self.assertRaises(KeyError, load_profile, name="non-existing-section", filename="filename")
+        self.assertRaises(ConfigFileReadError, load_config_from_files, filenames=['/path/to/non/existing/config'])
 
     def test_config_file_detection_cwd(self):
         configpath = "./dwave.conf"
         with mock.patch("os.path.exists", lambda path: path == configpath):
-            self.assertEqual(detect_configfile_path(), configpath)
+            self.assertEqual(detect_existing_configfile_paths(), [configpath])
 
     def test_config_file_detection_user(self):
         if sys.platform == 'win32':
@@ -119,7 +115,7 @@ class TestConfig(unittest.TestCase):
             configpath = os.path.expanduser("~/.config/dwave/dwave.conf")
 
         with mock.patch("os.path.exists", lambda path: path == configpath):
-            self.assertEqual(detect_configfile_path(), configpath)
+            self.assertEqual(detect_existing_configfile_paths(), [configpath])
 
     def test_config_file_detection_system(self):
         if sys.platform == 'win32':
@@ -131,11 +127,11 @@ class TestConfig(unittest.TestCase):
             configpath = "/etc/xdg/dwave/dwave.conf"
 
         with mock.patch("os.path.exists", lambda path: path == configpath):
-            self.assertEqual(detect_configfile_path(), configpath)
+            self.assertEqual(detect_existing_configfile_paths(), [configpath])
 
     def test_config_file_detection_nonexisting(self):
         with mock.patch("os.path.exists", lambda path: False):
-            self.assertEqual(detect_configfile_path(), None)
+            self.assertEqual(detect_existing_configfile_paths(), [])
 
 
     def _assert_config_valid(self, config):
@@ -144,7 +140,7 @@ class TestConfig(unittest.TestCase):
         # default values are inherited
         self.assertEqual(config['client'], "qpu")
 
-    def _load_config_from_file(self, asked, provided, data=None):
+    def _load_config_from_files(self, asked, provided, data=None):
         self.assertEqual(asked, provided)
         if data is None:
             data = self.config_body
@@ -152,38 +148,38 @@ class TestConfig(unittest.TestCase):
 
 
     def test_config_load_configfile_arg(self):
-        with mock.patch("dwave.cloud.config.load_config_from_file",
-                        partial(self._load_config_from_file, provided='myfile')):
+        with mock.patch("dwave.cloud.config.load_config_from_files",
+                        partial(self._load_config_from_files, provided=['myfile'])):
             self._assert_config_valid(load_config(config_file='myfile', profile='alpha'))
 
     def test_config_load_configfile_env(self):
-        with mock.patch("dwave.cloud.config.load_config_from_file",
-                        partial(self._load_config_from_file, provided='myfile')):
+        with mock.patch("dwave.cloud.config.load_config_from_files",
+                        partial(self._load_config_from_files, provided=['myfile'])):
             with mock.patch.dict(os.environ, {'DWAVE_CONFIG_FILE': 'myfile'}):
                 self._assert_config_valid(load_config(config_file=None, profile='alpha'))
 
     def test_config_load_configfile_detect(self):
-        with mock.patch("dwave.cloud.config.load_config_from_file",
-                        partial(self._load_config_from_file, provided=None)):
+        with mock.patch("dwave.cloud.config.load_config_from_files",
+                        partial(self._load_config_from_files, provided=None)):
             self._assert_config_valid(load_config(config_file=None, profile='alpha'))
 
     def test_config_load_configfile_detect_profile_env(self):
-        with mock.patch("dwave.cloud.config.load_config_from_file",
-                        partial(self._load_config_from_file, provided=None)):
+        with mock.patch("dwave.cloud.config.load_config_from_files",
+                        partial(self._load_config_from_files, provided=None)):
             with mock.patch.dict(os.environ, {'DWAVE_PROFILE': 'alpha'}):
                 self._assert_config_valid(load_config())
 
     def test_config_load_configfile_env_profile_env(self):
-        with mock.patch("dwave.cloud.config.load_config_from_file",
-                        partial(self._load_config_from_file, provided='myfile')):
+        with mock.patch("dwave.cloud.config.load_config_from_files",
+                        partial(self._load_config_from_files, provided=['myfile'])):
             with mock.patch.dict(os.environ, {'DWAVE_CONFIG_FILE': 'myfile',
                                               'DWAVE_PROFILE': 'alpha'}):
                 self._assert_config_valid(load_config())
 
     def test_config_load_configfile_env_profile_env_key_arg(self):
         """Explicitly provided values should override env/file."""
-        with mock.patch("dwave.cloud.config.load_config_from_file",
-                        partial(self._load_config_from_file, provided='myfile')):
+        with mock.patch("dwave.cloud.config.load_config_from_files",
+                        partial(self._load_config_from_files, provided=['myfile'])):
             with mock.patch.dict(os.environ, {'DWAVE_CONFIG_FILE': 'myfile',
                                               'DWAVE_PROFILE': 'alpha'}):
                 self.assertEqual(load_config(endpoint='manual')['endpoint'], 'manual')
@@ -196,8 +192,8 @@ class TestConfig(unittest.TestCase):
         """load_config should fail if the profile specified in kwargs or env in
         non-existing.
         """
-        with mock.patch("dwave.cloud.config.load_config_from_file",
-                        partial(self._load_config_from_file, provided=None)):
+        with mock.patch("dwave.cloud.config.load_config_from_files",
+                        partial(self._load_config_from_files, provided=None)):
             self.assertRaises(ValueError, load_config, profile="nonexisting")
             with mock.patch.dict(os.environ, {'DWAVE_PROFILE': 'nonexisting'}):
                 self.assertRaises(ValueError, load_config)
@@ -206,8 +202,8 @@ class TestConfig(unittest.TestCase):
         """Check the right profile is loaded when `profile` specified only in
         [defaults] section.
         """
-        with mock.patch("dwave.cloud.config.load_config_from_file",
-                        partial(self._load_config_from_file, provided='myfile')):
+        with mock.patch("dwave.cloud.config.load_config_from_files",
+                        partial(self._load_config_from_files, provided=['myfile'])):
             profile = load_config(config_file='myfile')
             self.assertEqual(profile['solver'], 'c4-sw_sample')
 
@@ -219,8 +215,8 @@ class TestConfig(unittest.TestCase):
             [first]
             solver = DW_2000Q_1
         """
-        with mock.patch("dwave.cloud.config.load_config_from_file",
-                        partial(self._load_config_from_file,
+        with mock.patch("dwave.cloud.config.load_config_from_files",
+                        partial(self._load_config_from_files,
                                 provided=None, data=myconfig)):
             profile = load_config()
             self.assertIn('solver', profile)
@@ -235,8 +231,8 @@ class TestConfig(unittest.TestCase):
             [defaults]
             solver = DW_2000Q_1
         """
-        with mock.patch("dwave.cloud.config.load_config_from_file",
-                        partial(self._load_config_from_file,
+        with mock.patch("dwave.cloud.config.load_config_from_files",
+                        partial(self._load_config_from_files,
                                 provided=None, data=myconfig)):
             profile = load_config()
             self.assertIn('solver', profile)
@@ -253,7 +249,7 @@ class TestConfig(unittest.TestCase):
             [some]
             solver = DW_2000Q_1
         """
-        with mock.patch("dwave.cloud.config.load_config_from_file",
-                        partial(self._load_config_from_file,
-                                provided='myfile', data=myconfig)):
+        with mock.patch("dwave.cloud.config.load_config_from_files",
+                        partial(self._load_config_from_files,
+                                provided=['myfile'], data=myconfig)):
             self.assertRaises(ValueError, load_config, config_file='myfile')

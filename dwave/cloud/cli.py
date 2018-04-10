@@ -8,8 +8,8 @@ from dwave.cloud.utils import readline_input
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError)
 from dwave.cloud.config import (
-    load_config_from_file, get_default_config,
-    detect_configfile_path, get_default_configfile_path)
+    load_config_from_files, get_default_config,
+    get_configfile_path, get_default_configfile_path)
 
 
 @click.group()
@@ -30,7 +30,7 @@ def configure(config_file, profile):
         print("Using config file:", config_file)
     else:
         # path not given, try to detect; or use default, but allow user to override
-        config_file = detect_configfile_path()
+        config_file = get_configfile_path()
         if config_file:
             print("Found existing config file:", config_file)
         else:
@@ -40,8 +40,8 @@ def configure(config_file, profile):
 
     # try loading existing config, or use defaults
     try:
-        config = load_config_from_file(config_file)
-    except ValueError:
+        config = load_config_from_files([config_file])
+    except:
         config = get_default_config()
 
     # determine profile

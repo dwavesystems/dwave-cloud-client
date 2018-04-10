@@ -9,32 +9,39 @@ CONF_AUTHOR = "dwavesystem"
 CONF_FILENAME = "dwave.conf"
 
 
-def detect_configfile_path():
-    """Returns the first existing file that it finds in a list of possible
-    candidates, and `None` if the list was exhausted, but no candidate config
-    file exists.
+def detect_existing_configfile_paths():
+    """Returns the list of existing config files found on disk.
 
-    For details, see :func:`load_config_from_file`.
+    Candidates examined depend on the OS, but for Linux possible list is:
+    ``dwave.conf`` in CWD, user-local ``.config/dwave/``, system-wide
+    ``/etc/dwave/``. For details, see :func:`load_config_from_file`.
     """
-    # look for `./dwave.conf`
-    candidates = ["."]
 
-    # then for something like `~/.config/dwave/dwave.conf`
+    # system-wide has the lowest priority, `/etc/dwave/dwave.conf`
+    candidates = homebase.site_config_dir_list(
+        app_author=CONF_AUTHOR, app_name=CONF_APP,
+        use_virtualenv=False, create=False)
+
+    # user-local will override it, `~/.config/dwave/dwave.conf`
     candidates.append(homebase.user_config_dir(
         app_author=CONF_AUTHOR, app_name=CONF_APP, roaming=False,
         use_virtualenv=False, create=False))
 
-    # and finally for e.g. `/etc/dwave/dwave.conf`
-    candidates.extend(homebase.site_config_dir_list(
-        app_author=CONF_AUTHOR, app_name=CONF_APP,
-        use_virtualenv=False, create=False))
+    # highest priority (overrides all): `./dwave.conf`
+    candidates.append(".")
 
-    for base in candidates:
-        path = os.path.join(base, CONF_FILENAME)
-        if os.path.exists(path):
-            return path
+    paths = [os.path.join(base, CONF_FILENAME) for base in candidates]
+    existing_paths = [path for path in paths if os.path.exists(path)]
 
-    return None
+    return existing_paths
+
+
+def get_configfile_path():
+    """Returns the highest-priority existing config file from a list
+    of possible candidates returned by `detect_existing_configfile_paths()`, and
+    ``None`` if no candidate config file exists."""
+    paths = detect_existing_configfile_paths()
+    return paths[-1] if paths else None
 
 
 def get_default_configfile_path():
@@ -47,11 +54,14 @@ def get_default_configfile_path():
     return path
 
 
-def load_config_from_file(filename=None):
-    """Load D-Wave cloud client configuration from ``filename``.
+def load_config_from_files(filenames=None):
+    """Load D-Wave cloud client configuration from a list of ``filenames``.
 
     The format of the config file is the standard Windows INI-like format,
     parsable with the Python's :mod:`configparser`.
+
+    Each filename in the list (each config file loaded) progressively upgrades
+    the final configuration (on a key by key basis, per each section).
 
     The section containing default values inherited by other sections is called
     ``defaults``. For example::
@@ -75,19 +85,19 @@ def load_config_from_file(filename=None):
         token = ...
 
     Args:
-        filename (str, default=None):
-            D-Wave cloud client configuration file location.
+        filenames (list[str], default=None):
+            D-Wave cloud client configuration file locations.
 
-            If unspecified, a config file named ``dwave.conf`` is searched for in
-            the current directory, then in the user-local config dir, and then
-            in all system-wide config dirs. For example, on Unix, we try to load
-            the config from these paths (in order) and possibly others
+            If set to ``None``, a config file named ``dwave.conf`` is searched for
+            in all system-wide config dirs, then in the user-local config dir,
+            and finally in the current directory. For example, on Unix, we try
+            to load the config from these paths (in order) and possibly others
             (depending on your Unix flavour)::
 
-                ./dwave.conf
-                ~/.config/dwave/dwave.conf
-                /usr/local/share/dwave/dwave.conf
                 /usr/share/dwave/dwave.conf
+                /usr/local/share/dwave/dwave.conf
+                ~/.config/dwave/dwave.conf
+                ./dwave.conf
 
             On Windows 7+, config file should be located in:
             ``C:\\Users\\<username>\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf``,
@@ -102,31 +112,24 @@ def load_config_from_file(filename=None):
             mapping of per-profile keys holding values.
 
     Raises:
-        :exc:`ValueError`:
-            Config file location unspecified and undetected.
-
         :exc:`~dwave.cloud.exceptions.ConfigFileReadError`:
             Config file specified or detected could not be opened or read.
 
         :exc:`~dwave.cloud.exceptions.ConfigFileParseError`:
             Config file parse failed.
     """
-    if filename is None:
-        filename = detect_configfile_path()
-        if not filename:
-            raise ValueError("Config file not given, and could not be detected")
+    if filenames is None:
+        filenames = detect_existing_configfile_paths()
 
     config = configparser.ConfigParser(default_section="defaults")
-    try:
-        with open(filename, 'r') as f:
-            config.read_file(f, filename)
-
-    except (IOError, OSError):
-        raise ConfigFileReadError("Failed to read {!r}".format(filename))
-
-    except configparser.Error:
-        raise ConfigFileParseError("Failed to parse {!r}".format(filename))
-
+    for filename in filenames:
+        try:
+            with open(filename, 'r') as f:
+                config.read_file(f, filename)
+        except (IOError, OSError):
+            raise ConfigFileReadError("Failed to read {!r}".format(filename))
+        except configparser.Error:
+            raise ConfigFileParseError("Failed to parse {!r}".format(filename))
     return config
 
 
@@ -157,11 +160,6 @@ def get_default_config():
         #proxy = http://user:pass@proxy.org:8080/
     """)
     return config
-
-
-def load_profile(name, filename=None):
-    """Load profile with ``name`` from config file ``filename``."""
-    return load_config_from_file(filename)[name]
 
 
 def load_config(config_file=None, profile=None, client=None,
@@ -292,23 +290,22 @@ def load_config(config_file=None, profile=None, client=None,
     """
     if config_file is None:
         config_file = os.getenv("DWAVE_CONFIG_FILE")
-    try:
-        config = load_config_from_file(config_file)
-        # determine profile name fallback:
-        #  (1) profile key under [defaults],
-        #  (2) first non-[defaults] section
-        first_section = next(iter(config.sections() + [None]))
-        config_defaults = config.defaults()
-        default_profile = config_defaults.get('profile', first_section)
-    except ValueError:
-        # config file not specified, or not detected: start with null-config
-        config = {}
-        config_defaults = {}
-        default_profile = None
-    except (ConfigFileReadError, ConfigFileParseError):
-        # unable to access/read/parse config file(s): explicitly fail
-        raise
 
+    # auto-detect if not specified with arg or env
+    filenames = [config_file] if config_file else None
+
+    # progressively build config from a file, or a list of auto-detected files
+    # raises ConfigFileReadError/ConfigFileParseError on error
+    config = load_config_from_files(filenames)
+
+    # determine profile name fallback:
+    #  (1) profile key under [defaults],
+    #  (2) first non-[defaults] section
+    first_section = next(iter(config.sections() + [None]))
+    config_defaults = config.defaults()
+    default_profile = config_defaults.get('profile', first_section)
+
+    # select profile from the config
     if profile is None:
         profile = os.getenv("DWAVE_PROFILE", default_profile)
     if profile:
