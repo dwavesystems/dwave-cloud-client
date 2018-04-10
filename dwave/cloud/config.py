@@ -226,7 +226,7 @@ def load_config(config_file=None, profile=None, client=None,
 
     Args:
 
-        config_file (str, default=None):
+        config_file (str/None/False/True, default=None):
             Path to config file.
 
             If undefined (set to ``None``), the name of the config file is

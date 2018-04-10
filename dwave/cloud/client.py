@@ -73,12 +73,57 @@ class Client(object):
         and returning the appropriate client instance
         (:class:`dwave.cloud.qpu.Client` or :class:`dwave.cloud.sw.Client`).
 
+        Note:
+            For details on config loading from files and environment, please
+            see :func:`~dwave.cloud.config.load_config`.
+
         Args:
-            TODO
+            config_file (str/None/False/True, default=None):
+                Path to config file. ``None`` for auto-detect, ``False`` to
+                skip loading from any file (including auto-detection), and
+                ``True`` to force auto-detection, disregarding environment value
+                for config file.
+
+            profile (str, default=None):
+                Profile name (config file section name). If undefined it is
+                taken from ``DWAVE_PROFILE`` environment variable, or config
+                file, or first section, or defaults. For details, see
+                :func:`~dwave.cloud.config.load_config`.
+
+            client (str, default=None):
+                Client class (selected by name) to use for accessing the API.
+                Use ``qpu`` to specify the :class:`dwave.cloud.qpu.Client` and
+                ``sw`` for :class:`dwave.cloud.sw.Client`.
+
+            endpoint (str, default=None):
+                API endpoint URL.
+
+            token (str, default=None):
+                API authorization token.
+
+            solver (str, default=None):
+                Default solver to use in :meth:`~dwave.cloud.client.Client.get_solver`.
+                If undefined, you'll have to explicitly specify the solver name/id
+                in all calls to :meth:`~dwave.cloud.client.Client.get_solver`.
+
+            proxy (str, default=None):
+                URL for proxy to use in connections to D-Wave API. Can include
+                username/password, port, scheme, etc. If undefined, client will
+                connect directly to the API (unless you use a system-level proxy).
 
             legacy_config_fallback (bool, default=True):
                 If loading from a ``dwave.conf`` config file fails, try
                 loading the ``.dwrc`` legacy config.
+
+            **kwargs:
+                All remaining keyword arguments are passed-through as-is to the
+                chosen `Client` constructor method.
+
+                A notable custom argument is `permissive_ssl`.
+
+                Note: all user-defined keys from config files are propagated to
+                the `Client` constructor too, and can be overridden with these
+                keyword arguments.
 
         Example:
             Create ``dwave.conf`` in your current directory or
@@ -103,12 +148,6 @@ class Client(object):
 
             :exc:`~dwave.cloud.exceptions.ConfigFileParseError`:
                 Config file parse failed.
-
-        TODO: describe config loading, new config in broad strokes, refer to
-        actual loaders' doc; include examples for config and usage.
-
-        TODO: mention kwargs include `permissive_ssl`, but are not limited to
-        that.
         """
 
         # try loading configuration from a preferred new config subsystem
