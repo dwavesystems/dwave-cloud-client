@@ -253,3 +253,37 @@ class TestConfig(unittest.TestCase):
                         partial(self._load_config_from_files,
                                 provided=['myfile'], data=myconfig)):
             self.assertRaises(ValueError, load_config, config_file='myfile')
+
+    def test_config_load_multiple_configfiles(self):
+        """Test more specific config overrides less specific one,
+        on a key by key basis."""
+
+        config_system = u"""
+            [alpha]
+            endpoint = alpha
+            solver = DW_2000Q_1
+        """
+        config_user = u"""
+            [alpha]
+            solver = DW_2000Q_2
+            [beta]
+            endpoint = beta
+        """
+
+        with mock.patch("dwave.cloud.config.detect_existing_configfile_paths",
+                        lambda: ['config_system', 'config_user']):
+
+            # test per-key override
+            with mock.patch('dwave.cloud.config.open', create=True) as m:
+                m.side_effect=[iterable_mock_open(config_system)(),
+                               iterable_mock_open(config_user)()]
+                section = load_config(profile='alpha')
+                self.assertEqual(section['endpoint'], 'alpha')
+                self.assertEqual(section['solver'], 'DW_2000Q_2')
+
+            # test per-section override (section addition)
+            with mock.patch('dwave.cloud.config.open', create=True) as m:
+                m.side_effect=[iterable_mock_open(config_system)(),
+                               iterable_mock_open(config_user)()]
+                section = load_config(profile='beta')
+                self.assertEqual(section['endpoint'], 'beta')
