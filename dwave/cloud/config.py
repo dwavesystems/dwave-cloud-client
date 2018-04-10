@@ -2,6 +2,7 @@ import os
 import configparser
 import homebase
 
+from dwave.cloud.utils import uniform_get
 from dwave.cloud.exceptions import ConfigFileReadError, ConfigFileParseError
 
 CONF_APP = "dwave"
@@ -456,14 +457,14 @@ def legacy_load_config(key=None, endpoint=None, token=None, solver=None, proxy=N
     # Go through the connections and select entry matching the key
     for line in lines:
         try:
-            label, data = line.split('|', 1)
-            data = {index: value for index, value in enumerate(data.split(','))}
+            label, rest = line.split('|', 1)
+            data = [field.strip() for field in rest.split(',')]
 
-            if label == key or data[0] == key or key is None:
+            if key is None or key == label:
                 return (endpoint or data[0] or None,
                         token or data[1] or None,
-                        proxy or data.get(2),
-                        solver or data.get(3))
+                        proxy or uniform_get(data, 2),
+                        solver or uniform_get(data, 3))
         except:
             pass  # Just ignore any malformed lines
             # TODO issue a warning
