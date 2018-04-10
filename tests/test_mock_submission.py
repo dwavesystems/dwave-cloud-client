@@ -13,7 +13,7 @@ import threading
 
 from dwave.cloud.utils import evaluate_ising
 from dwave.cloud.qpu import Client, Solver
-from dwave.cloud import exceptions
+from dwave.cloud.exceptions import SolverFailureError, CanceledFutureError
 
 
 def solver_data(id_, incomplete=False):
@@ -178,7 +178,7 @@ class MockSubmission(_QueryTest):
             results = solver.sample_ising(linear, quad, num_reads=100)
 
             #
-            with self.assertRaises(exceptions.SolverFailureError):
+            with self.assertRaises(SolverFailureError):
                 results.samples
 
     def test_submit_cancel_reply(self):
@@ -194,7 +194,7 @@ class MockSubmission(_QueryTest):
             results = solver.sample_ising(linear, quad, num_reads=100)
 
             #
-            with self.assertRaises(exceptions.CanceledFutureError):
+            with self.assertRaises(CanceledFutureError):
                 results.samples
 
     def test_submit_continue_then_ok_reply(self):
@@ -231,7 +231,7 @@ class MockSubmission(_QueryTest):
             results = solver.sample_ising(linear, quad, num_reads=100)
 
             #
-            with self.assertRaises(exceptions.SolverFailureError):
+            with self.assertRaises(SolverFailureError):
                 self._check(results, linear, quad, 100)
 
     def test_submit_continue_then_ok_and_error_reply(self):
@@ -275,8 +275,7 @@ class MockSubmission(_QueryTest):
             results1 = solver.sample_ising(linear, quad, num_reads=100)
             results2 = solver.sample_ising(linear, quad, num_reads=100)
 
-            #
-            with self.assertRaises(exceptions.SolverFailureError):
+            with self.assertRaises(SolverFailureError):
                 self._check(results1, linear, quad, 100)
             self._check(results2, linear, quad, 100)
         Client._POLL_THREAD_COUNT = old_value
