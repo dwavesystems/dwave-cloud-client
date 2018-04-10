@@ -140,7 +140,7 @@ class TestConfig(unittest.TestCase):
         # default values are inherited
         self.assertEqual(config['client'], "qpu")
 
-    def _load_config_from_files(self, asked, provided, data=None):
+    def _load_config_from_files(self, asked, provided=None, data=None):
         self.assertEqual(asked, provided)
         if data is None:
             data = self.config_body
@@ -162,6 +162,41 @@ class TestConfig(unittest.TestCase):
         with mock.patch("dwave.cloud.config.load_config_from_files",
                         partial(self._load_config_from_files, provided=None)):
             self._assert_config_valid(load_config(config_file=None, profile='alpha'))
+
+    def test_config_load_skip_configfiles(self):
+        with mock.patch("dwave.cloud.config.load_config_from_files",
+                        self._load_config_from_files):
+
+            # don't load from file, use arg or env
+            self.assertEqual(load_config(config_file=False)['endpoint'], None)
+            with mock.patch.dict(os.environ, {'DWAVE_API_ENDPOINT': 'test'}):
+                self.assertEqual(load_config(config_file=False)['endpoint'], 'test')
+
+            # specifying a profile doesn't affect outcome
+            self.assertEqual(load_config(config_file=False, profile='alpha')['endpoint'], None)
+            with mock.patch.dict(os.environ, {'DWAVE_API_ENDPOINT': 'test'}):
+                self.assertEqual(load_config(config_file=False, profile='alpha')['endpoint'], 'test')
+            with mock.patch.dict(os.environ, {'DWAVE_PROFILE': 'profile'}):
+                self.assertEqual(load_config(config_file=False, endpoint='test')['endpoint'], 'test')
+
+    def test_config_load_force_autodetection(self):
+        with mock.patch("dwave.cloud.config.load_config_from_files",
+                        partial(self._load_config_from_files, provided=None)):
+
+            # load from file
+            self._assert_config_valid(load_config(config_file=True, profile='alpha'))
+
+            # load from file, even when config_file overridden in env (to path)
+            with mock.patch.dict(os.environ, {'DWAVE_CONFIG_FILE': 'nonexisting'}):
+                self._assert_config_valid(load_config(config_file=True, profile='alpha'))
+                with mock.patch.dict(os.environ, {'DWAVE_PROFILE': 'alpha'}):
+                    self._assert_config_valid(load_config(config_file=True))
+
+            # load from file, even when config_file overridden in env (to None)
+            with mock.patch.dict(os.environ, {'DWAVE_CONFIG_FILE': ''}):
+                self._assert_config_valid(load_config(config_file=True, profile='alpha'))
+                with mock.patch.dict(os.environ, {'DWAVE_PROFILE': 'alpha'}):
+                    self._assert_config_valid(load_config(config_file=True))
 
     def test_config_load_configfile_detect_profile_env(self):
         with mock.patch("dwave.cloud.config.load_config_from_files",
