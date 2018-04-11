@@ -4,13 +4,9 @@ import os
 
 from click.testing import CliRunner
 
-try:
-    import unittest.mock as mock
-except ImportError:
-    import mock
-
 from dwave.cloud.cli import cli
 from dwave.cloud.config import load_config
+from dwave.cloud.testing import mock, isolated_environ
 
 
 def touch(path):
@@ -28,7 +24,7 @@ class TestCli(unittest.TestCase):
 
         with mock.patch("six.moves.input", side_effect=values, create=True):
             runner = CliRunner()
-            with runner.isolated_filesystem():
+            with runner.isolated_filesystem(), isolated_environ(remove_dwave=True):
                 touch(config_file)
                 result = runner.invoke(cli, [
                     'configure', '--config-file', config_file, '--profile', profile

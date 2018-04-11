@@ -1,7 +1,9 @@
 import os
 import warnings
+
 from dwave.cloud.config import load_config
 from dwave.cloud.exceptions import CanceledFutureError, ConfigFileError
+
 
 # try to load client config needed for live tests on SAPI webservice
 try:
