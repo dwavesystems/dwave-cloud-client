@@ -13,57 +13,52 @@ from dwave.cloud.exceptions import SolverAuthenticationError
 from dwave.cloud.testing import mock
 import dwave.cloud
 
-from tests import config, skip_live
+from tests import config
 
 
+@unittest.skipUnless(config, "No live server configuration available.")
 class ConnectivityTests(unittest.TestCase):
     """Test connecting and related failure modes."""
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_bad_url(self):
         """Connect with a bad URL."""
         with self.assertRaises(IOError):
             with Client("not-a-url", config['token']) as client:
                 client.get_solvers()
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_bad_token(self):
         """Connect with a bad token."""
         with self.assertRaises(SolverAuthenticationError):
             with Client(config['endpoint'], 'not-a-token') as client:
                 client.get_solvers()
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_good_connection(self):
         """Connect with a valid URL and token."""
         with Client(config['endpoint'], config['token']) as client:
             self.assertTrue(len(client.get_solvers()) > 0)
 
 
+@unittest.skipUnless(config, "No live server configuration available.")
 class SolverLoading(unittest.TestCase):
     """Test loading solvers in a few different configurations."""
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_list_all_solvers(self):
         """List all the solvers."""
         with Client(config['endpoint'], config['token']) as client:
             self.assertTrue(len(client.get_solvers()) > 0)
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_load_all_solvers(self):
         """List and retrieve all the solvers."""
         with Client(config['endpoint'], config['token']) as client:
             for name in client.get_solvers():
                 self.assertEqual(client.get_solver(name).id, name)
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_load_bad_solvers(self):
         """Try to load a nonexistent solver."""
         with Client(config['endpoint'], config['token']) as client:
             with self.assertRaises(KeyError):
                 client.get_solver("not-a-solver")
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_load_any_solver(self):
         """Load a single solver without calling get_solvers (which caches data)."""
         with Client(config['endpoint'], config['token']) as client:
