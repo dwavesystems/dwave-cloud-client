@@ -12,16 +12,16 @@ try:
 except ImportError:
     import mock
 
-from dwave.cloud.config import legacy_load_config
+from dwave.cloud.config import load_config
 from dwave.cloud.qpu import Client
 from dwave.cloud.exceptions import SolverAuthenticationError
 import dwave.cloud
 
 
 try:
-    config_url, config_token, _, config_solver = legacy_load_config()
-    if None in [config_url, config_token, config_solver]:
-        raise ValueError()
+    config = load_config()
+    if not config['endpoint'] or not config['token'] or not config['solver']:
+        raise ValueError
     skip_live = False
 except:
     skip_live = True
@@ -34,20 +34,20 @@ class ConnectivityTests(unittest.TestCase):
     def test_bad_url(self):
         """Connect with a bad URL."""
         with self.assertRaises(IOError):
-            with Client("not-a-url", config_token) as client:
+            with Client("not-a-url", config['token']) as client:
                 client.get_solvers()
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_bad_token(self):
         """Connect with a bad token."""
         with self.assertRaises(SolverAuthenticationError):
-            with Client(config_url, 'not-a-token') as client:
+            with Client(config['endpoint'], 'not-a-token') as client:
                 client.get_solvers()
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_good_connection(self):
         """Connect with a valid URL and token."""
-        with Client(config_url, config_token) as client:
+        with Client(config['endpoint'], config['token']) as client:
             self.assertTrue(len(client.get_solvers()) > 0)
 
 
@@ -57,28 +57,28 @@ class SolverLoading(unittest.TestCase):
     @unittest.skipIf(skip_live, "No live server available.")
     def test_list_all_solvers(self):
         """List all the solvers."""
-        with Client(config_url, config_token) as client:
+        with Client(config['endpoint'], config['token']) as client:
             self.assertTrue(len(client.get_solvers()) > 0)
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_load_all_solvers(self):
         """List and retrieve all the solvers."""
-        with Client(config_url, config_token) as client:
+        with Client(config['endpoint'], config['token']) as client:
             for name in client.get_solvers():
                 self.assertEqual(client.get_solver(name).id, name)
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_load_bad_solvers(self):
         """Try to load a nonexistent solver."""
-        with Client(config_url, config_token) as client:
+        with Client(config['endpoint'], config['token']) as client:
             with self.assertRaises(KeyError):
                 client.get_solver("not-a-solver")
 
     @unittest.skipIf(skip_live, "No live server available.")
     def test_load_any_solver(self):
         """Load a single solver without calling get_solvers (which caches data)."""
-        with Client(config_url, config_token) as client:
-            self.assertEqual(client.get_solver(config_solver).id, config_solver)
+        with Client(config['endpoint'], config['token']) as client:
+            self.assertEqual(client.get_solver(config['solver']).id, config['solver'])
 
 
 class ClientFactory(unittest.TestCase):
@@ -110,7 +110,7 @@ class ClientFactory(unittest.TestCase):
                     endpoint='endpoint', token='token', custom='new-custom')
 
     def test_legacy_config_load_fallback(self):
-        conf = 'endpoint token proxy solver'.split()
+        conf = {k: k for k in 'endpoint token proxy solver'.split()}
         with mock.patch("dwave.cloud.client.load_config", return_value={}):
             with mock.patch("dwave.cloud.client.legacy_load_config", lambda **kwargs: conf):
                 # test fallback works (legacy config is loaded)
