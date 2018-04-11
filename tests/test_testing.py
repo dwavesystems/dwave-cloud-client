@@ -105,16 +105,17 @@ class TestMockUtils(unittest.TestCase):
 
     def test_iterable_mock_open(self):
         data = '1\n2\n3'
+        namespaced_open = '{}.open'.format(__name__)
 
         # first, verify `mock.mock_open` fails for iteration
         with self.assertRaises(AttributeError):
-            with mock.patch('builtins.open', mock.mock_open(data), create=True):
+            with mock.patch(namespaced_open, mock.mock_open(data), create=True):
                 for line in open('filename'):
                     pass
 
         # then verify our `iterable_mock_open` works
         lines = []
-        with mock.patch('builtins.open', iterable_mock_open(data), create=True):
+        with mock.patch(namespaced_open, iterable_mock_open(data), create=True):
             for line in open('filename'):
                 lines.append(line)
         self.assertEqual(''.join(lines), data)
