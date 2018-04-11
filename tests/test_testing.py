@@ -2,11 +2,11 @@ import os
 import uuid
 import unittest
 
-from dwave.cloud.testing import mock, isolated_environ
+from dwave.cloud.testing import isolated_environ, mock, iterable_mock_open
 
 
 @mock.patch.dict(os.environ)
-class TestUtils(unittest.TestCase):
+class TestEnvUtils(unittest.TestCase):
     def setUp(self):
         self.var = str(uuid.uuid4())
         self.val = str(uuid.uuid4())
@@ -99,6 +99,25 @@ class TestUtils(unittest.TestCase):
 
         # ensure "global" env is restored
         self.assertEqual(os.getenv(self.var), self.val)
+
+
+class TestMockUtils(unittest.TestCase):
+
+    def test_iterable_mock_open(self):
+        data = '1\n2\n3'
+
+        # first, verify `mock.mock_open` fails for iteration
+        with self.assertRaises(AttributeError):
+            with mock.patch('builtins.open', mock.mock_open(data), create=True):
+                for line in open('filename'):
+                    pass
+
+        # then verify our `iterable_mock_open` works
+        lines = []
+        with mock.patch('builtins.open', iterable_mock_open(data), create=True):
+            for line in open('filename'):
+                lines.append(line)
+        self.assertEqual(''.join(lines), data)
 
 
 if __name__ == '__main__':
