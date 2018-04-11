@@ -16,27 +16,25 @@ from dwave.cloud.qpu import Client
 from dwave.cloud.exceptions import CanceledFutureError
 import dwave.cloud.computation
 
-from tests import config, skip_live
+from tests import config
 
 
+@unittest.skipUnless(config, "No live server configuration available.")
 class PropertyLoading(unittest.TestCase):
     """Ensure that the properties of solvers can be retrieved."""
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_load_properties(self):
         """Ensure that the propreties are populated."""
         with Client(config['endpoint'], config['token']) as client:
             solver = client.get_solver(config['solver'])
             self.assertTrue(len(solver.properties) > 0)
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_load_parameters(self):
         """Make sure the parameters are populated."""
         with Client(config['endpoint'], config['token']) as client:
             solver = client.get_solver(config['solver'])
             self.assertTrue(len(solver.parameters) > 0)
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_submit_invalid_parameter(self):
         """Ensure that the parameters are populated."""
         with Client(config['endpoint'], config['token']) as client:
@@ -45,7 +43,6 @@ class PropertyLoading(unittest.TestCase):
             with self.assertRaises(KeyError):
                 solver.sample_ising({}, {}, not_a_parameter=True)
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_read_connectivity(self):
         """Ensure that the edge set is populated."""
         with Client(config['endpoint'], config['token']) as client:
@@ -67,10 +64,10 @@ class _QueryTest(unittest.TestCase):
         return results
 
 
+@unittest.skipUnless(config, "No live server configuration available.")
 class Submission(_QueryTest):
     """Submit some sample problems."""
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_result_structure(self):
         with Client(config['endpoint'], config['token']) as client:
             solver = client.get_solver(config['solver'])
@@ -81,7 +78,6 @@ class Submission(_QueryTest):
             self.assertIn('occurrences', result)
             self.assertIn('timing', result)
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_submit_extra_qubit(self):
         """Submit a defective problem with an unsupported variable."""
         # Connect
@@ -101,7 +97,6 @@ class Submission(_QueryTest):
                 results = solver.sample_ising(linear, quad)
                 results.samples
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_submit_linear_problem(self):
         """Submit a problem with all the linear terms populated."""
         # Connect
@@ -117,7 +112,6 @@ class Submission(_QueryTest):
             # Solve the problem
             self._submit_and_check(solver, linear, quad)
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_submit_full_problem(self):
         """Submit a problem with all supported coefficients set."""
         # Connect
@@ -135,7 +129,6 @@ class Submission(_QueryTest):
             # Solve the problem
             self._submit_and_check(solver, linear, quad)
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_submit_dict_problem(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
@@ -149,7 +142,6 @@ class Submission(_QueryTest):
             # Solve the problem
             self._submit_and_check(solver, linear, quad)
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_submit_partial_problem(self):
         """Submit a problem with only some of the terms set."""
         # Connect
@@ -173,7 +165,6 @@ class Submission(_QueryTest):
             # Solve the problem
             self._submit_and_check(solver, linear, quad)
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_submit_batch(self):
         """Submit batch of problems."""
         # Connect
@@ -202,7 +193,6 @@ class Submission(_QueryTest):
                 for energy, state in zip(results.energies, results.samples):
                     self.assertTrue(energy == evaluate_ising(linear, quad, state))
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_cancel_batch(self):
         """Submit batch of problems, then cancel them."""
         # Connect
@@ -236,7 +226,6 @@ class Submission(_QueryTest):
                 except CanceledFutureError:
                     pass
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_wait_many(self):
         """Submit a batch of problems then use `wait_multiple` to wait on all of them."""
         # Connect
@@ -269,7 +258,6 @@ class Submission(_QueryTest):
                 for energy, state in zip(results.energies, results.samples):
                     self.assertTrue(energy == evaluate_ising(linear, quad, state))
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_as_completed(self):
         """Submit a batch of problems then use `as_completed` to iterate over
         all of them."""
@@ -295,6 +283,7 @@ class Submission(_QueryTest):
                     self.assertTrue(energy == evaluate_ising(linear, quad, state))
 
 
+@unittest.skipUnless(config, "No live server configuration available.")
 class DecodingMethod(_QueryTest):
     """Test different decoding behaviors.
 
@@ -313,7 +302,6 @@ class DecodingMethod(_QueryTest):
         from six.moves import reload_module
         reload_module(dwave.cloud.computation)
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_request_matrix_with_no_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
@@ -330,7 +318,6 @@ class DecodingMethod(_QueryTest):
             with self.assertRaises(ValueError):
                 self._submit_and_check(solver, linear, quad)
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_request_matrix_with_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
@@ -349,7 +336,6 @@ class DecodingMethod(_QueryTest):
             self.assertIsInstance(result.energies, numpy.ndarray)
             self.assertIsInstance(result.occurrences, numpy.ndarray)
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_request_list_with_no_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
@@ -365,7 +351,6 @@ class DecodingMethod(_QueryTest):
             # Solve the problem
             self._submit_and_check(solver, linear, quad)
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_request_list_with_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
@@ -381,7 +366,6 @@ class DecodingMethod(_QueryTest):
             # Solve the problem
             self._submit_and_check(solver, linear, quad)
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_request_raw_matrix_with_no_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
@@ -398,7 +382,6 @@ class DecodingMethod(_QueryTest):
             with self.assertRaises(ValueError):
                 self._submit_and_check(solver, linear, quad, answer_mode='raw')
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_request_raw_matrix_with_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
@@ -417,7 +400,6 @@ class DecodingMethod(_QueryTest):
             self.assertIsInstance(result.energies, numpy.ndarray)
             self.assertIsInstance(result.occurrences, numpy.ndarray)
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_request_raw_list_with_no_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
@@ -433,7 +415,6 @@ class DecodingMethod(_QueryTest):
             # Solve the problem
             self._submit_and_check(solver, linear, quad, answer_mode='raw')
 
-    @unittest.skipIf(skip_live, "No live server available.")
     def test_request_raw_list_with_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect

@@ -18,8 +18,6 @@ try:
         if not config[var]:
             raise ValueError("Config incomplete, missing: {!r}".format(var))
 
-    skip_live = False
-
 except (ConfigFileError, ValueError) as e:
+    config = None
     warnings.warn("Skipping live tests due to: {!s}".format(e))
-    skip_live = True

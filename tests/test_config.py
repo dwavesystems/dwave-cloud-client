@@ -7,31 +7,7 @@ import configparser
 from functools import partial
 
 from dwave.cloud.exceptions import ConfigFileParseError, ConfigFileReadError
-
-try:
-    # python 3
-    import unittest.mock as mock
-
-    def iterable_mock_open(data):
-        m = mock.mock_open(read_data=data)
-        m.return_value.__iter__ = lambda self: self
-        m.return_value.__next__ = lambda self: next(iter(self.readline, ''))
-        return m
-
-    configparser_open_namespace = "configparser.open"
-
-except ImportError:
-    # python 2
-    import mock
-
-    def iterable_mock_open(data):
-        m = mock.mock_open(read_data=data)
-        m.return_value.__iter__ = lambda self: iter(self.readline, '')
-        return m
-
-    configparser_open_namespace = "backports.configparser.open"
-
-
+from dwave.cloud.testing import mock, iterable_mock_open
 from dwave.cloud.config import (
     detect_existing_configfile_paths, load_config_from_files, load_config)
 

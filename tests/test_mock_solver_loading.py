@@ -6,17 +6,11 @@ import json
 import unittest
 import requests_mock
 
-try:
-    import unittest.mock as mock
-except ImportError:
-    import mock
-
 from dwave.cloud.qpu import Client, Solver
 from dwave.cloud.exceptions import (
     InvalidAPIResponseError, ConfigFileReadError, ConfigFileParseError)
 from dwave.cloud.config import legacy_load_config, load_config
-
-from .test_config import iterable_mock_open, configparser_open_namespace
+from dwave.cloud.testing import mock, iterable_mock_open
 
 
 url = 'https://dwavesys.com'

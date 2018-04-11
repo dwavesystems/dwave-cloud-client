@@ -1,11 +1,6 @@
 """Test problem submission against hard-coded replies with unittest.mock."""
 from __future__ import division, absolute_import, print_function, unicode_literals
 
-try:
-    import unittest.mock as mock
-except ImportError:
-    import mock
-
 import json
 import unittest
 import itertools
@@ -14,6 +9,7 @@ import threading
 from dwave.cloud.utils import evaluate_ising
 from dwave.cloud.qpu import Client, Solver
 from dwave.cloud.exceptions import SolverFailureError, CanceledFutureError
+from dwave.cloud.testing import mock
 
 
 def solver_data(id_, incomplete=False):
