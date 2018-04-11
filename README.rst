@@ -65,12 +65,14 @@ Compatible with Python 2 and 3:
 
     pip install dwave-cloud-client
 
-To install from source:
+To install from source (available on GitHub in `dwavesystems/dwave-cloud-client`_ repo):
 
 .. code-block:: bash
 
     pip install -r requirements.txt
     python setup.py install
+
+.. _`dwavesystems/dwave-cloud-client`: https://github.com/dwavesystems/dwave-cloud-client
 
 .. installation-end-marker
 
