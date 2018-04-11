@@ -12,8 +12,9 @@ except ImportError:
     import mock
 
 from dwave.cloud.qpu import Client, Solver
-from dwave.cloud.exceptions import InvalidAPIResponseError, ConfigFileReadError
-from dwave.cloud.config import legacy_load_config
+from dwave.cloud.exceptions import (
+    InvalidAPIResponseError, ConfigFileReadError, ConfigFileParseError)
+from dwave.cloud.config import legacy_load_config, load_config
 
 from .test_config import iterable_mock_open, configparser_open_namespace
 
@@ -197,9 +198,20 @@ class GetEvent(Exception):
         raise GetEvent(path)
 
 
-config_body = """
+legacy_config_body = """
 prod|file-prod-url,file-prod-token
 alpha|file-alpha-url,file-alpha-token,,alpha-solver
+"""
+
+config_body = """
+[prod]
+endpoint = file-prod-url
+token = file-prod-token
+
+[alpha]
+endpoint = file-alpha-url
+token = file-alpha-token
+solver = alpha-solver
 """
 
 
@@ -234,7 +246,7 @@ class MockConfiguration(unittest.TestCase):
 
     def test_explicit_with_file(self):
         """With arguments and a config file, the config file should be ignored."""
-        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
+        with mock.patch("dwave.cloud.config.open", iterable_mock_open(config_body), create=True):
             with Client.from_config(endpoint='arg-url', token='arg-token') as client:
                 client.session.get = GetEvent.handle
                 try:
@@ -246,8 +258,8 @@ class MockConfiguration(unittest.TestCase):
 
     def test_only_file(self):
         """With no arguments or environment variables, the default connection from the config file should be used."""
-        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
-            with Client.from_config() as client:
+        with mock.patch("dwave.cloud.config.open", iterable_mock_open(config_body), create=True):
+            with Client.from_config('config_file') as client:
                 client.session.get = GetEvent.handle
                 try:
                     client.get_solver('arg-solver')
@@ -258,10 +270,8 @@ class MockConfiguration(unittest.TestCase):
 
     def test_only_file_key(self):
         """If give a name from the config file the proper URL should be loaded."""
-        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
-            with mock.patch(configparser_open_namespace, iterable_mock_open(config_body), create=True):
-                # this will try parsing legacy format as new, fail,
-                # then try parsing it as legacy config
+        with mock.patch("dwave.cloud.config.open", iterable_mock_open(config_body), create=True):
+            with mock.patch("dwave.cloud.config.detect_existing_configfile_paths", lambda *x: ['file']):
                 with Client.from_config(profile='alpha') as client:
                     client.session.get = GetEvent.handle
                     try:
@@ -273,9 +283,9 @@ class MockConfiguration(unittest.TestCase):
 
     def test_env_with_file_set(self):
         """With environment variables and a config file, the config file should be ignored."""
-        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data=config_body), create=True):
+        with mock.patch("dwave.cloud.config.open", iterable_mock_open(legacy_config_body), create=True):
             with mock.patch.dict(os.environ, {'DW_INTERNAL__HTTPLINK': 'env-url', 'DW_INTERNAL__TOKEN': 'env-token'}):
-                with Client.from_config() as client:
+                with Client.from_config(False) as client:
                     client.session.get = GetEvent.handle
                     try:
                         client.get_solver('arg-solver')
@@ -297,13 +307,6 @@ class MockConfiguration(unittest.TestCase):
                 self.fail()
 
     def test_file_read_error(self):
-        """On config file read error, we should fail with `IOError`."""
+        """On config file read error, we should fail with `ConfigFileReadError`."""
         with mock.patch("dwave.cloud.config.open", side_effect=OSError, create=True):
-            self.assertRaises(IOError, legacy_load_config)
-
-    def test_file_format_error(self):
-        """Config parsing error should be suppressed."""
-        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data="|\na|b,c"), create=True):
-            self.assertEqual(legacy_load_config(profile='a'), ('b', 'c', None, None))
-        with mock.patch("dwave.cloud.config.open", mock.mock_open(read_data="|"), create=True):
-            self.assertRaises(ValueError, legacy_load_config)
+            self.assertRaises(ConfigFileReadError, legacy_load_config)
