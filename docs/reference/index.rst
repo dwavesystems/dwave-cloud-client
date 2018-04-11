@@ -11,8 +11,8 @@ Configuration
 -------------
 
 .. automodule:: dwave.cloud.config
-    :members: load_config_from_file, load_config, legacy_load_config,
-        load_profile, detect_configfile_path
+    :members: load_config, legacy_load_config,
+        load_config_from_files, detect_existing_configfile_paths
 
 
 Resources
