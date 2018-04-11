@@ -152,31 +152,19 @@ class Client(object):
 
         # try loading configuration from a preferred new config subsystem
         # (`./dwave.conf`, `~/.config/dwave/dwave.conf`, etc)
-        try:
-            config = load_config(
-                config_file=config_file, profile=profile, client=client,
-                endpoint=endpoint, token=token, solver=solver, proxy=proxy)
-        except ValueError:
-            config = dict(
-                endpoint=endpoint, token=token, solver=solver, proxy=proxy,
-                client=client)
+        config = load_config(
+            config_file=config_file, profile=profile, client=client,
+            endpoint=endpoint, token=token, solver=solver, proxy=proxy)
 
-        # and fallback to the legacy `.dwrc`
+        # fallback to legacy `.dwrc` if key variables missing
         if legacy_config_fallback and (
-                config.get('token') is None or config.get('endpoint') is None):
-            try:
-                _endpoint, _token, _proxy, _solver = legacy_load_config(
-                    key=profile,
-                    endpoint=endpoint, token=token, solver=solver, proxy=proxy)
-                config = dict(
-                    endpoint=_endpoint, token=_token, solver=_solver, proxy=_proxy,
-                    client=client)
-            except (ValueError, IOError):
-                pass
+                not config.get('token') or not config.get('endpoint')):
+            config = legacy_load_config(
+                profile=profile, client=client,
+                endpoint=endpoint, token=token, solver=solver, proxy=proxy)
 
         # manual override of other (client-custom) arguments
-        for var, val in kwargs.items():
-            config[var] = val
+        config.update(kwargs)
 
         from dwave.cloud import qpu, sw
         _clients = {'qpu': qpu.Client, 'sw': sw.Client}

@@ -360,7 +360,8 @@ def load_config(config_file=None, profile=None, client=None,
     return section
 
 
-def legacy_load_config(profile=None, endpoint=None, token=None, solver=None, proxy=None):
+def legacy_load_config(profile=None, endpoint=None, token=None, solver=None,
+                       proxy=None, **kwargs):
     """Load the configured URLs and token for the SAPI server.
 
     .. warning:: Included only for backward compatibility, please use
@@ -482,5 +483,6 @@ def legacy_load_config(profile=None, endpoint=None, token=None, solver=None, pro
     section['token'] = token or os.getenv("DW_INTERNAL__TOKEN", section.get('token'))
     section['proxy'] = proxy or os.getenv("DW_INTERNAL__HTTPPROXY", section.get('proxy'))
     section['solver'] = solver or os.getenv("DW_INTERNAL__SOLVER", section.get('solver'))
+    section.update(kwargs)
 
     return section
