@@ -307,6 +307,8 @@ class MockConfiguration(unittest.TestCase):
                 self.fail()
 
     def test_file_read_error(self):
-        """On config file read error, we should fail with `ConfigFileReadError`."""
+        """On config file read error, we should fail with `ConfigFileReadError`,
+        but only if .dwrc actually exists on disk."""
         with mock.patch("dwave.cloud.config.open", side_effect=OSError, create=True):
-            self.assertRaises(ConfigFileReadError, legacy_load_config)
+            with mock.patch("os.path.exists", lambda fn: True):
+                self.assertRaises(ConfigFileReadError, legacy_load_config)
