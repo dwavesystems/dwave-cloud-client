@@ -1,12 +1,8 @@
 import unittest
 from collections import OrderedDict
 
-try:
-    import unittest.mock as mock
-except ImportError:
-    import mock
-
 from dwave.cloud.utils import readline_input, uniform_iterator, uniform_get
+from dwave.cloud.testing import mock
 
 
 class TestUtils(unittest.TestCase):

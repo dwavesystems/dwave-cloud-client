@@ -7,14 +7,10 @@ from __future__ import absolute_import
 
 import unittest
 
-try:
-    import unittest.mock as mock
-except ImportError:
-    import mock
-
 from dwave.cloud.config import load_config
 from dwave.cloud.qpu import Client
 from dwave.cloud.exceptions import SolverAuthenticationError
+from dwave.cloud.testing import mock
 import dwave.cloud
 
 from tests import config, skip_live
