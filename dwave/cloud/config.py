@@ -1,9 +1,12 @@
 import os
 import configparser
+from collections import OrderedDict
+
 import homebase
 
 from dwave.cloud.utils import uniform_get
 from dwave.cloud.exceptions import ConfigFileReadError, ConfigFileParseError
+
 
 CONF_APP = "dwave"
 CONF_AUTHOR = "dwavesystem"
@@ -357,25 +360,27 @@ def load_config(config_file=None, profile=None, client=None,
     return section
 
 
-def legacy_load_config(key=None, endpoint=None, token=None, solver=None, proxy=None):
+def legacy_load_config(profile=None, endpoint=None, token=None, solver=None, proxy=None):
     """Load the configured URLs and token for the SAPI server.
 
     .. warning:: Included only for backward compatibility, please use
         :func:`load_config` instead, or the client factory
         :meth:`~dwave.cloud.client.Client.from_config`.
 
-    First, this method tries to read from environment variables.
-    If these are not set, it tries to load a configuration file from ``~/.dwrc``.
+    This method tries to load a configuration file from ``~/.dwrc``, select a
+    specified `profile` (or first if not specified), and then override
+    individual keys with the values read from environment variables, and finally
+    with values given explicitly through function arguments.
 
     The environment variables searched are:
 
      - ``DW_INTERNAL__HTTPLINK``
      - ``DW_INTERNAL__TOKEN``
-     - ``DW_INTERNAL__HTTPPROXY`` (optional)
-     - ``DW_INTERNAL__SOLVER`` (optional)
+     - ``DW_INTERNAL__HTTPPROXY``
+     - ``DW_INTERNAL__SOLVER``
 
     The configuration file format is a modified CSV where the first comma is
-    replaced with a bar character ``|``. Each line encodes a single connection.
+    replaced with a bar character ``|``. Each line encodes a single profile.
 
     The columns are::
 
@@ -384,7 +389,7 @@ def legacy_load_config(key=None, endpoint=None, token=None, solver=None, proxy=N
     Everything after the ``authentication_token`` is optional.
 
     When there are multiple connections in a file, the first one is taken to be
-    the default. Any commas in the urls are percent encoded.
+    the default. Any commas in the urls must be percent encoded.
 
     Example:
 
@@ -407,7 +412,7 @@ def legacy_load_config(key=None, endpoint=None, token=None, solver=None, proxy=N
         # Will try to connect with the url `https://two.com` and the token `new-token`.
 
     Args:
-        key (str):
+        profile (str):
             The profile name in the legacy config file.
 
         endpoint (str, default=None):
@@ -427,46 +432,55 @@ def legacy_load_config(key=None, endpoint=None, token=None, solver=None, proxy=N
             connect directly to the API (unless you use a system-level proxy).
 
     Returns:
-        A tuple of SAPI info, as (url, token, proxy, default_solver_name)
+        A dictionary with keys: endpoint, token, solver, proxy.
     """
-    # Try to load environment variables
-    url = endpoint or os.environ.get('DW_INTERNAL__HTTPLINK')
-    token = token or os.environ.get('DW_INTERNAL__TOKEN')
-    proxy = proxy or os.environ.get('DW_INTERNAL__HTTPPROXY')
-    solver = solver or os.environ.get('DW_INTERNAL__SOLVER')
 
-    if url is not None and token is not None:
-        return url, token, proxy, solver
+    def _parse_config(fp, filename):
+        fields = ('endpoint', 'token', 'proxy', 'solver')
+        config = OrderedDict()
+        for line in fp:
+            # strip whitespace, skip blank and comment lines
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            # parse each record, store in dict with label as key
+            try:
+                label, data = line.split('|', 1)
+                values = [v.strip() or None for v in data.split(',')]
+                config[label] = dict(zip(fields, values))
+            except:
+                raise ConfigFileParseError(
+                    "Failed to parse {!r}, line {!r}".format(filename, line))
+        return config
 
-    # Load the configuration file
-    user_path = os.path.expanduser('~')
-    file_path = os.path.join(user_path, '.dwrc')
-
-    # Parse the config file
-    try:
-        with open(file_path, 'r') as handle:
-            lines = handle.readlines()
-    except (IOError, OSError):
-        # Make sure python 2 and 3 raise the same error
-        raise IOError("Could not load configuration from {}".format(file_path))
-
-    # Clean whitespace and empty lines
-    lines = [line.strip() for line in lines]
-    lines = [line for line in lines if line != '']
-
-    # Go through the connections and select entry matching the key
-    for line in lines:
+    def _read_config(filename):
         try:
-            label, rest = line.split('|', 1)
-            data = [field.strip() for field in rest.split(',')]
+            with open(filename, 'r') as f:
+                return _parse_config(f, filename)
+        except (IOError, OSError):
+            raise ConfigFileReadError("Failed to read {!r}".format(filename))
 
-            if key is None or key == label:
-                return (endpoint or data[0] or None,
-                        token or data[1] or None,
-                        proxy or uniform_get(data, 2),
-                        solver or uniform_get(data, 3))
-        except:
-            pass  # Just ignore any malformed lines
-            # TODO issue a warning
+    config = {}
+    filename = os.path.expanduser('~/.dwrc')
+    if os.path.exists(filename):
+        config = _read_config(filename)
 
-    raise ValueError("No configuration for the client could be discovered.")
+    # load profile if specified, or first one in file
+    if profile:
+        try:
+            section = config[profile]
+        except KeyError:
+            raise ValueError("Config profile {!r} not found".format(profile))
+    else:
+        try:
+            _, section = next(iter(config.items()))
+        except StopIteration:
+            section = {}
+
+    # override config variables (if any) with environment and then with arguments
+    section['endpoint'] = endpoint or os.getenv("DW_INTERNAL__HTTPLINK", section.get('endpoint'))
+    section['token'] = token or os.getenv("DW_INTERNAL__TOKEN", section.get('token'))
+    section['proxy'] = proxy or os.getenv("DW_INTERNAL__HTTPPROXY", section.get('proxy'))
+    section['solver'] = solver or os.getenv("DW_INTERNAL__SOLVER", section.get('solver'))
+
+    return section
