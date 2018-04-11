@@ -17,14 +17,7 @@ from dwave.cloud.qpu import Client
 from dwave.cloud.exceptions import SolverAuthenticationError
 import dwave.cloud
 
-
-try:
-    config = load_config()
-    if not config['endpoint'] or not config['token'] or not config['solver']:
-        raise ValueError
-    skip_live = False
-except:
-    skip_live = True
+from tests import config, skip_live
 
 
 class ConnectivityTests(unittest.TestCase):
