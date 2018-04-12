@@ -60,9 +60,6 @@ class Future(object):
         #: `datetime` corresponding to the time when the problem was completed by the server (None before then)
         self.time_solved = None
 
-        #: `datetime` corresponding to the time when the problem was completed by the server (None before then)
-        self.time_solved = None
-
         # Track how long it took us to parse the data
         self.parse_time = None
 
