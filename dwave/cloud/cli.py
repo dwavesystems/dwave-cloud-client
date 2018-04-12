@@ -3,7 +3,7 @@ from __future__ import print_function
 import click
 from timeit import default_timer as timer
 
-from dwave.cloud.qpu import Client
+from dwave.cloud import Client
 from dwave.cloud.utils import readline_input
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError)
@@ -65,8 +65,10 @@ def configure(config_file, profile):
 
     # fill out the profile variables
     variables = 'endpoint token client solver proxy'.split()
-    prompts = ['API endpoint URL (editable): ', 'Auth token (editable): ',
-               'Client class (qpu or sw): ', 'Solver (can be left blank): ',
+    prompts = ['API endpoint URL (editable): ',
+               'Auth token (editable): ',
+               'Client class (qpu or sw): ',
+               'Solver (can be left blank): ',
                'Proxy URL (can be left blank): ']
     for var, prompt in zip(variables, prompts):
         default_val = config.get(profile, var, fallback=None)

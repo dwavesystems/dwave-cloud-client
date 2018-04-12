@@ -11,7 +11,10 @@ try:
     test_config_path = os.path.join(os.path.dirname(__file__), 'dwave.conf')
 
     # use `sw` resource instead of QPU
-    config = load_config(config_file=test_config_path, profile='sw')
+    test_config_profile = 'sw'
+
+    config = load_config(config_file=test_config_path,
+                         profile=test_config_profile)
 
     # ensure config is complete
     for var in 'endpoint token solver'.split():
