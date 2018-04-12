@@ -3,7 +3,7 @@ from __future__ import print_function
 import click
 from timeit import default_timer as timer
 
-from dwave.cloud.qpu import Client
+from dwave.cloud import Client
 from dwave.cloud.utils import readline_input
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError)

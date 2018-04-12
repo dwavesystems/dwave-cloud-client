@@ -40,8 +40,35 @@ class TestCli(unittest.TestCase):
                 for val in values:
                     self.assertEqual(config.get(val), val)
 
-    @unittest.skipUnless(config, "No live server configuration available.")
     def test_ping(self):
+        config_file = 'dwave.conf'
+        profile = 'profile'
+
+        with mock.patch('dwave.cloud.cli.Client') as m:
+
+            runner = CliRunner()
+            with runner.isolated_filesystem():
+                touch(config_file)
+                result = runner.invoke(cli, ['ping',
+                                            '--config-file', config_file,
+                                            '--profile', profile])
+
+            # proper arguments passed to Client.from_config?
+            m.from_config.assert_called_with(config_file=config_file, profile=profile)
+
+            # get solver called?
+            c = m.from_config(config_file=config_file, profile=profile)
+            c.get_solvers.assert_called_with()
+            c.get_solver.assert_called_with()
+
+            # sampling method called on solver?
+            s = c.get_solver()
+            s.sample_ising.assert_called_with({0: 1}, {})
+
+        self.assertEqual(result.exit_code, 0)
+
+    @unittest.skipUnless(config, "No live server configuration available.")
+    def test_ping_live(self):
         runner = CliRunner()
         result = runner.invoke(cli, ['ping',
                                      '--config-file', test_config_path,
