@@ -1,5 +1,5 @@
 six>=1.10
-requests>=2.18
+requests[socks]>=2.18
 homebase>=1.0.0
 pyreadline>=2.1
 python-dateutil>=2.7
