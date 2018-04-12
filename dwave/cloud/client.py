@@ -7,7 +7,7 @@ import posixpath
 import logging
 import requests
 import collections
-import datetime
+from dateutil.parser import parse as parse_timestamp
 from itertools import chain
 from six.moves import queue, range
 
@@ -504,11 +504,11 @@ class Client(object):
             future.id = message['id']
             future.remote_status = status
 
-            if future.time_received is not None and 'submitted_on' in message and message['submitted_on'] is not None:
-                future.time_received = datetime.strptime(message['submitted_on'])
+            if not future.time_received and message.get('submitted_on'):
+                future.time_received = parse_timestamp(message['submitted_on'])
 
-            if future.time_solved is not None and 'solved_on' in message and message['solved_on'] is not None:
-                future.time_solved = datetime.strptime(message['solved_on'])
+            if not future.time_solved and message.get('solved_on'):
+                future.time_solved = parse_timestamp(message['solved_on'])
 
             if status == self.STATUS_COMPLETE:
                 # If the message is complete, forward it to the future object

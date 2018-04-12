@@ -8,6 +8,7 @@ from __future__ import absolute_import, division
 
 import unittest
 import random
+from datetime import datetime
 
 import numpy
 
@@ -77,6 +78,17 @@ class Submission(_QueryTest):
             self.assertIn('energies', result)
             self.assertIn('occurrences', result)
             self.assertIn('timing', result)
+
+    def test_future_structure(self):
+        with Client(config['endpoint'], config['token']) as client:
+            solver = client.get_solver(config['solver'])
+            computation = solver.sample_ising({}, {})
+            _ = computation.result()
+            self.assertIsInstance(computation.id, str)
+            self.assertEqual(computation.remote_status, Client.STATUS_COMPLETE)
+            self.assertEqual(computation.solver, solver)
+            self.assertIsInstance(computation.time_received, datetime)
+            self.assertIsInstance(computation.time_solved, datetime)
 
     def test_submit_extra_qubit(self):
         """Submit a defective problem with an unsupported variable."""

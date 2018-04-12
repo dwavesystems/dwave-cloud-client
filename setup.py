@@ -16,7 +16,7 @@ except SyntaxError:
 
 # Package requirements, minimal pinning
 install_requires = ['requests>=2.18', 'six>=1.10', 'homebase>=1.0', 'click>=6.7',
-                    'pyreadline>=2.1']
+                    'python-dateutil>=2.7','pyreadline>=2.1']
 
 # Package extras requirements
 extras_require = {
