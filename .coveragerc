@@ -1,8 +1,10 @@
 [run]
-# omit virtualenv and test files
-omit = venv/*, env/*, */tests/*
 source = dwave.cloud
+omit =
+    venv/*, env/*
+    tests/*, perf/*
+    dwave/cloud/package_info.py
 
 [report]
-exclude_lines:
+exclude_lines =
     pragma: no cover
