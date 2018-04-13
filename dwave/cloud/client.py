@@ -1,23 +1,23 @@
 from __future__ import division, absolute_import
 
-import threading
-import time
 import sys
-import posixpath
+import time
 import logging
+import threading
 import requests
+import posixpath
 import collections
-from dateutil.parser import parse as parse_timestamp
 from itertools import chain
+
+from dateutil.parser import parse as parse_timestamp
 from six.moves import queue, range
 
 from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config
 from dwave.cloud.solver import Solver
 
+
 _LOGGER = logging.getLogger(__name__)
-# _LOGGER.setLevel(logging.DEBUG)
-# _LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 
 
 class Client(object):
