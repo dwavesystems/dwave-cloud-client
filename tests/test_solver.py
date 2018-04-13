@@ -26,28 +26,28 @@ class PropertyLoading(unittest.TestCase):
 
     def test_load_properties(self):
         """Ensure that the propreties are populated."""
-        with Client(config['endpoint'], config['token']) as client:
-            solver = client.get_solver(config['solver'])
+        with Client(**config) as client:
+            solver = client.get_solver()
             self.assertTrue(len(solver.properties) > 0)
 
     def test_load_parameters(self):
         """Make sure the parameters are populated."""
-        with Client(config['endpoint'], config['token']) as client:
-            solver = client.get_solver(config['solver'])
+        with Client(**config) as client:
+            solver = client.get_solver()
             self.assertTrue(len(solver.parameters) > 0)
 
     def test_submit_invalid_parameter(self):
         """Ensure that the parameters are populated."""
-        with Client(config['endpoint'], config['token']) as client:
-            solver = client.get_solver(config['solver'])
+        with Client(**config) as client:
+            solver = client.get_solver()
             assert 'not_a_parameter' not in solver.parameters
             with self.assertRaises(KeyError):
                 solver.sample_ising({}, {}, not_a_parameter=True)
 
     def test_read_connectivity(self):
         """Ensure that the edge set is populated."""
-        with Client(config['endpoint'], config['token']) as client:
-            solver = client.get_solver(config['solver'])
+        with Client(**config) as client:
+            solver = client.get_solver()
             self.assertTrue(len(solver.edges) > 0)
 
 
@@ -70,8 +70,8 @@ class Submission(_QueryTest):
     """Submit some sample problems."""
 
     def test_result_structure(self):
-        with Client(config['endpoint'], config['token']) as client:
-            solver = client.get_solver(config['solver'])
+        with Client(**config) as client:
+            solver = client.get_solver()
             computation = solver.sample_ising({}, {})
             result = computation.result()
             self.assertIn('samples', result)
@@ -80,8 +80,8 @@ class Submission(_QueryTest):
             self.assertIn('timing', result)
 
     def test_future_structure(self):
-        with Client(config['endpoint'], config['token']) as client:
-            solver = client.get_solver(config['solver'])
+        with Client(**config) as client:
+            solver = client.get_solver()
             computation = solver.sample_ising({}, {})
             _ = computation.result()
             self.assertIsInstance(computation.id, str)
@@ -93,8 +93,8 @@ class Submission(_QueryTest):
     def test_submit_extra_qubit(self):
         """Submit a defective problem with an unsupported variable."""
         # Connect
-        with Client(config['endpoint'], config['token']) as client:
-            solver = client.get_solver(config['solver'])
+        with Client(**config) as client:
+            solver = client.get_solver()
 
             # Build a linear problem
             linear = [0] * (max(solver.nodes) + 1)
@@ -112,8 +112,8 @@ class Submission(_QueryTest):
     def test_submit_linear_problem(self):
         """Submit a problem with all the linear terms populated."""
         # Connect
-        with Client(config['endpoint'], config['token']) as client:
-            solver = client.get_solver(config['solver'])
+        with Client(**config) as client:
+            solver = client.get_solver()
 
             # Build a linear problem
             linear = [0] * (max(solver.nodes) + 1)
@@ -127,8 +127,8 @@ class Submission(_QueryTest):
     def test_submit_full_problem(self):
         """Submit a problem with all supported coefficients set."""
         # Connect
-        with Client(config['endpoint'], config['token']) as client:
-            solver = client.get_solver(config['solver'])
+        with Client(**config) as client:
+            solver = client.get_solver()
 
             # Build a linear problem
             linear = [0] * (max(solver.nodes) + 1)
@@ -144,8 +144,8 @@ class Submission(_QueryTest):
     def test_submit_dict_problem(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
-        with Client(config['endpoint'], config['token']) as client:
-            solver = client.get_solver(config['solver'])
+        with Client(**config) as client:
+            solver = client.get_solver()
 
             # Build a problem
             linear = {index: random.choice([-1, 1]) for index in solver.nodes}
@@ -157,8 +157,8 @@ class Submission(_QueryTest):
     def test_submit_partial_problem(self):
         """Submit a problem with only some of the terms set."""
         # Connect
-        with Client(config['endpoint'], config['token']) as client:
-            solver = client.get_solver(config['solver'])
+        with Client(**config) as client:
+            solver = client.get_solver()
 
             # Build a linear problem
             linear = [0] * (max(solver.nodes) + 1)
@@ -180,8 +180,8 @@ class Submission(_QueryTest):
     def test_submit_batch(self):
         """Submit batch of problems."""
         # Connect
-        with Client(config['endpoint'], config['token']) as client:
-            solver = client.get_solver(config['solver'])
+        with Client(**config) as client:
+            solver = client.get_solver()
 
             result_list = []
             for _ in range(100):
@@ -208,8 +208,8 @@ class Submission(_QueryTest):
     def test_cancel_batch(self):
         """Submit batch of problems, then cancel them."""
         # Connect
-        with Client(config['endpoint'], config['token']) as client:
-            solver = client.get_solver(config['solver'])
+        with Client(**config) as client:
+            solver = client.get_solver()
 
             # Build a linear problem
             linear = [0] * (max(solver.nodes) + 1)
@@ -241,8 +241,8 @@ class Submission(_QueryTest):
     def test_wait_many(self):
         """Submit a batch of problems then use `wait_multiple` to wait on all of them."""
         # Connect
-        with Client(config['endpoint'], config['token']) as client:
-            solver = client.get_solver(config['solver'])
+        with Client(**config) as client:
+            solver = client.get_solver()
 
             # Build a linear problem
             linear = [0] * (max(solver.nodes) + 1)
@@ -275,8 +275,8 @@ class Submission(_QueryTest):
         all of them."""
 
         # Connect
-        with Client(config['endpoint'], config['token']) as client:
-            solver = client.get_solver(config['solver'])
+        with Client(**config) as client:
+            solver = client.get_solver()
 
             # Build a problem
             linear = [0] * (max(solver.nodes) + 1)
@@ -317,9 +317,9 @@ class DecodingMethod(_QueryTest):
     def test_request_matrix_with_no_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
-        with Client(config['endpoint'], config['token']) as client:
+        with Client(**config) as client:
             dwave.cloud.computation._numpy = False
-            solver = client.get_solver(config['solver'])
+            solver = client.get_solver()
             solver.return_matrix = True
 
             # Build a problem
@@ -333,9 +333,9 @@ class DecodingMethod(_QueryTest):
     def test_request_matrix_with_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
-        with Client(config['endpoint'], config['token']) as client:
+        with Client(**config) as client:
             assert dwave.cloud.computation._numpy
-            solver = client.get_solver(config['solver'])
+            solver = client.get_solver()
             solver.return_matrix = True
 
             # Build a problem
@@ -351,9 +351,9 @@ class DecodingMethod(_QueryTest):
     def test_request_list_with_no_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
-        with Client(config['endpoint'], config['token']) as client:
+        with Client(**config) as client:
             dwave.cloud.computation._numpy = False
-            solver = client.get_solver(config['solver'])
+            solver = client.get_solver()
             solver.return_matrix = False
 
             # Build a problem
@@ -366,9 +366,9 @@ class DecodingMethod(_QueryTest):
     def test_request_list_with_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
-        with Client(config['endpoint'], config['token']) as client:
+        with Client(**config) as client:
             assert dwave.cloud.computation._numpy
-            solver = client.get_solver(config['solver'])
+            solver = client.get_solver()
             solver.return_matrix = False
 
             # Build a problem
@@ -381,9 +381,9 @@ class DecodingMethod(_QueryTest):
     def test_request_raw_matrix_with_no_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
-        with Client(config['endpoint'], config['token']) as client:
+        with Client(**config) as client:
             dwave.cloud.computation._numpy = False
-            solver = client.get_solver(config['solver'])
+            solver = client.get_solver()
             solver.return_matrix = True
 
             # Build a problem
@@ -397,9 +397,9 @@ class DecodingMethod(_QueryTest):
     def test_request_raw_matrix_with_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
-        with Client(config['endpoint'], config['token']) as client:
+        with Client(**config) as client:
             assert dwave.cloud.computation._numpy
-            solver = client.get_solver(config['solver'])
+            solver = client.get_solver()
             solver.return_matrix = True
 
             # Build a problem
@@ -415,9 +415,9 @@ class DecodingMethod(_QueryTest):
     def test_request_raw_list_with_no_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
-        with Client(config['endpoint'], config['token']) as client:
+        with Client(**config) as client:
             dwave.cloud.computation._numpy = False
-            solver = client.get_solver(config['solver'])
+            solver = client.get_solver()
             solver.return_matrix = False
 
             # Build a problem
@@ -430,9 +430,9 @@ class DecodingMethod(_QueryTest):
     def test_request_raw_list_with_numpy(self):
         """Submit a problem using a dict for the linear terms."""
         # Connect
-        with Client(config['endpoint'], config['token']) as client:
+        with Client(**config) as client:
             assert dwave.cloud.computation._numpy
-            solver = client.get_solver(config['solver'])
+            solver = client.get_solver()
             solver.return_matrix = False
 
             # Build a problem
