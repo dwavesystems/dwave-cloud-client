@@ -346,6 +346,7 @@ def load_config(config_file=None, profile=None, client=None,
     else:
         # auto-detect if not specified with arg or env
         if config_file is None:
+            # note: both empty and undefined DWAVE_CONFIG_FILE treated as None
             config_file = os.getenv("DWAVE_CONFIG_FILE")
         section = _get_section([config_file] if config_file else None, profile)
 

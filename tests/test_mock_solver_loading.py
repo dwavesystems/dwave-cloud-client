@@ -211,7 +211,7 @@ solver = alpha-solver
 
 # patch the new config loading mechanism, to test only legacy config loading
 @mock.patch("dwave.cloud.config.detect_existing_configfile_paths", lambda: [])
-class MockConfiguration(unittest.TestCase):
+class MockLegacyConfiguration(unittest.TestCase):
     """Ensure that the precedence of configuration sources is followed."""
 
     def setUp(self):

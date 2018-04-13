@@ -23,18 +23,22 @@ class ConnectivityTests(unittest.TestCase):
     def test_bad_url(self):
         """Connect with a bad URL."""
         with self.assertRaises(IOError):
-            with Client("not-a-url", config['token']) as client:
+            invalid_config = config.copy()
+            invalid_config.update(endpoint='invalid-endpoint')
+            with Client(**invalid_config) as client:
                 client.get_solvers()
 
     def test_bad_token(self):
         """Connect with a bad token."""
         with self.assertRaises(SolverAuthenticationError):
-            with Client(config['endpoint'], 'not-a-token') as client:
+            invalid_config = config.copy()
+            invalid_config.update(token='invalid-token')
+            with Client(**invalid_config) as client:
                 client.get_solvers()
 
     def test_good_connection(self):
-        """Connect with a valid URL and token."""
-        with Client(config['endpoint'], config['token']) as client:
+        """Connect with valid connection settings (url/token/proxy/etc)."""
+        with Client(**config) as client:
             self.assertTrue(len(client.get_solvers()) > 0)
 
 
@@ -44,24 +48,24 @@ class SolverLoading(unittest.TestCase):
 
     def test_list_all_solvers(self):
         """List all the solvers."""
-        with Client(config['endpoint'], config['token']) as client:
+        with Client(**config) as client:
             self.assertTrue(len(client.get_solvers()) > 0)
 
     def test_load_all_solvers(self):
         """List and retrieve all the solvers."""
-        with Client(config['endpoint'], config['token']) as client:
+        with Client(**config) as client:
             for name in client.get_solvers():
                 self.assertEqual(client.get_solver(name).id, name)
 
     def test_load_bad_solvers(self):
         """Try to load a nonexistent solver."""
-        with Client(config['endpoint'], config['token']) as client:
+        with Client(**config) as client:
             with self.assertRaises(KeyError):
                 client.get_solver("not-a-solver")
 
     def test_load_any_solver(self):
         """Load a single solver without calling get_solvers (which caches data)."""
-        with Client(config['endpoint'], config['token']) as client:
+        with Client(**config) as client:
             self.assertEqual(client.get_solver(config['solver']).id, config['solver'])
 
 
