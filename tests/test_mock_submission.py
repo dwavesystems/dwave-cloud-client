@@ -138,7 +138,6 @@ class MockSubmission(_QueryTest):
             quad = {key: -1 for key in solver.undirected_edges}
             results = solver.sample_ising(linear, quad, num_reads=100)
 
-            #
             with self.assertRaises(ValueError):
                 results.samples
 
@@ -156,7 +155,6 @@ class MockSubmission(_QueryTest):
             quad = {key: -1 for key in solver.undirected_edges}
             results = solver.sample_ising(linear, quad, num_reads=100)
 
-            #
             self._check(results, linear, quad, 100)
 
     def test_submit_error_reply(self):
@@ -173,7 +171,6 @@ class MockSubmission(_QueryTest):
             quad = {key: -1 for key in solver.undirected_edges}
             results = solver.sample_ising(linear, quad, num_reads=100)
 
-            #
             with self.assertRaises(SolverFailureError):
                 results.samples
 
@@ -189,7 +186,6 @@ class MockSubmission(_QueryTest):
             quad = {key: -1 for key in solver.undirected_edges}
             results = solver.sample_ising(linear, quad, num_reads=100)
 
-            #
             with self.assertRaises(CanceledFutureError):
                 results.samples
 
@@ -209,7 +205,6 @@ class MockSubmission(_QueryTest):
             quad = {key: -1 for key in solver.undirected_edges}
             results = solver.sample_ising(linear, quad, num_reads=100)
 
-            #
             self._check(results, linear, quad, 100)
 
     def test_submit_continue_then_error_reply(self):
@@ -226,7 +221,6 @@ class MockSubmission(_QueryTest):
             quad = {key: -1 for key in solver.undirected_edges}
             results = solver.sample_ising(linear, quad, num_reads=100)
 
-            #
             with self.assertRaises(SolverFailureError):
                 self._check(results, linear, quad, 100)
 
@@ -235,6 +229,7 @@ class MockSubmission(_QueryTest):
         # Reduce the number of poll threads to 1 so that the system can be tested
         old_value = Client._POLL_THREAD_COUNT
         Client._POLL_THREAD_COUNT = 1
+
         with Client('endpoint', 'token') as client:
             client.session = mock.Mock()
             client.session.get = lambda a: choose_reply(a, {
@@ -274,6 +269,7 @@ class MockSubmission(_QueryTest):
             with self.assertRaises(SolverFailureError):
                 self._check(results1, linear, quad, 100)
             self._check(results2, linear, quad, 100)
+
         Client._POLL_THREAD_COUNT = old_value
 
 
@@ -338,7 +334,7 @@ class MockCancel(unittest.TestCase):
 
             def post(a, _):
                 release_reply.wait()
-                return choose_reply(a, {'endpoint/problems/'.format(submission_id): reply_body})
+                return choose_reply(a, {'endpoint/problems/': reply_body})
             client.session.post = post
             client.session.delete = DeleteEvent.handle
 
