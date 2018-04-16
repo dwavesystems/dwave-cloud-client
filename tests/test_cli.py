@@ -40,6 +40,43 @@ class TestCli(unittest.TestCase):
                 for val in values:
                     self.assertEqual(config.get(val), val)
 
+    def test_configure_list_config(self):
+        runner = CliRunner()
+        with runner.isolated_filesystem():
+            touch('dwave.conf')
+            with mock.patch('dwave.cloud.config.homebase.site_config_dir_list',
+                            lambda **kw: ['/system1', '/system2']):
+                with mock.patch('dwave.cloud.config.homebase.user_config_dir',
+                                lambda **kw: '/user'):
+                    with mock.patch('os.path.exists', lambda *x: True):
+                        # test --list-config-files
+                        result = runner.invoke(cli, [
+                            'configure', '--list-config-files'
+                        ])
+                        self.assertEqual(result.output.strip(), '\n'.join([
+                            '/system1/dwave.conf', '/system2/dwave.conf',
+                            '/user/dwave.conf', './dwave.conf']))
+
+                        # test --list-system-paths
+                        result = runner.invoke(cli, [
+                            'configure', '--list-system-paths'
+                        ])
+                        self.assertEqual(result.output.strip(), '\n'.join([
+                            '/system1/dwave.conf', '/system2/dwave.conf']))
+
+                        # test --list-user-paths
+                        result = runner.invoke(cli, [
+                            'configure', '--list-user-paths'
+                        ])
+                        self.assertEqual(result.output.strip(), '/user/dwave.conf')
+
+                        # test --list-local-paths
+                        result = runner.invoke(cli, [
+                            'configure', '--list-local-paths'
+                        ])
+                        self.assertEqual(result.output.strip(), './dwave.conf')
+
+
     def test_ping(self):
         config_file = 'dwave.conf'
         profile = 'profile'
