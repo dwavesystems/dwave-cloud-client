@@ -9,7 +9,7 @@ from functools import partial
 from dwave.cloud.exceptions import ConfigFileParseError, ConfigFileReadError
 from dwave.cloud.testing import mock, iterable_mock_open
 from dwave.cloud.config import (
-    detect_existing_configfile_paths, load_config_from_files, load_config)
+    get_configfile_paths, load_config_from_files, load_config)
 
 
 class TestConfig(unittest.TestCase):
@@ -70,7 +70,7 @@ class TestConfig(unittest.TestCase):
     def test_no_config_detected(self):
         """When no config file detected, `load_config_from_files` should return
         empty config."""
-        with mock.patch("dwave.cloud.config.detect_existing_configfile_paths", lambda: []):
+        with mock.patch("dwave.cloud.config.get_configfile_paths", lambda: []):
             self.assertFalse(load_config_from_files().sections())
 
     def test_invalid_filename_given(self):
@@ -79,7 +79,7 @@ class TestConfig(unittest.TestCase):
     def test_config_file_detection_cwd(self):
         configpath = "./dwave.conf"
         with mock.patch("os.path.exists", lambda path: path == configpath):
-            self.assertEqual(detect_existing_configfile_paths(), [configpath])
+            self.assertEqual(get_configfile_paths(), [configpath])
 
     def test_config_file_detection_user(self):
         if sys.platform == 'win32':
@@ -91,7 +91,7 @@ class TestConfig(unittest.TestCase):
             configpath = os.path.expanduser("~/.config/dwave/dwave.conf")
 
         with mock.patch("os.path.exists", lambda path: path == configpath):
-            self.assertEqual(detect_existing_configfile_paths(), [configpath])
+            self.assertEqual(get_configfile_paths(), [configpath])
 
     def test_config_file_detection_system(self):
         if sys.platform == 'win32':
@@ -103,11 +103,11 @@ class TestConfig(unittest.TestCase):
             configpath = "/etc/xdg/dwave/dwave.conf"
 
         with mock.patch("os.path.exists", lambda path: path == configpath):
-            self.assertEqual(detect_existing_configfile_paths(), [configpath])
+            self.assertEqual(get_configfile_paths(), [configpath])
 
     def test_config_file_detection_nonexisting(self):
         with mock.patch("os.path.exists", lambda path: False):
-            self.assertEqual(detect_existing_configfile_paths(), [])
+            self.assertEqual(get_configfile_paths(), [])
 
 
     def _assert_config_valid(self, config):
@@ -281,7 +281,7 @@ class TestConfig(unittest.TestCase):
             endpoint = beta
         """
 
-        with mock.patch("dwave.cloud.config.detect_existing_configfile_paths",
+        with mock.patch("dwave.cloud.config.get_configfile_paths",
                         lambda: ['config_system', 'config_user']):
 
             # test per-key override

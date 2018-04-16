@@ -210,7 +210,7 @@ solver = alpha-solver
 
 
 # patch the new config loading mechanism, to test only legacy config loading
-@mock.patch("dwave.cloud.config.detect_existing_configfile_paths", lambda: [])
+@mock.patch("dwave.cloud.config.get_configfile_paths", lambda: [])
 class MockLegacyConfiguration(unittest.TestCase):
     """Ensure that the precedence of configuration sources is followed."""
 
@@ -265,7 +265,7 @@ class MockLegacyConfiguration(unittest.TestCase):
     def test_only_file_key(self):
         """If give a name from the config file the proper URL should be loaded."""
         with mock.patch("dwave.cloud.config.open", iterable_mock_open(config_body), create=True):
-            with mock.patch("dwave.cloud.config.detect_existing_configfile_paths", lambda *x: ['file']):
+            with mock.patch("dwave.cloud.config.get_configfile_paths", lambda *x: ['file']):
                 with Client.from_config(profile='alpha') as client:
                     client.session.get = GetEvent.handle
                     try:

@@ -13,38 +13,61 @@ CONF_AUTHOR = "dwavesystem"
 CONF_FILENAME = "dwave.conf"
 
 
-def detect_existing_configfile_paths():
-    """Returns the list of existing config files found on disk.
+def get_configfile_paths(system=True, user=True, local=True, only_existing=True):
+    """Returns a list of (existing) config files found on disk.
 
     Candidates examined depend on the OS, but for Linux possible list is:
     ``dwave.conf`` in CWD, user-local ``.config/dwave/``, system-wide
     ``/etc/dwave/``. For details, see :func:`load_config_from_file`.
+
+    Args:
+        system (boolean, default=True):
+            Search for system-wide config files.
+
+        user (boolean, default=True):
+            Search for user-local config files.
+
+        local (boolean, default=True):
+            Search for local config files (in CWD).
+
+        only_existing (boolean, default=True):
+            Return only paths for files that exist on disk.
+
+    Returns:
+        list[str]:
+            A list of config file paths.
     """
 
+    candidates = []
+
     # system-wide has the lowest priority, `/etc/dwave/dwave.conf`
-    candidates = homebase.site_config_dir_list(
-        app_author=CONF_AUTHOR, app_name=CONF_APP,
-        use_virtualenv=False, create=False)
+    if system:
+        candidates.extend(homebase.site_config_dir_list(
+            app_author=CONF_AUTHOR, app_name=CONF_APP,
+            use_virtualenv=False, create=False))
 
     # user-local will override it, `~/.config/dwave/dwave.conf`
-    candidates.append(homebase.user_config_dir(
-        app_author=CONF_AUTHOR, app_name=CONF_APP, roaming=False,
-        use_virtualenv=False, create=False))
+    if user:
+        candidates.append(homebase.user_config_dir(
+            app_author=CONF_AUTHOR, app_name=CONF_APP, roaming=False,
+            use_virtualenv=False, create=False))
 
     # highest priority (overrides all): `./dwave.conf`
-    candidates.append(".")
+    if local:
+        candidates.append(".")
 
     paths = [os.path.join(base, CONF_FILENAME) for base in candidates]
-    existing_paths = [path for path in paths if os.path.exists(path)]
+    if only_existing:
+        paths = list(filter(os.path.exists, paths))
 
-    return existing_paths
+    return paths
 
 
 def get_configfile_path():
     """Returns the highest-priority existing config file from a list
-    of possible candidates returned by `detect_existing_configfile_paths()`, and
+    of possible candidates returned by `get_configfile_paths()`, and
     ``None`` if no candidate config file exists."""
-    paths = detect_existing_configfile_paths()
+    paths = get_configfile_paths()
     return paths[-1] if paths else None
 
 
@@ -123,7 +146,7 @@ def load_config_from_files(filenames=None):
             Config file parse failed.
     """
     if filenames is None:
-        filenames = detect_existing_configfile_paths()
+        filenames = get_configfile_paths()
 
     config = configparser.ConfigParser(default_section="defaults")
     for filename in filenames:
