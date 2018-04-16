@@ -5,6 +5,7 @@ from timeit import default_timer as timer
 
 from dwave.cloud import Client
 from dwave.cloud.utils import readline_input
+from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError)
 from dwave.cloud.config import (
@@ -13,6 +14,7 @@ from dwave.cloud.config import (
 
 
 @click.group()
+@click.version_option(prog_name=__title__, version=__version__)
 def cli():
     """D-Wave cloud tool."""
 
