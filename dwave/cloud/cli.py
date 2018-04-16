@@ -11,7 +11,7 @@ from dwave.cloud.exceptions import (
 from dwave.cloud.config import (
     load_config_from_files, get_default_config,
     get_configfile_path, get_default_configfile_path,
-    detect_existing_configfile_paths)
+    get_configfile_paths)
 
 
 @click.group()
@@ -23,7 +23,15 @@ def cli():
 def show_config_files(ctx, param, value):
     if not value or ctx.resilient_parsing:
         return
-    for path in detect_existing_configfile_paths():
+    for path in get_configfile_paths():
+        click.echo(path)
+    ctx.exit()
+
+
+def list_system_config(ctx, param, value):
+    if not value or ctx.resilient_parsing:
+        return
+    for path in get_configfile_paths(system=True, user=False, local=False, only_existing=False):
         click.echo(path)
     ctx.exit()
 
@@ -36,6 +44,9 @@ def show_config_files(ctx, param, value):
 @click.option('--show-config-files', is_flag=True, callback=show_config_files,
               expose_value=False, is_eager=True,
               help='List all config file paths detected on this system')
+@click.option('--list-system-paths', is_flag=True, callback=list_system_config,
+              expose_value=False, is_eager=True,
+              help='List paths of system-level config files examined')
 def configure(config_file, profile):
     """Create and/or update cloud client configuration file."""
 
