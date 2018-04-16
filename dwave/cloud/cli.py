@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 from functools import wraps
 
 import click
@@ -93,15 +91,15 @@ def configure(config_file, profile):
 
     # determine the config file path
     if config_file:
-        print("Using config file:", config_file)
+        click.echo("Using config file: {}".format(config_file))
     else:
         # path not given, try to detect; or use default, but allow user to override
         config_file = get_configfile_path()
         if config_file:
-            print("Found existing config file:", config_file)
+            click.echo("Found existing config file: {}".format(config_file))
         else:
             config_file = get_default_configfile_path()
-            print("Config file not found, the default location is:", config_file)
+            click.echo("Config file not found, the default location is: {}".format(config_file))
         config_file = readline_input("Confirm config file path (editable): ", config_file)
 
     # try loading existing config, or use defaults
@@ -112,7 +110,7 @@ def configure(config_file, profile):
 
     # determine profile
     if profile:
-        print("Using profile:", profile)
+        click.echo("Using profile: {}".format(profile))
     else:
         existing = config.sections()
         if existing:
@@ -124,7 +122,7 @@ def configure(config_file, profile):
         while not profile:
             profile = readline_input("Profile (%s): " % profiles, default_profile)
             if not profile:
-                print("Profile name can't be empty.")
+                click.echo("Profile name can't be empty.")
 
     if not config.has_section(profile):
         config.add_section(profile)
@@ -145,7 +143,7 @@ def configure(config_file, profile):
     with open(config_file, 'w') as fp:
         config.write(fp)
 
-    print("Config saved.")
+    click.echo("Config saved.")
     return 0
 
 
@@ -159,22 +157,22 @@ def ping(config_file, profile):
     try:
         client = Client.from_config(config_file=config_file, profile=profile)
     except Exception as e:
-        print("Invalid config: {}".format(e))
+        click.echo("Invalid config: {}".format(e))
         return 1
     if config_file:
-        print("Using config file:", config_file)
+        click.echo("Using config file: {}".format(config_file))
     if profile:
-        print("Using profile:", profile)
-    print("Using endpoint:", client.endpoint)
+        click.echo("Using profile: {}".format(profile))
+    click.echo("Using endpoint: {}".format(client.endpoint))
 
     t0 = timer()
     try:
         solvers = client.get_solvers()
     except SolverAuthenticationError:
-        print("Authentication error. Check credentials in your config file.")
+        click.echo("Authentication error. Check credentials in your config file.")
         return 1
     except (InvalidAPIResponseError, UnsupportedSolverError):
-        print("Invalid or unexpected API response.")
+        click.echo("Invalid or unexpected API response.")
         return 2
 
     try:
@@ -185,20 +183,20 @@ def ping(config_file, profile):
         if solvers:
             _, solver = next(iter(solvers.items()))
         else:
-            print("No solvers available.")
+            click.echo("No solvers available.")
             return 1
 
     t1 = timer()
-    print("Using solver: {}".format(solver.id))
+    click.echo("Using solver: {}".format(solver.id))
 
     timing = solver.sample_ising({0: 1}, {}).timing
     t2 = timer()
 
-    print("\nWall clock time:")
-    print(" * Solver definition fetch web request: {:.3f} ms".format((t1-t0)*1000.0))
-    print(" * Problem submit and results fetch: {:.3f} ms".format((t2-t1)*1000.0))
-    print(" * Total: {:.3f} ms".format((t2-t0)*1000.0))
-    print("\nQPU timing:")
+    click.echo("\nWall clock time:")
+    click.echo(" * Solver definition fetch web request: {:.3f} ms".format((t1-t0)*1000.0))
+    click.echo(" * Problem submit and results fetch: {:.3f} ms".format((t2-t1)*1000.0))
+    click.echo(" * Total: {:.3f} ms".format((t2-t0)*1000.0))
+    click.echo("\nQPU timing:")
     for component, duration in timing.items():
-        print(" * {} = {} us".format(component, duration))
+        click.echo(" * {} = {} us".format(component, duration))
     return 0
