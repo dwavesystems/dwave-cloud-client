@@ -10,7 +10,8 @@ from dwave.cloud.exceptions import (
     SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError)
 from dwave.cloud.config import (
     load_config_from_files, get_default_config,
-    get_configfile_path, get_default_configfile_path)
+    get_configfile_path, get_default_configfile_path,
+    detect_existing_configfile_paths)
 
 
 @click.group()
@@ -19,11 +20,22 @@ def cli():
     """D-Wave cloud tool."""
 
 
+def show_config_files(ctx, param, value):
+    if not value or ctx.resilient_parsing:
+        return
+    for path in detect_existing_configfile_paths():
+        click.echo(path)
+    ctx.exit()
+
+
 @cli.command()
 @click.option('--config-file', default=None, help='Config file path',
               type=click.Path(exists=True, dir_okay=False))
 @click.option('--profile', default=None,
               help='Connection profile name (config section name)')
+@click.option('--show-config-files', is_flag=True, callback=show_config_files,
+              expose_value=False, is_eager=True,
+              help='List all config file paths detected on this system')
 def configure(config_file, profile):
     """Create and/or update cloud client configuration file."""
 
