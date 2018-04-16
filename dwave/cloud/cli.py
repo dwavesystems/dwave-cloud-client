@@ -1,5 +1,7 @@
 from __future__ import print_function
 
+from functools import wraps
+
 import click
 from timeit import default_timer as timer
 
@@ -14,26 +16,59 @@ from dwave.cloud.config import (
     get_configfile_paths)
 
 
+def click_info_switch(f):
+    """Decorator to create Click eager info switch option, as described in docs:
+    http://click.pocoo.org/6/options/#callbacks-and-eager-options.
+
+    Takes a no-argument function and abstracts the boilerplate required by
+    Click (value checking, exit on done).
+
+    Example:
+
+        @click.option('--my-option', is_flag=True, callback=my_option,
+                    expose_value=False, is_eager=True)
+        def test():
+            pass
+
+        @click_info_switch
+        def my_option()
+            click.echo('some info related to my switch')
+    """
+
+    @wraps(f)
+    def wrapped(ctx, param, value):
+        if not value or ctx.resilient_parsing:
+            return
+        f()
+        ctx.exit()
+    return wrapped
+
+
+@click_info_switch
+def list_config_files():
+    for path in get_configfile_paths():
+        click.echo(path)
+
+@click_info_switch
+def list_system_config():
+    for path in get_configfile_paths(user=False, local=False, only_existing=False):
+        click.echo(path)
+
+@click_info_switch
+def list_user_config():
+    for path in get_configfile_paths(system=False, local=False, only_existing=False):
+        click.echo(path)
+
+@click_info_switch
+def list_local_config():
+    for path in get_configfile_paths(system=False, user=False, only_existing=False):
+        click.echo(path)
+
+
 @click.group()
 @click.version_option(prog_name=__title__, version=__version__)
 def cli():
     """D-Wave cloud tool."""
-
-
-def show_config_files(ctx, param, value):
-    if not value or ctx.resilient_parsing:
-        return
-    for path in get_configfile_paths():
-        click.echo(path)
-    ctx.exit()
-
-
-def list_system_config(ctx, param, value):
-    if not value or ctx.resilient_parsing:
-        return
-    for path in get_configfile_paths(system=True, user=False, local=False, only_existing=False):
-        click.echo(path)
-    ctx.exit()
 
 
 @cli.command()
@@ -41,12 +76,18 @@ def list_system_config(ctx, param, value):
               type=click.Path(exists=True, dir_okay=False))
 @click.option('--profile', default=None,
               help='Connection profile name (config section name)')
-@click.option('--show-config-files', is_flag=True, callback=show_config_files,
+@click.option('--list-config-files', is_flag=True, callback=list_config_files,
               expose_value=False, is_eager=True,
-              help='List all config file paths detected on this system')
+              help='List paths of all config files detected on this system')
 @click.option('--list-system-paths', is_flag=True, callback=list_system_config,
               expose_value=False, is_eager=True,
-              help='List paths of system-level config files examined')
+              help='List paths of system-wide config files examined')
+@click.option('--list-user-paths', is_flag=True, callback=list_user_config,
+              expose_value=False, is_eager=True,
+              help='List paths of user-local config files examined')
+@click.option('--list-local-paths', is_flag=True, callback=list_local_config,
+              expose_value=False, is_eager=True,
+              help='List paths of local config files examined')
 def configure(config_file, profile):
     """Create and/or update cloud client configuration file."""
 
