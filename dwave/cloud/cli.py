@@ -72,7 +72,7 @@ def cli():
 
 @cli.command()
 @click.option('--config-file', default=None, help='Config file path',
-              type=click.Path(exists=True, dir_okay=False))
+              type=click.Path(exists=False, dir_okay=False))
 @click.option('--profile', default=None,
               help='Connection profile name (config section name)')
 @click.option('--list-config-files', is_flag=True, callback=list_config_files,
