@@ -1,3 +1,4 @@
+import os
 from functools import wraps
 
 import click
@@ -101,6 +102,16 @@ def configure(config_file, profile):
             config_file = get_default_configfile_path()
             click.echo("Config file not found, the default location is: {}".format(config_file))
         config_file = readline_input("Confirm config file path (editable): ", config_file)
+
+    # create config_file path
+    config_base = os.path.dirname(config_file)
+    if config_base and not os.path.exists(config_base):
+        if click.confirm("Config file path does not exist. Create it?", abort=True):
+            try:
+                os.makedirs(config_base)
+            except Exception as e:
+                click.echo(e)
+                return 1
 
     # try loading existing config, or use defaults
     try:
