@@ -110,7 +110,7 @@ def configure(config_file, profile):
             try:
                 os.makedirs(config_base)
             except Exception as e:
-                click.echo(e)
+                click.echo("Error creating config path: {}".format(e))
                 return 1
 
     # try loading existing config, or use defaults
@@ -151,8 +151,12 @@ def configure(config_file, profile):
         if val != default_val:
             config.set(profile, var, val)
 
-    with open(config_file, 'w') as fp:
-        config.write(fp)
+    try:
+        with open(config_file, 'w') as fp:
+            config.write(fp)
+    except Exception as e:
+        click.echo("Error writing to config file: {}".format(e))
+        return 2
 
     click.echo("Config saved.")
     return 0
