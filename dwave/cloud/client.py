@@ -12,6 +12,7 @@ from itertools import chain
 from dateutil.parser import parse as parse_timestamp
 from six.moves import queue, range
 
+from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config
 from dwave.cloud.solver import Solver
@@ -50,6 +51,9 @@ class Client(object):
     STATUS_COMPLETE = 'COMPLETED'
     STATUS_FAILED = 'FAILED'
     STATUS_CANCELLED = 'CANCELLED'
+
+    # Identify as something like `dwave-cloud-client/0.4` in all requests
+    USER_AGENT = '{}/{}'.format(__packagename__, __version__)
 
     # Cases when multiple status flags qualify
     ANY_STATUS_ONGOING = [STATUS_IN_PROGRESS, STATUS_PENDING]
@@ -197,7 +201,8 @@ class Client(object):
 
         # Create a :mod:`requests` session. `requests` will manage our url parsing, https, etc.
         self.session = requests.Session()
-        self.session.headers.update({'X-Auth-Token': self.token})
+        self.session.headers.update({'X-Auth-Token': self.token,
+                                     'User-Agent': self.USER_AGENT})
         self.session.proxies = {'http': proxy, 'https': proxy}
         if permissive_ssl:
             self.session.verify = False
