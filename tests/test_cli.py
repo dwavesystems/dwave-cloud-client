@@ -76,6 +76,49 @@ class TestCli(unittest.TestCase):
                         ])
                         self.assertEqual(result.output.strip(), './dwave.conf')
 
+    def test_configure_inspect(self):
+        runner = CliRunner()
+        with runner.isolated_filesystem():
+            config_file = 'dwave.conf'
+            with open(config_file, 'w') as f:
+                f.write('''
+                    [defaults]
+                    endpoint = 1
+                    [a]
+                    endpoint = 2
+                    [b]
+                    token = 3''')
+
+            # test auto-detected case
+            with mock.patch('dwave.cloud.config.get_configfile_paths',
+                            lambda **kw: [config_file]):
+                result = runner.invoke(cli, [
+                    'configure', '--inspect'
+                ])
+                self.assertIn('endpoint = 2', result.output)
+
+            # test explicit config
+            result = runner.invoke(cli, [
+                'configure', '--inspect', '--config-file', config_file
+            ])
+            self.assertIn('endpoint = 2', result.output)
+
+            # test explicit profile
+            result = runner.invoke(cli, [
+                'configure', '--inspect', '--config-file', config_file,
+                '--profile', 'b'
+            ])
+            self.assertIn('endpoint = 1', result.output)
+            self.assertIn('token = 3', result.output)
+
+            # test eagerness of config-file ane profile
+            result = runner.invoke(cli, [
+                'configure', '--config-file', config_file,
+                '--profile', 'b', '--inspect'
+            ])
+            self.assertIn('endpoint = 1', result.output)
+            self.assertIn('token = 3', result.output)
+
 
     def test_ping(self):
         config_file = 'dwave.conf'

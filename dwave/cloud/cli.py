@@ -8,9 +8,10 @@ from dwave.cloud import Client
 from dwave.cloud.utils import readline_input
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
-    SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError)
+    SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError,
+    ConfigFileReadError, ConfigFileParseError)
 from dwave.cloud.config import (
-    load_config_from_files, get_default_config,
+    load_profile_from_files, load_config_from_files, get_default_config,
     get_configfile_path, get_default_configfile_path,
     get_configfile_paths)
 
@@ -64,6 +65,29 @@ def list_local_config():
         click.echo(path)
 
 
+def inspect_config(ctx, param, value):
+    if not value or ctx.resilient_parsing:
+        return
+
+    config_file = ctx.params.get('config_file')
+    profile = ctx.params.get('profile')
+
+    try:
+        section = load_profile_from_files(
+            [config_file] if config_file else None, profile)
+
+        click.echo("Config file: {}".format(config_file if config_file else "auto-detected"))
+        click.echo("Profile: {}".format(profile if profile else "auto-detected"))
+        click.echo("---")
+        for key, val in section.items():
+            click.echo("{} = {}".format(key, val))
+
+    except (ValueError, ConfigFileReadError, ConfigFileParseError) as e:
+        click.echo(e)
+
+    ctx.exit()
+
+
 @click.group()
 @click.version_option(prog_name=__title__, version=__version__)
 def cli():
@@ -71,10 +95,13 @@ def cli():
 
 
 @cli.command()
-@click.option('--config-file', default=None, help='Config file path',
-              type=click.Path(exists=False, dir_okay=False))
-@click.option('--profile', default=None,
+@click.option('--config-file', '-c', default=None, is_eager=True,
+              type=click.Path(exists=False, dir_okay=False),
+              help='Config file path')
+@click.option('--profile', '-p', default=None, is_eager=True,
               help='Connection profile name (config section name)')
+@click.option('--inspect', is_flag=True, expose_value=False, callback=inspect_config,
+              help='Only inspect existing config/profile (no update)')
 @click.option('--list-config-files', is_flag=True, callback=list_config_files,
               expose_value=False, is_eager=True,
               help='List paths of all config files detected on this system')
@@ -163,9 +190,9 @@ def configure(config_file, profile):
 
 
 @cli.command()
-@click.option('--config-file', default=None, help='Config file path',
+@click.option('--config-file', '-c', default=None, help='Config file path',
               type=click.Path(exists=True, dir_okay=False))
-@click.option('--profile', default=None, help='Connection profile name')
+@click.option('--profile', '-p', default=None, help='Connection profile name')
 def ping(config_file, profile):
     """Ping the QPU by submitting a single-qubit problem."""
 
