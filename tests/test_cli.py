@@ -119,7 +119,6 @@ class TestCli(unittest.TestCase):
             self.assertIn('endpoint = 1', result.output)
             self.assertIn('token = 3', result.output)
 
-
     def test_ping(self):
         config_file = 'dwave.conf'
         profile = 'profile'
