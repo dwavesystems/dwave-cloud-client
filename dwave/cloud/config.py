@@ -18,7 +18,7 @@ def get_configfile_paths(system=True, user=True, local=True, only_existing=True)
 
     Candidates examined depend on the OS, but for Linux possible list is:
     ``dwave.conf`` in CWD, user-local ``.config/dwave/``, system-wide
-    ``/etc/dwave/``. For details, see :func:`load_config_from_file`.
+    ``/etc/dwave/``. For details, see :func:`load_config_from_files`.
 
     Args:
         system (boolean, default=True):
@@ -204,7 +204,7 @@ def load_config(config_file=None, profile=None, client=None,
     performed (looking first for ``dwave.conf`` in process' current working
     directory, then in user-local config directories, and finally in system-wide
     config dirs). For details on format and location detection, see
-    :func:`load_config_from_file`.
+    :func:`load_config_from_files`.
 
     If location of ``config_file`` is explicitly specified (via arguments or
     environment variable), but the file does not exits, or is not readable,
@@ -424,7 +424,7 @@ def legacy_load_config(profile=None, endpoint=None, token=None, solver=None,
             profile-b|https://two.com,token-two
 
         Assuming the new config file ``dwave.conf`` is not found (in any of the
-        standard locations, see :meth:`~dwave.cloud.config.load_config_from_file`
+        standard locations, see :meth:`~dwave.cloud.config.load_config_from_files`
         and :meth:`~dwave.cloud.config.load_config`), then:
 
         >>> client = dwave.cloud.Client.from_config()
