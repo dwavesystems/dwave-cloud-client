@@ -71,9 +71,9 @@ def cli():
 
 
 @cli.command()
-@click.option('--config-file', default=None, help='Config file path',
+@click.option('--config-file', '-c', default=None, help='Config file path',
               type=click.Path(exists=False, dir_okay=False))
-@click.option('--profile', default=None,
+@click.option('--profile', '-p', default=None,
               help='Connection profile name (config section name)')
 @click.option('--list-config-files', is_flag=True, callback=list_config_files,
               expose_value=False, is_eager=True,
@@ -163,9 +163,9 @@ def configure(config_file, profile):
 
 
 @cli.command()
-@click.option('--config-file', default=None, help='Config file path',
+@click.option('--config-file', '-c', default=None, help='Config file path',
               type=click.Path(exists=True, dir_okay=False))
-@click.option('--profile', default=None, help='Connection profile name')
+@click.option('--profile', '-p', default=None, help='Connection profile name')
 def ping(config_file, profile):
     """Ping the QPU by submitting a single-qubit problem."""
 
