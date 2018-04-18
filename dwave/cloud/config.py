@@ -160,6 +160,70 @@ def load_config_from_files(filenames=None):
     return config
 
 
+def load_profile_from_files(filenames=None, profile=None):
+    """Load config from a list of `filenames`, returning only section
+    defined with `profile`.
+
+    Note:
+        Config files and profile name are **not** read from process environment.
+
+    Args:
+        filenames (list[str], default=None):
+            D-Wave cloud client configuration file locations. Set to ``None`` to
+            auto-detect config files, as described in
+            :func:`load_config_from_files`.
+
+        profile (str, default=None):
+            Name of the profile to return from configuration read from config
+            file(s). Set to ``None`` fallback to ``profile`` key under
+            ``[defaults]`` section, or the first non-defaults section, or the
+            actual ``[defaults]`` section.
+
+    Returns:
+        dict:
+            Mapping of config keys to config values. If no valid config/profile
+            found, returns an empty dict.
+
+    Raises:
+        :exc:`~dwave.cloud.exceptions.ConfigFileReadError`:
+            Config file specified or detected could not be opened or read.
+
+        :exc:`~dwave.cloud.exceptions.ConfigFileParseError`:
+            Config file parse failed.
+
+        :exc:`ValueError`:
+            Profile name not found.
+    """
+
+    # progressively build config from a file, or a list of auto-detected files
+    # raises ConfigFileReadError/ConfigFileParseError on error
+    config = load_config_from_files(filenames)
+
+    # determine profile name fallback:
+    #  (1) profile key under [defaults],
+    #  (2) first non-[defaults] section
+    #  (3) [defaults] section
+    first_section = next(iter(config.sections() + [None]))
+    config_defaults = config.defaults()
+    if not profile:
+        profile = config_defaults.get('profile', first_section)
+
+    if profile:
+        try:
+            section = dict(config[profile])
+        except KeyError:
+            raise ValueError("Config profile {!r} not found".format(profile))
+    else:
+        # as the very last resort (unspecified profile name and
+        # no profiles defined in config), try to use [defaults]
+        if config_defaults:
+            section = config_defaults
+        else:
+            section = {}
+
+    return section
+
+
 def get_default_config():
     config = configparser.ConfigParser(default_section="defaults")
     config.read_string(u"""
@@ -327,51 +391,22 @@ def load_config(config_file=None, profile=None, client=None,
             Config file parse failed.
     """
 
-    def _get_section(filenames, profile):
-        """Load config from a list of `filenames`, returning only section
-        defined with `profile`."""
-
-        # progressively build config from a file, or a list of auto-detected files
-        # raises ConfigFileReadError/ConfigFileParseError on error
-        config = load_config_from_files(filenames)
-
-        # determine profile name fallback:
-        #  (1) profile key under [defaults],
-        #  (2) first non-[defaults] section
-        first_section = next(iter(config.sections() + [None]))
-        config_defaults = config.defaults()
-        default_profile = config_defaults.get('profile', first_section)
-
-        # select profile from the config
-        if profile is None:
-            profile = os.getenv("DWAVE_PROFILE", default_profile)
-        if profile:
-            try:
-                section = dict(config[profile])
-            except KeyError:
-                raise ValueError("Config profile {!r} not found".format(profile))
-        else:
-            # as the very last resort (unspecified profile name and
-            # no profiles defined in config), try to use [defaults]
-            if config_defaults:
-                section = config_defaults
-            else:
-                section = {}
-
-        return section
+    if profile is None:
+        profile = os.getenv("DWAVE_PROFILE")
 
     if config_file == False:
         # skip loading from file altogether
         section = {}
     elif config_file == True:
         # force auto-detection, disregarding DWAVE_CONFIG_FILE
-        section = _get_section(None, profile)
+        section = load_profile_from_files(None, profile)
     else:
         # auto-detect if not specified with arg or env
         if config_file is None:
             # note: both empty and undefined DWAVE_CONFIG_FILE treated as None
             config_file = os.getenv("DWAVE_CONFIG_FILE")
-        section = _get_section([config_file] if config_file else None, profile)
+        section = load_profile_from_files(
+            [config_file] if config_file else None, profile)
 
     # override a selected subset of values via env or kwargs,
     # pass-through the rest unmodified
