@@ -15,27 +15,6 @@ from dwave.cloud.config import (
     get_configfile_paths)
 
 
-@click_info_switch
-def list_config_files():
-    for path in get_configfile_paths():
-        click.echo(path)
-
-@click_info_switch
-def list_system_config():
-    for path in get_configfile_paths(user=False, local=False, only_existing=False):
-        click.echo(path)
-
-@click_info_switch
-def list_user_config():
-    for path in get_configfile_paths(system=False, local=False, only_existing=False):
-        click.echo(path)
-
-@click_info_switch
-def list_local_config():
-    for path in get_configfile_paths(system=False, user=False, only_existing=False):
-        click.echo(path)
-
-
 @click.group()
 @click.version_option(prog_name=__title__, version=__version__)
 def cli():
@@ -48,20 +27,22 @@ def config():
 
 
 @config.command()
-@click.option('--detected', is_flag=True, callback=list_config_files,
-              expose_value=False, is_eager=True,
+@click.option('--detected', is_flag=True,
               help='List paths of all config files detected on this system')
-@click.option('--system', is_flag=True, callback=list_system_config,
-              expose_value=False,
+@click.option('--system', is_flag=True,
               help='List paths of system-wide config files examined')
-@click.option('--user', is_flag=True, callback=list_user_config,
-              expose_value=False,
+@click.option('--user', is_flag=True,
               help='List paths of user-local config files examined')
-@click.option('--local', is_flag=True, callback=list_local_config,
-              expose_value=False,
+@click.option('--local', is_flag=True,
               help='List paths of local config files examined')
-def ls():
+def ls(detected, system, user, local):
     """List config file paths detected or looked-up."""
+
+    if detected and not (system or user or local):
+        system = user = local = True
+    for path in get_configfile_paths(system=system, user=user,
+                                     local=local, only_existing=detected):
+        click.echo(path)
 
 
 @config.command()
