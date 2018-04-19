@@ -27,21 +27,23 @@ def config():
 
 
 @config.command()
-@click.option('--detected', is_flag=True,
-              help='List paths of all config files detected on this system')
 @click.option('--system', is_flag=True,
-              help='List paths of system-wide config files examined')
+              help='List paths of system-wide config files')
 @click.option('--user', is_flag=True,
-              help='List paths of user-local config files examined')
+              help='List paths of user-local config files')
 @click.option('--local', is_flag=True,
-              help='List paths of local config files examined')
-def ls(detected, system, user, local):
-    """List config file paths detected or looked-up."""
+              help='List paths of local config files')
+@click.option('--include-missing', '-m', is_flag=True,
+              help='List all examined paths, not only existing')
+def ls(system, user, local, include_missing):
+    """List config files detected (and/or paths examined)."""
 
-    if detected and not (system or user or local):
+    # default action is to list *all* auto-detected files
+    if not (system or user or local):
         system = user = local = True
-    for path in get_configfile_paths(system=system, user=user,
-                                     local=local, only_existing=detected):
+
+    for path in get_configfile_paths(system=system, user=user, local=local,
+                                     only_existing=not include_missing):
         click.echo(path)
 
 
