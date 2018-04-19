@@ -19,7 +19,7 @@ def touch(path):
 
 class TestCli(unittest.TestCase):
 
-    def test_configure(self):
+    def test_config_create(self):
         config_file = 'dwave.conf'
         profile = 'profile'
         values = 'endpoint token client solver proxy'.split()
@@ -30,7 +30,7 @@ class TestCli(unittest.TestCase):
             touch(config_file)
             with mock.patch("six.moves.input", side_effect=values, create=True):
                 result = runner.invoke(cli, [
-                    'configure', '--config-file', config_file, '--profile', profile
+                    'config', 'create', '--config-file', config_file, '--profile', profile
                 ], input='\n'.join(values))
                 self.assertEqual(result.exit_code, 0)
 
@@ -40,7 +40,7 @@ class TestCli(unittest.TestCase):
                 for val in values:
                     self.assertEqual(config.get(val), val)
 
-    def test_configure_list_config(self):
+    def test_config_ls(self):
         runner = CliRunner()
         with runner.isolated_filesystem():
             touch('dwave.conf')
@@ -51,7 +51,7 @@ class TestCli(unittest.TestCase):
                     with mock.patch('os.path.exists', lambda *x: True):
                         # test --list-config-files
                         result = runner.invoke(cli, [
-                            'configure', '--list-config-files'
+                            'config', 'ls', '--detected'
                         ])
                         self.assertEqual(result.output.strip(), '\n'.join([
                             '/system1/dwave.conf', '/system2/dwave.conf',
@@ -59,20 +59,20 @@ class TestCli(unittest.TestCase):
 
                         # test --list-system-paths
                         result = runner.invoke(cli, [
-                            'configure', '--list-system-paths'
+                            'config', 'ls', '--system'
                         ])
                         self.assertEqual(result.output.strip(), '\n'.join([
                             '/system1/dwave.conf', '/system2/dwave.conf']))
 
                         # test --list-user-paths
                         result = runner.invoke(cli, [
-                            'configure', '--list-user-paths'
+                            'config', 'ls', '--user'
                         ])
                         self.assertEqual(result.output.strip(), '/user/dwave.conf')
 
                         # test --list-local-paths
                         result = runner.invoke(cli, [
-                            'configure', '--list-local-paths'
+                            'config', 'ls', '--local'
                         ])
                         self.assertEqual(result.output.strip(), './dwave.conf')
 
@@ -93,28 +93,19 @@ class TestCli(unittest.TestCase):
             with mock.patch('dwave.cloud.config.get_configfile_paths',
                             lambda **kw: [config_file]):
                 result = runner.invoke(cli, [
-                    'configure', '--inspect'
+                    'config', 'inspect'
                 ])
                 self.assertIn('endpoint = 2', result.output)
 
             # test explicit config
             result = runner.invoke(cli, [
-                'configure', '--inspect', '--config-file', config_file
+                'config', 'inspect', '--config-file', config_file
             ])
             self.assertIn('endpoint = 2', result.output)
 
             # test explicit profile
             result = runner.invoke(cli, [
-                'configure', '--inspect', '--config-file', config_file,
-                '--profile', 'b'
-            ])
-            self.assertIn('endpoint = 1', result.output)
-            self.assertIn('token = 3', result.output)
-
-            # test eagerness of config-file ane profile
-            result = runner.invoke(cli, [
-                'configure', '--config-file', config_file,
-                '--profile', 'b', '--inspect'
+                'config', 'inspect', '--config-file', config_file, '--profile', 'b'
             ])
             self.assertIn('endpoint = 1', result.output)
             self.assertIn('token = 3', result.output)
