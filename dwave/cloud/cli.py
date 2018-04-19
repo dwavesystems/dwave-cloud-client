@@ -1,11 +1,10 @@
 import os
-from functools import wraps
 
 import click
 from timeit import default_timer as timer
 
 from dwave.cloud import Client
-from dwave.cloud.utils import readline_input
+from dwave.cloud.utils import readline_input, click_info_switch
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError,
@@ -16,61 +15,45 @@ from dwave.cloud.config import (
     get_configfile_paths)
 
 
-def click_info_switch(f):
-    """Decorator to create Click eager info switch option, as described in docs:
-    http://click.pocoo.org/6/options/#callbacks-and-eager-options.
-
-    Takes a no-argument function and abstracts the boilerplate required by
-    Click (value checking, exit on done).
-
-    Example:
-
-        @click.option('--my-option', is_flag=True, callback=my_option,
-                    expose_value=False, is_eager=True)
-        def test():
-            pass
-
-        @click_info_switch
-        def my_option()
-            click.echo('some info related to my switch')
-    """
-
-    @wraps(f)
-    def wrapped(ctx, param, value):
-        if not value or ctx.resilient_parsing:
-            return
-        f()
-        ctx.exit()
-    return wrapped
+@click.group()
+@click.version_option(prog_name=__title__, version=__version__)
+def cli():
+    """D-Wave cloud tool."""
 
 
-@click_info_switch
-def list_config_files():
-    for path in get_configfile_paths():
-        click.echo(path)
+@cli.group()
+def config():
+    """Create, update or inspect cloud client configuration file(s)."""
 
-@click_info_switch
-def list_system_config():
-    for path in get_configfile_paths(user=False, local=False, only_existing=False):
-        click.echo(path)
 
-@click_info_switch
-def list_user_config():
-    for path in get_configfile_paths(system=False, local=False, only_existing=False):
-        click.echo(path)
+@config.command()
+@click.option('--system', is_flag=True,
+              help='List paths of system-wide config files')
+@click.option('--user', is_flag=True,
+              help='List paths of user-local config files')
+@click.option('--local', is_flag=True,
+              help='List paths of local config files')
+@click.option('--include-missing', '-m', is_flag=True,
+              help='List all examined paths, not only existing')
+def ls(system, user, local, include_missing):
+    """List config files detected (and/or paths examined)."""
 
-@click_info_switch
-def list_local_config():
-    for path in get_configfile_paths(system=False, user=False, only_existing=False):
+    # default action is to list *all* auto-detected files
+    if not (system or user or local):
+        system = user = local = True
+
+    for path in get_configfile_paths(system=system, user=user, local=local,
+                                     only_existing=not include_missing):
         click.echo(path)
 
 
-def inspect_config(ctx, param, value):
-    if not value or ctx.resilient_parsing:
-        return
-
-    config_file = ctx.params.get('config_file')
-    profile = ctx.params.get('profile')
+@config.command()
+@click.option('--config-file', '-c', default=None,
+              type=click.Path(exists=True, dir_okay=False), help='Config file path')
+@click.option('--profile', '-p', default=None,
+              help='Connection profile name (config section name)')
+def inspect(config_file, profile):
+    """Inspect existing config/profile."""
 
     try:
         section = load_profile_from_files(
@@ -85,36 +68,13 @@ def inspect_config(ctx, param, value):
     except (ValueError, ConfigFileReadError, ConfigFileParseError) as e:
         click.echo(e)
 
-    ctx.exit()
 
-
-@click.group()
-@click.version_option(prog_name=__title__, version=__version__)
-def cli():
-    """D-Wave cloud tool."""
-
-
-@cli.command()
-@click.option('--config-file', '-c', default=None, is_eager=True,
-              type=click.Path(exists=False, dir_okay=False),
-              help='Config file path')
-@click.option('--profile', '-p', default=None, is_eager=True,
+@config.command()
+@click.option('--config-file', '-c', default=None,
+              type=click.Path(exists=False, dir_okay=False), help='Config file path')
+@click.option('--profile', '-p', default=None,
               help='Connection profile name (config section name)')
-@click.option('--inspect', is_flag=True, expose_value=False, callback=inspect_config,
-              help='Only inspect existing config/profile (no update)')
-@click.option('--list-config-files', is_flag=True, callback=list_config_files,
-              expose_value=False, is_eager=True,
-              help='List paths of all config files detected on this system')
-@click.option('--list-system-paths', is_flag=True, callback=list_system_config,
-              expose_value=False, is_eager=True,
-              help='List paths of system-wide config files examined')
-@click.option('--list-user-paths', is_flag=True, callback=list_user_config,
-              expose_value=False, is_eager=True,
-              help='List paths of user-local config files examined')
-@click.option('--list-local-paths', is_flag=True, callback=list_local_config,
-              expose_value=False, is_eager=True,
-              help='List paths of local config files examined')
-def configure(config_file, profile):
+def create(config_file, profile):
     """Create and/or update cloud client configuration file."""
 
     # determine the config file path
@@ -190,9 +150,10 @@ def configure(config_file, profile):
 
 
 @cli.command()
-@click.option('--config-file', '-c', default=None, help='Config file path',
-              type=click.Path(exists=True, dir_okay=False))
-@click.option('--profile', '-p', default=None, help='Connection profile name')
+@click.option('--config-file', '-c', default=None,
+              type=click.Path(exists=True, dir_okay=False), help='Config file path')
+@click.option('--profile', '-p', default=None,
+              help='Connection profile name (config section name)')
 def ping(config_file, profile):
     """Ping the QPU by submitting a single-qubit problem."""
 
@@ -235,7 +196,7 @@ def ping(config_file, profile):
     t2 = timer()
 
     click.echo("\nWall clock time:")
-    click.echo(" * Solver definition fetch web request: {:.3f} ms".format((t1-t0)*1000.0))
+    click.echo(" * Solver definition fetch: {:.3f} ms".format((t1-t0)*1000.0))
     click.echo(" * Problem submit and results fetch: {:.3f} ms".format((t2-t1)*1000.0))
     click.echo(" * Total: {:.3f} ms".format((t2-t0)*1000.0))
     click.echo("\nQPU timing:")
