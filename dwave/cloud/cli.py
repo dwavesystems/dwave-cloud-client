@@ -1,11 +1,10 @@
 import os
-from functools import wraps
 
 import click
 from timeit import default_timer as timer
 
 from dwave.cloud import Client
-from dwave.cloud.utils import readline_input
+from dwave.cloud.utils import readline_input, click_info_switch
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError,
@@ -14,34 +13,6 @@ from dwave.cloud.config import (
     load_profile_from_files, load_config_from_files, get_default_config,
     get_configfile_path, get_default_configfile_path,
     get_configfile_paths)
-
-
-def click_info_switch(f):
-    """Decorator to create eager Click info switch option, as described in:
-    http://click.pocoo.org/6/options/#callbacks-and-eager-options.
-
-    Takes a no-argument function and abstracts the boilerplate required by
-    Click (value checking, exit on done).
-
-    Example:
-
-        @click.option('--my-option', is_flag=True, callback=my_option,
-                    expose_value=False, is_eager=True)
-        def test():
-            pass
-
-        @click_info_switch
-        def my_option()
-            click.echo('some info related to my switch')
-    """
-
-    @wraps(f)
-    def wrapped(ctx, param, value):
-        if not value or ctx.resilient_parsing:
-            return
-        f()
-        ctx.exit()
-    return wrapped
 
 
 @click_info_switch
