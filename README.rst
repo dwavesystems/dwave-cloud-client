@@ -26,7 +26,6 @@ and scheduling for quantum annealing resources at D-Wave Systems.
 This package aims to provide a minimal Python interface to that layer that
 still captures some reasonable practices for interacting with SAPI.
 
-
 Example
 -------
 
