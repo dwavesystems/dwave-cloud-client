@@ -1,3 +1,7 @@
+"""
+TODO: short description about computation
+"""
+
 from __future__ import division, absolute_import
 
 import threading

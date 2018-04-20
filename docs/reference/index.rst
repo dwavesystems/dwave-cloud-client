@@ -8,7 +8,10 @@ Reference Documentation
    :noindex:
 
 .. toctree::
+   :maxdepth: 2
 
+
+   intro
    configuration
    resources
    solver
