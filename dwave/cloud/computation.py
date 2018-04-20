@@ -64,6 +64,12 @@ class Future(object):
         #: `datetime` corresponding to the time when the problem was completed by the server (None before then)
         self.time_solved = None
 
+        # estimated `earliest_completion_time` as returned on problem submit
+        self.eta_min = None
+
+        # estimated `latest_completion_time` as returned on problem submit
+        self.eta_max = None
+
         # Track how long it took us to parse the data
         self.parse_time = None
 

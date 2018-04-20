@@ -716,6 +716,12 @@ class Client(object):
             if not future.time_solved and message.get('solved_on'):
                 future.time_solved = parse_timestamp(message['solved_on'])
 
+            if not future.eta_min and message.get('earliest_completion_time'):
+                future.eta_min = parse_timestamp(message['earliest_completion_time'])
+
+            if not future.eta_max and message.get('latest_completion_time'):
+                future.eta_max = parse_timestamp(message['latest_completion_time'])
+
             if status == self.STATUS_COMPLETE:
                 # If the message is complete, forward it to the future object
                 if 'answer' in message:

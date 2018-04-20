@@ -6,6 +6,8 @@ import unittest
 import itertools
 import threading
 
+from dateutil.parser import parse as parse_timestamp
+
 from dwave.cloud.utils import evaluate_ising
 from dwave.cloud.qpu import Client, Solver
 from dwave.cloud.exceptions import SolverFailureError, CanceledFutureError
@@ -90,6 +92,9 @@ def cancel_reply(id_, solver_name):
     })
 
 
+continue_reply_eta_min = parse_timestamp("2013-01-18T10:25:59.941674Z")
+continue_reply_eta_max = parse_timestamp("2013-01-18T10:27:51.123456Z")
+
 def continue_reply(id_, solver_name):
     """A reply saying a problem is still in the queue."""
     return json.dumps({
@@ -97,6 +102,8 @@ def continue_reply(id_, solver_name):
         "solved_on": None,
         "solver": solver_name,
         "submitted_on": "2013-01-18T10:06:10.025064",
+        "earliest_completion_time": continue_reply_eta_min.isoformat(),
+        "latest_completion_time": continue_reply_eta_max.isoformat(),
         "type": "ising",
         "id": id_
     })
@@ -206,6 +213,10 @@ class MockSubmission(_QueryTest):
             results = solver.sample_ising(linear, quad, num_reads=100)
 
             self._check(results, linear, quad, 100)
+
+            # test future has eta_min and eta_max parsed correctly
+            self.assertEqual(results.eta_min, continue_reply_eta_min)
+            self.assertEqual(results.eta_max, continue_reply_eta_max)
 
     def test_submit_continue_then_error_reply(self):
         """Handle polling for an error message."""
