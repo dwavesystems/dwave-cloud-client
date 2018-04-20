@@ -203,3 +203,41 @@ def ping(config_file, profile):
     for component, duration in timing.items():
         click.echo(" * {} = {} us".format(component, duration))
     return 0
+
+
+@cli.command()
+@click.option('--config-file', '-c', default=None,
+              type=click.Path(exists=True, dir_okay=False), help='Config file path')
+@click.option('--profile', '-p', default=None, help='Connection profile name')
+@click.option('--id', default=None, help='Solver ID/name')
+def solvers(config_file, profile, id):
+    """Get solver details.
+
+    Unless solver name/id specified, fetch and display details for
+    all solvers available on configured endpoint.
+    """
+
+    def trunc(s, maxlen=60):
+        s = str(s)
+        return s[:(maxlen-3)]+'...' if len(s) > maxlen else s
+
+    with Client.from_config(config_file=config_file, profile=profile) as client:
+        solvers = client.get_solvers().values()
+
+        if id:
+            solvers = filter(lambda s: s.id == id, solvers)
+            if not solvers:
+                click.echo("Solver {} not found.".format(id))
+                return 1
+
+        # ~YAML output
+        for solver in solvers:
+            click.echo("Solver: {}".format(solver.id))
+            click.echo("  Parameters:")
+            for param, desc in sorted(solver.parameters.items()):
+                click.echo("    {}: {}".format(param, trunc(desc) if desc else '?'))
+            solver.properties.pop('parameters', None)
+            click.echo("  Properties:")
+            for k,v in sorted(solver.properties.items()):
+                click.echo("    {}: {}".format(k, trunc(v)))
+            click.echo()
