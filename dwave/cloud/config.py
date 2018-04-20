@@ -1,3 +1,19 @@
+"""
+Configuration for communicating with a solver.
+
+Communicating with a solver---submitting a problem, monitoring its progress, receiving
+samples---requires configuration of several parameters such as the selected solver,
+its URL, an API token, etc. D-Wave Cloud Client provides multiple options for configuring
+those parameters:
+
+* One or more locally saved configuration files.
+* Environmental variables
+* Direct setting within functions
+
+These options can be flexibly used together.
+
+"""
+
 import os
 import configparser
 from collections import OrderedDict
@@ -14,28 +30,44 @@ CONF_FILENAME = "dwave.conf"
 
 
 def get_configfile_paths(system=True, user=True, local=True, only_existing=True):
-    """Returns a list of (existing) config files found on disk.
+    """Return a list of local configuration files.
 
-    Candidates examined depend on the OS, but for Linux possible list is:
-    ``dwave.conf`` in CWD, user-local ``.config/dwave/``, system-wide
-    ``/etc/dwave/``. For details, see :func:`load_config_from_files`.
+    Finds existing configuration files on the local system. Search paths
+    depend on operating system; for example, for Linux systems these might
+    include ``dwave.conf`` in the current working directory (CWD),
+    user-local ``.config/dwave/``, and system-wide ``/etc/dwave/``.
 
     Args:
         system (boolean, default=True):
-            Search for system-wide config files.
+            Search for system-wide configuration files.
 
         user (boolean, default=True):
-            Search for user-local config files.
+            Search for user-local configuration files.
 
         local (boolean, default=True):
-            Search for local config files (in CWD).
+            Search for local configuration files (in CWD).
 
         only_existing (boolean, default=True):
-            Return only paths for files that exist on disk.
+            Return only paths for files that exist on the local system.
 
     Returns:
         list[str]:
-            A list of config file paths.
+            A list of configuration file paths.
+
+    Examples:
+        This example displays the paths of all configuration files on a Windows system
+        running Python 2.7 and then finds the single existing configuration file.
+
+        >>> import dwave.cloud as dc
+        >>> # Display paths
+        >>> dc.config.get_configfile_paths(only_existing=False)   # doctest: +SKIP
+        [u'C:\\ProgramData\\dwavesystem\\dwave\\dwave.conf',
+         u'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf',
+         '.\\dwave.conf']
+        >>> # Find existing files
+        >>> dc.config.get_configfile_paths()   # doctest: +SKIP
+        [u'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf']
+
     """
 
     candidates = []

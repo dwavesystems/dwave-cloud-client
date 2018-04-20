@@ -4,11 +4,8 @@
 Configuration
 =============
 
-TODO: Short description of the configuration file
-
-TODO: fill in...
-1. File
-2. environmental variables
+.. currentmodule:: dwave.cloud.config
+.. automodule:: dwave.cloud.config
 
 Loading Configuration
 =====================
