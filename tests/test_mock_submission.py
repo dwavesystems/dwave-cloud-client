@@ -130,6 +130,7 @@ class _QueryTest(unittest.TestCase):
             self.assertTrue(energy == evaluate_ising(linear, quad, state))
 
 
+@mock.patch('time.sleep', lambda *x: None)
 class MockSubmission(_QueryTest):
     """Test connecting and some related failure modes."""
 
