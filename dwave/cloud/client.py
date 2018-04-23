@@ -873,6 +873,10 @@ class Client(object):
                 _LOGGER.debug("Polling for status of futures: %s", ids)
                 query_string = 'problems/?id=' + ','.join(ids)
 
+                # if futures were cancelled while `add`ing, skip empty frame
+                if not ids:
+                    continue
+
                 # wait until `frame_earliest` before polling
                 delay = frame_earliest - time.time()
                 if delay > 0:
