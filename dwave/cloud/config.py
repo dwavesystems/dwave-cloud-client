@@ -96,9 +96,26 @@ def get_configfile_paths(system=True, user=True, local=True, only_existing=True)
 
 
 def get_configfile_path():
-    """Returns the highest-priority existing config file from a list
-    of possible candidates returned by `get_configfile_paths()`, and
-    ``None`` if no candidate config file exists."""
+    """Return the highest-priority local configuration file.
+
+    Selects the top ranked configuration file from a list of candidates returned
+    by `get_configfile_paths()`, or ``None`` if no candidate configuration file exists.
+
+    Examples:
+        This example displays the highest-priority configuration file on a Windows system
+        running Python 2.7.
+
+        >>> import dwave.cloud as dc
+        >>> # Display paths
+        >>> dc.config.get_configfile_paths(only_existing=False)   # doctest: +SKIP
+        [u'C:\\ProgramData\\dwavesystem\\dwave\\dwave.conf',
+         u'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf',
+         '.\\dwave.conf']
+        >>> # Find highest-priority local configuration file
+        >>> dc.config.get_configfile_path()   # doctest: +SKIP
+        [u'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf']
+
+    """
     paths = get_configfile_paths()
     return paths[-1] if paths else None
 

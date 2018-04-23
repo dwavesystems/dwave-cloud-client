@@ -31,3 +31,5 @@ These functions manage your D-Wave cloud client configuration files.
    :toctree: generated
 
    get_configfile_paths
+   get_configfile_path
+   get_default_configfile_path

@@ -11,6 +11,11 @@ Configuration
 
 TODO: add description  and some examples
 
+1. Configuration files
+2. Interactive CLI configuration
+
+
+
 Work Flow
 =========
 
