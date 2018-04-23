@@ -404,93 +404,85 @@ def load_config(config_file=None, profile=None, client=None,
     parsable with Python's :mod:`configparser`. An optional ``defaults`` section
     provides default key/values for all other sections.
 
-    Configuration values may be overridden
+    Configuration values override values defined elsewhere, and so are
+    assigned in the following order:
 
-    `` (either
-    explicitly specified, or auto-detected) for ``profile``, but override the
-    values from config file with values defined in process environment, and
-    override those with values specified with keyword arguments.
+    1. Values specified as keyword arguments in :func:`load_config()`
+    2. Values specified in the configuration file's profile section
+    3. Values specified as environmental variables
 
+    If the location of the configuration file is not specified, auto-detection
+    searches for existing configuration files in the standard directories
+    set by homebase_.
 
-    If the location of ``config_file`` is not specified, an auto-detection is
-    performed (looking first for ``dwave.conf`` in process' current working
-    directory, then in user-local config directories, and finally in system-wide
-    config dirs). For details on format and location detection, see
-    :func:`load_config_from_files`.
+    .. _homebase: https://github.com/dwavesystems/homebase
 
-    If location of ``config_file`` is explicitly specified (via arguments or
-    environment variable), but the file does not exits, or is not readable,
-    config loading will fail with
-    :exc:`~dwave.cloud.exceptions.ConfigFileReadError`. Config loading will fail
-    with :exc:`~dwave.cloud.exceptions.ConfigFileParseError` if file is
-    readable, but it's not a valid config file.
+    If a configuration file explicitly specified, via an argument or
+    environment variable, does not exist or is unreadable,loading fails with
+    :exc:`~dwave.cloud.exceptions.ConfigFileReadError`. Loading fails
+    with :exc:`~dwave.cloud.exceptions.ConfigFileParseError` if the file is
+    readable but invalid as a configuration file.
 
-    Similarly, if ``profile`` is explicitly specified (via arguments or
-    environment variable), config loading will fail with :exc:`ValueError` if
-    that profile is not present in the config loaded. If config file is not
-    specified explicitly, nor detected on file system, not defined via
-    environment, resulting in an empty config, explicit profile selection will
-    also fail.
-
-    If profile is not explicitly specified, selection of profile is described
-    under ``profile`` argument below.
+    Similarly, if a profile explicitly specified, via an argument or
+    environment variable, is not present in the loaded configuration, loading fails
+    with :exc:`ValueError`. Explicit profile selection also fails if the configuration
+    file is not explicitly specified, detected on the system, or defined via
+    an environment variable.
 
     Environment variables:
 
         ``DWAVE_CONFIG_FILE``:
-            Config file path used if ``config_file`` not specified.
+            Configuration file path used if no configuration file is specified.
 
         ``DWAVE_PROFILE``:
-            Name of config profile (section) to use if ``profile`` not specified.
+            Name of profile (section) to use if no profile is specified.
 
         ``DWAVE_API_CLIENT``:
-            API client class used (can be: ``qpu`` or ``sw``). Overrides values
-            from config file, but is overridden with ``client``.
+            API client class used (supported values are ``qpu`` or ``sw``) if no client
+            is specified.
 
         ``DWAVE_API_ENDPOINT``:
-            API endpoint URL to use instead of the URL given in config file,
-            if ``endpoint`` not given.
+            API endpoint URL used if no endpoint is specified.
 
         ``DWAVE_API_TOKEN``:
-            API authorization token. Overrides values from config file, but is
-            overridden with ``token``.
+            API authorization token used if no token is specified.
 
         ``DWAVE_API_SOLVER``:
-            Default solver. Overrides values from config file, but is overridden
-            with ``solver``.
+            Default solver used if no solver is specified.
 
         ``DWAVE_API_PROXY``:
-            URL for proxy to use in connections to D-Wave API. Overrides values
-            from config file, but is overridden with ``proxy``.
+            URL for proxy connections to D-Wave API used if no proxy is specified.
 
     Args:
 
         config_file (str/None/False/True, default=None):
-            Path to config file.
+            Path to configuration file.
 
-            If undefined (set to ``None``), the name of the config file is
-            taken from ``DWAVE_CONFIG_FILE`` environment variable.
-            If that env var is undefined or empty, the location of configuration
-            files is auto-detected, as described in :func:`load_config_from_files`.
+            If ``None``, the value is taken from ``DWAVE_CONFIG_FILE`` environmental
+            variable if defined. If the environmental variable is undefined or empty,
+            auto-detection searches for existing configuration files in the standard
+            directories set by homebase_.
 
-            Config loading from files, including auto-detected ones, can be
-            skipped if `config_file` is set to ``False``.
+            If ``False``, loading from file is skipped.
 
-            Auto-detection is forced (disregarding ``DWAVE_CONFIG_FILE`` env
-            var) by setting `config_file` to ``True``.
+            If ``True``, forces auto-detection (regardless of the ``DWAVE_CONFIG_FILE``
+            environmental variable).
 
         profile (str, default=None):
-            Profile name (config file section name). If undefined (by default),
-            it is inferred from ``DWAVE_PROFILE`` environment variable, and if
-            that variable is not present, ``profile`` key is looked-up in the
-            ``[defaults]`` config section. If ``profile`` is not defined under
-            ``[defaults]``, the first section is used. If no other sections are
-            defined besides ``[defaults]``, the ``[defaults]`` section is
-            promoted to profile.
+            Profile name (name of the profile section in the configuration file).
+
+            If undefined, inferred from ``DWAVE_PROFILE`` environmental variable if
+            defined. If the environmental variable is undefined or empty, a profile is
+            selected in the following order:
+
+            1. From the default section if it includes a profile key
+            2. The first section (after the default section)
+            3. If no other section is defined besides ``[defaults]``, the defaults
+            section is promoted and selected.
 
         client (str, default=None):
-            Client (selected by name) to use for accessing the API. Use ``qpu``
-            to specify the :class:`dwave.cloud.qpu.Client` and ``sw`` for
+            Client type used for accessing the API. Supported values are ``qpu``
+            for :class:`dwave.cloud.qpu.Client` and ``sw`` for
             :class:`dwave.cloud.sw.Client`.
 
         endpoint (str, default=None):
@@ -501,32 +493,21 @@ def load_config(config_file=None, profile=None, client=None,
 
         solver (str, default=None):
             Default solver to use in :meth:`~dwave.cloud.client.Client.get_solver`.
-            If undefined, you'll have to explicitly specify the solver name/id
-            in all calls to :meth:`~dwave.cloud.client.Client.get_solver`.
+            If undefined, all calls to :meth:`~dwave.cloud.client.Client.get_solver`
+            must explicitly specify the solver name/id.
 
         proxy (str, default=None):
             URL for proxy to use in connections to D-Wave API. Can include
-            username/password, port, scheme, etc. If undefined, client will
-            connect directly to the API (unless you use a system-level proxy).
+            username/password, port, scheme, etc. If undefined, client
+            use the system-level proxy, if defined, or connects directly to the API.
 
     Returns:
         dict:
-            Mapping of config keys to config values, for a specific profile
-            (section), as read from the config file, overridden with
-            environment values, overridden with immediate keyword arguments.
-
-            A set of keys guaranteed to be present: ``client``,
-            ``endpoint``, ``token``, ``solver``, ``proxy``.
-
-            Example::
-
-                {
-                    'client': 'qpu'
-                    'endpoint': 'https://cloud.dwavesys.com/sapi',
-                    'token': '123',
-                    'solver': None,
-                    'proxy': None
-                }
+            Mapping of configuration keys to values for the profile
+            (section), as read from the configuration file, optionally overridden by
+            environmental values, optionally overridden by specified keyword arguments.
+            Always contains the ``client``, ``endpoint``, ``token``, ``solver``, and ``proxy``
+            keys.
 
     Raises:
         :exc:`ValueError`:
@@ -537,6 +518,45 @@ def load_config(config_file=None, profile=None, client=None,
 
         :exc:`~dwave.cloud.exceptions.ConfigFileParseError`:
             Config file parse failed.
+
+    Examples
+       This example loads profile values from a specified configuration file, dwave_c.conf,
+       located in the current working directory::
+
+           [defaults]
+           endpoint = https://url.of.some.dwavesystem.com/sapi
+           client = qpu
+
+           [dw2000A]
+           client = sw
+           token = ABC-123456789123456789123456789
+           solver = EXAMPLE_2000Q
+
+           [dw2000B]
+           client = qpu
+           token = DEF-987654321987654321987654321
+
+       The file contains two profiles in addition to the defaults section. First no
+       profile is specified, and the first profile after the defaults section is loaded with
+       the solver overridden by the environmental variable. Then the second profile is selected
+       with the explicitly named solver overriding the environmental variable setting.
+
+       >>> import dwave.cloud as dc
+       >>> import os
+       >>> os.environ['DWAVE_API_SOLVER'] = 'EXAMPLE_2000Q_SYSTEM'   # doctest: +SKIP
+       >>> dc.config.load_config("./dwave_c.conf")   # doctest: +SKIP
+       {'client': u'sw',
+        'endpoint': u'https://url.of.some.dwavesystem.com/sapi',
+        'proxy': None,
+        'solver': 'EXAMPLE_2000Q_SYSTEM',
+        'token': u'ABC-123456789123456789123456789'}
+       >>> dc.config.load_config("./dwave_c.conf", profile='dw2000B', solver='Solver3')   # doctest: +SKIP
+       {'client': u'qpu',
+        'endpoint': u'https://url.of.some.dwavesystem.com/sapi',
+        'proxy': None,
+        'solver': 'Solver3',
+        'token': u'DEF-987654321987654321987654321'}
+
     """
 
     if profile is None:
@@ -571,9 +591,9 @@ def legacy_load_config(profile=None, endpoint=None, token=None, solver=None,
                        proxy=None, **kwargs):
     """Load the configured URLs and token for the SAPI server.
 
-    .. warning:: Included only for backward compatibility, please use
-        :func:`load_config` instead, or the client factory
-        :meth:`~dwave.cloud.client.Client.from_config`.
+    .. warning:: Included only for backward compatibility. Please use
+        :func:`load_config` or the client factory
+        :meth:`~dwave.cloud.client.Client.from_config` instead, .
 
     This method tries to load a configuration file from ``~/.dwrc``, select a
     specified `profile` (or first if not specified), and then override
