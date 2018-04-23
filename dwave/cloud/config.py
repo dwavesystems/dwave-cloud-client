@@ -101,6 +101,10 @@ def get_configfile_path():
     Selects the top ranked configuration file from a list of candidates returned
     by `get_configfile_paths()`, or ``None`` if no candidate configuration file exists.
 
+    Returns:
+        str:
+            A configuration file path.
+
     Examples:
         This example displays the highest-priority configuration file on a Windows system
         running Python 2.7.
@@ -113,7 +117,7 @@ def get_configfile_path():
          '.\\dwave.conf']
         >>> # Find highest-priority local configuration file
         >>> dc.config.get_configfile_path()   # doctest: +SKIP
-        [u'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf']
+        u'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf'
 
     """
     paths = get_configfile_paths()
@@ -121,8 +125,32 @@ def get_configfile_path():
 
 
 def get_default_configfile_path():
-    """Returns the preferred config file path: a user-local config, e.g:
-    ``~/.config/dwave/dwave.conf``."""
+    """Return the preferred configuration-file path.
+
+    Typically returns a user-local configuration file; e.g:
+    ``~/.config/dwave/dwave.conf``.
+
+    Returns:
+        str:
+            A configuration file path.
+
+    Examples:
+        This example displays the default configuration file on an Ubuntu Unix system
+        running IPython 2.7.
+
+        >>> import dwave.cloud as dc
+        >>> # Display paths
+        >>> dc.config.get_configfile_paths(only_existing=False)   # doctest: +SKIP
+        ['/etc/xdg/xdg-ubuntu/dwave/dwave.conf',
+         '/usr/share/upstart/xdg/dwave/dwave.conf',
+         '/etc/xdg/dwave/dwave.conf',
+         '/home/mary/.config/dwave/dwave.conf',
+         './dwave.conf']
+        >>> # Find default configuration path
+        >>> dc.config.get_default_configfile_path()   # doctest: +SKIP
+        '/home/mary/.config/dwave/dwave.conf'
+
+    """
     base = homebase.user_config_dir(
         app_author=CONF_AUTHOR, app_name=CONF_APP, roaming=False,
         use_virtualenv=False, create=False)
