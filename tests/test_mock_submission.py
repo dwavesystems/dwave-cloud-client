@@ -283,6 +283,46 @@ class MockSubmission(_QueryTest):
 
         Client._POLL_THREAD_COUNT = old_value
 
+    def test_exponential_backoff_polling(self):
+        "After each poll, back-off should double"
+
+        # Reduce the number of poll threads to 1 so that the system can be tested
+        old_value = Client._POLL_THREAD_COUNT
+        Client._POLL_THREAD_COUNT = 1
+
+        with Client('endpoint', 'token') as client:
+            client.session = mock.Mock()
+            # on submit, return status pending
+            client.session.post = lambda a, _: choose_reply(a, {
+                'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123')
+            })
+            # on first and second status poll, return pending
+            # on third status poll, return completed
+            def continue_then_complete(path, state={'count': 0}):
+                state['count'] += 1
+                if state['count'] < 3:
+                    return choose_reply(path, {
+                        'endpoint/problems/?id=123': '[%s]' % continue_reply('123', 'abc123'),
+                        'endpoint/problems/123/': continue_reply('123', 'abc123')
+                    })
+                else:
+                    return choose_reply(path, {
+                        'endpoint/problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
+                        'endpoint/problems/123/': complete_reply('123', 'abc123')
+                    })
+
+            client.session.get = continue_then_complete
+
+            solver = Solver(client, solver_data('abc123'))
+
+            future = solver.sample_qubo({})
+            future.result()
+
+            # after third poll, back-off interval should be 4
+            self.assertEqual(future._poll_backoff, 4)
+
+        Client._POLL_THREAD_COUNT = old_value
+
 
 class DeleteEvent(Exception):
     """Throws exception when mocked client submits an HTTP DELETE request."""
