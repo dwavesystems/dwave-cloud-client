@@ -32,8 +32,8 @@ These functions manage your D-Wave cloud client configuration files.
    get_configfile_path
    get_default_configfile_path
 
-Utilities for Loading Configuration
-===================================
+Configuration Utilities
+=======================
 
 These functions provide non-standard options to deploy D-Wave cloud client settings
 from configuration files. **Most users should not need to use these methods.**

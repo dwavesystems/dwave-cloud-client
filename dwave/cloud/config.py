@@ -227,6 +227,7 @@ def load_config_from_files(filenames=None):
         .. code:: python
 
             >>> import dwave.cloud as dc
+            >>> import sys
             >>> configuration = dc.config.load_config_from_files(["./dwave_a.conf", "./dwave_b.conf"])   # doctest: +SKIP
             >>> configuration.write(sys.stdout)    # doctest: +SKIP
             [defaults]
@@ -366,6 +367,7 @@ def load_profile_from_files(filenames=None, profile=None):
 
 
 def get_default_config():
+    # Used only internally by the package
     config = configparser.ConfigParser(default_section="defaults")
     config.read_string(u"""
         [defaults]
@@ -396,14 +398,19 @@ def get_default_config():
 
 def load_config(config_file=None, profile=None, client=None,
                 endpoint=None, token=None, solver=None, proxy=None):
-    """Load D-Wave cloud client configuration from ``config_file`` (either
+    """Load D-Wave Cloud Client configuration based on a configuration file.
+
+    Configuration files comply with standard Windows INI-like format,
+    parsable with Python's :mod:`configparser`. An optional ``defaults`` section
+    provides default key/values for all other sections.
+
+    Configuration values may be overridden
+
+    `` (either
     explicitly specified, or auto-detected) for ``profile``, but override the
     values from config file with values defined in process environment, and
     override those with values specified with keyword arguments.
 
-    Config file uses the standard Windows INI format, with one profile per
-    section. A section providing default values for all other sections is called
-    ``defaults``.
 
     If the location of ``config_file`` is not specified, an auto-detection is
     performed (looking first for ``dwave.conf`` in process' current working
