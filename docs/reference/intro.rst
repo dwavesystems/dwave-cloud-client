@@ -9,12 +9,36 @@ TODO: some words about solvers, work with SAPI, etc
 Configuration
 =============
 
-TODO: add description  and some examples
+It's recommended you set up a configuration file through the interactive CLI utility.
 
-1. Configuration files
-2. Interactive CLI configuration
+Configuration Files
+-------------------
 
+Candidates paths for configuration files are set by the D-Wave homebase_ package.
 
+For example, on a Unix system, depending on its flavor, these might include (in order)::
+
+          /usr/share/dwave/dwave.conf
+          /usr/local/share/dwave/dwave.conf
+          ~/.config/dwave/dwave.conf
+          ./dwave.conf
+
+while on Windows 7+, configuration files are expected to be located under::
+
+      C:\\Users\\<username>\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf
+
+and on Mac OS X under::
+
+     ~/Library/Application Support/dwave/dwave.conf
+
+For details on user/system config paths see homebase_.
+
+.. _homebase: https://github.com/dwavesystems/homebase
+
+Interactive CLI Configuration
+-----------------------------
+
+TODO
 
 Work Flow
 =========
