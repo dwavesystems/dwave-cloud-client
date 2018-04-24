@@ -64,6 +64,12 @@ class Future(object):
         #: `datetime` corresponding to the time when the problem was completed by the server (None before then)
         self.time_solved = None
 
+        # estimated `earliest_completion_time` as returned on problem submit
+        self.eta_min = None
+
+        # estimated `latest_completion_time` as returned on problem submit
+        self.eta_max = None
+
         # Track how long it took us to parse the data
         self.parse_time = None
 
@@ -80,6 +86,9 @@ class Future(object):
         # Event(s) to signal when the results are ready
         self._results_ready_event = threading.Event()
         self._other_events = []
+
+        # current poll back-off interval, in seconds
+        self._poll_backoff = 0
 
     def _set_message(self, message):
         """Complete the future with a message from the server.

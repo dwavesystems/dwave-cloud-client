@@ -6,6 +6,8 @@ import unittest
 import itertools
 import threading
 
+from dateutil.parser import parse as parse_timestamp
+
 from dwave.cloud.utils import evaluate_ising
 from dwave.cloud.qpu import Client, Solver
 from dwave.cloud.exceptions import SolverFailureError, CanceledFutureError
@@ -90,6 +92,9 @@ def cancel_reply(id_, solver_name):
     })
 
 
+continue_reply_eta_min = parse_timestamp("2013-01-18T10:25:59.941674Z")
+continue_reply_eta_max = parse_timestamp("2013-01-18T10:27:51.123456Z")
+
 def continue_reply(id_, solver_name):
     """A reply saying a problem is still in the queue."""
     return json.dumps({
@@ -97,6 +102,8 @@ def continue_reply(id_, solver_name):
         "solved_on": None,
         "solver": solver_name,
         "submitted_on": "2013-01-18T10:06:10.025064",
+        "earliest_completion_time": continue_reply_eta_min.isoformat(),
+        "latest_completion_time": continue_reply_eta_max.isoformat(),
         "type": "ising",
         "id": id_
     })
@@ -123,6 +130,7 @@ class _QueryTest(unittest.TestCase):
             self.assertTrue(energy == evaluate_ising(linear, quad, state))
 
 
+@mock.patch('time.sleep', lambda *x: None)
 class MockSubmission(_QueryTest):
     """Test connecting and some related failure modes."""
 
@@ -207,6 +215,10 @@ class MockSubmission(_QueryTest):
 
             self._check(results, linear, quad, 100)
 
+            # test future has eta_min and eta_max parsed correctly
+            self.assertEqual(results.eta_min, continue_reply_eta_min)
+            self.assertEqual(results.eta_max, continue_reply_eta_max)
+
     def test_submit_continue_then_error_reply(self):
         """Handle polling for an error message."""
         with Client('endpoint', 'token') as client:
@@ -269,6 +281,46 @@ class MockSubmission(_QueryTest):
             with self.assertRaises(SolverFailureError):
                 self._check(results1, linear, quad, 100)
             self._check(results2, linear, quad, 100)
+
+        Client._POLL_THREAD_COUNT = old_value
+
+    def test_exponential_backoff_polling(self):
+        "After each poll, back-off should double"
+
+        # Reduce the number of poll threads to 1 so that the system can be tested
+        old_value = Client._POLL_THREAD_COUNT
+        Client._POLL_THREAD_COUNT = 1
+
+        with Client('endpoint', 'token') as client:
+            client.session = mock.Mock()
+            # on submit, return status pending
+            client.session.post = lambda a, _: choose_reply(a, {
+                'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123')
+            })
+            # on first and second status poll, return pending
+            # on third status poll, return completed
+            def continue_then_complete(path, state={'count': 0}):
+                state['count'] += 1
+                if state['count'] < 3:
+                    return choose_reply(path, {
+                        'endpoint/problems/?id=123': '[%s]' % continue_reply('123', 'abc123'),
+                        'endpoint/problems/123/': continue_reply('123', 'abc123')
+                    })
+                else:
+                    return choose_reply(path, {
+                        'endpoint/problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
+                        'endpoint/problems/123/': complete_reply('123', 'abc123')
+                    })
+
+            client.session.get = continue_then_complete
+
+            solver = Solver(client, solver_data('abc123'))
+
+            future = solver.sample_qubo({})
+            future.result()
+
+            # after third poll, back-off interval should be 4
+            self.assertEqual(future._poll_backoff, 4)
 
         Client._POLL_THREAD_COUNT = old_value
 

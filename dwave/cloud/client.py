@@ -104,6 +104,13 @@ class Client(object):
     _POLL_THREAD_COUNT = 2
     _LOAD_THREAD_COUNT = 5
 
+    # Poll back-off interval [sec]
+    _POLL_BACKOFF_MIN = 1
+    _POLL_BACKOFF_MAX = 60
+
+    # Poll grouping time frame; two scheduled polls are grouped if closer than [sec]:
+    _POLL_GROUP_TIMEFRAME = 2
+
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None,
                     endpoint=None, token=None, solver=None, proxy=None,
@@ -427,7 +434,7 @@ class Client(object):
             self._cancel_workers.append(worker)
 
         # Build the problem status polling queue, start its workers
-        self._poll_queue = queue.Queue()
+        self._poll_queue = queue.PriorityQueue()
         self._poll_workers = []
         for _ in range(self._POLL_THREAD_COUNT):
             worker = threading.Thread(target=self._do_poll_problems)
@@ -479,7 +486,7 @@ class Client(object):
         for _ in self._cancel_workers:
             self._cancel_queue.put(None)
         for _ in self._poll_workers:
-            self._poll_queue.put(None)
+            self._poll_queue.put((-1, None))
         for _ in self._load_workers:
             self._load_queue.put(None)
 
@@ -643,7 +650,7 @@ class Client(object):
                         break
 
                 # Submit the problems
-                _LOGGER.debug("submitting {} problems".format(len(ready_problems)))
+                _LOGGER.debug("Submitting %d problems", len(ready_problems))
                 body = '[' + ','.join(mess.body for mess in ready_problems) + ']'
                 try:
                     response = self.session.post(posixpath.join(self.endpoint, 'problems/'), body)
@@ -653,8 +660,9 @@ class Client(object):
                     response.raise_for_status()
 
                     message = response.json()
-                    _LOGGER.debug("Finished submitting {} problems".format(len(ready_problems)))
+                    _LOGGER.debug("Finished submitting %d problems", len(ready_problems))
                 except BaseException as exception:
+                    _LOGGER.debug("Submit failed for %d problems", len(ready_problems))
                     if not isinstance(exception, SolverAuthenticationError):
                         exception = IOError(exception)
 
@@ -665,7 +673,7 @@ class Client(object):
 
                 # Pass on the information
                 for submission, res in zip(ready_problems, message):
-                    self._handle_problem_status(res, submission.future, False)
+                    self._handle_problem_status(res, submission.future)
                     self._submission_queue.task_done()
 
                 # this is equivalent to a yield to scheduler in other threading libraries
@@ -674,7 +682,7 @@ class Client(object):
         except BaseException as err:
             _LOGGER.exception(err)
 
-    def _handle_problem_status(self, message, future, in_poll):
+    def _handle_problem_status(self, message, future):
         """Handle the results of a problem submission or results request.
 
         This method checks the status of the problem and puts it in the correct queue.
@@ -682,10 +690,6 @@ class Client(object):
         Args:
             message (dict): Update message from the SAPI server wrt. this problem.
             future `Future`: future corresponding to the problem
-            in_poll (bool): Flag set to true if the problem is in the poll loop already.
-
-        Returns:
-            true if the problem has been processed out of the status poll loop
 
         Note:
             This method is always run inside of a daemon thread.
@@ -716,6 +720,12 @@ class Client(object):
             if not future.time_solved and message.get('solved_on'):
                 future.time_solved = parse_timestamp(message['solved_on'])
 
+            if not future.eta_min and message.get('earliest_completion_time'):
+                future.eta_min = parse_timestamp(message['earliest_completion_time'])
+
+            if not future.eta_max and message.get('latest_completion_time'):
+                future.eta_max = parse_timestamp(message['latest_completion_time'])
+
             if status == self.STATUS_COMPLETE:
                 # If the message is complete, forward it to the future object
                 if 'answer' in message:
@@ -726,9 +736,7 @@ class Client(object):
                     self._load(future)
             elif status in self.ANY_STATUS_ONGOING:
                 # If the response is pending add it to the queue.
-                if not in_poll:
-                    self._poll(future)
-                return False
+                self._poll(future)
             elif status == self.STATUS_CANCELLED:
                 # If canceled return error
                 future._set_error(CanceledFutureError())
@@ -740,7 +748,6 @@ class Client(object):
             # If there were any unhandled errors we need to release the
             # lock in the future, otherwise deadlock occurs.
             future._set_error(error, sys.exc_info())
-        return True
 
     def _cancel(self, id_, future):
         """Enqueue a problem to be canceled.
@@ -795,7 +802,18 @@ class Client(object):
 
         This method is threadsafe.
         """
-        self._poll_queue.put(future)
+        # update exponential poll back-off, clipped to a range
+        future._poll_backoff = \
+            max(self._POLL_BACKOFF_MIN,
+                min(future._poll_backoff * 2, self._POLL_BACKOFF_MAX))
+
+        # for poll priority we use timestamp of next scheduled poll
+        at = time.time() + future._poll_backoff
+
+        _LOGGER.debug("_poll_backoff is %.2f sec (scheduled at %.2f) for %s",
+                      future._poll_backoff, at, future.id)
+
+        self._poll_queue.put((at, future))
 
     def _do_poll_problems(self):
         """Poll the server for the status of a set of problems.
@@ -804,44 +822,66 @@ class Client(object):
             This method is always run inside of a daemon thread.
         """
         try:
-            # Maintain an active group of queries
-            futures = {}
-            active_queries = set()
+            # grouped futures (all scheduled within _POLL_GROUP_TIMEFRAME)
+            frame_futures = {}
 
-            # Add a query to the active queries
-            def add(ftr):
-                # `None` task signifies thread termination
-                if ftr is None:
-                    return False
-                if ftr.id not in futures and not ftr.done():
-                    active_queries.add(ftr.id)
-                    futures[ftr.id] = ftr
-                else:
-                    self._poll_queue.task_done()
-                return True
-
-            # Remove a query from the active set
-            def remove(id_):
-                del futures[id_]
-                active_queries.remove(id_)
+            def task_done():
                 self._poll_queue.task_done()
 
-            while True:
-                try:
-                    # If we have no active queries, wait on the status queue
-                    while len(active_queries) == 0:
-                        if not add(self._poll_queue.get()):
-                            return
-                    # Once there is any active queries try to fill up the set and move on
-                    while len(active_queries) < self._STATUS_QUERY_SIZE:
-                        if not add(self._poll_queue.get_nowait()):
-                            return
-                except queue.Empty:
-                    pass
+            def add(future):
+                # add future to query frame_futures
+                # returns: worker lives on?
 
-                # Build a query string with block of ids
-                _LOGGER.debug("Query on futures: %s", ', '.join(active_queries))
-                query_string = 'problems/?id=' + ','.join(active_queries)
+                # `None` task signifies thread termination
+                if future is None:
+                    task_done()
+                    return False
+
+                if future.id not in frame_futures and not future.done():
+                    frame_futures[future.id] = future
+                else:
+                    task_done()
+
+                return True
+
+            while True:
+                frame_futures.clear()
+
+                # blocking add first scheduled
+                frame_earliest, future = self._poll_queue.get()
+                if not add(future):
+                    return
+
+                # try grouping if scheduled within grouping timeframe
+                while len(frame_futures) < self._STATUS_QUERY_SIZE:
+                    try:
+                        task = self._poll_queue.get_nowait()
+                    except queue.Empty:
+                        break
+
+                    at, future = task
+                    if at - frame_earliest <= self._POLL_GROUP_TIMEFRAME:
+                        if not add(future):
+                            return
+                    else:
+                        task_done()
+                        self._poll_queue.put(task)
+                        break
+
+                # build a query string with ids of all futures in this frame
+                ids = [future.id for future in frame_futures.values()]
+                _LOGGER.debug("Polling for status of futures: %s", ids)
+                query_string = 'problems/?id=' + ','.join(ids)
+
+                # if futures were cancelled while `add`ing, skip empty frame
+                if not ids:
+                    continue
+
+                # wait until `frame_earliest` before polling
+                delay = frame_earliest - time.time()
+                if delay > 0:
+                    _LOGGER.debug("Pausing polling %.2f sec for futures: %s", delay, ids)
+                    time.sleep(delay)
 
                 try:
                     response = self.session.get(posixpath.join(self.endpoint, query_string))
@@ -850,28 +890,20 @@ class Client(object):
                         raise SolverAuthenticationError()
                     response.raise_for_status()
 
-                    message = response.json()
+                    statuses = response.json()
+                    for status in statuses:
+                        self._handle_problem_status(status, frame_futures[status['id']])
+
                 except BaseException as exception:
                     if not isinstance(exception, SolverAuthenticationError):
                         exception = IOError(exception)
 
-                    for id_ in list(active_queries):
-                        futures[id_]._set_error(IOError(exception), sys.exc_info())
-                        remove(id_)
-                    continue
+                    for id_ in frame_futures.keys():
+                        frame_futures[id_]._set_error(IOError(exception), sys.exc_info())
 
-                # If problems are removed from the polling by _handle_problem_status
-                # remove them from the active set
-                for single_message in message:
-                    if self._handle_problem_status(single_message, futures[single_message['id']], True):
-                        remove(single_message['id'])
+                for id_ in frame_futures.keys():
+                    task_done()
 
-                # Remove the finished queries
-                for id_ in list(active_queries):
-                    if futures[id_].done():
-                        remove(id_)
-
-                # this is equivalent to a yield to scheduler in other threading libraries
                 time.sleep(0)
 
         except Exception as err:
@@ -902,7 +934,7 @@ class Client(object):
                 # `None` task signifies thread termination
                 if future is None:
                     break
-                _LOGGER.debug("Query for results: %s", future.id)
+                _LOGGER.debug("Loading results of: %s", future.id)
 
                 # Submit the query
                 query_string = 'problems/{}/'.format(future.id)
@@ -922,7 +954,7 @@ class Client(object):
                     continue
 
                 # Dispatch the results, mark the task complete
-                self._handle_problem_status(message, future, False)
+                self._handle_problem_status(message, future)
                 self._load_queue.task_done()
 
                 # this is equivalent to a yield to scheduler in other threading libraries
