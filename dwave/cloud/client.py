@@ -16,13 +16,14 @@ import posixpath
 import collections
 from itertools import chain
 
-from dateutil.parser import parse as parse_timestamp
+from dateutil.parser import parse as parse_datetime
 from six.moves import queue, range
 
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config
 from dwave.cloud.solver import Solver
+from dwave.cloud.utils import datetime_to_timestamp
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -715,16 +716,16 @@ class Client(object):
             future.remote_status = status
 
             if not future.time_received and message.get('submitted_on'):
-                future.time_received = parse_timestamp(message['submitted_on'])
+                future.time_received = parse_datetime(message['submitted_on'])
 
             if not future.time_solved and message.get('solved_on'):
-                future.time_solved = parse_timestamp(message['solved_on'])
+                future.time_solved = parse_datetime(message['solved_on'])
 
             if not future.eta_min and message.get('earliest_completion_time'):
-                future.eta_min = parse_timestamp(message['earliest_completion_time'])
+                future.eta_min = parse_datetime(message['earliest_completion_time'])
 
             if not future.eta_max and message.get('latest_completion_time'):
-                future.eta_max = parse_timestamp(message['latest_completion_time'])
+                future.eta_max = parse_datetime(message['latest_completion_time'])
 
             if status == self.STATUS_COMPLETE:
                 # If the message is complete, forward it to the future object
@@ -798,20 +799,29 @@ class Client(object):
             _LOGGER.exception(err)
 
     def _poll(self, future):
-        """Enqueue a problem to poll the server for status.
+        """Enqueue a problem to poll the server for status."""
 
-        This method is threadsafe.
-        """
-        # update exponential poll back-off, clipped to a range
-        future._poll_backoff = \
-            max(self._POLL_BACKOFF_MIN,
-                min(future._poll_backoff * 2, self._POLL_BACKOFF_MAX))
+        if future._poll_backoff is None:
+            # on first poll, start with minimal back-off
+            future._poll_backoff = self._POLL_BACKOFF_MIN
 
-        # for poll priority we use timestamp of next scheduled poll
-        at = time.time() + future._poll_backoff
+            # if we have ETA of results, schedule the first poll for then
+            if future.eta_min:
+                at = datetime_to_timestamp(future.eta_min)
+            else:
+                at = time.time() + future._poll_backoff
 
-        _LOGGER.debug("_poll_backoff is %.2f sec (scheduled at %.2f) for %s",
-                      future._poll_backoff, at, future.id)
+        else:
+            # update exponential poll back-off, clipped to a range
+            future._poll_backoff = \
+                max(self._POLL_BACKOFF_MIN,
+                    min(future._poll_backoff * 2, self._POLL_BACKOFF_MAX))
+
+            # for poll priority we use timestamp of next scheduled poll
+            at = time.time() + future._poll_backoff
+
+        _LOGGER.debug("Polling scheduled at %.2f with %.2f sec back-off for: %s",
+                      at, future._poll_backoff, future.id)
 
         self._poll_queue.put((at, future))
 

@@ -88,7 +88,7 @@ class Future(object):
         self._other_events = []
 
         # current poll back-off interval, in seconds
-        self._poll_backoff = 0
+        self._poll_backoff = None
 
     def _set_message(self, message):
         """Complete the future with a message from the server.
