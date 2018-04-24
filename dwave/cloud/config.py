@@ -30,10 +30,10 @@ CONF_FILENAME = "dwave.conf"
 
 
 def get_configfile_paths(system=True, user=True, local=True, only_existing=True):
-    """Return a list of local configuration files.
+    """Return a list of local configuration file paths.
 
-    Finds existing configuration files on the local system. Search paths
-    are set by homebase_ and depend on operating system; for example, for Linux systems
+    Search paths for configuration files on the local system
+    are based on homebase_ and depend on operating system; for example, for Linux systems
     these might include ``dwave.conf`` in the current working directory (CWD),
     user-local ``.config/dwave/``, and system-wide ``/etc/dwave/``.
 
@@ -57,7 +57,7 @@ def get_configfile_paths(system=True, user=True, local=True, only_existing=True)
             List of configuration file paths.
 
     Examples:
-        This example displays the paths of all configuration files on a Windows system
+        This example displays all paths to configuration files on a Windows system
         running Python 2.7 and then finds the single existing configuration file.
 
         >>> import dwave.cloud as dc
@@ -100,8 +100,8 @@ def get_configfile_paths(system=True, user=True, local=True, only_existing=True)
 def get_configfile_path():
     """Return the highest-priority local configuration file.
 
-    Selects the top ranked configuration file from a list of candidates returned
-    by `get_configfile_paths()`, or ``None`` if no candidate configuration file exists.
+    Selects the top-ranked configuration file path from a list of candidates returned
+    by :func:`get_configfile_paths()`, or ``None`` if no candidate path exists.
 
     Returns:
         str:
@@ -174,18 +174,14 @@ def load_config_from_files(filenames=None):
     Each filename in the list (each configuration file loaded) progressively upgrades
     the final configuration, on a key by key basis, per each section.
 
-
-
     Args:
         filenames (list[str], default=None):
             D-Wave Cloud Client configuration files (paths and names).
 
             If ``None``, searches for a configuration file named ``dwave.conf``
-            in all system-wide configuration directories, then in the user-local
-            configuration directory, and finally in the current working directory,
-            following the user/system configuration paths set by homebase_.
-
-            .. _homebase: https://github.com/dwavesystems/homebase
+            in all system-wide configuration directories, in the user-local
+            configuration directory, and in the current working directory,
+            following the user/system configuration paths of :func:`get_configfile_paths`.
 
     Returns:
         :obj:`~configparser.ConfigParser`:
@@ -282,9 +278,7 @@ def load_profile_from_files(filenames=None, profile=None):
         filenames (list[str], default=None):
             D-Wave cloud client configuration files (path and name). If ``None``,
             searches for existing configuration files in the standard directories
-            set by homebase_.
-
-            .. _homebase: https://github.com/dwavesystems/homebase
+            of :func:`get_configfile_paths`.
 
         profile (str, default=None):
             Name of profile to return from reading the configuration from the specified
@@ -336,7 +330,8 @@ def load_profile_from_files(filenames=None, profile=None):
             client = qpu
             solver = EXAMPLE_2000Q_SYSTEM_B
 
-        The following example code loads profile values from parsing both these files.
+        The following example code loads profile values from parsing both these files,
+        by default loading the first profile encountered or an explicitly specified profile.
 
         >>> import dwave.cloud as dc
         >>> dc.config.load_profile_from_files(["./dwave_a.conf", "./dwave_b.conf"])   # doctest: +SKIP
@@ -344,6 +339,12 @@ def load_profile_from_files(filenames=None, profile=None):
          'endpoint': u'https://url.of.some.dwavesystem.com/sapi',
          'solver': u'EXAMPLE_2000Q_SYSTEM_A',
          'token': u'DEF-987654321987654321987654321'}
+        >>> dc.config.load_profile_from_files(["./dwave_a.conf", "./dwave_b.conf"],
+        ...                                   profile='dw2000B')   # doctest: +SKIP
+        {'client': u'qpu',
+        'endpoint': u'https://url.of.some.other.dwavesystem.com/sapi',
+        'solver': u'EXAMPLE_2000Q_SYSTEM_B',
+        'token': u'ABC-123456789123456789123456789'}
 
     """
 
@@ -418,15 +419,12 @@ def load_config(config_file=None, profile=None, client=None,
     order (with 1 the highest ranked):
 
     1. Values specified as keyword arguments in :func:`load_config()`
-    2. Values specified in the configuration file's profile section
-    3. Values specified as environment variables
-    4. Values specified in the configuration file's defaults section
+    2. Values specified as environment variables
+    3. Values specified in the configuration file
 
     If the location of the configuration file is not specified, auto-detection
     searches for existing configuration files in the standard directories
-    set by homebase_.
-
-    .. _homebase: https://github.com/dwavesystems/homebase
+    of :func:`get_configfile_paths`.
 
     If a configuration file explicitly specified, via an argument or
     environment variable, does not exist or is unreadable, loading fails with
@@ -472,7 +470,7 @@ def load_config(config_file=None, profile=None, client=None,
             If ``None``, the value is taken from ``DWAVE_CONFIG_FILE`` environment
             variable if defined. If the environment variable is undefined or empty,
             auto-detection searches for existing configuration files in the standard
-            directories set by homebase_.
+            directories of :func:`get_configfile_paths`.
 
             If ``False``, loading from file is skipped.
 
@@ -568,6 +566,20 @@ def load_config(config_file=None, profile=None, client=None,
         'proxy': None,
         'solver': 'Solver3',
         'token': u'DEF-987654321987654321987654321'}
+
+       This example loads the configuration from an auto-detected configuration file
+       in the home directory of a Windows system user.
+
+       >>> import dwave.cloud as dc
+       >>> dc.config.load_config()
+       {'client': u'qpu',
+        'endpoint': u'https://url.of.some.dwavesystem.com/sapi',
+        'proxy': None,
+        'solver': u'EXAMPLE_2000Q_SYSTEM_A',
+        'token': u'DEF-987654321987654321987654321'}
+       >>> See which configuration file was loaded
+       >>> dc.config.get_configfile_paths()
+       [u'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf']
 
     """
 
@@ -674,10 +686,8 @@ def legacy_load_config(profile=None, endpoint=None, token=None, solver=None,
 
         The following example code creates a client without explicitly specifying
         key values, therefore auto-detection searches for existing (non-legacy) configuration
-        files in the standard directories set by homebase_ and, failing to find one,
-        falls back on the existing legacy configuration file above.
-
-        .. _homebase: https://github.com/dwavesystems/homebase
+        files in the standard directories of :func:`get_configfile_paths` and, failing to
+        find one, falls back on the existing legacy configuration file above.
 
         >>> import dwave.cloud as dc
         >>> client = dwave.cloud.Client.from_config()    # doctest: +SKIP
