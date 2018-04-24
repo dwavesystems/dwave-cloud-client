@@ -33,9 +33,11 @@ def get_configfile_paths(system=True, user=True, local=True, only_existing=True)
     """Return a list of local configuration files.
 
     Finds existing configuration files on the local system. Search paths
-    depend on operating system; for example, for Linux systems these might
-    include ``dwave.conf`` in the current working directory (CWD),
+    are set by homebase_ and depend on operating system; for example, for Linux systems
+    these might include ``dwave.conf`` in the current working directory (CWD),
     user-local ``.config/dwave/``, and system-wide ``/etc/dwave/``.
+
+    .. _homebase: https://github.com/dwavesystems/homebase
 
     Args:
         system (boolean, default=True):
@@ -52,7 +54,7 @@ def get_configfile_paths(system=True, user=True, local=True, only_existing=True)
 
     Returns:
         list[str]:
-            A list of configuration file paths.
+            List of configuration file paths.
 
     Examples:
         This example displays the paths of all configuration files on a Windows system
@@ -103,7 +105,7 @@ def get_configfile_path():
 
     Returns:
         str:
-            A configuration file path.
+            Configuration file path.
 
     Examples:
         This example displays the highest-priority configuration file on a Windows system
@@ -125,14 +127,14 @@ def get_configfile_path():
 
 
 def get_default_configfile_path():
-    """Return the preferred configuration-file path.
+    """Return the default configuration-file path.
 
     Typically returns a user-local configuration file; e.g:
     ``~/.config/dwave/dwave.conf``.
 
     Returns:
         str:
-            A configuration file path.
+            Configuration file path.
 
     Examples:
         This example displays the default configuration file on an Ubuntu Unix system
@@ -161,25 +163,25 @@ def get_default_configfile_path():
 def load_config_from_files(filenames=None):
     """Load D-Wave Cloud Client configuration from a list of files.
 
+    .. note:: This method is not standardly used to set up D-Wave Cloud Client configuration.
+        It is recommended you use :meth:`.Client.from_config` or
+        :meth:`.config.load_config` instead.
+
     Configuration files comply with standard Windows INI-like format,
-    parsable with Python's :mod:`configparser`.
+    parsable with Python's :mod:`configparser`. A section called
+    ``defaults`` contains default values inherited by other sections.
 
     Each filename in the list (each configuration file loaded) progressively upgrades
     the final configuration, on a key by key basis, per each section.
 
-    The section containing default values inherited by other sections is called
-    ``defaults``.
 
-    .. note:: This method is not standardly used to set up D-Wave Cloud Client configuration.
-        It is recommended you use :meth:`.Client.from_config` or
-        :meth:`.config.load_config` instead.
 
     Args:
         filenames (list[str], default=None):
             D-Wave Cloud Client configuration files (paths and names).
 
             If ``None``, searches for a configuration file named ``dwave.conf``
-            in all system-wide configuration directoriess, then in the user-local
+            in all system-wide configuration directories, then in the user-local
             configuration directory, and finally in the current working directory,
             following the user/system configuration paths set by homebase_.
 
@@ -202,7 +204,7 @@ def load_config_from_files(filenames=None):
         section with key/values that are overwritten by any profile section that
         contains that key/value; for example, profile dw2000B in file dwave_b.conf
         overwrites the default URL and client type, which profile dw2000A inherits
-        from the defaults section, while profile dw2000A overwites the API token that
+        from the defaults section, while profile dw2000A overwrites the API token that
         profile dw2000B inherits.
 
         The files, which are located in the current working directory, are
@@ -223,6 +225,9 @@ def load_config_from_files(filenames=None):
             endpoint = https://url.of.some.other.dwavesystem.com/sapi
             client = sw
             solver = EXAMPLE_2000Q_SYSTEM
+
+        The following example code loads configuration from both these files, with
+        the defined overrides and inheritance.
 
         .. code:: python
 
@@ -263,15 +268,15 @@ def load_config_from_files(filenames=None):
 def load_profile_from_files(filenames=None, profile=None):
     """Load a profile from a list of D-Wave Cloud Client configuration files.
 
+    .. note:: This method is not standardly used to set up D-Wave Cloud Client configuration.
+        It is recommended you use :meth:`.Client.from_config` or
+        :meth:`.config.load_config` instead.
+
     Configuration files comply with standard Windows INI-like format,
     parsable with Python's :mod:`configparser`.
 
     Each file in the list is progressively searched until the first profile is found.
     This function does not input profile information from environment variables.
-
-    .. note:: This method is not standardly used to set up D-Wave Cloud Client configuration.
-        It is recommended you use :meth:`.Client.from_config` or
-        :meth:`.config.load_config` instead.
 
     Args:
         filenames (list[str], default=None):
@@ -283,9 +288,12 @@ def load_profile_from_files(filenames=None, profile=None):
 
         profile (str, default=None):
             Name of profile to return from reading the configuration from the specified
-            configuration file(s). If ``None``, progressively falls back to (1) the
-            ``profile`` key following ``[defaults]`` section, (2) the first non-``[defaults]``
-            section, or (3) the ``[defaults]`` section.
+            configuration file(s). If ``None``, progressively falls back in the
+            following order:
+
+            (1) ``profile`` key following ``[defaults]`` section.
+            (2) First non-``[defaults]`` section.
+            (3) ``[defaults]`` section.
 
     Returns:
         dict:
@@ -327,6 +335,8 @@ def load_profile_from_files(filenames=None, profile=None):
             endpoint = https://url.of.some.other.dwavesystem.com/sapi
             client = qpu
             solver = EXAMPLE_2000Q_SYSTEM_B
+
+        The following example code loads profile values from parsing both these files.
 
         >>> import dwave.cloud as dc
         >>> dc.config.load_profile_from_files(["./dwave_a.conf", "./dwave_b.conf"])   # doctest: +SKIP
@@ -404,12 +414,13 @@ def load_config(config_file=None, profile=None, client=None,
     parsable with Python's :mod:`configparser`. An optional ``defaults`` section
     provides default key/values for all other sections.
 
-    Configuration values override values defined elsewhere, and so are
-    assigned in the following order:
+    Configuration values can be specified in multiple ways, ranked in the following
+    order (with 1 the highest ranked):
 
     1. Values specified as keyword arguments in :func:`load_config()`
     2. Values specified in the configuration file's profile section
     3. Values specified as environment variables
+    4. Values specified in the configuration file's defaults section
 
     If the location of the configuration file is not specified, auto-detection
     searches for existing configuration files in the standard directories
@@ -418,7 +429,7 @@ def load_config(config_file=None, profile=None, client=None,
     .. _homebase: https://github.com/dwavesystems/homebase
 
     If a configuration file explicitly specified, via an argument or
-    environment variable, does not exist or is unreadable,loading fails with
+    environment variable, does not exist or is unreadable, loading fails with
     :exc:`~dwave.cloud.exceptions.ConfigFileReadError`. Loading fails
     with :exc:`~dwave.cloud.exceptions.ConfigFileParseError` if the file is
     readable but invalid as a configuration file.
@@ -438,8 +449,8 @@ def load_config(config_file=None, profile=None, client=None,
             Name of profile (section) to use if no profile is specified.
 
         ``DWAVE_API_CLIENT``:
-            API client class used (supported values are ``qpu`` or ``sw``) if no client
-            is specified.
+            API client class used if no client is specified. Supported values are
+            ``qpu`` or ``sw``.
 
         ``DWAVE_API_ENDPOINT``:
             API endpoint URL used if no endpoint is specified.
@@ -475,8 +486,8 @@ def load_config(config_file=None, profile=None, client=None,
             defined. If the environment variable is undefined or empty, a profile is
             selected in the following order:
 
-            1. From the default section if it includes a profile key
-            2. The first section (after the default section)
+            1. From the default section if it includes a profile key.
+            2. The first section (after the default section).
             3. If no other section is defined besides ``[defaults]``, the defaults
                section is promoted and selected.
 
@@ -499,13 +510,13 @@ def load_config(config_file=None, profile=None, client=None,
         proxy (str, default=None):
             URL for proxy to use in connections to D-Wave API. Can include
             username/password, port, scheme, etc. If undefined, client
-            use the system-level proxy, if defined, or connects directly to the API.
+            uses the system-level proxy, if defined, or connects directly to the API.
 
     Returns:
         dict:
             Mapping of configuration keys to values for the profile
-            (section), as read from the configuration file, optionally overridden by
-            environment values, optionally overridden by specified keyword arguments.
+            (section), as read from the configuration file and optionally overridden by
+            environment values and specified keyword arguments.
             Always contains the ``client``, ``endpoint``, ``token``, ``solver``, and ``proxy``
             keys.
 
@@ -520,8 +531,8 @@ def load_config(config_file=None, profile=None, client=None,
             Config file parse failed.
 
     Examples
-       This example loads profile values from a specified configuration file, dwave_c.conf,
-       located in the current working directory::
+       This example loads profile values from the following configuration file, dwave_c.conf,
+       located in the current working directory, and specified explicitly::
 
            [defaults]
            endpoint = https://url.of.some.dwavesystem.com/sapi
@@ -536,9 +547,10 @@ def load_config(config_file=None, profile=None, client=None,
            client = qpu
            token = DEF-987654321987654321987654321
 
-       The file contains two profiles in addition to the defaults section. First no
-       profile is specified, and the first profile after the defaults section is loaded with
-       the solver overridden by the environment variable. Then the second profile is selected
+       This configuration file contains two profiles in addition to the defaults section.
+       In the following example code, first no profile is specified, and the first profile
+       after the defaults section is loaded with the solver overridden by the environment
+       variable. Next, the second profile is selected
        with the explicitly named solver overriding the environment variable setting.
 
        >>> import dwave.cloud as dc
@@ -596,9 +608,16 @@ def legacy_load_config(profile=None, endpoint=None, token=None, solver=None,
         :meth:`~dwave.cloud.client.Client.from_config` instead.
 
     This method tries to load a legacy configuration file from ``~/.dwrc``, select a
-    specified `profile` (or, if not specified, the first profile), override
+    specified `profile` (or, if not specified, the first profile), and override
     individual keys with values read from environment variables or
-    specified explicitly as function arguments.
+    specified explicitly as key values in the function.
+
+    Configuration values can be specified in multiple ways, ranked in the following
+    order (with 1 the highest ranked):
+
+    1. Values specified as keyword arguments in :func:`legacy_load_config()`
+    2. Values specified as environment variables
+    3. Values specified in the legacy ``~/.dwrc`` configuration file
 
     Environment variables searched for are:
 
@@ -608,12 +627,12 @@ def legacy_load_config(profile=None, endpoint=None, token=None, solver=None,
      - ``DW_INTERNAL__SOLVER``
 
     Legacy configuration file format is a modified CSV where the first comma is
-    replaced with a bar character ``|``. Each line encodes a single profile. Its
+    replaced with a bar character (``|``). Each line encodes a single profile. Its
     columns are::
 
         profile_name|endpoint_url,authentication_token,proxy_url,default_solver_name
 
-    All fields after ``authentication_token`` are optional.
+    All its fields after ``authentication_token`` are optional.
 
     When there are multiple connections in a file, the first one is
     the default. Any commas in the URLs must be percent-encoded.
@@ -623,12 +642,10 @@ def legacy_load_config(profile=None, endpoint=None, token=None, solver=None,
             Profile name in the legacy configuration file.
 
         endpoint (str, default=None):
-            API endpoint URL. Overrides environment variable and configuration file
-            values.
+            API endpoint URL.
 
         token (str, default=None):
-            API authorization token. Overrides environment variable and configuration
-            file values.
+            API authorization token.
 
         solver (str, default=None):
             Default solver to use in :meth:`~dwave.cloud.client.Client.get_solver`.
@@ -641,18 +658,26 @@ def legacy_load_config(profile=None, endpoint=None, token=None, solver=None,
             system-level proxy, if defined, or connects directly to the API.
 
     Returns:
-        Dictionary with keys: endpoint, token, solver, proxy.
+        Dictionary with keys: endpoint, token, solver, and proxy.
 
     Examples:
         This example creates a client using the :meth:`~dwave.cloud.client.Client.from_config`
         method, which falls back on the legacy file by default when it fails to
         find a D-Wave Cloud Client configuration file (setting its `legacy_config_fallback`
         parameter to False precludes this fall-back operation). For this example,
-        no D-Wave Cloud Client configuration file is provided; instead a ``~/.dwrc``
-        legacy configuration file is present::
+        no D-Wave Cloud Client configuration file is present on the local system;
+        instead the following ``.dwrc`` legacy configuration file is present in the
+        user's home directory::
 
             profile-a|https://one.com,token-one
             profile-b|https://two.com,token-two
+
+        The following example code creates a client without explicitly specifying
+        key values, therefore auto-detection searches for existing (non-legacy) configuration
+        files in the standard directories set by homebase_ and, failing to find one,
+        falls back on the existing legacy configuration file above.
+
+        .. _homebase: https://github.com/dwavesystems/homebase
 
         >>> import dwave.cloud as dc
         >>> client = dwave.cloud.Client.from_config()    # doctest: +SKIP
