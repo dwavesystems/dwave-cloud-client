@@ -1,7 +1,27 @@
 """
-Base client for all D-Wave API clients.
+D-Wave API clients handle communications with :term:`solver` resources: problem submittal,
+monitoring, samples retrieval, etc.
 
-Used by QPU and software sampler classes.
+Examples:
+    This example creates a client using the local system's default D-Wave Cloud Client
+    configuration file, which is configured to access a D-Wave 2000Q QPU, submits
+    a :term:`QUBO` problem (a Boolean NOT gate represented by a penalty model) it
+    samples 5 times.
+
+    >>> from dwave.cloud import Client
+    >>> Q = {(0, 0): -1, (0, 4): 0, (4, 0): 2, (4, 4): -1}
+    >>> with Client.from_config() as client:  # doctest: +SKIP
+    ...     solver = client.get_solver()
+    ...     computation = solver.sample_qubo(Q, num_reads=5)
+    ...
+    >>> for i in range(5):     # doctest: +SKIP
+     ...     print(computation.samples[i][0], computation.samples[i][4])
+     ...
+     (1, 0)
+     (1, 0)
+     (0, 1)
+     (0, 1)
+     (0, 1)
 
 """
 
@@ -32,10 +52,11 @@ _LOGGER = logging.getLogger(__name__)
 
 class Client(object):
     """
-    Base client class for all D-Wave API clients.
+    Base client class for all D-Wave API clients. Used by QPU and software :term:`sampler`
+    classes.
 
-    Implements workers (and handles thread pools) for problem submittal, task
-    cancellation, problem status polling and results downloading.
+    Manages workers and handles thread pools for submitting problems, cancelling tasks,
+    polling problem status, and retrieving results.
 
     Args:
         endpoint (str):
@@ -53,15 +74,15 @@ class Client(object):
         permissive_ssl (bool, default=False):
             Disables SSL verification.
 
+    All unrecognized keys are passed through to the respective client class constructor
+    as string keyword arguments.
+
     Examples:
-        This example show direct :class:`~dwave.cloud.client.Client` initializiation.
+        This example directly initializes a :class:`~dwave.cloud.client.Client`.
+        Direct initialization uses class constructor arguments, the minimum being
+        values for `endpoint` and `token`.
 
-        The most basic initialization of a new :class:`~dwave.cloud.client.Client`
-        instance (like :class:`dwave.cloud.qpu.Client` or
-        :class:`dwave.cloud.sw.Client`) is via class constructor arguments. You should
-        specify values for at least ``endpoint`` and ``token``::
-
-        >>> from dwave.cloud.qpu import Client
+        >>> from dwave.cloud import Client
         >>> client = Client(endpoint='https://cloud.dwavesys.com/sapi', token='secret')
 
         This example shows unrecognized configuration file keys being passed through.

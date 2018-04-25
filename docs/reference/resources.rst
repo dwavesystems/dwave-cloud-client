@@ -4,12 +4,14 @@
 Resources
 =========
 
-TODO: short description of term client
+TODO: short description of term client and then how it's standardly used:
+from dwave.cloud import Client, for simplicity. The default client (if `client=None`) is a QPU one
+dwave.cloud.qpu.Client.from_config(client='sw') would return instance of dwave.cloud.sw.Client
 
 Base Client
 ===========
 
-.. currentmodule:: dwave.cloud
+
 
 .. automodule:: dwave.cloud.client
 
@@ -26,11 +28,11 @@ Methods
 .. autosummary::
    :toctree: generated
 
-   client.Client.close
    client.Client.from_config
    client.Client.get_solver
    client.Client.get_solvers
    client.Client.is_solver_handled
+   client.Client.close
 
 QPU Client
 ==========
@@ -59,7 +61,6 @@ Software-Samplers Client
 
 .. currentmodule:: dwave.cloud.sw
 
-.. automodule:: dwave.cloud.sw
 
 Class
 -----
