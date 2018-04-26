@@ -502,8 +502,9 @@ class Client(object):
     def get_solvers(self, refresh=False):
         """List all solvers this client can provide and load solvers' data.
 
-        Makes a blocking web call to `{endpoint}/solvers/remote/``, caches the result,
-        and populates a list of available :term:`solvers` described through :class:`.Solver`
+        Makes a blocking web call to `{endpoint}/solvers/remote/``, where `{endpoint}`
+        is a URL configured for the client, caches the result,
+        and populates a list of available :term:`solver`\ s described through :class:`.Solver`
         instances.
 
         To submit a sampling problem to the D-Wave API, select a solver from the returned list,
@@ -561,16 +562,15 @@ class Client(object):
             return self._solvers
 
     def get_solver(self, name=None, refresh=False):
-        """Load the configuration for a single solver, as publicized by the API
-        on ``{endpoint}/solvers/remote/{solver_name}/``.
+        """Load the configuration for a single solver.
 
-        This is a blocking web call that returns a :class:`.Solver` instance,
-        which in turn can be used to submit sampling problems to the D-Wave API
-        and fetch the results.
+        Makes a blocking web call to `{endpoint}/solvers/remote/{solver_name}/`, where `{endpoint}`
+        is a URL configured for the client, and returns a :class:`.Solver` instance
+        that can be used to submit sampling problems to the D-Wave API and retrieve results.
 
         Args:
             name (str):
-                Id of the requested solver. ``None`` will return the default solver.
+                ID of the requested solver. ``None`` returns the default solver.
 
             refresh (bool):
                 Return solver from cache (if cached with ``get_solvers()``),
@@ -578,6 +578,25 @@ class Client(object):
 
         Returns:
             :class:`.Solver`
+
+        Examples:
+            This example creates two solver for a client instantiated from
+            a local system's auto-detected default configuration file, which configures
+            a connection to a D-Wave resource that provides two solvers. The first
+            uses the default solver, the second explicitly selects another solver.
+
+            >>> from dwave.cloud import Client
+            >>> client = Client.from_config()
+            >>> client.get_solvers()   # doctest: +SKIP
+            {u'2000Q_ONLINE_SOLVER1': <dwave.cloud.solver.Solver at 0x7e84fd0>,
+             u'2000Q_ONLINE_SOLVER2': <dwave.cloud.solver.Solver at 0x7e84828>}
+            >>> solver1 = client.get_solver()    # doctest: +SKIP
+            >>> solver2 = client.get_solver('2000Q_ONLINE_SOLVER2')    # doctest: +SKIP
+            >>> solver1.id  # doctest: +SKIP
+            u'2000Q_ONLINE_SOLVER1'
+            >>> solver2.id   # doctest: +SKIP
+            u'2000Q_ONLINE_SOLVER2'
+
         """
         _LOGGER.debug("Looking for solver: %s", name)
         if name is None:
