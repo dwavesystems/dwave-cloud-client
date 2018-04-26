@@ -89,6 +89,8 @@ class Client(object):
 
         >>> from dwave.cloud import Client
         >>> client = Client(endpoint='https://cloud.dwavesys.com/sapi', token='secret')
+        >>> # code that uses client
+        >>> client.close()
 
 
     """
@@ -269,6 +271,8 @@ class Client(object):
 
             >>> from dwave.cloud import Client
             >>> client = Client.from_config(config_file='~/jane/my_path_to_config/my_cloud_conf.conf')  # doctest: +SKIP
+            >>> # code that uses client
+            >>> client.close()
 
             This second example auto-detects a configuration file on the local system following the
             user/system configuration paths of :func:`get_configfile_paths`. It passes through
@@ -276,6 +280,8 @@ class Client(object):
 
             >>> from dwave.cloud import Client
             >>> client = Client.from_config(my_param=`my_value`)
+            >>> # code that uses client
+            >>> client.close()
 
             This third example instantiates two clients, for managing both QPU and software
             solvers. Common key-value pairs are taken from the defaults section of a shared
@@ -311,6 +317,10 @@ class Client(object):
             u'EXAMPLE_2000Q_SYSTEM_A'
             >>> client_qpu2.endpoint   # doctest: +SKIP
             u'https://url.of.some.dwavesystem.com/sapi'
+            >>> # code that uses client
+            >>> client_qpu1.close() # doctest: +SKIP
+            >>> client_qpu2.close() # doctest: +SKIP
+            >>> client_sw1.close() # doctest: +SKIP
 
             This fourth example loads configurations auto-detected in more than one configuration
             file, with the higher priority file (in the current working directory) supplementing
@@ -340,6 +350,8 @@ class Client(object):
             u'https://int.se.dwavesystems.com/sapi'
             >>> client.token  # doctest: +SKIP
             u'DEF-987654321987654321987654321'
+            >>> # code that uses client
+            >>> client.close() # doctest: +SKIP
 
         """
 
@@ -445,9 +457,23 @@ class Client(object):
     def close(self):
         """Perform a clean shutdown.
 
-        Waits for all the currently scheduled work to finish, kill the workers,
-        and close the connection pool. Assumes no one is submitting more work
-        while the connection is closing.
+        Waits for all the currently scheduled work to finish, kills the workers,
+        and closes the connection pool.
+
+        .. note:: Ensure your code does not submit new work while the connection is closing.
+
+        Where possible, it is recommended you use a context manager (a :code:`with Client.from_config(...) as`
+        construct) to ensure your code properly closes all resources.
+
+        Examples:
+            This example creates a client (based on an auto-detected configuration file), executes
+            some code (represented by a placeholder comment), and then closes the client.
+
+            >>> from dwave.cloud import Client
+            >>> client = Client.from_config()
+            >>> # code that uses client
+            >>> client.close()
+
         """
         # Finish all the work that requires the connection
         _LOGGER.debug("Joining submission queue")
@@ -529,6 +555,8 @@ class Client(object):
             >>> client.get_solvers()   # doctest: +SKIP
             {u'2000Q_ONLINE_SOLVER1': <dwave.cloud.solver.Solver at 0x7e84fd0>,
              u'2000Q_ONLINE_SOLVER2': <dwave.cloud.solver.Solver at 0x7e84828>}
+            >>> # code that uses client
+            >>> client.close() # doctest: +SKIP
 
         """
         with self._solvers_lock:
@@ -580,7 +608,7 @@ class Client(object):
             :class:`.Solver`
 
         Examples:
-            This example creates two solver for a client instantiated from
+            This example creates two solvers for a client instantiated from
             a local system's auto-detected default configuration file, which configures
             a connection to a D-Wave resource that provides two solvers. The first
             uses the default solver, the second explicitly selects another solver.
@@ -596,6 +624,8 @@ class Client(object):
             u'2000Q_ONLINE_SOLVER1'
             >>> solver2.id   # doctest: +SKIP
             u'2000Q_ONLINE_SOLVER2'
+            >>> # code that uses client
+            >>> client.close() # doctest: +SKIP
 
         """
         _LOGGER.debug("Looking for solver: %s", name)
