@@ -14,6 +14,8 @@ It's recommended you set up a configuration file through the interactive CLI uti
 Configuration Files
 -------------------
 
+** THE FOLLOWING IS JUST DRAFT CONTENT **
+
 Candidates paths for configuration files are set by the D-Wave homebase_ package.
 
 For example, on a Unix system, depending on its flavor, these might include (in order)::
@@ -34,6 +36,48 @@ and on Mac OS X under::
 For details on user/system config paths see homebase_.
 
 .. _homebase: https://github.com/dwavesystems/homebase
+
+
+One config file can contain multiple profiles, each defining a separate
+      (endpoint, token, solver, etc.) combination. Since config file conforms to a
+      standard Windows INI-style format, profiles are defined by sections like:
+      ``[profile-a]`` and ``[profile-b]``.
+
+      Default values for undefined profile keys are taken from the ``[defaults]``
+      section.
+
+      For example, assuming ``~/.config/dwave/dwave.conf`` contains::
+
+          [defaults]
+          endpoint = https://cloud.dwavesys.com/sapi
+          client = qpu
+
+          [dw2000]
+          solver = DW_2000Q_1
+          token = ...
+
+          [software]
+          client = sw
+          solver = c4-sw_sample
+          token = ...
+
+          [alpha]
+          endpoint = https://url.to.alpha/api
+          proxy = http://user:pass@myproxy.com:8080/
+          token = ...
+
+      We can instantiate a client for D-Wave 2000Q QPU endpoint with
+
+      >>> from dwave.cloud import Client
+      >>> client = Client.from_config(profile='dw2000')
+
+      and a client for remote software solver with::
+
+      >>> client = Client.from_config(profile='software')
+
+      ``alpha`` profile will connect to a pre-release API endpoint via defined HTTP
+      proxy server.
+
 
 Interactive CLI Configuration
 -----------------------------
