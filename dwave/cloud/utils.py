@@ -1,5 +1,7 @@
 from __future__ import division, absolute_import
 
+from datetime import datetime
+from dateutil.tz import UTC
 from functools import wraps
 
 import six
@@ -93,3 +95,14 @@ def click_info_switch(f):
         f()
         ctx.exit()
     return wrapped
+
+
+def datetime_to_timestamp(dt):
+    """Convert timezone-aware `datetime` to POSIX timestamp and
+    return seconds since UNIX epoch.
+
+    Note: similar to `datetime.timestamp()` in Python 3.3+.
+    """
+
+    epoch = datetime.utcfromtimestamp(0).replace(tzinfo=UTC)
+    return (dt - epoch).total_seconds()
