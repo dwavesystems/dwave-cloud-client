@@ -98,6 +98,9 @@ class Future(object):
     def __eq__(self, other):
         return self is other
 
+    def __hash__(self):
+        return id(self)
+
     def _set_message(self, message):
         """Complete the future with a message from the server.
 
