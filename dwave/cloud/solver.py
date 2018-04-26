@@ -149,7 +149,7 @@ class Solver(object):
         quadratic = {(i1, i2): v for (i1, i2), v in uniform_iterator(qubo) if i1 != i2}
         return self._sample('qubo', linear, quadratic, params)
 
-    def _sample(self, type_, linear, quadratic, params, reuse_future=None):
+    def _sample(self, type_, linear, quadratic, params):
         """Internal method for both sample_ising and sample_qubo.
 
         Args:
@@ -180,12 +180,8 @@ class Solver(object):
             'params': params
         })
 
-        # Construct where we will put the result when we finish, submit the query
-        if reuse_future is not None:
-            future = reuse_future
-            future.__init__(self, None, self.return_matrix, (type_, linear, quadratic, params))
-        else:
-            future = Future(self, None, self.return_matrix, (type_, linear, quadratic, params))
+        future = Future(solver=self, id_=None, return_matrix=self.return_matrix,
+                        submission_data=(type_, linear, quadratic, params))
 
         _LOGGER.debug("Submitting new problem to: %s", self.id)
         self.client._submit(body, future)
