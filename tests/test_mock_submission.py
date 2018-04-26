@@ -99,18 +99,22 @@ now = datetime.utcnow().replace(tzinfo=UTC)
 continue_reply_eta_min = now + timedelta(seconds=10)
 continue_reply_eta_max = now + timedelta(seconds=30)
 
-def continue_reply(id_, solver_name):
+def continue_reply(id_, solver_name, with_eta=False):
     """A reply saying a problem is still in the queue."""
-    return json.dumps({
+    resp = {
         "status": "PENDING",
         "solved_on": None,
         "solver": solver_name,
         "submitted_on": now.isoformat(),
-        "earliest_completion_time": continue_reply_eta_min.isoformat(),
-        "latest_completion_time": continue_reply_eta_max.isoformat(),
         "type": "ising",
         "id": id_
-    })
+    }
+    if with_eta:
+        resp.update({
+            "earliest_completion_time": continue_reply_eta_min.isoformat(),
+            "latest_completion_time": continue_reply_eta_max.isoformat(),
+        })
+    return json.dumps(resp)
 
 
 def choose_reply(path, replies):
@@ -205,7 +209,9 @@ class MockSubmission(_QueryTest):
         """Handle polling for a complete problem."""
         with Client('endpoint', 'token') as client:
             client.session = mock.Mock()
-            client.session.post = lambda a, _: choose_reply(a, {'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123')})
+            client.session.post = lambda a, _: choose_reply(a, {
+                'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123', with_eta=True)
+            })
             client.session.get = lambda a: choose_reply(a, {
                 'endpoint/problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
                 'endpoint/problems/123/': complete_reply('123', 'abc123')
@@ -267,12 +273,12 @@ class MockSubmission(_QueryTest):
                 else:
                     return choose_reply(path, {
                         'endpoint/problems/?id=1': '[{}]'.format(error_reply('1', 'abc123', 'error')),
-                        'endpoint/problems/?id=2': '[{}]'.format(complete_reply('2', 'abc123')),
+                        'endpoint/problems/?id=2': '[{}]'.format(complete_no_answer_reply('2', 'abc123')),
                         'endpoint/problems/1/': error_reply('1', 'abc123', 'error'),
                         'endpoint/problems/2/': complete_reply('2', 'abc123'),
                         'endpoint/problems/?id=1,2': '[{},{}]'.format(error_reply('1', 'abc123', 'error'),
-                                                                      complete_reply('2', 'abc123')),
-                        'endpoint/problems/?id=2,1': '[{},{}]'.format(complete_reply('2', 'abc123'),
+                                                                      complete_no_answer_reply('2', 'abc123')),
+                        'endpoint/problems/?id=2,1': '[{},{}]'.format(complete_no_answer_reply('2', 'abc123'),
                                                                       error_reply('1', 'abc123', 'error'))
                     })
 
@@ -288,7 +294,7 @@ class MockSubmission(_QueryTest):
             client.session.post = accept_problems_with_continue_reply
 
             solver = Solver(client, solver_data('abc123'))
-            # Build a problem
+
             linear = {index: 1 for index in solver.nodes}
             quad = {key: -1 for key in solver.undirected_edges}
 
@@ -308,7 +314,7 @@ class MockSubmission(_QueryTest):
         with Client('endpoint', 'token') as client:
             client.session = mock.Mock()
             # on submit, return status pending
-            client.session.post = lambda a, _: choose_reply(a, {
+            client.session.post = lambda path, _: choose_reply(path, {
                 'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123')
             })
             # on first and second status poll, return pending
@@ -335,6 +341,55 @@ class MockSubmission(_QueryTest):
 
             # after third poll, back-off interval should be 4
             self.assertEqual(future._poll_backoff, 4)
+
+    @mock.patch.object(Client, "_POLL_THREAD_COUNT", 1)
+    @mock.patch.object(Client, "_SUBMISSION_THREAD_COUNT", 1)
+    def test_eta_min_is_respected_on_first_poll(self):
+        "eta_min/earliest_completion_time should be respected if present in response"
+
+        with Client('endpoint', 'token') as client:
+            client.session = mock.Mock()
+            client.session.post = lambda path, _: choose_reply(path, {
+                'endpoint/problems/': '[%s]' % continue_reply('1', 'abc123', with_eta=True)
+            })
+            client.session.get = lambda path: choose_reply(path, {
+                'endpoint/problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
+                'endpoint/problems/1/': complete_reply('1', 'abc123')
+            })
+
+            solver = Solver(client, solver_data('abc123'))
+
+            def assert_min_eta(s):
+                s and self.assertTrue(abs(s - 10) < 1)
+
+            with mock.patch('time.sleep', assert_min_eta):
+                future = solver.sample_qubo({})
+                future.result()
+
+    @mock.patch.object(Client, "_POLL_THREAD_COUNT", 1)
+    @mock.patch.object(Client, "_SUBMISSION_THREAD_COUNT", 1)
+    def test_immediate_polling_without_eta_min(self):
+        "First poll happens with minimal delay if eta_min missing"
+
+        with Client('endpoint', 'token') as client:
+            client.session = mock.Mock()
+            client.session.post = lambda path, _: choose_reply(path, {
+                'endpoint/problems/': '[%s]' % continue_reply('1', 'abc123', with_eta=False)
+            })
+            client.session.get = lambda path: choose_reply(path, {
+                'endpoint/problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
+                'endpoint/problems/1/': complete_reply('1', 'abc123')
+            })
+
+            solver = Solver(client, solver_data('abc123'))
+
+            def assert_no_delay(s):
+                s and self.assertTrue(
+                    abs(s - client._POLL_BACKOFF_MIN) < client._POLL_BACKOFF_MIN / 10.0)
+
+            with mock.patch('time.sleep', assert_no_delay):
+                future = solver.sample_qubo({})
+                future.result()
 
 
 class DeleteEvent(Exception):
