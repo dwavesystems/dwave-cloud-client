@@ -12,6 +12,7 @@ from dwave.cloud.coders import encode_bqm_as_qp
 from dwave.cloud.utils import uniform_iterator, uniform_get
 from dwave.cloud.computation import Future
 
+__all__ = ['Solver']
 
 _LOGGER = logging.getLogger(__name__)
 

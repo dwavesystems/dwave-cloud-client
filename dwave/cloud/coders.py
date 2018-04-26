@@ -5,6 +5,8 @@ import base64
 
 from dwave.cloud.utils import uniform_iterator, uniform_get
 
+__all__ = ['encode_bqm_as_qp', 'decode_qp', 'decode_qp_numpy']
+
 
 def encode_bqm_as_qp(solver, linear, quadratic):
     """Encode the binary quadratic problem for submission to a given solver,

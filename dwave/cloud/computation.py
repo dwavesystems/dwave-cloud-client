@@ -12,7 +12,6 @@ from concurrent.futures import TimeoutError
 
 from dwave.cloud.coders import decode_qp, decode_qp_numpy
 
-
 # Use numpy if available for fast decoding
 try:
     import numpy as np
@@ -20,6 +19,8 @@ try:
 except ImportError:
     # If numpy isn't available we can do the encoding slower in native python
     _numpy = False
+
+__all__ = ['Future']
 
 
 @functools.total_ordering

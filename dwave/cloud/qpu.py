@@ -67,6 +67,8 @@ from dwave.cloud.client import Client as BaseClient
 from dwave.cloud.solver import Solver
 from dwave.cloud.computation import Future
 
+__all__ = ['Client']
+
 
 class Client(BaseClient):
     """D-Wave API client specialized to work with the QPU solvers (samplers)."""

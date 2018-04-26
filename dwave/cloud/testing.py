@@ -3,6 +3,9 @@
 import os
 import contextlib
 
+__all__ = ['mock', 'iterable_mock_open', 'configparser_open_namespace',
+           'isolated_environ']
+
 
 def iterable_mock_open(read_data):
     """Version of `mock.mock_open` that supports iteration
