@@ -7,6 +7,7 @@ from __future__ import division, absolute_import
 import threading
 import time
 import six
+import functools
 from concurrent.futures import TimeoutError
 
 from dwave.cloud.coders import decode_qp, decode_qp_numpy
@@ -21,6 +22,7 @@ except ImportError:
     _numpy = False
 
 
+@functools.total_ordering
 class Future(object):
     """An object for a pending SAPI call.
 
@@ -89,6 +91,12 @@ class Future(object):
 
         # current poll back-off interval, in seconds
         self._poll_backoff = None
+
+    def __lt__(self, other):
+        return id(self) < id(other)
+
+    def __eq__(self, other):
+        return self is other
 
     def _set_message(self, message):
         """Complete the future with a message from the server.
