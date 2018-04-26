@@ -697,7 +697,7 @@ class Client(object):
         """
         try:
             status = message['status']
-            _LOGGER.debug("Status: %s %s", message['id'], status)
+            _LOGGER.debug("Handling response for %s with status %s", message['id'], status)
 
             # The future may not have the ID set yet
             with future._single_cancel_lock:
@@ -728,6 +728,11 @@ class Client(object):
                 future.eta_max = parse_datetime(message['latest_completion_time'])
 
             if status == self.STATUS_COMPLETE:
+                # TODO: find a better way to differentiate between
+                # `completed-on-submit` and `completed-on-poll`.
+                # Loading should happen only once, not every time when response
+                # doesn't contain 'answer'.
+
                 # If the message is complete, forward it to the future object
                 if 'answer' in message:
                     future._set_message(message)
