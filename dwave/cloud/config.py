@@ -17,6 +17,7 @@ import os
 import configparser
 from collections import OrderedDict
 
+import six
 import homebase
 
 from dwave.cloud.utils import uniform_get
@@ -466,7 +467,7 @@ def load_config(config_file=None, profile=None, client=None,
 
     Args:
 
-        config_file (str/None/False/True, default=None):
+        config_file (str/[str]/None/False/True, default=None):
             Path to configuration file.
 
             If ``None``, the value is taken from ``DWAVE_CONFIG_FILE`` environment
@@ -599,8 +600,16 @@ def load_config(config_file=None, profile=None, client=None,
         if config_file is None:
             # note: both empty and undefined DWAVE_CONFIG_FILE treated as None
             config_file = os.getenv("DWAVE_CONFIG_FILE")
-        section = load_profile_from_files(
-            [config_file] if config_file else None, profile)
+
+        # handle ''/None/str/[str] for `config_file` (after env)
+        filenames = None
+        if config_file:
+            if isinstance(config_file, six.string_types):
+                filenames = [config_file]
+            else:
+                filenames = config_file
+
+        section = load_profile_from_files(filenames, profile)
 
     # override a selected subset of values via env or kwargs,
     # pass-through the rest unmodified

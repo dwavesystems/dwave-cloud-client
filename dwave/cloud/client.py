@@ -127,7 +127,7 @@ class Client(object):
             see :func:`~dwave.cloud.config.load_config`.
 
         Args:
-            config_file (str/None/False/True, default=None):
+            config_file (str/[str]/None/False/True, default=None):
                 Path to config file. ``None`` for auto-detect, ``False`` to
                 skip loading from any file (including auto-detection), and
                 ``True`` to force auto-detection, disregarding environment value
