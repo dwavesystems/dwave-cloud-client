@@ -23,39 +23,42 @@ from dwave.cloud.computation import Future
 
 
 class Client(BaseClient):
-    """D-Wave API client specialized to work with the QPU solvers (samplers)."""
+    """D-Wave API client specialized to work with QPU solvers.
 
-An example using the client:
+    This class is instantiated by default, or explicitly when `client=qpu`, with the
+    typical base client instantiation: :code:`with Client.from_config() as client:` of
+    a client.
 
-.. code-block:: python
-    :linenos:
+    Examples:
+        This example explicitly instantiates a :class:`dwave.cloud.qpu.client` based
+        on the local system`s default D-Wave Cloud Client configuration file to sample
+        a random Ising problem tailored to fit the client`s default solver`s graph.
 
-    import random
-    from dwave.cloud.qpu import Client
+        .. code-block:: python
 
-    # Connect using explicit connection information
-    # Also, note the use context manager, which ensures the resources (thread
-    # pools used by Client) are freed as soon as we're done with using client.
-    with Client('https://sapi-url', 'token-string') as client:
+            import random
+            from dwave.cloud.qpu import Client
 
-        # Load a solver by name
-        solver = client.get_solver('test-solver')
+            # Use context manager to ensure resources (thread pools used by Client) are released
+            with Client.from_config() as client:
 
-        # Build a random Ising model on +1, -1. Build it to exactly fit the graph the solver provides
-        linear = {index: random.choice([-1, 1]) for index in solver.nodes}
-        quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
+                solver = client.get_solver()
 
-        # Send the problem for sampling, include a solver specific parameter 'num_reads'
-        computation = solver.sample_ising(linear, quad, num_reads=100)
+                # Build problem to exactly fit the solver graph
+                linear = {index: random.choice([-1, 1]) for index in solver.nodes}
+                quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
 
-        # Print out the first sample (out of a hundred)
-        print(computation.samples[0])
+                # Sample 100 times and print out the first sample
+                computation = solver.sample_ising(linear, quad, num_reads=100)
+                print(computation.samples[0])
 
+    """
 
     @staticmethod
     def is_solver_handled(solver):
-        """Predicate function used from superclass to filter solvers.
-        In QPU client we're handling only QPU solvers.
+        """Determine if the specified solver should be handled by this client.
+
+        This predicate function overrides superclass to filter out any non-QPU solvers.
         """
         if not solver:
             return False
