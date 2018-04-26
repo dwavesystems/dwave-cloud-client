@@ -522,6 +522,17 @@ class Client(object):
         predicate function with a subclass if you want to specialize your client for a
         particular type of solvers.
 
+        Examples:
+            This function accepts only solvers named "My_Solver_*".
+
+            .. code:: python
+
+                @staticmethod
+                def is_solver_handled(solver):
+                    if not solver:
+                        return False
+                    return solver.id.startswith('My_Solver_')
+        
         """
         return True
 

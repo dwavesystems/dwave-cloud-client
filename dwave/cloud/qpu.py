@@ -1,13 +1,29 @@
 """
-An implementation of the REST API exposed by D-Wave Solver API (SAPI) servers.
+An implementation of the REST API for D-Wave Solver API (SAPI) servers.
 
-This API lets you submit an Ising model and receive samples from a distribution
-over the model as defined by the solver you have selected.
+SAPI servers provide authentication, queuing, and scheduling services,
+and provide a network interface to :term:`solver`\ s. This API enables you submit
+a binary quadratic (\ :term:`Ising` or :term:QUBO`\ ) model
+and receive samples from a distribution over the model as defined by a
+selected solver.
 
- - The SAPI servers provide authentication, queuing, and scheduling services, and
-   provide a network interface to the solvers.
- - A solver is a resource that can sample from a discrete quadratic model.
- - This package implements the REST interface these servers provide.
+SAPI server workflow is roughly as follows:
+
+ 1. Submitted problems enter an input queue. Each user has an input queue per solver.
+ 2. Drawing from all input queues for a solver, problems are scheduled.
+ 3. Results are cached for retrieval by the client.
+
+"""
+
+from __future__ import absolute_import
+
+from dwave.cloud.client import Client as BaseClient
+from dwave.cloud.solver import Solver
+from dwave.cloud.computation import Future
+
+
+class Client(BaseClient):
+    """D-Wave API client specialized to work with the QPU solvers (samplers)."""
 
 An example using the client:
 
@@ -35,43 +51,6 @@ An example using the client:
         # Print out the first sample (out of a hundred)
         print(computation.samples[0])
 
-Rough workflow within the SAPI server:
- 1. Submitted problems enter an input queue. Each user has an input queue per solver.
- 2. Drawing from all input queues for a solver, problems are scheduled.
- 3. Results of the server are cached for retrieval by the client.
-
-By default all sampling requests will be processed asynchronously. Reading results from
-any future object is a blocking operation.
-
-.. code-block:: python
-    :linenos:
-
-    # We can submit several sample requests without blocking
-    # (In this specific case we could accomplish the same thing by increasing 'num_reads')
-    futures = [solver.sample_ising(linear, quad, num_reads=100) for _ in range(10)]
-
-    # We can check if a set of samples are ready without blocking
-    print(futures[0].done())
-
-    # We can wait on a single future
-    futures[0].wait()
-
-    # Or we can wait on several futures
-    dwave.cloud.computation.Future.wait_multiple(futures, min_done=3)
-
-"""
-
-from __future__ import absolute_import
-
-from dwave.cloud.client import Client as BaseClient
-from dwave.cloud.solver import Solver
-from dwave.cloud.computation import Future
-
-__all__ = ['Client']
-
-
-class Client(BaseClient):
-    """D-Wave API client specialized to work with the QPU solvers (samplers)."""
 
     @staticmethod
     def is_solver_handled(solver):
