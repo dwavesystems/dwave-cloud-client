@@ -518,7 +518,7 @@ class Client(object):
     def is_solver_handled(solver):
         """Determine if the specified solver should be handled by this client.
 
-        Default implementation accepts all solvers (always retruns True). Override this
+        Default implementation accepts all solvers (always returns True). Override this
         predicate function with a subclass if you want to specialize your client for a
         particular type of solvers.
 
