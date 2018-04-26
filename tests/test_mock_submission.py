@@ -1,12 +1,15 @@
 """Test problem submission against hard-coded replies with unittest.mock."""
 from __future__ import division, absolute_import, print_function, unicode_literals
 
+import time
 import json
 import unittest
 import itertools
 import threading
 
-from dateutil.parser import parse as parse_timestamp
+from datetime import datetime, timedelta
+from dateutil.tz import UTC
+from dateutil.parser import parse as parse_datetime
 
 from dwave.cloud.utils import evaluate_ising
 from dwave.cloud.qpu import Client, Solver
@@ -92,8 +95,9 @@ def cancel_reply(id_, solver_name):
     })
 
 
-continue_reply_eta_min = parse_timestamp("2013-01-18T10:25:59.941674Z")
-continue_reply_eta_max = parse_timestamp("2013-01-18T10:27:51.123456Z")
+now = datetime.utcnow().replace(tzinfo=UTC)
+continue_reply_eta_min = now + timedelta(seconds=10)
+continue_reply_eta_max = now + timedelta(seconds=30)
 
 def continue_reply(id_, solver_name):
     """A reply saying a problem is still in the queue."""
@@ -101,7 +105,7 @@ def continue_reply(id_, solver_name):
         "status": "PENDING",
         "solved_on": None,
         "solver": solver_name,
-        "submitted_on": "2013-01-18T10:06:10.025064",
+        "submitted_on": now.isoformat(),
         "earliest_completion_time": continue_reply_eta_min.isoformat(),
         "latest_completion_time": continue_reply_eta_max.isoformat(),
         "type": "ising",
@@ -236,39 +240,52 @@ class MockSubmission(_QueryTest):
             with self.assertRaises(SolverFailureError):
                 self._check(results, linear, quad, 100)
 
+    # Reduce the number of poll and submission threads so that the system can be tested
+    @mock.patch.object(Client, "_POLL_THREAD_COUNT", 1)
+    @mock.patch.object(Client, "_SUBMISSION_THREAD_COUNT", 1)
     def test_submit_continue_then_ok_and_error_reply(self):
         """Handle polling for the status of multiple problems."""
-        # Reduce the number of poll threads to 1 so that the system can be tested
-        old_value = Client._POLL_THREAD_COUNT
-        Client._POLL_THREAD_COUNT = 1
 
         with Client('endpoint', 'token') as client:
             client.session = mock.Mock()
-            client.session.get = lambda a: choose_reply(a, {
-                # Wait until both problems are
-                'endpoint/problems/?id=1': '[%s]' % continue_reply('1', 'abc123'),
-                'endpoint/problems/?id=2': '[%s]' % continue_reply('2', 'abc123'),
-                'endpoint/problems/?id=2,1': '[' + complete_no_answer_reply('2', 'abc123') + ',' +
-                                     error_reply('1', 'abc123', 'error') + ']',
-                'endpoint/problems/?id=1,2': '[' + error_reply('1', 'abc123', 'error') + ',' +
-                                     complete_no_answer_reply('2', 'abc123') + ']',
-                'endpoint/problems/1/': error_reply('1', 'abc123', 'Error message'),
-                'endpoint/problems/2/': complete_reply('2', 'abc123')
-            })
 
-            def switch_post_reply(path, body):
-                message = json.loads(body)
-                if len(message) == 1:
-                    client.session.post = lambda a, _: choose_reply(a, {
-                        'endpoint/problems/': '[%s]' % continue_reply('2', 'abc123')})
-                    return choose_reply('', {'': '[%s]' % continue_reply('1', 'abc123')})
+            # on first status poll, return pending for both problems
+            # on second status poll, return error for first problem and complete for second
+            def continue_then_complete(path, state={'count': 0}):
+                state['count'] += 1
+                if state['count'] < 2:
+                    return choose_reply(path, {
+                        'endpoint/problems/?id=1': '[{}]'.format(continue_reply('1', 'abc123')),
+                        'endpoint/problems/?id=2': '[{}]'.format(continue_reply('2', 'abc123')),
+                        'endpoint/problems/1/': continue_reply('1', 'abc123'),
+                        'endpoint/problems/2/': continue_reply('2', 'abc123'),
+                        'endpoint/problems/?id=1,2': '[{},{}]'.format(continue_reply('1', 'abc123'),
+                                                                      continue_reply('2', 'abc123')),
+                        'endpoint/problems/?id=2,1': '[{},{}]'.format(continue_reply('2', 'abc123'),
+                                                                      continue_reply('1', 'abc123'))
+                    })
                 else:
-                    client.session.post = None
-                    return choose_reply('endpoint/', {
-                        'endpoint/': '[%s, %s]' % (continue_reply('1', 'abc123'), continue_reply('2', 'abc123'))
+                    return choose_reply(path, {
+                        'endpoint/problems/?id=1': '[{}]'.format(error_reply('1', 'abc123', 'error')),
+                        'endpoint/problems/?id=2': '[{}]'.format(complete_reply('2', 'abc123')),
+                        'endpoint/problems/1/': error_reply('1', 'abc123', 'error'),
+                        'endpoint/problems/2/': complete_reply('2', 'abc123'),
+                        'endpoint/problems/?id=1,2': '[{},{}]'.format(error_reply('1', 'abc123', 'error'),
+                                                                      complete_reply('2', 'abc123')),
+                        'endpoint/problems/?id=2,1': '[{},{}]'.format(complete_reply('2', 'abc123'),
+                                                                      error_reply('1', 'abc123', 'error'))
                     })
 
-            client.session.post = lambda a, body: switch_post_reply(a, body)
+            client.session.get = continue_then_complete
+
+            def accept_problems_with_continue_reply(path, body, ids=iter('12')):
+                problems = json.loads(body)
+                return choose_reply(path, {
+                    'endpoint/problems/': json.dumps(
+                        [json.loads(continue_reply(next(ids), 'abc123')) for _ in problems])
+                })
+
+            client.session.post = accept_problems_with_continue_reply
 
             solver = Solver(client, solver_data('abc123'))
             # Build a problem
@@ -282,14 +299,11 @@ class MockSubmission(_QueryTest):
                 self._check(results1, linear, quad, 100)
             self._check(results2, linear, quad, 100)
 
-        Client._POLL_THREAD_COUNT = old_value
-
+    # Reduce the number of poll and submission threads so that the system can be tested
+    @mock.patch.object(Client, "_POLL_THREAD_COUNT", 1)
+    @mock.patch.object(Client, "_SUBMISSION_THREAD_COUNT", 1)
     def test_exponential_backoff_polling(self):
         "After each poll, back-off should double"
-
-        # Reduce the number of poll threads to 1 so that the system can be tested
-        old_value = Client._POLL_THREAD_COUNT
-        Client._POLL_THREAD_COUNT = 1
 
         with Client('endpoint', 'token') as client:
             client.session = mock.Mock()
@@ -321,8 +335,6 @@ class MockSubmission(_QueryTest):
 
             # after third poll, back-off interval should be 4
             self.assertEqual(future._poll_backoff, 4)
-
-        Client._POLL_THREAD_COUNT = old_value
 
 
 class DeleteEvent(Exception):
