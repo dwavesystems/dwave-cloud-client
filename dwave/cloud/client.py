@@ -25,6 +25,7 @@ from dwave.cloud.config import load_config, legacy_load_config
 from dwave.cloud.solver import Solver
 from dwave.cloud.utils import datetime_to_timestamp
 
+__all__ = ['Client']
 
 _LOGGER = logging.getLogger(__name__)
 

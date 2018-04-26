@@ -11,7 +11,6 @@ those parameters:
 * Direct setting of key values in functions
 
 These options can be flexibly used together.
-
 """
 
 import os
@@ -23,6 +22,9 @@ import homebase
 from dwave.cloud.utils import uniform_get
 from dwave.cloud.exceptions import ConfigFileReadError, ConfigFileParseError
 
+__all__ = ['get_configfile_paths', 'get_configfile_path', 'get_default_configfile_path',
+           'load_config_from_files', 'load_profile_from_files',
+           'load_config', 'legacy_load_config']
 
 CONF_APP = "dwave"
 CONF_AUTHOR = "dwavesystem"

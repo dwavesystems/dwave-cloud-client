@@ -14,6 +14,9 @@ try:
 except ImportError:  # pragma: no cover
     _numpy = False
 
+__all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
+           'readline_input', 'click_info_switch', 'datetime_to_timestamp']
+
 
 def evaluate_ising(linear, quad, state):
     """Calculate the energy of a state given the Hamiltonian.

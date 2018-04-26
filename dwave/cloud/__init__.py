@@ -6,6 +6,8 @@ from dwave.cloud.client import Client
 from dwave.cloud.solver import Solver
 from dwave.cloud.computation import Future
 
+__all__ = ['Client', 'Solver', 'Future']
+
 
 # configure logger `dwave.cloud` root logger, inherited in submodules
 # (write level warning+ to stderr, include timestamp/module/level)
