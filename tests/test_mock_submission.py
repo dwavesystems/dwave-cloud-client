@@ -351,6 +351,7 @@ class DeleteEvent(Exception):
         raise DeleteEvent(path, json.dumps(kwargs['json']))
 
 
+@mock.patch('time.sleep', lambda *x: None)
 class MockCancel(unittest.TestCase):
     """Make sure cancel works at the two points in the process where it should."""
 
