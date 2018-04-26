@@ -445,7 +445,7 @@ class Client(object):
     def close(self):
         """Perform a clean shutdown.
 
-        Wait for all the currently scheduled work to finish, kill the workers,
+        Waits for all the currently scheduled work to finish, kill the workers,
         and close the connection pool. Assumes no one is submitting more work
         while the connection is closing.
         """
@@ -490,36 +490,45 @@ class Client(object):
 
     @staticmethod
     def is_solver_handled(solver):
-        """Predicate function that determines if the given solver should be
-        handled by this client.
+        """Determine if the specified solver should be handled by this client.
 
-        Can be overridden in a subclass to specialize the client for a
+        Default implementation accepts all solvers (always retruns True). Override this
+        predicate function with a subclass if you want to specialize your client for a
         particular type of solvers.
 
-        Default implementation accepts all solvers.
         """
         return True
 
     def get_solvers(self, refresh=False):
-        """List all the solvers this client can provide, and load the data
-        about the solvers.
+        """List all solvers this client can provide and load solvers' data.
 
-        This is a blocking web call to `{endpoint}/solvers/remote/`` that
-        caches the result and populates a list of available solvers described
-        through :class:`.Solver` instances.
+        Makes a blocking web call to `{endpoint}/solvers/remote/``, caches the result,
+        and populates a list of available :term:`solvers` described through :class:`.Solver`
+        instances.
 
-        To submit a sampling problem to the D-Wave API, filter the list returned
-        and execute a ``sampling_*`` method on the solver of interest.
-        Alternatively, if you know the solver name (or it's defined in config),
-        use the :meth:`.get_solver` method.
+        To submit a sampling problem to the D-Wave API, select a solver from the returned list,
+        and execute a ``sampling_*`` method on it. Alternatively, use the :meth:`.get_solver` method
+        if you know the solver ID (name) or have it defined in your configuration file.
 
         Args:
             refresh (bool, default=False):
                 By default, ``get_solvers`` caches the list of solvers it
-                receives from the API. Use this parameter to force refresh.
+                receives from the API. Set to True to force a cache refresh.
 
         Returns:
-            dict[id, solver]: a mapping of solver name/id to :class:`.Solver`
+            dict[id, solver]: Mapping of solver name/id to :class:`.Solver`
+
+        Examples:
+            This example lists all solvers available to a client instantiated from
+            a local system's auto-detected default configuration file, which configures
+            a connection to a D-Wave resource that provides two solvers.
+
+            >>> from dwave.cloud import Client
+            >>> client = Client.from_config()
+            >>> client.get_solvers()   # doctest: +SKIP
+            {u'2000Q_ONLINE_SOLVER1': <dwave.cloud.solver.Solver at 0x7e84fd0>,
+             u'2000Q_ONLINE_SOLVER2': <dwave.cloud.solver.Solver at 0x7e84828>}
+
         """
         with self._solvers_lock:
             if self._all_solvers_ready and not refresh:
