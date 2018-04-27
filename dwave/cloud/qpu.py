@@ -3,7 +3,7 @@ An implementation of the REST API for D-Wave Solver API (SAPI) servers.
 
 SAPI servers provide authentication, queuing, and scheduling services,
 and provide a network interface to :term:`solver`\ s. This API enables you submit
-a binary quadratic (\ :term:`Ising` or :term:QUBO`\ ) model
+a binary quadratic (\ :term:`Ising` or :term:`QUBO`\ ) model
 and receive samples from a distribution over the model as defined by a
 selected solver.
 

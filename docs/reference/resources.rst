@@ -7,7 +7,7 @@ Resources
 The :term:`solver`\ s that provide sampling for solving :term:`Ising` and :term:`QUBO` problems, such
 as a D-Wave 2000Q QPU or a software :term:`sampler` such as the `dimod <https://github.com/dwavesystems/dimod>`_
 simulated annealing sampler, are typically remote resources. The D-Wave Cloud Client
-:class:`~dwave.cloud.client.Client` class manages the solver resources.
+:class:`~dwave.cloud.client.Client` class manages such remote solver resources.
 
 Preferred use is with a context manager (a :code:`with Client.from_config(...) as`
 construct) to ensure proper closure of all resources. The following example snippet
