@@ -265,9 +265,9 @@ class TestConfig(unittest.TestCase):
                                 provided=['myfile'], data=myconfig)):
             self.assertRaises(ValueError, load_config, config_file='myfile')
 
-    def test_config_load_multiple_configfiles(self):
+    def test_config_load_multiple_autodetected_configfiles(self):
         """Test more specific config overrides less specific one,
-        on a key by key basis."""
+        on a key by key basis, in a list of auto-detected config files."""
 
         config_system = u"""
             [alpha]
@@ -298,3 +298,25 @@ class TestConfig(unittest.TestCase):
                                iterable_mock_open(config_user)()]
                 section = load_config(profile='beta')
                 self.assertEqual(section['endpoint'], 'beta')
+
+    def test_config_load_multiple_explicit_configfiles(self):
+        """Test more specific config overrides less specific one,
+        on a key by key basis, in a list of explicitly given files."""
+
+        file1 = u"""
+            [alpha]
+            endpoint = alpha
+            solver = DW_2000Q_1
+        """
+        file2 = u"""
+            [alpha]
+            solver = DW_2000Q_2
+        """
+
+        with mock.patch('dwave.cloud.config.open', create=True) as m:
+            m.side_effect=[iterable_mock_open(file1)(),
+                           iterable_mock_open(file2)()]
+            section = load_config(config_file=['file1', 'file2'], profile='alpha')
+            m.assert_has_calls([mock.call('file1', 'r'), mock.call('file2', 'r')])
+            self.assertEqual(section['endpoint'], 'alpha')
+            self.assertEqual(section['solver'], 'DW_2000Q_2')
