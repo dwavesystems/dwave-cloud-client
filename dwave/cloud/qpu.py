@@ -21,12 +21,13 @@ from dwave.cloud.client import Client as BaseClient
 from dwave.cloud.solver import Solver
 from dwave.cloud.computation import Future
 
+__all__ = ['Client']
 
 class Client(BaseClient):
     """D-Wave API client specialized to work with QPU solvers.
 
     This class is instantiated by default, or explicitly when `client=qpu`, with the
-    typical base client instantiation: :code:`with Client.from_config() as client:` of
+    typical base client instantiation :code:`with Client.from_config() as client:` of
     a client.
 
     Examples:
@@ -59,6 +60,22 @@ class Client(BaseClient):
         """Determine if the specified solver should be handled by this client.
 
         This predicate function overrides superclass to filter out any non-QPU solvers.
+
+        Current implementation filters out D-Wave software clients with solver IDs
+        prefixed with `c4-sw`. If needed, update this method to suit your solver
+        naming scheme.
+
+        Examples:
+            This example filters solvers for those prefixed 2000Q.
+
+            .. code:: python
+
+                @staticmethod
+                def is_solver_handled(solver):
+                    if not solver:
+                        return False
+                    return solver.id.startswith('2000Q')
+
         """
         if not solver:
             return False
