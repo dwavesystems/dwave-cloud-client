@@ -1,5 +1,15 @@
 """
-TODO: some explanation of solvers
+A :term:`solver` is a resource for solving problems.
+
+Solvers are responsible for:
+
+    - Encoding submitted problems
+    - Checking submitted parameters
+    - Adding problems to a client's submission queue
+
+You can list all solvers available to a :class:`Client` with its :meth:`get_solvers` method
+and select and return one with its :meth:`get_solver` method.
+
 """
 
 from __future__ import division, absolute_import
@@ -19,19 +29,28 @@ _LOGGER = logging.getLogger(__name__)
 
 class Solver(object):
     """
-    A solver enables sampling from an Ising model. It encapsulates the solver
-    description as returned by the D-Wave cloud API.
+    Class for D-Wave solvers.
 
-    Get solver objects by calling :meth:`get_solver` on a :class:`Client` object.
-
-    The solver has responsibility for:
-    - Encoding problems submitted
-    - Checking the submitted parameters
-    - Add problems to the Client's submission queue
+    This class provides :term:`Ising` and :term:`QUBO` sampling methods and encapsulates
+    the solver description returned from the D-Wave cloud API.
 
     Args:
-        client (:class:`Client`): Client through which the solver is accessed.
-        data (`dict`): Data from the server describing this solver.
+        client (:class:`Client`):
+            Client that manages access to this solver.
+
+        data (`dict`):
+            Data from the server describing this solver.
+
+    Examples:
+        This example creates a client using the local system's default D-Wave Cloud
+        Client configuration file and checks the identity of its default solver.
+
+        >>> from dwave.cloud import Client
+        >>> client = Client.from_config()
+        >>> solver = client.get_solver()
+        >>> solver.data['id']    # doctest: +SKIP
+        u'EXAMPLE_2000Q_SYSTEM'
+
     """
 
     # Special flag to notify the system a solver needs access to special hardware
