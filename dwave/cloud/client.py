@@ -1,7 +1,27 @@
 """
-Base client for all D-Wave API clients.
+D-Wave API clients handle communications with :term:`solver` resources: problem submittal,
+monitoring, samples retrieval, etc.
 
-Used by QPU and software sampler classes.
+Examples:
+    This example creates a client using the local system's default D-Wave Cloud Client
+    configuration file, which is configured to access a D-Wave 2000Q QPU, submits
+    a :term:`QUBO` problem (a Boolean NOT gate represented by a penalty model), and
+    samples 5 times.
+
+    >>> from dwave.cloud import Client
+    >>> Q = {(0, 0): -1, (0, 4): 0, (4, 0): 2, (4, 4): -1}
+    >>> with Client.from_config() as client:  # doctest: +SKIP
+    ...     solver = client.get_solver()
+    ...     computation = solver.sample_qubo(Q, num_reads=5)
+    ...
+    >>> for i in range(5):     # doctest: +SKIP
+    ...     print(computation.samples[i][0], computation.samples[i][4])
+    ...
+    (1, 0)
+    (1, 0)
+    (0, 1)
+    (0, 1)
+    (0, 1)
 
 """
 
@@ -32,10 +52,11 @@ _LOGGER = logging.getLogger(__name__)
 
 class Client(object):
     """
-    Base client class for all D-Wave API clients.
+    Base client class for all D-Wave API clients. Used by QPU and software :term:`sampler`
+    classes.
 
-    Implements workers (and handles thread pools) for problem submittal, task
-    cancellation, problem status polling and results downloading.
+    Manages workers and handles thread pools for submitting problems, cancelling tasks,
+    polling problem status, and retrieving results.
 
     Args:
         endpoint (str):
@@ -53,33 +74,24 @@ class Client(object):
         permissive_ssl (bool, default=False):
             Disables SSL verification.
 
+    Other Parameters:
+        Unrecognized keys (str):
+            All unrecognized keys are passed through to the appropriate client class constructor
+            as string keyword arguments.
+
+            An explicit key value overrides an identical user-defined key value loaded from a
+            configuration file.
+
     Examples:
-        This example show direct :class:`~dwave.cloud.client.Client` initializiation.
+        This example directly initializes a :class:`~dwave.cloud.client.Client`.
+        Direct initialization uses class constructor arguments, the minimum being
+        values for `endpoint` and `token`.
 
-        The most basic initialization of a new :class:`~dwave.cloud.client.Client`
-        instance (like :class:`dwave.cloud.qpu.Client` or
-        :class:`dwave.cloud.sw.Client`) is via class constructor arguments. You should
-        specify values for at least ``endpoint`` and ``token``::
-
-        >>> from dwave.cloud.qpu import Client
+        >>> from dwave.cloud import Client
         >>> client = Client(endpoint='https://cloud.dwavesys.com/sapi', token='secret')
+        >>> # code that uses client
+        >>> client.close()
 
-        This example shows unrecognized configuration file keys being passed through.
-
-        All (unrecognized) config file keys are passed-through to the respective
-        ``Client`` class constructor as string keyword arguments.
-
-        This makes config-parsing future-proof and enables passing of (undocumented)
-        variables like ``permissive_ssl``. With::
-
-            [defaults]
-            ...
-
-            [testing]
-            endpoint = <testing-endpoint>
-            permissive_ssl = 1
-
-        The ``Client`` is constructed with ``Client(endpoint=..., permissive_ssl='1')``.
 
     """
 
@@ -117,32 +129,90 @@ class Client(object):
     def from_config(cls, config_file=None, profile=None, client=None,
                     endpoint=None, token=None, solver=None, proxy=None,
                     legacy_config_fallback=True, **kwargs):
-        """Client factory method which loads configuration from file(s),
-        process environment variables and explicitly provided values, creating
-        and returning the appropriate client instance
-        (:class:`dwave.cloud.qpu.Client` or :class:`dwave.cloud.sw.Client`).
+        """Client factory method to instantiate a client instance from configuration.
 
-        Note:
-            For details on config loading from files and environment, please
-            see :func:`~dwave.cloud.config.load_config`.
+        Configuration files comply with standard Windows INI-like format,
+        parsable with Python's :mod:`configparser`. An optional ``defaults`` section
+        provides default key-value pairs for all other sections. User-defined key-value
+        pairs (unrecognized keys) are passed through to the client.
+
+        Configuration values can be specified in multiple ways, ranked in the following
+        order (with 1 the highest ranked):
+
+        1. Values specified as keyword arguments in :func:`from_config()`
+        2. Values specified as environment variables
+        3. Values specified in the configuration file
+
+        If the location of the configuration file is not specified, auto-detection
+        searches for existing configuration files in the standard directories
+        of :func:`get_configfile_paths`.
+
+        If a configuration file explicitly specified, via an argument or
+        environment variable, does not exist or is unreadable, loading fails with
+        :exc:`~dwave.cloud.exceptions.ConfigFileReadError`. Loading fails
+        with :exc:`~dwave.cloud.exceptions.ConfigFileParseError` if the file is
+        readable but invalid as a configuration file.
+
+        Similarly, if a profile explicitly specified, via an argument or
+        environment variable, is not present in the loaded configuration, loading fails
+        with :exc:`ValueError`. Explicit profile selection also fails if the configuration
+        file is not explicitly specified, detected on the system, or defined via
+        an environment variable.
+
+        Environment variables:
+
+            ``DWAVE_CONFIG_FILE``:
+                Configuration file path used if no configuration file is specified.
+
+            ``DWAVE_PROFILE``:
+                Name of profile (section) to use if no profile is specified.
+
+            ``DWAVE_API_CLIENT``:
+                API client class used if no client is specified. Supported values are
+                ``qpu`` or ``sw``.
+
+            ``DWAVE_API_ENDPOINT``:
+                API endpoint URL used if no endpoint is specified.
+
+            ``DWAVE_API_TOKEN``:
+                API authorization token used if no token is specified.
+
+            ``DWAVE_API_SOLVER``:
+                Default solver used if no solver is specified.
+
+            ``DWAVE_API_PROXY``:
+                URL for proxy connections to D-Wave API used if no proxy is specified.
 
         Args:
             config_file (str/[str]/None/False/True, default=None):
-                Path to config file. ``None`` for auto-detect, ``False`` to
-                skip loading from any file (including auto-detection), and
-                ``True`` to force auto-detection, disregarding environment value
-                for config file.
+                Path to configuration file.
+
+                If ``None``, the value is taken from ``DWAVE_CONFIG_FILE`` environment
+                variable if defined. If the environment variable is undefined or empty,
+                auto-detection searches for existing configuration files in the standard
+                directories of :func:`get_configfile_paths`.
+
+                If ``False``, loading from file is skipped.
+
+                If ``True``, forces auto-detection (regardless of the ``DWAVE_CONFIG_FILE``
+                environment variable).
 
             profile (str, default=None):
-                Profile name (config file section name). If undefined it is
-                taken from ``DWAVE_PROFILE`` environment variable, or config
-                file, or first section, or defaults. For details, see
-                :func:`~dwave.cloud.config.load_config`.
+                Profile name (name of the profile section in the configuration file).
+
+                If undefined, inferred from ``DWAVE_PROFILE`` environment variable if
+                defined. If the environment variable is undefined or empty, a profile is
+                selected in the following order:
+
+                1. From the default section if it includes a profile key.
+                2. The first section (after the default section).
+                3. If no other section is defined besides ``[defaults]``, the defaults
+                   section is promoted and selected.
 
             client (str, default=None):
-                Client class (selected by name) to use for accessing the API.
-                Use ``qpu`` to specify the :class:`dwave.cloud.qpu.Client` and
-                ``sw`` for :class:`dwave.cloud.sw.Client`.
+                Client type used for accessing the API. Supported values are ``qpu``
+                for :class:`dwave.cloud.qpu.Client` and ``sw`` for
+                :class:`dwave.cloud.sw.Client`.
 
             endpoint (str, default=None):
                 API endpoint URL.
@@ -151,210 +221,30 @@ class Client(object):
                 API authorization token.
 
             solver (str, default=None):
-                Default solver to use in :meth:`~dwave.cloud.client.Client.get_solver`.
-                If undefined, you'll have to explicitly specify the solver name/id
-                in all calls to :meth:`~dwave.cloud.client.Client.get_solver`.
+                Default :term:`solver` to use in :meth:`~dwave.cloud.client.Client.get_solver`.
+                If undefined, all calls to :meth:`~dwave.cloud.client.Client.get_solver`
+                must explicitly specify the solver name/id.
 
             proxy (str, default=None):
                 URL for proxy to use in connections to D-Wave API. Can include
-                username/password, port, scheme, etc. If undefined, client will
-                connect directly to the API (unless you use a system-level proxy).
+                username/password, port, scheme, etc. If undefined, client
+                uses the system-level proxy, if defined, or connects directly to the API.
 
             legacy_config_fallback (bool, default=True):
-                If loading from a ``dwave.conf`` config file fails, try
-                loading the ``.dwrc`` legacy config.
+                If True (the default) and loading from a standard D-Wave Cloud Client configuration
+                file (``dwave.conf``) fails, tries loading a legacy configuration file (``~\.dwrc``).
 
-            **kwargs:
-                All remaining keyword arguments are passed-through as-is to the
-                chosen `Client` constructor method.
+        Other Parameters:
+            Unrecognized keys (str):
+                All unrecognized keys are passed through to the appropriate client class constructor
+                as string keyword arguments.
 
-                A notable custom argument is `permissive_ssl`.
+                An explicit key value overrides an identical user-defined key value loaded from a
+                configuration file.
 
-                Note: all user-defined keys from config files are propagated to
-                the `Client` constructor too, and can be overridden with these
-                keyword arguments.
-
-        Examples:
-            (1) This example initializes :class:`~dwave.cloud.client.Client` from an
-            explicitly given configuration file.
-
-            Configuration parameters for ``Client`` classes can be read from a config file
-            (and process environment variables) via ``Client`` factory method
-            :func:`~dwave.cloud.client.Client.from_config`. Configuration loading is
-            delegated to :func:`~dwave.cloud.config.load_config`.
-
-            Assuming ``/path/to/config`` file contains::
-
-                [prod]
-                endpoint = https://cloud.dwavesys.com/sapi
-                token = secret
-                client = qpu
-                solver = DW_2000Q_1
-
-            >>> from dwave.cloud import Client
-            >>> client = Client.from_config(config_file='/path/to/config')
-
-            The above creates a client object which will connect to D-Wave production QPU,
-            using :class:`dwave.cloud.qpu.Client` and ``DW_2000Q_1`` as a default solver.
-
-            Note: in case the config file specified does not exist, or the file is
-            unreadable (e.g. no read permission), or format is invalid,
-            :exc:`~dwave.cloud.exceptions.ConfigFileReadError` or
-            :exc:`~dwave.cloud.exceptions.ConfigFileParseError` will be raised.
-
-            (2) This example demonstrates auto-detection of a configuration file.
-
-            If ``config_file`` parameter to :func:`~dwave.cloud.client.Client.from_config`
-            factory method is not specified (or is explicitly set to ``None``), config file
-            location is auto-detected. Lookup order of paths examined is described in
-            :func:`~dwave.cloud.config.load_config_from_files`.
-
-            Assuming (on Linux) the file ``~/.config/dwave/dwave.conf`` contains::
-
-                [prod]
-                endpoint = https://cloud.dwavesys.com/sapi
-                token = secret
-
-            >>> from dwave.cloud import Client
-            >>> client = Client.from_config()
-
-            Note: config file read/parse exceptions are not raised in the auto-detect case
-            if no suitable file is found. If a file is found, but it's unreadable or
-            unparseable, exception are still raised.
-
-            (3) This example demonstrates defaults and profiles.
-            One config file can contain multiple profiles, each defining a separate
-            (endpoint, token, solver, etc.) combination. Since config file conforms to a
-            standard Windows INI-style format, profiles are defined by sections like:
-            ``[profile-a]`` and ``[profile-b]``.
-
-            Default values for undefined profile keys are taken from the ``[defaults]``
-            section.
-
-            For example, assuming ``~/.config/dwave/dwave.conf`` contains::
-
-                [defaults]
-                endpoint = https://cloud.dwavesys.com/sapi
-                client = qpu
-
-                [dw2000]
-                solver = DW_2000Q_1
-                token = ...
-
-                [software]
-                client = sw
-                solver = c4-sw_sample
-                token = ...
-
-                [alpha]
-                endpoint = https://url.to.alpha/api
-                proxy = http://user:pass@myproxy.com:8080/
-                token = ...
-
-            We can instantiate a client for D-Wave 2000Q QPU endpoint with
-
-            >>> from dwave.cloud import Client
-            >>> client = Client.from_config(profile='dw2000')
-
-            and a client for remote software solver with::
-
-            >>> client = Client.from_config(profile='software')
-
-            ``alpha`` profile will connect to a pre-release API endpoint via defined HTTP
-            proxy server.
-
-            (4) This example demonstrates progressive config file override
-
-            System-wide configuration files are overridden (on a key-by-key,
-            section-by-section basis) with user-local config files, and then by current
-            directory config files.
-
-            For example, if ``/usr/local/share/dwave/dwave.conf`` has::
-
-                [defaults]
-                endpoint = <production>
-                client = qpu
-
-                [prod]
-                token = <token>
-
-            and ``~/.config/dwave/dwave.conf`` has::
-
-                [alpha]
-                endpoint = <alpha>
-                token = <token>
-
-            and ``./dwave.conf`` has::
-
-                [alpha]
-                proxy = <proxy>
-
-            then both profiles can be loaded::
-
-                from dwave.cloud import Client
-
-                production_client = Client.from_config(profile='prod')
-
-                alpha_client = Client.from_config(profile='alpha')
-
-            Note: ``alpha`` profile will use alpha endpoint, but also a proxy and a QPU
-            client.
-
-            (5) This example demonstrates Environment variables and explicit argument override.
-
-            All of the basic ``Client`` configuration variables can be specified **via
-            environment variables** (see :func:`~dwave.cloud.config.load_config`). Values
-            from the environment will **override** values read from config file(s).
-
-            In addition, location of the very config file and profile can also be specified
-            within process environment.
-
-            For example, with ``/tests/test.conf`` containing::
-
-                [defaults]
-                endpoint = <production>
-
-                [prod]
-                token = <token-1>
-
-                [test]
-                token = <token-2>
-
-            and environment variables set as::
-
-                DWAVE_CONFIG_FILE=/tests/test.conf
-                DWAVE_PROFILE=test
-                DWAVE_API_SOLVER=DW_2000Q_1
-
-            then the standard::
-
-                client = Client.from_config()
-
-            will construct a client to connect with ``test`` profile from ``test.conf``
-            file, and in addition, to use the ``DW_2000Q_1`` solver.
-
-            However, **explicit keyword argument** values in
-            :func:`~dwave.cloud.client.Client.from_config` factory will override both file
-            and environment values::
-
-                client = Client.from_config(token='token-3', proxy='...')
-
-
-            (6) For another example, create ``dwave.conf`` in your current directory or
-            ``~/.config/dwave/dwave.conf``::
-
-                [prod]
-                endpoint = https://cloud.dwavesys.com/sapi
-                token = DW-123123-secret
-                solver = DW_2000Q_1
-
-            Run::
-
-                from dwave.cloud import Client
-                with Client.from_config(profile='prod') as client:
-                    solver = client.get_solver()
-                    computation = solver.sample_ising({}, {})
-                    samples = computation.result()
+        Returns:
+            :class:`~dwave.cloud.client.Client` (:class:`dwave.cloud.qpu.Client` or :class:`dwave.cloud.sw.Client`, default=\ :class:`dwave.cloud.qpu.Client`):
+                Appropriate instance of a QPU or software client.
 
         Raises:
             :exc:`~dwave.cloud.exceptions.ConfigFileReadError`:
@@ -362,6 +252,107 @@ class Client(object):
 
             :exc:`~dwave.cloud.exceptions.ConfigFileParseError`:
                 Config file parse failed.
+
+        Examples:
+            This first example initializes :class:`~dwave.cloud.client.Client` from an
+            explicitly specified configuration file, "~/jane/my_path_to_config/my_cloud_conf.conf"::
+
+                [defaults]
+                endpoint = https://url.of.some.dwavesystem.com/sapi
+                client = qpu
+                token = ABC-123456789123456789123456789
+
+                [dw2000]
+                solver = EXAMPLE_2000Q_SYSTEM
+                token = DEF-987654321987654321987654321
+
+            The example code below creates a client object that connects to a D-Wave QPU,
+            using :class:`dwave.cloud.qpu.Client` and ``EXAMPLE_2000Q_SYSTEM`` as a default solver.
+
+            >>> from dwave.cloud import Client
+            >>> client = Client.from_config(config_file='~/jane/my_path_to_config/my_cloud_conf.conf')  # doctest: +SKIP
+            >>> # code that uses client
+            >>> client.close()
+
+            This second example auto-detects a configuration file on the local system following the
+            user/system configuration paths of :func:`get_configfile_paths`. It passes through
+            to the instantiated client an unrecognized key-value pair my_param=`my_value`.
+
+            >>> from dwave.cloud import Client
+            >>> client = Client.from_config(my_param=`my_value`)
+            >>> # code that uses client
+            >>> client.close()
+
+            This third example instantiates two clients, for managing both QPU and software
+            solvers. Common key-value pairs are taken from the defaults section of a shared
+            configuration file::
+
+                [defaults]
+                endpoint = https://url.of.some.dwavesystem.com/sapi
+                client = qpu
+
+                [dw2000A]
+                solver = EXAMPLE_2000Q_SYSTEM_A
+                token = ABC-123456789123456789123456789
+
+                [sw_solver]
+                client = sw
+                solver = c4-sw_sample
+                endpoint = https://url.of.some.software.resource.com/my_if
+                token = DEF-987654321987654321987654321
+
+                [dw2000B]
+                solver = EXAMPLE_2000Q_SYSTEM_B
+                proxy = http://user:pass@myproxy.com:8080/
+                token = XYZ-0101010100112341234123412341234
+
+            The example code below creates client objects for two QPU solvers (at the
+            same URL but each with its own solver ID and token) and one software solver.
+
+            >>> from dwave.cloud import Client
+            >>> client_qpu1 = Client.from_config(profile='dw2000A')    # doctest: +SKIP
+            >>> client_qpu1 = Client.from_config(profile='dw2000B')    # doctest: +SKIP
+            >>> client_sw1 = Client.from_config(profile='sw_solver')   # doctest: +SKIP
+            >>> client_qpu1.default_solver   # doctest: +SKIP
+            u'EXAMPLE_2000Q_SYSTEM_A'
+            >>> client_qpu2.endpoint   # doctest: +SKIP
+            u'https://url.of.some.dwavesystem.com/sapi'
+            >>> # code that uses client
+            >>> client_qpu1.close() # doctest: +SKIP
+            >>> client_qpu2.close() # doctest: +SKIP
+            >>> client_sw1.close() # doctest: +SKIP
+
+            This fourth example loads configurations auto-detected in more than one configuration
+            file, with the higher priority file (in the current working directory) supplementing
+            and overriding values from the lower priority user-local file. After instantiation,
+            an endpoint from the default section and client from the profile section is provided
+            from the user-local ``/usr/local/share/dwave/dwave.conf`` file::
+
+                [defaults]
+                endpoint = https://int.se.dwavesystems.com/sapi
+
+                [dw2000]
+                client = qpu
+                token = ABC-123456789123456789123456789
+
+            A solver is supplemented from the file in the current working directory, which also
+            overrides the token value. ``./dwave.conf`` is the file in the current directory::
+
+                [dw2000]
+                solver = EXAMPLE_2000Q_SYSTEM_A
+                token = DEF-987654321987654321987654321
+
+            >>> from dwave.cloud import Client
+            >>> client = Client.from_config()
+            >>> client.default_solver   # doctest: +SKIP
+            u'EXAMPLE_2000Q_SYSTEM_A'
+            >>> client.endpoint  # doctest: +SKIP
+            u'https://int.se.dwavesystems.com/sapi'
+            >>> client.token  # doctest: +SKIP
+            u'DEF-987654321987654321987654321'
+            >>> # code that uses client
+            >>> client.close() # doctest: +SKIP
+
         """
 
         # try loading configuration from a preferred new config subsystem
@@ -466,9 +457,23 @@ class Client(object):
     def close(self):
         """Perform a clean shutdown.
 
-        Wait for all the currently scheduled work to finish, kill the workers,
-        and close the connection pool. Assumes no one is submitting more work
-        while the connection is closing.
+        Waits for all the currently scheduled work to finish, kills the workers,
+        and closes the connection pool.
+
+        .. note:: Ensure your code does not submit new work while the connection is closing.
+
+        Where possible, it is recommended you use a context manager (a :code:`with Client.from_config(...) as`
+        construct) to ensure your code properly closes all resources.
+
+        Examples:
+            This example creates a client (based on an auto-detected configuration file), executes
+            some code (represented by a placeholder comment), and then closes the client.
+
+            >>> from dwave.cloud import Client
+            >>> client = Client.from_config()
+            >>> # code that uses client
+            >>> client.close()
+
         """
         # Finish all the work that requires the connection
         _LOGGER.debug("Joining submission queue")
@@ -511,36 +516,59 @@ class Client(object):
 
     @staticmethod
     def is_solver_handled(solver):
-        """Predicate function that determines if the given solver should be
-        handled by this client.
+        """Determine if the specified solver should be handled by this client.
 
-        Can be overridden in a subclass to specialize the client for a
+        Default implementation accepts all solvers (always returns True). Override this
+        predicate function with a subclass if you want to specialize your client for a
         particular type of solvers.
 
-        Default implementation accepts all solvers.
+        Examples:
+            This function accepts only solvers named "My_Solver_*".
+
+            .. code:: python
+
+                @staticmethod
+                def is_solver_handled(solver):
+                    if not solver:
+                        return False
+                    return solver.id.startswith('My_Solver_')
+        
         """
         return True
 
     def get_solvers(self, refresh=False):
-        """List all the solvers this client can provide, and load the data
-        about the solvers.
+        """List all solvers this client can provide and load solvers' data.
 
-        This is a blocking web call to `{endpoint}/solvers/remote/`` that
-        caches the result and populates a list of available solvers described
-        through :class:`.Solver` instances.
+        Makes a blocking web call to `{endpoint}/solvers/remote/``, where `{endpoint}`
+        is a URL configured for the client, caches the result,
+        and populates a list of available :term:`solver`\ s described through :class:`.Solver`
+        instances.
 
-        To submit a sampling problem to the D-Wave API, filter the list returned
-        and execute a ``sampling_*`` method on the solver of interest.
-        Alternatively, if you know the solver name (or it's defined in config),
-        use the :meth:`.get_solver` method.
+        To submit a sampling problem to the D-Wave API, select a solver from the returned list,
+        and execute a ``sampling_*`` method on it. Alternatively, use the :meth:`.get_solver` method
+        if you know the solver ID (name) or have it defined in your configuration file.
 
         Args:
             refresh (bool, default=False):
                 By default, ``get_solvers`` caches the list of solvers it
-                receives from the API. Use this parameter to force refresh.
+                receives from the API. Set to True to force a cache refresh.
 
         Returns:
-            dict[id, solver]: a mapping of solver name/id to :class:`.Solver`
+            dict[id, solver]: Mapping of solver name/id to :class:`.Solver`
+
+        Examples:
+            This example lists all solvers available to a client instantiated from
+            a local system's auto-detected default configuration file, which configures
+            a connection to a D-Wave resource that provides two solvers.
+
+            >>> from dwave.cloud import Client
+            >>> client = Client.from_config()
+            >>> client.get_solvers()   # doctest: +SKIP
+            {u'2000Q_ONLINE_SOLVER1': <dwave.cloud.solver.Solver at 0x7e84fd0>,
+             u'2000Q_ONLINE_SOLVER2': <dwave.cloud.solver.Solver at 0x7e84828>}
+            >>> # code that uses client
+            >>> client.close() # doctest: +SKIP
+
         """
         with self._solvers_lock:
             if self._all_solvers_ready and not refresh:
@@ -573,16 +601,15 @@ class Client(object):
             return self._solvers
 
     def get_solver(self, name=None, refresh=False):
-        """Load the configuration for a single solver, as publicized by the API
-        on ``{endpoint}/solvers/remote/{solver_name}/``.
+        """Load the configuration for a single solver.
 
-        This is a blocking web call that returns a :class:`.Solver` instance,
-        which in turn can be used to submit sampling problems to the D-Wave API
-        and fetch the results.
+        Makes a blocking web call to `{endpoint}/solvers/remote/{solver_name}/`, where `{endpoint}`
+        is a URL configured for the client, and returns a :class:`.Solver` instance
+        that can be used to submit sampling problems to the D-Wave API and retrieve results.
 
         Args:
             name (str):
-                Id of the requested solver. ``None`` will return the default solver.
+                ID of the requested solver. ``None`` returns the default solver.
 
             refresh (bool):
                 Return solver from cache (if cached with ``get_solvers()``),
@@ -590,6 +617,27 @@ class Client(object):
 
         Returns:
             :class:`.Solver`
+
+        Examples:
+            This example creates two solvers for a client instantiated from
+            a local system's auto-detected default configuration file, which configures
+            a connection to a D-Wave resource that provides two solvers. The first
+            uses the default solver, the second explicitly selects another solver.
+
+            >>> from dwave.cloud import Client
+            >>> client = Client.from_config()
+            >>> client.get_solvers()   # doctest: +SKIP
+            {u'2000Q_ONLINE_SOLVER1': <dwave.cloud.solver.Solver at 0x7e84fd0>,
+             u'2000Q_ONLINE_SOLVER2': <dwave.cloud.solver.Solver at 0x7e84828>}
+            >>> solver1 = client.get_solver()    # doctest: +SKIP
+            >>> solver2 = client.get_solver('2000Q_ONLINE_SOLVER2')    # doctest: +SKIP
+            >>> solver1.id  # doctest: +SKIP
+            u'2000Q_ONLINE_SOLVER1'
+            >>> solver2.id   # doctest: +SKIP
+            u'2000Q_ONLINE_SOLVER2'
+            >>> # code that uses client
+            >>> client.close() # doctest: +SKIP
+
         """
         _LOGGER.debug("Looking for solver: %s", name)
         if name is None:

@@ -1,63 +1,17 @@
 """
-An implementation of the REST API exposed by D-Wave Solver API (SAPI) servers.
+An implementation of the REST API for D-Wave Solver API (SAPI) servers.
 
-This API lets you submit an Ising model and receive samples from a distribution
-over the model as defined by the solver you have selected.
+SAPI servers provide authentication, queuing, and scheduling services,
+and provide a network interface to :term:`solver`\ s. This API enables you submit
+a binary quadratic (\ :term:`Ising` or :term:`QUBO`\ ) model
+and receive samples from a distribution over the model as defined by a
+selected solver.
 
- - The SAPI servers provide authentication, queuing, and scheduling services, and
-   provide a network interface to the solvers.
- - A solver is a resource that can sample from a discrete quadratic model.
- - This package implements the REST interface these servers provide.
+SAPI server workflow is roughly as follows:
 
-An example using the client:
-
-.. code-block:: python
-    :linenos:
-
-    import random
-    from dwave.cloud.qpu import Client
-
-    # Connect using explicit connection information
-    # Also, note the use context manager, which ensures the resources (thread
-    # pools used by Client) are freed as soon as we're done with using client.
-    with Client('https://sapi-url', 'token-string') as client:
-
-        # Load a solver by name
-        solver = client.get_solver('test-solver')
-
-        # Build a random Ising model on +1, -1. Build it to exactly fit the graph the solver provides
-        linear = {index: random.choice([-1, 1]) for index in solver.nodes}
-        quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
-
-        # Send the problem for sampling, include a solver specific parameter 'num_reads'
-        computation = solver.sample_ising(linear, quad, num_reads=100)
-
-        # Print out the first sample (out of a hundred)
-        print(computation.samples[0])
-
-Rough workflow within the SAPI server:
  1. Submitted problems enter an input queue. Each user has an input queue per solver.
  2. Drawing from all input queues for a solver, problems are scheduled.
- 3. Results of the server are cached for retrieval by the client.
-
-By default all sampling requests will be processed asynchronously. Reading results from
-any future object is a blocking operation.
-
-.. code-block:: python
-    :linenos:
-
-    # We can submit several sample requests without blocking
-    # (In this specific case we could accomplish the same thing by increasing 'num_reads')
-    futures = [solver.sample_ising(linear, quad, num_reads=100) for _ in range(10)]
-
-    # We can check if a set of samples are ready without blocking
-    print(futures[0].done())
-
-    # We can wait on a single future
-    futures[0].wait()
-
-    # Or we can wait on several futures
-    dwave.cloud.computation.Future.wait_multiple(futures, min_done=3)
+ 3. Results are cached for retrieval by the client.
 
 """
 
@@ -69,14 +23,59 @@ from dwave.cloud.computation import Future
 
 __all__ = ['Client']
 
-
 class Client(BaseClient):
-    """D-Wave API client specialized to work with the QPU solvers (samplers)."""
+    """D-Wave API client specialized to work with QPU solvers.
+
+    This class is instantiated by default, or explicitly when `client=qpu`, with the
+    typical base client instantiation :code:`with Client.from_config() as client:` of
+    a client.
+
+    Examples:
+        This example explicitly instantiates a :class:`dwave.cloud.qpu.client` based
+        on the local system`s default D-Wave Cloud Client configuration file to sample
+        a random Ising problem tailored to fit the client`s default solver`s graph.
+
+        .. code-block:: python
+
+            import random
+            from dwave.cloud.qpu import Client
+
+            # Use context manager to ensure resources (thread pools used by Client) are released
+            with Client.from_config() as client:
+
+                solver = client.get_solver()
+
+                # Build problem to exactly fit the solver graph
+                linear = {index: random.choice([-1, 1]) for index in solver.nodes}
+                quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
+
+                # Sample 100 times and print out the first sample
+                computation = solver.sample_ising(linear, quad, num_reads=100)
+                print(computation.samples[0])
+
+    """
 
     @staticmethod
     def is_solver_handled(solver):
-        """Predicate function used from superclass to filter solvers.
-        In QPU client we're handling only QPU solvers.
+        """Determine if the specified solver should be handled by this client.
+
+        This predicate function overrides superclass to filter out any non-QPU solvers.
+
+        Current implementation filters out D-Wave software clients with solver IDs
+        prefixed with `c4-sw`. If needed, update this method to suit your solver
+        naming scheme.
+
+        Examples:
+            This example filters solvers for those prefixed 2000Q.
+
+            .. code:: python
+
+                @staticmethod
+                def is_solver_handled(solver):
+                    if not solver:
+                        return False
+                    return solver.id.startswith('2000Q')
+
         """
         if not solver:
             return False

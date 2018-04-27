@@ -153,6 +153,27 @@ class Future(object):
 
         Returns:
             2-tuple of futures done and not_done, similar to `concurrent.futures.wait()`
+
+        Examples:
+
+        By default all sampling requests are processed asynchronously. Reading results from
+        any future object is a blocking operation.
+
+        .. code-block:: python
+
+            # We can submit several sample requests without blocking
+            # (In this specific case we could accomplish the same thing by increasing 'num_reads')
+            futures = [solver.sample_ising(linear, quad, num_reads=100) for _ in range(10)]
+
+            # We can check if a set of samples are ready without blocking
+            print(futures[0].done())
+
+            # We can wait on a single future
+            futures[0].wait()
+
+            # Or we can wait on several futures
+            dwave.cloud.computation.Future.wait_multiple(futures, min_done=3)
+            
         """
         if min_done is None:
             min_done = len(futures)

@@ -10,7 +10,7 @@ Configuration
 Loading Configuration
 =====================
 
-These functions deploy D-Wave cloud client settings from a configuration file.
+These functions deploy D-Wave Cloud Client settings from a configuration file.
 
 .. currentmodule:: dwave.cloud.config
 

@@ -11,8 +11,10 @@ Learn the relevant terminology at
 Index
 =====
 
-Terms defined in dimod:
+Terms defined in D-Wave Cloud Client:
 
+    * :term:`ising`
     * :term:`model`
+    * :term:`qubo`
     * :term:`sampler`
     * :term:`solver`
