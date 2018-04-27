@@ -135,9 +135,7 @@ class Solver(object):
         return "Solver(id={!r})".format(self.id)
 
     def sample_ising(self, linear, quadratic, **params):
-        """Draw samples from the provided Ising model.
-
-        To submit a problem: ``POST /problems/``
+        """Sample from the specified Ising model.
 
         Args:
             linear (list/dict): Linear terms of the model (h).
@@ -146,22 +144,67 @@ class Solver(object):
 
         Returns:
             :obj:`Future`
+
+        Examples:
+            This example creates a client using the local system’s default D-Wave Cloud Client
+            configuration file, which is configured to access a D-Wave 2000Q QPU, submits a
+            simple :term:`Ising` problem (opposite linear biases on two coupled qubits), and samples
+            5 times.
+
+            >>> from dwave.cloud import Client
+            >>> with Client.from_config() as client:
+            ...     solver = client.get_solver()
+            ...     u, v = next(iter(solver.edges))
+            ...     computation = solver.sample_ising({u: -1, v: 1},{}, num_reads=5)   # doctest: +SKIP
+            ...
+            >>> for i in range(5):    # doctest: +SKIP
+            ...     print(computation.samples[i][u], computation.samples[i][v])
+            ...
+            (1, -1)
+            (1, -1)
+            (1, -1)
+            (1, -1)
+            (1, -1)
+
         """
         # Our linear and quadratic objective terms are already separated in an
         # ising model so we can just directly call `_sample`.
         return self._sample('ising', linear, quadratic, params)
 
     def sample_qubo(self, qubo, **params):
-        """Draw samples from the provided QUBO.
-
-        To submit a problem: ``POST /problems/``
+        """Sample from the specified QUBO.
 
         Args:
-            qubo (dict of (int, int):float): Terms of the model.
+            qubo (dict of (int, int):float): Coefficients of a quadratic unconstrained binary
+                optimization (QUBO) model.
             **params: Parameters for the sampling method, specified per solver.
 
         Returns:
             :obj:`Future`
+
+        Examples:
+            This example creates a client using the local system's default D-Wave Cloud Client
+            configuration file, which is configured to access a D-Wave 2000Q QPU, submits
+            a :term:`QUBO` problem (a Boolean NOT gate represented by a penalty model), and
+            samples 5 times.
+
+            >>> from dwave.cloud import Client
+            >>> Q = {(0, 0): -1, (0, 4): 0, (4, 0): 2, (4, 4): -1}
+            >>> with Client.from_config() as client:  # doctest: +SKIP
+            ...     solver = client.get_solver()
+            ...     u, v = next(iter(solver.edges))
+            ...     Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            ...     computation = solver.sample_qubo(Q, num_reads=5)
+            ...
+            >>> for i in range(5):     # doctest: +SKIP
+            ...     print(computation.samples[i][u], computation.samples[i][v])
+            ...
+            (0, 1)
+            (1, 0)
+            (1, 0)
+            (0, 1)
+            (1, 0)
+
         """
         # In a QUBO the linear and quadratic terms in the objective are mixed into
         # a matrix. For the sake of encoding, we will separate them before calling `_sample`
