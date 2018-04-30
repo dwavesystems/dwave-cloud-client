@@ -425,7 +425,7 @@ class MockCancel(unittest.TestCase):
             client.session.delete = DeleteEvent.handle
 
             solver = Solver(client, solver_data('abc123'))
-            future = solver.retrieve_problem(submission_id)
+            future = solver._retrieve_problem(submission_id)
             future.cancel()
 
             try:
