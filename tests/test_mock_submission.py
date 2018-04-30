@@ -339,8 +339,8 @@ class MockSubmission(_QueryTest):
             future = solver.sample_qubo({})
             future.result()
 
-            # after third poll, back-off interval should be 4
-            self.assertEqual(future._poll_backoff, 4)
+            # after third poll, back-off interval should be 4 x initial back-off
+            self.assertEqual(future._poll_backoff, Client._POLL_BACKOFF_MIN * 2**2)
 
     @mock.patch.object(Client, "_POLL_THREAD_COUNT", 1)
     @mock.patch.object(Client, "_SUBMISSION_THREAD_COUNT", 1)
