@@ -168,35 +168,47 @@ class Future(object):
     def wait_multiple(futures, min_done=None, timeout=None):
         """Wait for multiple :class:`Future` objects to complete.
 
-        A blocking call that uses an event object to emulate multi-wait for Python.
+        Blocking call that uses an event object to emulate multi-wait for Python.
 
         Args:
-            futures (list of Future): list of objects to wait on
-            min_done (int): Stop waiting when this many results are ready
-            timeout (float): Maximum number of seconds to wait, `None` for indefinite wait.
+            futures (list of Future): List of :class:`Future` objects to await.
+            min_done (int): Minimum required completions to end the waiting. The wait is terminated
+                when this number of results are ready. If None, waits for all the
+                :class:`Future` objects to complete.
+            timeout (float): Maximum number of seconds to await completion. If None,
+                awaits indefinitely.
 
         Returns:
-            2-tuple of futures done and not_done, similar to `concurrent.futures.wait()`
+            Two-tuple of :class:`Future` objects completed and not completed,
+                similar to `concurrent.futures.wait()` returned two-tuple of 'done' and
+                'not_done' sets.
 
         Examples:
+            This example creates a solver using the local system’s default D-Wave Cloud Client
+            configuration file, submits a simple QUBO problem to a remote D-Wave resource 3 times
+            for differing numers of samples, and waits for sampling to complete on any
+            two of the submissions. The wait ends with the completion of two submissions while
+            the third is still in progress.
 
-        By default all sampling requests are processed asynchronously. Reading results from
-        any future object is a blocking operation.
-
-        .. code-block:: python
-
-            # We can submit several sample requests without blocking
-            # (In this specific case we could accomplish the same thing by increasing 'num_reads')
-            futures = [solver.sample_ising(linear, quad, num_reads=100) for _ in range(10)]
-
-            # We can check if a set of samples are ready without blocking
-            print(futures[0].done())
-
-            # We can wait on a single future
-            futures[0].wait()
-
-            # Or we can wait on several futures
-            dwave.cloud.computation.Future.wait_multiple(futures, min_done=3)
+            >>> import dwave.cloud as dc
+            >>> client = dc.Client.from_config()
+            >>> solver = client.get_solver()
+            >>> u, v = next(iter(solver.edges))
+            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            >>> computation = [solver.sample_qubo(Q, num_reads=1000),
+            ...                solver.sample_qubo(Q, num_reads=50),
+            ...                solver.sample_qubo(Q, num_reads=10)]   # doctest: +SKIP
+            >>> dc.computation.Future.wait_multiple(computation, min_done=1)    # doctest: +SKIP
+            ([<dwave.cloud.computation.Future at 0x17dde518>,
+              <dwave.cloud.computation.Future at 0x17ddee80>],
+             [<dwave.cloud.computation.Future at 0x15078080>])
+            >>> print(computation[0].done())   # doctest: +SKIP
+            False
+            >>> print(computation[1].done())  # doctest: +SKIP
+            True
+            >>> print(computation[2].done())   # doctest: +SKIP
+            True
+            >>> client.close()
 
         """
         if min_done is None:
@@ -293,7 +305,7 @@ class Future(object):
     def done(self):
         """Check whether the solver received a response for a submitted problem.
 
-        A non-blocking call that checks whether the solver has received a result from
+        A non-blocking call that checks whether the solver has received a response from
         the remote resource.
 
         Examples:
