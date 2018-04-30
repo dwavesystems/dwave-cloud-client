@@ -64,7 +64,7 @@ class Future(object):
         u'1cefeb6d-ebd5-4592-87c0-4cc43ec03e27'
         >>> computation.done()   # doctest: +SKIP
         True
-        >>> client.close() 
+        >>> client.close()
     """
 
     def __init__(self, solver, id_, return_matrix, submission_data):
@@ -271,10 +271,26 @@ class Future(object):
         return self._results_ready_event.wait(timeout)
 
     def done(self):
-        """Test whether a response has arrived.
+        """Check whether the solver received a response for a submitted problem.
 
         A non-blocking call that checks whether the solver has received a result from
         the remote resource.
+
+        Examples:
+            This example creates a solver using the local system’s default D-Wave Cloud Client
+            configuration file, submits a simple QUBO problem to a remote D-Wave resource for
+            100 samples, and checks a couple of times whether sampling is completed.
+
+            >>> from dwave.cloud import Client
+            >>> solver = client.get_solver()
+            >>> u, v = next(iter(solver.edges))
+            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            >>> computation = solver.sample_qubo(Q, num_reads=100)   # doctest: +SKIP
+            >>> computation.done()  # doctest: +SKIP
+            False
+            >>> computation.done()   # doctest: +SKIP
+            True
+            >>> client.close()
         """
         return self._message is not None or self.error is not None
 
