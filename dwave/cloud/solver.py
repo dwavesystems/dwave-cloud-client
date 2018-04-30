@@ -206,7 +206,7 @@ class Solver(object):
                 return False
         return True
 
-    def retrieve_problem(self, id_):
+    def _retrieve_problem(self, id_):
         """Resume polling for a problem previously submitted.
 
         Args:
