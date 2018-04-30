@@ -1,5 +1,15 @@
 """
-TODO: short description about computation
+Computation manages the interactions between your code and a :term:`solver`, which
+manages interaction between the remote resource and your submitted problems.
+
+Your solver instantiates a :class:`Future` object for its calls to the remote resource
+via D-Wave Sampler API (SAPI) servers.
+
+You can interact with the :class:`Future` object for pending calls: monitoring problem status,
+waiting for and retrieving results, cancelling enqueued jobs, etc.
+
+Some :class:`Future` methods are blocking.
+
 """
 
 from __future__ import division, absolute_import
@@ -25,21 +35,36 @@ __all__ = ['Future']
 
 @functools.total_ordering
 class Future(object):
-    """An object for a pending SAPI call.
+    """Class for interacting with jobs submitted to SAPI.
 
-    Waits for a request to complete and parses the message returned.
-    The future will be block to resolve when any data value is accessed.
-    The method :meth:`done` can be used to query for resolution without blocking.
-    :meth:`wait`, and :meth:`wait_multiple` can be used to block for a variable
-    number of jobs for a given amount of time.
+    :obj:`Solver` uses :class:`Future` to construct objects for pending SAPI calls that can wait for
+    requests to complete and parse returned messages.
 
-    Note:
-        Only constructed by :obj:`Solver` objects.
+    Objects are blocked for the duration of any data accessed.
 
     Args:
-        solver: The solver that is going to fulfil this future.
-        id_: Identification of the query we are waiting for. (May be None and filled in later.)
-        return_matrix: Request return values as numpy matrices.
+        solver: Solver responsible for this :class:`Future` object.
+        id_: Identification for a query submitted by a solver to SAPI.
+            May be None following submission until an identification number is set.
+        return_matrix: Return values for this :class:`Future` object are NumPy matrices.
+
+    Examples:
+        This example creates a solver using the local system’s default D-Wave Cloud Client
+        configuration file, submits a simple QUBO problem to a remote D-Wave resource for
+        100 samples, and checks a couple of times whether the sampling is completed.
+
+        >>> from dwave.cloud import Client
+        >>> solver = client.get_solver()
+        >>> u, v = next(iter(solver.edges))
+        >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+        >>> computation = solver.sample_qubo(Q, num_reads=100)   # doctest: +SKIP
+        >>> computation.done()  # doctest: +SKIP
+        False
+        >>> computation.id   # doctest: +SKIP
+        u'1cefeb6d-ebd5-4592-87c0-4cc43ec03e27'
+        >>> computation.done()   # doctest: +SKIP
+        True
+        >>> client.close() 
     """
 
     def __init__(self, solver, id_, return_matrix, submission_data):
@@ -143,8 +168,7 @@ class Future(object):
     def wait_multiple(futures, min_done=None, timeout=None):
         """Wait for multiple Future objects to complete.
 
-        Python doesn't provide a multi-wait, but we can jury rig something reasonably
-        efficient using an event object.
+        A blocking call that uses an event object to emulate multi-wait for Python.
 
         Args:
             futures (list of Future): list of objects to wait on
@@ -173,7 +197,7 @@ class Future(object):
 
             # Or we can wait on several futures
             dwave.cloud.computation.Future.wait_multiple(futures, min_done=3)
-            
+
         """
         if min_done is None:
             min_done = len(futures)
@@ -239,20 +263,26 @@ class Future(object):
     def wait(self, timeout=None):
         """Wait for the results to be available.
 
+        A blocking call that waits for a Future object to complete.
+
         Args:
             timeout (float): Maximum number of seconds to wait
         """
         return self._results_ready_event.wait(timeout)
 
     def done(self):
-        """Test whether a response has arrived."""
+        """Test whether a response has arrived.
+
+        A non-blocking call that checks whether the solver has received a result from
+        the remote resource.
+        """
         return self._message is not None or self.error is not None
 
     def cancel(self):
         """Try to cancel the problem corresponding to this result.
 
-        An effort will be made to prevent the execution of the corresponding problem
-        but there are no guarantees.
+        A non-blocking call to the remote resource in a best-effort attempt to prevent execution of a problem.
+
         """
         # Don't need to cancel something already finished
         if self.done():
