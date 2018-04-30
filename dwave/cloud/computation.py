@@ -166,7 +166,7 @@ class Future(object):
 
     @staticmethod
     def wait_multiple(futures, min_done=None, timeout=None):
-        """Wait for multiple Future objects to complete.
+        """Wait for multiple :class:`Future` objects to complete.
 
         A blocking call that uses an event object to emulate multi-wait for Python.
 
@@ -261,12 +261,32 @@ class Future(object):
                 yield f
 
     def wait(self, timeout=None):
-        """Wait for the results to be available.
+        """Wait for the solver to receive a response for a submitted problem.
 
-        A blocking call that waits for a Future object to complete.
+        A blocking call that waits for a :class:`Future` object to complete.
 
         Args:
-            timeout (float): Maximum number of seconds to wait
+            timeout (float): Maximum number of seconds to wait.
+
+        Examples:
+            This example creates a solver using the local system’s default D-Wave Cloud Client
+            configuration file, submits a simple QUBO problem to a remote D-Wave resource for
+            100 samples, and tries waiting for 10 seconds for sampling to complete.
+
+            >>> from dwave.cloud import Client
+            >>> solver = client.get_solver()
+            >>> u, v = next(iter(solver.edges))
+            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            >>> computation = solver.sample_qubo(Q, num_reads=100)   # doctest: +SKIP
+            >>> computation.wait(timeout=10)    # doctest: +SKIP
+            False
+            >>> computation.remote_status
+            u'IN_PROGRESS'
+            >>> computation.wait(timeout=10)  # doctest: +SKIP
+            True
+            >>> computation.remote_status   # doctest: +SKIP
+            u'COMPLETED'
+            >>> client.close()
         """
         return self._results_ready_event.wait(timeout)
 
