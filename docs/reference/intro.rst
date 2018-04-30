@@ -4,7 +4,13 @@
 Introduction
 ============
 
-TODO: some words about solvers, work with SAPI, etc
+D-Wave Cloud Client is a minimal implementation of the REST interface used to communicate with
+D-Wave Sampler API (SAPI) servers.
+
+SAPI is an application layer built to provide resource discovery, permissions,
+and scheduling for quantum annealing resources at D-Wave Systems.
+This package provides a minimal Python interface to that layer without
+compromising the quality of interactions and workflow.
 
 Configuration
 =============

@@ -20,6 +20,6 @@ Methods
    :toctree: generated
 
    Solver.check_problem
-   Solver.retrieve_problem
+   .. Solver.retrieve_problem Took out as per Issue #147
    Solver.sample_ising
    Solver.sample_qubo

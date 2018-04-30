@@ -189,7 +189,6 @@ class Solver(object):
             samples 5 times.
 
             >>> from dwave.cloud import Client
-            >>> Q = {(0, 0): -1, (0, 4): 0, (4, 0): 2, (4, 4): -1}
             >>> with Client.from_config() as client:  # doctest: +SKIP
             ...     solver = client.get_solver()
             ...     u, v = next(iter(solver.edges))
