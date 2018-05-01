@@ -469,14 +469,14 @@ def load_config(config_file=None, profile=None, client=None,
     Args:
 
         config_file (str/[str]/None/False/True, default=None):
-            Path to configuration file.
+            Path to configuration file(s).
 
             If ``None``, the value is taken from ``DWAVE_CONFIG_FILE`` environment
             variable if defined. If the environment variable is undefined or empty,
             auto-detection searches for existing configuration files in the standard
             directories of :func:`get_configfile_paths`.
 
-            If ``False``, loading from file is skipped.
+            If ``False``, loading from file(s) is skipped.
 
             If ``True``, forces auto-detection (regardless of the ``DWAVE_CONFIG_FILE``
             environment variable).

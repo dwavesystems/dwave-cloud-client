@@ -1,5 +1,15 @@
 """
-TODO: some explanation of solvers
+A :term:`solver` is a resource for solving problems.
+
+Solvers are responsible for:
+
+    - Encoding submitted problems
+    - Checking submitted parameters
+    - Adding problems to a client's submission queue
+
+You can list all solvers available to a :class:`Client` with its :meth:`get_solvers` method
+and select and return one with its :meth:`get_solver` method.
+
 """
 
 from __future__ import division, absolute_import
@@ -19,19 +29,28 @@ _LOGGER = logging.getLogger(__name__)
 
 class Solver(object):
     """
-    A solver enables sampling from an Ising model. It encapsulates the solver
-    description as returned by the D-Wave cloud API.
+    Class for D-Wave solvers.
 
-    Get solver objects by calling :meth:`get_solver` on a :class:`Client` object.
-
-    The solver has responsibility for:
-    - Encoding problems submitted
-    - Checking the submitted parameters
-    - Add problems to the Client's submission queue
+    This class provides :term:`Ising` and :term:`QUBO` sampling methods and encapsulates
+    the solver description returned from the D-Wave cloud API.
 
     Args:
-        client (:class:`Client`): Client through which the solver is accessed.
-        data (`dict`): Data from the server describing this solver.
+        client (:class:`Client`):
+            Client that manages access to this solver.
+
+        data (`dict`):
+            Data from the server describing this solver.
+
+    Examples:
+        This example creates a client using the local system's default D-Wave Cloud
+        Client configuration file and checks the identity of its default solver.
+
+        >>> from dwave.cloud import Client
+        >>> client = Client.from_config()
+        >>> solver = client.get_solver()
+        >>> solver.data['id']    # doctest: +SKIP
+        u'EXAMPLE_2000Q_SYSTEM'
+
     """
 
     # Special flag to notify the system a solver needs access to special hardware
@@ -116,9 +135,7 @@ class Solver(object):
         return "Solver(id={!r})".format(self.id)
 
     def sample_ising(self, linear, quadratic, **params):
-        """Draw samples from the provided Ising model.
-
-        To submit a problem: ``POST /problems/``
+        """Sample from the specified Ising model.
 
         Args:
             linear (list/dict): Linear terms of the model (h).
@@ -127,22 +144,66 @@ class Solver(object):
 
         Returns:
             :obj:`Future`
+
+        Examples:
+            This example creates a client using the local system's default D-Wave Cloud Client
+            configuration file, which is configured to access a D-Wave 2000Q QPU, submits a
+            simple :term:`Ising` problem (opposite linear biases on two coupled qubits), and samples
+            5 times.
+
+            >>> from dwave.cloud import Client
+            >>> with Client.from_config() as client:
+            ...     solver = client.get_solver()
+            ...     u, v = next(iter(solver.edges))
+            ...     computation = solver.sample_ising({u: -1, v: 1},{}, num_reads=5)   # doctest: +SKIP
+            ...     for i in range(5):
+            ...         print(computation.samples[i][u], computation.samples[i][v])
+            ...
+            ...
+            (1, -1)
+            (1, -1)
+            (1, -1)
+            (1, -1)
+            (1, -1)
+
         """
         # Our linear and quadratic objective terms are already separated in an
         # ising model so we can just directly call `_sample`.
         return self._sample('ising', linear, quadratic, params)
 
     def sample_qubo(self, qubo, **params):
-        """Draw samples from the provided QUBO.
-
-        To submit a problem: ``POST /problems/``
+        """Sample from the specified QUBO.
 
         Args:
-            qubo (dict of (int, int):float): Terms of the model.
+            qubo (dict of (int, int):float): Coefficients of a quadratic unconstrained binary
+                optimization (QUBO) model.
             **params: Parameters for the sampling method, specified per solver.
 
         Returns:
             :obj:`Future`
+
+        Examples:
+            This example creates a client using the local system's default D-Wave Cloud Client
+            configuration file, which is configured to access a D-Wave 2000Q QPU, submits
+            a :term:`QUBO` problem (a Boolean NOT gate represented by a penalty model), and
+            samples 5 times.
+
+            >>> from dwave.cloud import Client
+            >>> with Client.from_config() as client:  # doctest: +SKIP
+            ...     solver = client.get_solver()
+            ...     u, v = next(iter(solver.edges))
+            ...     Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            ...     computation = solver.sample_qubo(Q, num_reads=5)
+            ...     for i in range(5):
+            ...         print(computation.samples[i][u], computation.samples[i][v])
+            ...
+            ...
+            (0, 1)
+            (1, 0)
+            (1, 0)
+            (0, 1)
+            (1, 0)
+
         """
         # In a QUBO the linear and quadratic terms in the objective are mixed into
         # a matrix. For the sake of encoding, we will separate them before calling `_sample`
@@ -197,6 +258,28 @@ class Solver(object):
 
         Returns:
             boolean
+
+        Examples:
+            This example creates a client using the local system's default D-Wave Cloud Client
+            configuration file, which is configured to access a D-Wave 2000Q QPU, and
+            tests a simple :term:`Ising` model for two target embeddings (that is, representations
+            of the model's graph by coupled qubits on the QPU's sparsely connected graph),
+            where only the second is valid.
+
+            >>> from dwave.cloud import Client
+            >>> print((0, 1) in solver.edges)   # doctest: +SKIP
+            False
+            >>> print((0, 4) in solver.edges)   # doctest: +SKIP
+            True
+            >>> with Client.from_config() as client:  # doctest: +SKIP
+            ...     solver = client.get_solver()
+            ...     print(solver.check_problem({0: -1, 1: 1},{(0, 1):0.5}))
+            ...     print(solver.check_problem({0: -1, 4: 1},{(0, 4):0.5}))
+            ...
+            False
+            True
+
+
         """
         for key, value in uniform_iterator(linear):
             if value != 0 and key not in self.nodes:
