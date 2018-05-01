@@ -156,9 +156,9 @@ class Solver(object):
             ...     solver = client.get_solver()
             ...     u, v = next(iter(solver.edges))
             ...     computation = solver.sample_ising({u: -1, v: 1},{}, num_reads=5)   # doctest: +SKIP
+            ...     for i in range(5):
+            ...         print(computation.samples[i][u], computation.samples[i][v])
             ...
-            >>> for i in range(5):    # doctest: +SKIP
-            ...     print(computation.samples[i][u], computation.samples[i][v])
             ...
             (1, -1)
             (1, -1)
@@ -194,9 +194,9 @@ class Solver(object):
             ...     u, v = next(iter(solver.edges))
             ...     Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
             ...     computation = solver.sample_qubo(Q, num_reads=5)
+            ...     for i in range(5):
+            ...         print(computation.samples[i][u], computation.samples[i][v])
             ...
-            >>> for i in range(5):     # doctest: +SKIP
-            ...     print(computation.samples[i][u], computation.samples[i][v])
             ...
             (0, 1)
             (1, 0)
