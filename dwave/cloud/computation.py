@@ -416,10 +416,39 @@ class Future(object):
                 self.solver.client._cancel(self.id, self)
 
     def result(self):
-        """Blocking call to retrieve the result.
+        """Retrieve results for a submitted job.
+
+        Blocking call to retrieve the result for a :class:`Future` object that a solver
+        submitted to a remote resource.
 
         Returns:
-            dict with the results. Should be considered read-only.
+            dict: Results of the submitted job. Should be considered read-only.
+
+        Examples:
+            This example creates a solver using the local system's default D-Wave Cloud Client
+            configuration file, submits a simple QUBO problem (representing a Boolean NOT gate
+            by a penalty function) to a remote D-Wave resource for 5 samples, and waits for it
+            to complete before printing part of the returned result (the relevant samples).
+
+            >>> from dwave.cloud import Client
+            >>> with Client.from_config() as client:  # doctest: +SKIP
+            ...     solver = client.get_solver()
+            ...     u, v = next(iter(solver.edges))
+            ...     Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            ...     computation = solver.sample_qubo(Q, num_reads=5)
+            ...     computation.wait()
+            ...
+            >>> computation.done()    # doctest: +SKIP
+            True
+            >>> for i in range(5):     # doctest: +SKIP
+            ...     print(computation.result()['samples'][i][u], computation.result()['samples'][i][v])
+            ...
+            (0, 1)
+            (1, 0)
+            (1, 0)
+            (0, 1)
+            (0, 1)
+
         """
         self._load_result()
         return self._result
