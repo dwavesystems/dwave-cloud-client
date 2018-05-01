@@ -183,6 +183,10 @@ class Future(object):
                 similar to `concurrent.futures.wait()` returned two-tuple of 'done' and
                 'not_done' sets.
 
+        See Also:
+             :func:`as_completed` for a blocking iterable of resolved futures similar to
+                  concurrent.futures.as_completed() method.
+
         Examples:
             This example creates a solver using the local system’s default D-Wave Cloud Client
             configuration file, submits a simple QUBO problem to a remote D-Wave resource 3 times
@@ -256,10 +260,16 @@ class Future(object):
 
     @staticmethod
     def as_completed(fs, timeout=None):
-        """Emulate `concurrent.futures.as_completed()` behavior.
+        """Yield Futures objects as they complete.
 
-        Returns an iterator over the list of out `Future` instances given by
-        `fs` that yields futures as they complete (finished or were cancelled).
+        Returns an iterator over the specified list of :class:`Future` objects that
+        yields those objects as they complete. Completion occurs
+        when the submitted job is finished or cancelled.
+
+        Emulates the behavior of the `concurrent.futures.as_completed()` function.
+
+        Args:
+
 
         The `concurrent.futures.TimeoutError` is raised if per-future timeout is
         exceeded at any point.
@@ -275,7 +285,7 @@ class Future(object):
     def wait(self, timeout=None):
         """Wait for the solver to receive a response for a submitted problem.
 
-        A blocking call that waits for a :class:`Future` object to complete.
+        Blocking call that waits for a :class:`Future` object to complete.
 
         Args:
             timeout (float): Maximum number of seconds to wait.
@@ -305,7 +315,7 @@ class Future(object):
     def done(self):
         """Check whether the solver received a response for a submitted problem.
 
-        A non-blocking call that checks whether the solver has received a response from
+        Non-blocking call that checks whether the solver has received a response from
         the remote resource.
 
         Examples:
@@ -329,7 +339,7 @@ class Future(object):
     def cancel(self):
         """Try to cancel the problem corresponding to this result.
 
-        A non-blocking call to the remote resource in a best-effort attempt to prevent execution of a problem.
+        Non-blocking call to the remote resource in a best-effort attempt to prevent execution of a problem.
 
         """
         # Don't need to cancel something already finished
@@ -363,6 +373,9 @@ class Future(object):
     def energies(self):
         """The energy buffer, blocks if needed.
 
+        First calls to access a :class:`Future` object are blocking; subsequent access
+        to this property is non-blocking.
+
         Returns:
             list or numpy matrix of doubles.
         """
@@ -372,6 +385,9 @@ class Future(object):
     def samples(self):
         """The state buffer, blocks if needed.
 
+        First calls to access a :class:`Future` object are blocking; subsequent access
+        to this property is non-blocking.
+
         Returns:
             list of lists or numpy matrix.
         """
@@ -380,6 +396,9 @@ class Future(object):
     @property
     def occurrences(self):
         """The occurrences buffer, blocks if needed.
+
+        First calls to access a :class:`Future` object are blocking; subsequent access
+        to this property is non-blocking.
 
         Returns:
             list or numpy matrix of doubles.
@@ -398,6 +417,9 @@ class Future(object):
 
         The response is a mapping from string keys to numeric values.
         The exact keys used depend on the solver.
+
+        First calls to access a :class:`Future` object are blocking; subsequent access
+        to this property is non-blocking.
 
         Returns:
             dict
