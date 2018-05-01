@@ -416,10 +416,10 @@ class Future(object):
                 self.solver.client._cancel(self.id, self)
 
     def result(self):
-        """Retrieve results for a submitted job.
+        """Results for a submitted job.
 
-        Blocking call to retrieve the result for a :class:`Future` object that a solver
-        submitted to a remote resource.
+        Retrives result data in a :class:`Future` object that the solver submitted to a remote resource.
+        First calls to access this data are blocking.
 
         Returns:
             dict: Results of the submitted job. Should be considered read-only.
@@ -454,7 +454,7 @@ class Future(object):
     def energies(self):
         """Energy buffer for the submitted job.
 
-        First calls to access a :class:`Future` object are blocking; subsequent access
+        First calls to access data of a :class:`Future` object are blocking; subsequent access
         to this property is non-blocking.
 
         Returns:
@@ -482,25 +482,47 @@ class Future(object):
 
     @property
     def samples(self):
-        """The state buffer, blocks if needed.
+        """State buffer for the submitted job.
 
-        First calls to access a :class:`Future` object are blocking; subsequent access
+        First calls to access data of a :class:`Future` object are blocking; subsequent access
         to this property is non-blocking.
 
         Returns:
-            list of lists or numpy matrix.
+            list of lists or numpy matrix: Samples on the nodes of solver's graph.
+
+        Examples:
+            This example creates a solver using the local system's default D-Wave Cloud Client
+            configuration file, submits a simple QUBO problem (representing a Boolean NOT gate
+            by a penalty function) to a remote D-Wave resource for 5 samples, and prints part
+            of the returned result (the relevant samples).
+
+            >>> from dwave.cloud import Client
+            >>> with Client.from_config() as client:  # doctest: +SKIP
+            ...     solver = client.get_solver()
+            ...     u, v = next(iter(solver.edges))
+            ...     Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            ...     computation = solver.sample_qubo(Q, num_reads=5)
+            ...     for i in range(5):
+            ...         print(computation.samples[i][u], computation.samples[i][v])
+            ...
+            ...
+            (1, 0)
+            (0, 1)
+            (0, 1)
+            (1, 0)
+            (0, 1)
         """
         return self.result()['samples']
 
     @property
     def occurrences(self):
-        """The occurrences buffer, blocks if needed.
+        """Occurrences buffer for the submitted job.
 
-        First calls to access a :class:`Future` object are blocking; subsequent access
+        First calls to access data of a :class:`Future` object are blocking; subsequent access
         to this property is non-blocking.
 
         Returns:
-            list or numpy matrix of doubles.
+            list or numpy matrix of doubles: Occurrences.
         """
         self._load_result()
         if 'occurrences' in self._result:
@@ -518,7 +540,7 @@ class Future(object):
         for a submitted job as returned from the remote resource. Keys are dependant on
         the particular solver.
 
-        First calls to access a :class:`Future` object are blocking; subsequent access
+        First calls to access data of a :class:`Future` object are blocking; subsequent access
         to this property is non-blocking.
 
         Returns:

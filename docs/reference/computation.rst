@@ -20,13 +20,12 @@ Methods
 .. autosummary::
    :toctree: generated
 
-   Future.as_completed
-   Future.cancel
-   Future.done
    Future.result
+   Future.as_completed
    Future.wait
    Future.wait_multiple
-
+   Future.done
+   Future.cancel
 
 Properties
 ----------
@@ -34,7 +33,7 @@ Properties
 .. autosummary::
    :toctree: generated
 
+   Future.samples
    Future.energies
    Future.occurrences
-   Future.samples
    Future.timing
