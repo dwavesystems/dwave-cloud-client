@@ -427,8 +427,8 @@ class Future(object):
         Examples:
             This example creates a solver using the local system's default D-Wave Cloud Client
             configuration file, submits a simple QUBO problem (representing a Boolean NOT gate
-            by a penalty function) to a remote D-Wave resource for 5 samples, and waits for it
-            to complete before printing part of the returned result (the relevant samples).
+            by a penalty function) to a remote D-Wave resource for 5 samples, and prints part
+            of the returned result (the relevant samples).
 
             >>> from dwave.cloud import Client
             >>> with Client.from_config() as client:  # doctest: +SKIP
@@ -436,12 +436,9 @@ class Future(object):
             ...     u, v = next(iter(solver.edges))
             ...     Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
             ...     computation = solver.sample_qubo(Q, num_reads=5)
-            ...     computation.wait()
+            ...     for i in range(5):
+            ...         print(computation.result()['samples'][i][u], computation.result()['samples'][i][v])
             ...
-            >>> computation.done()    # doctest: +SKIP
-            True
-            >>> for i in range(5):     # doctest: +SKIP
-            ...     print(computation.result()['samples'][i][u], computation.result()['samples'][i][v])
             ...
             (0, 1)
             (1, 0)
@@ -497,16 +494,34 @@ class Future(object):
 
     @property
     def timing(self):
-        """Information about the time the solver took in operation.
+        """Timing information about a solver operation.
 
-        The response is a mapping from string keys to numeric values.
-        The exact keys used depend on the solver.
+        Returns a mapping from string keys to numeric values representing timing details
+        for a submitted job as returned from the remote resource. Keys are dependant on
+        the particular solver.
 
         First calls to access a :class:`Future` object are blocking; subsequent access
         to this property is non-blocking.
 
         Returns:
-            dict
+            dict: Mapping from string keys to numeric values representing timing information.
+
+        Examples:
+            This example creates a client using the local system's default D-Wave Cloud Client
+            configuration file, which is configured to access a D-Wave 2000Q QPU, submits a
+            simple :term:`Ising` problem (opposite linear biases on two coupled qubits) for
+            5 samples, and prints timing information for the job.
+
+            >>> from dwave.cloud import Client
+            >>> with Client.from_config() as client:
+            ...     solver = client.get_solver()
+            ...     u, v = next(iter(solver.edges))
+            ...     computation = solver.sample_ising({u: -1, v: 1},{}, num_reads=5)   # doctest: +SKIP
+            ...     print(computation.timing)
+            ...
+            {u'total_real_time': 10961, u'anneal_time_per_run': 20,
+            >>> # Snipped above response for brevity
+
         """
         return self.result()['timing']
 
