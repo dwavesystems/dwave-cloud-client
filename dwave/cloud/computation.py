@@ -452,13 +452,31 @@ class Future(object):
 
     @property
     def energies(self):
-        """The energy buffer, blocks if needed.
+        """Energy buffer for the submitted job.
 
         First calls to access a :class:`Future` object are blocking; subsequent access
         to this property is non-blocking.
 
         Returns:
-            list or numpy matrix of doubles.
+            list or numpy matrix of doubles: Energies for each set of samples.
+
+        Examples:
+            This example creates a solver using the local system's default D-Wave Cloud Client
+            configuration file, submits a random Ising problem (+1 or -1 values of linear and
+            quadratic biases on all nodes and edges, respectively, of the solver's garph) to
+            a remote D-Wave resource for 10 samples, and prints the returned energies.
+
+            >>> import random
+            >>> from dwave.cloud import Client
+            >>> with Client.from_config() as client:  # doctest: +SKIP
+            ...     solver = client.get_solver()
+            ...     linear = {index: random.choice([-1, 1]) for index in solver.nodes}
+            ...     quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
+            ...     computation = solver.sample_ising(linear, quad, num_reads=10)
+            ...     print(computation.energies)
+            ...
+            [-3976.0, -3974.0, -3972.0, -3970.0, -3968.0, -3968.0, -3966.0,
+             -3964.0, -3964.0, -3960.0]
         """
         return self.result()['energies']
 
@@ -496,7 +514,7 @@ class Future(object):
     def timing(self):
         """Timing information about a solver operation.
 
-        Returns a mapping from string keys to numeric values representing timing details
+        Mapping from string keys to numeric values representing timing details
         for a submitted job as returned from the remote resource. Keys are dependant on
         the particular solver.
 
