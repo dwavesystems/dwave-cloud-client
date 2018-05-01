@@ -37,7 +37,7 @@ __all__ = ['Future']
 class Future(object):
     """Class for interacting with jobs submitted to SAPI.
 
-    :class:`Solver` uses :class:`Future` to construct objects for pending SAPI calls that can wait for
+    :class:`~dwave.cloud.solver.Solver` uses :class:`Future` to construct objects for pending SAPI calls that can wait for
     requests to complete and parse returned messages.
 
     Objects are blocked for the duration of any data accessed on the remote resource.
@@ -180,13 +180,10 @@ class Future(object):
                 If None, waits indefinitely.
 
         Returns:
-            Two-tuple of :class:`Future` objects completed and not completed,
-                similar to `concurrent.futures.wait()` returned two-tuple of 'done'
-                and 'not_done' sets.
+            Two-tuple of :class:`Future` objects: completed and not completed submitted tasks. Similar to `concurrent.futures.wait()` method's returned two-tuple of `done` and `not_done` sets.
 
         See Also:
-             :func:`as_completed` for a blocking iterable of resolved futures similar
-                 to concurrent.futures.as_completed() method.
+            :func:`as_completed` for a blocking iterable of resolved futures similar to `concurrent.futures.as_completed()` method.
 
         Examples:
             This example creates a solver using the local system's default D-Wave Cloud Client
@@ -380,6 +377,24 @@ class Future(object):
         """Try to cancel the problem corresponding to this result.
 
         Non-blocking call to the remote resource in a best-effort attempt to prevent execution of a problem.
+
+        Examples:
+            This example creates a solver using the local system's default D-Wave Cloud Client
+            configuration file, submits a simple QUBO problem to a remote D-Wave resource for
+            100 samples, and tries (and in this case succeeds) to cancel it.
+
+            >>> import dwave.cloud as dc
+            >>> client = dc.Client.from_config()
+            >>> solver = Client.get_solver()
+            >>> u, v = next(iter(solver.edges))
+            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            >>> computation = solver.sample_qubo(Q, num_reads=100)   # doctest: +SKIP
+            >>> computation.cancel()  # doctest: +SKIP
+            >>> computation.done()   # doctest: +SKIP
+            True
+            >>> computation.remote_status    # doctest: +SKIP
+            u'CANCELLED'
+            >>> client.close()
 
         """
         # Don't need to cancel something already finished
