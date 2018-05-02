@@ -18,7 +18,7 @@ from dwave.cloud.config import (
 @click.group()
 @click.version_option(prog_name=__title__, version=__version__)
 def cli():
-    """D-Wave cloud tool."""
+    """D-Wave Cloud Client interactive configuration tool."""
 
 
 @cli.group()
@@ -28,15 +28,15 @@ def config():
 
 @config.command()
 @click.option('--system', is_flag=True,
-              help='List paths of system-wide config files')
+              help='List paths of system-wide configuration files')
 @click.option('--user', is_flag=True,
-              help='List paths of user-local config files')
+              help='List paths of user-local configuration files')
 @click.option('--local', is_flag=True,
-              help='List paths of local config files')
+              help='List paths of local configuration files')
 @click.option('--include-missing', '-m', is_flag=True,
-              help='List all examined paths, not only existing')
+              help='List all examined paths, not only used paths')
 def ls(system, user, local, include_missing):
-    """List config files detected (and/or paths examined)."""
+    """List configuration files detected (and/or examined paths)."""
 
     # default action is to list *all* auto-detected files
     if not (system or user or local):
@@ -49,17 +49,17 @@ def ls(system, user, local, include_missing):
 
 @config.command()
 @click.option('--config-file', '-c', default=None,
-              type=click.Path(exists=True, dir_okay=False), help='Config file path')
+              type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
 @click.option('--profile', '-p', default=None,
-              help='Connection profile name (config section name)')
+              help='Connection profile (section) name')
 def inspect(config_file, profile):
-    """Inspect existing config/profile."""
+    """Inspect existing configuration/profile."""
 
     try:
         section = load_profile_from_files(
             [config_file] if config_file else None, profile)
 
-        click.echo("Config file: {}".format(config_file if config_file else "auto-detected"))
+        click.echo("Configuration file: {}".format(config_file if config_file else "auto-detected"))
         click.echo("Profile: {}".format(profile if profile else "auto-detected"))
         click.echo("---")
         for key, val in section.items():
@@ -71,33 +71,33 @@ def inspect(config_file, profile):
 
 @config.command()
 @click.option('--config-file', '-c', default=None,
-              type=click.Path(exists=False, dir_okay=False), help='Config file path')
+              type=click.Path(exists=False, dir_okay=False), help='Configuration file path')
 @click.option('--profile', '-p', default=None,
-              help='Connection profile name (config section name)')
+              help='Connection profile (section) name')
 def create(config_file, profile):
     """Create and/or update cloud client configuration file."""
 
     # determine the config file path
     if config_file:
-        click.echo("Using config file: {}".format(config_file))
+        click.echo("Using configuration file: {}".format(config_file))
     else:
         # path not given, try to detect; or use default, but allow user to override
         config_file = get_configfile_path()
         if config_file:
-            click.echo("Found existing config file: {}".format(config_file))
+            click.echo("Found existing configuration file: {}".format(config_file))
         else:
             config_file = get_default_configfile_path()
-            click.echo("Config file not found, the default location is: {}".format(config_file))
-        config_file = readline_input("Confirm config file path (editable): ", config_file)
+            click.echo("Configuration file not found; the default location is: {}".format(config_file))
+        config_file = readline_input("Confirm configuration file path (editable): ", config_file)
 
     # create config_file path
     config_base = os.path.dirname(config_file)
     if config_base and not os.path.exists(config_base):
-        if click.confirm("Config file path does not exist. Create it?", abort=True):
+        if click.confirm("Configuration file path does not exist. Create it?", abort=True):
             try:
                 os.makedirs(config_base)
             except Exception as e:
-                click.echo("Error creating config path: {}".format(e))
+                click.echo("Error creating configuration path: {}".format(e))
                 return 1
 
     # try loading existing config, or use defaults
@@ -120,7 +120,7 @@ def create(config_file, profile):
         while not profile:
             profile = readline_input("Profile (%s): " % profiles, default_profile)
             if not profile:
-                click.echo("Profile name can't be empty.")
+                click.echo("Profile name cannot be empty.")
 
     if not config.has_section(profile):
         config.add_section(profile)
@@ -128,7 +128,7 @@ def create(config_file, profile):
     # fill out the profile variables
     variables = 'endpoint token client solver proxy'.split()
     prompts = ['API endpoint URL (editable): ',
-               'Auth token (editable): ',
+               'Authentication token (editable): ',
                'Client class (qpu or sw): ',
                'Solver (can be left blank): ',
                'Proxy URL (can be left blank): ']
@@ -142,28 +142,28 @@ def create(config_file, profile):
         with open(config_file, 'w') as fp:
             config.write(fp)
     except Exception as e:
-        click.echo("Error writing to config file: {}".format(e))
+        click.echo("Error writing to configuration file: {}".format(e))
         return 2
 
-    click.echo("Config saved.")
+    click.echo("Configuration saved.")
     return 0
 
 
 @cli.command()
 @click.option('--config-file', '-c', default=None,
-              type=click.Path(exists=True, dir_okay=False), help='Config file path')
+              type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
 @click.option('--profile', '-p', default=None,
-              help='Connection profile name (config section name)')
+              help='Connection profile (section) name')
 def ping(config_file, profile):
     """Ping the QPU by submitting a single-qubit problem."""
 
     try:
         client = Client.from_config(config_file=config_file, profile=profile)
     except Exception as e:
-        click.echo("Invalid config: {}".format(e))
+        click.echo("Invalid configuration: {}".format(e))
         return 1
     if config_file:
-        click.echo("Using config file: {}".format(config_file))
+        click.echo("Using configuration file: {}".format(config_file))
     if profile:
         click.echo("Using profile: {}".format(profile))
     click.echo("Using endpoint: {}".format(client.endpoint))
@@ -172,7 +172,7 @@ def ping(config_file, profile):
     try:
         solvers = client.get_solvers()
     except SolverAuthenticationError:
-        click.echo("Authentication error. Check credentials in your config file.")
+        click.echo("Authentication error. Check credentials in your configuration file.")
         return 1
     except (InvalidAPIResponseError, UnsupportedSolverError):
         click.echo("Invalid or unexpected API response.")
@@ -207,7 +207,7 @@ def ping(config_file, profile):
 
 @cli.command()
 @click.option('--config-file', '-c', default=None,
-              type=click.Path(exists=True, dir_okay=False), help='Config file path')
+              type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
 @click.option('--profile', '-p', default=None, help='Connection profile name')
 @click.option('--id', default=None, help='Solver ID/name')
 def solvers(config_file, profile, id):
