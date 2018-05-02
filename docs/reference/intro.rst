@@ -103,7 +103,7 @@ can be set in environment variables; for example:
 * ``DWAVE_PROFILE`` may select the name of a profile (section).
 * ``DWAVE_API_CLIENT`` may select the API client class.
 
-For details on supported environment variables and the ordering between these and 
+For details on supported environment variables and prioritizing between these and
 values set explicitly or through configuration file, see the
 :func:`~dwave.cloud.config.load_config` method.
 
