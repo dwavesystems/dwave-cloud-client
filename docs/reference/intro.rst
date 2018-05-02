@@ -117,14 +117,37 @@ TODO
 Work Flow
 =========
 
-TODO: describe the general use of cloud client including problem submission and
-monitoring (computation)
+A :term:`solver` is a resource for solving problems. Solvers are responsible for:
 
-Solvers
-=======
+    - Encoding submitted problems
+    - Checking submitted parameters
+    - Adding problems to a client's submission queue
 
-TODO: add short description of available resources for sampling
+Solvers that provide sampling for solving :term:`Ising` and :term:`QUBO` problems, such
+as a D-Wave 2000Q QPU or a software :term:`sampler` such as the
+`dimod <https://github.com/dwavesystems/dimod>`_ simulated annealing sampler,
+are typically remote resources. While the D-Wave Cloud Client
+:class:`~dwave.cloud.solver.Solver` manages the submission of your problem,
+:class:`~dwave.cloud.client.Client` manages communication with the remote solver
+resources, selecting and authenticating access to available solvers; for example,
+you can list all solvers available to a client with its
+:func:`~dwave.cloud.client.Client.get_solvers` method and select and return one with its
+:func:`~dwave.cloud.client.Client.get_solver` method.
 
+Preferred use is with a context manager (a :code:`with Client.from_config(...) as`
+construct) to ensure proper closure of all resources. The following example snippet
+creates a client based on an auto-detected configuration file and instantiates
+a solver.
+
+>>> with Client.from_config() as client:   # doctest: +SKIP
+...     solver = client.get_solver('2000Q_ONLINE_SOLVER')
+
+Alternatively, the following example snippet creates a client for software resources
+that it later explicitly closes.
+
+>>> client = Client.from_config(client='sw')   # doctest: +SKIP
+>>> # code that uses client
+>>> client.close()    # doctest: +SKIP
 
 Terminology
 ===========
