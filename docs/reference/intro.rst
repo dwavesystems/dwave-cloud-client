@@ -4,8 +4,8 @@
 Introduction
 ============
 
-D-Wave Cloud Client is a minimal implementation of the REST interface used to communicate with
-D-Wave Sampler API (SAPI) servers.
+D-Wave Cloud Client is a minimal implementation of the REST interface used to communicate
+with D-Wave Sampler API (SAPI) servers.
 
 SAPI is an application layer built to provide resource discovery, permissions,
 and scheduling for quantum annealing resources at D-Wave Systems.
@@ -15,14 +15,27 @@ compromising the quality of interactions and workflow.
 Configuration
 =============
 
-It's recommended you set up a configuration file through the interactive CLI utility.
+It's recommended you set up your D-Wave Cloud Client configuration through the
+:ref:`interactive CLI utility <interactiveCliConfiguration>`.
+
+D-Wave Cloud Client provides multiple options for configuring communication with
+a :term:`solver`:
+
+* One or more locally saved :ref:`configuration files <configurationFiles>`.
+* :ref:`Environment variables <environmentVariables>`
+* Direct setting of key values in functions
+
+These options can be flexibly used together.
+
+.. _configurationFiles:
 
 Configuration Files
 -------------------
 
-** THE FOLLOWING IS JUST DRAFT CONTENT **
-
-Candidates paths for configuration files are set by the D-Wave homebase_ package.
+If a D-Wave Cloud Client configuration file is not specified when instantiating a
+client or solver, auto-detection searches for candidate files in a number of standard
+directories, depending on your local system's operating system, you can list with the
+:func:`~dwave.cloud.config.get_configfile_paths` method.
 
 For example, on a Unix system, depending on its flavor, these might include (in order)::
 
@@ -39,51 +52,62 @@ and on Mac OS X under::
 
      ~/Library/Application Support/dwave/dwave.conf
 
-For details on user/system config paths see homebase_.
+(For details on the D-Wave API for determining platform-independent paths to user
+data and configuration folders see the homebase_ tool.)
 
 .. _homebase: https://github.com/dwavesystems/homebase
 
+A single D-Wave Cloud Client configuration file can contain multiple profiles, each
+defining a separate combination of communication parameters such as the URL to the
+remote resource, authentication token, solver, etc.
+Configuration files conform to a standard Windows INI-style format:
+profiles are defined by sections such as, ``[profile-a]`` and ``[profile-b]``.
+Default values for undefined profile keys are taken from the ``[defaults]`` section.
 
-One config file can contain multiple profiles, each defining a separate
-      (endpoint, token, solver, etc.) combination. Since config file conforms to a
-      standard Windows INI-style format, profiles are defined by sections like:
-      ``[profile-a]`` and ``[profile-b]``.
-
-      Default values for undefined profile keys are taken from the ``[defaults]``
-      section.
-
-      For example, assuming ``~/.config/dwave/dwave.conf`` contains::
+For example, if the configuration file, ``~/.config/dwave/dwave.conf``, selected
+through auto-detection as the default configuration, contains the following
+profiles::
 
           [defaults]
-          endpoint = https://cloud.dwavesys.com/sapi
+          endpoint = https://url.of.some.dwavesystem.com/sapi
           client = qpu
 
           [dw2000]
           solver = DW_2000Q_1
-          token = ...
+          token = ABC-123456789123456789123456789
 
           [software]
           client = sw
           solver = c4-sw_sample
-          token = ...
-
-          [alpha]
-          endpoint = https://url.to.alpha/api
+          token = DEF-987654321987654321987654321
           proxy = http://user:pass@myproxy.com:8080/
-          token = ...
 
-      We can instantiate a client for D-Wave 2000Q QPU endpoint with
+You can instantiate a client for D-Wave 2000Q QPU remote resource with::
 
       >>> from dwave.cloud import Client
-      >>> client = Client.from_config(profile='dw2000')
+      >>> client = Client.from_config(profile='dw2000')   # doctest: +SKIP
 
-      and a client for remote software solver with::
+and a client for a software solver with::
 
-      >>> client = Client.from_config(profile='software')
+      >>> client = Client.from_config(profile='software')   # doctest: +SKIP
 
-      ``alpha`` profile will connect to a pre-release API endpoint via defined HTTP
-      proxy server.
+.. _environmentVariables:
 
+Environment Variables
+---------------------
+
+In addition to D-Wave Cloud Client configuration files, configuration information
+can be set in environment variables; for example:
+
+* ``DWAVE_CONFIG_FILE`` may select the configuration file path.
+* ``DWAVE_PROFILE`` may select the name of a profile (section).
+* ``DWAVE_API_CLIENT`` may select the API client class.
+
+For details on supported environment variables and the ordering between these and 
+values set explicitly or through configuration file, see the
+:func:`~dwave.cloud.config.load_config` method.
+
+.. _interactiveCliConfiguration:
 
 Interactive CLI Configuration
 -----------------------------
