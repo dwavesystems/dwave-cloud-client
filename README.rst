@@ -18,16 +18,19 @@
 D-Wave Cloud Client
 ===================
 
-A minimal implementation of the REST interface used to communicate with
-D-Wave Sampler API (SAPI) servers.
+D-Wave Cloud Client is a minimal implementation of the REST interface used to
+communicate with D-Wave Sampler API (SAPI) servers.
 
 SAPI is an application layer built to provide resource discovery, permissions,
 and scheduling for quantum annealing resources at D-Wave Systems.
-This package aims to provide a minimal Python interface to that layer that
-still captures some reasonable practices for interacting with SAPI.
+This package provides a minimal Python interface to that layer without
+compromising the quality of interactions and workflow.
 
 Example
 -------
+This example instantiates a D-Wave Cloud Client and :term:`solver` based on the local
+system`s auto-detected default configuration file and samples a random :term:`Ising` problem
+tailored to fit the solver`s graph.
 
 .. code-block:: python
 
@@ -40,14 +43,14 @@ Example
         # Load the default solver
         solver = client.get_solver()
 
-        # Build a random Ising model on +1, -1. Build it to exactly fit the graph the solver provides
+        # Build a random Ising model to exactly fit the graph the solver supports
         linear = {index: random.choice([-1, 1]) for index in solver.nodes}
         quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
 
-        # Send the problem for sampling, include a solver specific parameter 'num_reads'
+        # Send the problem for sampling, include solver-specific parameter 'num_reads'
         computation = solver.sample_ising(linear, quad, num_reads=100)
 
-        # Print out the first sample (out of a hundred)
+        # Print the first sample out of a hundred
         print(computation.samples[0])
 
 .. index-end-marker
