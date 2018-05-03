@@ -1,5 +1,15 @@
 """
-TODO: short description about computation
+Computation manages the interactions between your code and a :term:`solver`, which
+manages interactions between the remote resource and your submitted problems.
+
+Your solver instantiates a :class:`Future` object for its calls, via D-Wave Sampler API
+(SAPI) servers, to the remote resource.
+
+You can interact with the :class:`Future` object for pending calls: monitoring problem status,
+waiting for and retrieving results, cancelling enqueued jobs, etc.
+
+Some :class:`Future` methods are blocking.
+
 """
 
 from __future__ import division, absolute_import
@@ -25,21 +35,37 @@ __all__ = ['Future']
 
 @functools.total_ordering
 class Future(object):
-    """An object for a pending SAPI call.
+    """Class for interacting with jobs submitted to SAPI.
 
-    Waits for a request to complete and parses the message returned.
-    The future will be block to resolve when any data value is accessed.
-    The method :meth:`done` can be used to query for resolution without blocking.
-    :meth:`wait`, and :meth:`wait_multiple` can be used to block for a variable
-    number of jobs for a given amount of time.
+    :class:`~dwave.cloud.solver.Solver` uses :class:`Future` to construct objects for pending SAPI calls that can wait for
+    requests to complete and parse returned messages.
 
-    Note:
-        Only constructed by :obj:`Solver` objects.
+    Objects are blocked for the duration of any data accessed on the remote resource.
 
     Args:
-        solver: The solver that is going to fulfil this future.
-        id_: Identification of the query we are waiting for. (May be None and filled in later.)
-        return_matrix: Request return values as numpy matrices.
+        solver: Solver responsible for this :class:`Future` object.
+        id_: Identification for a query submitted by a solver to SAPI.
+            May be None following submission until an identification number is set.
+        return_matrix: Return values for this :class:`Future` object are NumPy matrices.
+
+    Examples:
+        This example creates a solver using the local system's default D-Wave Cloud Client
+        configuration file, submits a simple QUBO problem to a remote D-Wave resource for
+        100 samples, and checks a couple of times whether the sampling is completed.
+
+        >>> import dwave.cloud as dc
+        >>> client = dc.Client.from_config()
+        >>> solver = client.get_solver()
+        >>> u, v = next(iter(solver.edges))
+        >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+        >>> computation = solver.sample_qubo(Q, num_reads=100)   # doctest: +SKIP
+        >>> computation.done()  # doctest: +SKIP
+        False
+        >>> computation.id   # doctest: +SKIP
+        u'1cefeb6d-ebd5-4592-87c0-4cc43ec03e27'
+        >>> computation.done()   # doctest: +SKIP
+        True
+        >>> client.close()
     """
 
     def __init__(self, solver, id_, return_matrix, submission_data):
@@ -141,39 +167,51 @@ class Future(object):
 
     @staticmethod
     def wait_multiple(futures, min_done=None, timeout=None):
-        """Wait for multiple Future objects to complete.
+        """Wait for multiple :class:`Future` objects to complete.
 
-        Python doesn't provide a multi-wait, but we can jury rig something reasonably
-        efficient using an event object.
+        Blocking call that uses an event object to emulate multi-wait for Python.
 
         Args:
-            futures (list of Future): list of objects to wait on
-            min_done (int): Stop waiting when this many results are ready
-            timeout (float): Maximum number of seconds to wait, `None` for indefinite wait.
+            futures (list of Futures): List of :class:`Future` objects to await.
+            min_done (int, optional, default=None): Minimum required completions to end
+                the waiting. The wait is terminated when this number of results are ready.
+                If None, waits for all the :class:`Future` objects to complete.
+            timeout (float, optional, default=None): Maximum number of seconds to await completion.
+                If None, waits indefinitely.
 
         Returns:
-            2-tuple of futures done and not_done, similar to `concurrent.futures.wait()`
+            Two-tuple of :class:`Future` objects: completed and not completed submitted tasks. Similar to `concurrent.futures.wait()` method's returned two-tuple of `done` and `not_done` sets.
+
+        See Also:
+            :func:`as_completed` for a blocking iterable of resolved futures similar to `concurrent.futures.as_completed()` method.
 
         Examples:
+            This example creates a solver using the local system's default D-Wave Cloud Client
+            configuration file, submits a simple QUBO problem to a remote D-Wave resource 3 times
+            for differing numers of samples, and waits for sampling to complete on any
+            two of the submissions. The wait ends with the completion of two submissions while
+            the third is still in progress.
 
-        By default all sampling requests are processed asynchronously. Reading results from
-        any future object is a blocking operation.
+            >>> import dwave.cloud as dc
+            >>> client = dc.Client.from_config()
+            >>> solver = client.get_solver()
+            >>> u, v = next(iter(solver.edges))
+            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            >>> computation = [solver.sample_qubo(Q, num_reads=1000),
+            ...                solver.sample_qubo(Q, num_reads=50),
+            ...                solver.sample_qubo(Q, num_reads=10)]   # doctest: +SKIP
+            >>> dc.computation.Future.wait_multiple(computation, min_done=1)    # doctest: +SKIP
+            ([<dwave.cloud.computation.Future at 0x17dde518>,
+              <dwave.cloud.computation.Future at 0x17ddee80>],
+             [<dwave.cloud.computation.Future at 0x15078080>])
+            >>> print(computation[0].done())   # doctest: +SKIP
+            False
+            >>> print(computation[1].done())  # doctest: +SKIP
+            True
+            >>> print(computation[2].done())   # doctest: +SKIP
+            True
+            >>> client.close()
 
-        .. code-block:: python
-
-            # We can submit several sample requests without blocking
-            # (In this specific case we could accomplish the same thing by increasing 'num_reads')
-            futures = [solver.sample_ising(linear, quad, num_reads=100) for _ in range(10)]
-
-            # We can check if a set of samples are ready without blocking
-            print(futures[0].done())
-
-            # We can wait on a single future
-            futures[0].wait()
-
-            # Or we can wait on several futures
-            dwave.cloud.computation.Future.wait_multiple(futures, min_done=3)
-            
         """
         if min_done is None:
             min_done = len(futures)
@@ -220,13 +258,49 @@ class Future(object):
 
     @staticmethod
     def as_completed(fs, timeout=None):
-        """Emulate `concurrent.futures.as_completed()` behavior.
+        """Yield Futures objects as they complete.
 
-        Returns an iterator over the list of out `Future` instances given by
-        `fs` that yields futures as they complete (finished or were cancelled).
+        Returns an iterator over the specified list of :class:`Future` objects that
+        yields those objects as they complete. Completion occurs
+        when the submitted job is finished or cancelled.
 
-        The `concurrent.futures.TimeoutError` is raised if per-future timeout is
-        exceeded at any point.
+        Emulates the behavior of the `concurrent.futures.as_completed()` function.
+
+        Args:
+            fs (list): List of :class:`Future` objects to iterate over.
+            timeout (float, optional, default=None): Maximum number of seconds to await completion.
+                If None, awaits indefinitely.
+
+        Returns:
+            Generator (:class:`Future` objects):
+                Listed :class:`Future` objects as they complete.
+
+        Raises:
+            `concurrent.futures.TimeoutError` is raised if per-future timeout is exceeded.
+
+        Examples:
+            This example creates a solver using the local system's default D-Wave Cloud Client
+            configuration file, submits a simple QUBO problem to a remote D-Wave resource 3 times
+            for differing numers of samples, and yields timing information for each job
+            as it completes.
+
+            >>> import dwave.cloud as dc
+            >>> client = dc.Client.from_config()
+            >>> solver = client.get_solver()
+            >>> u, v = next(iter(solver.edges))
+            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            >>> computation = [solver.sample_qubo(Q, num_reads=1000),
+            ...                solver.sample_qubo(Q, num_reads=50),
+            ...                solver.sample_qubo(Q, num_reads=10)]   # doctest: +SKIP
+            >>> for tasks in dc.computation.Future.as_completed(computation, timeout=10)
+            ...     print(tasks.timing)   # doctest: +SKIP
+            ...
+            {u'total_real_time': 17318, ... u'qpu_readout_time_per_sample': 123}
+            {u'total_real_time': 10816, ... u'qpu_readout_time_per_sample': 123}
+            {u'total_real_time': 26285, ... u'qpu_readout_time_per_sample': 123}
+            >>> # Snipped above response for brevity
+            >>> client.close()
+
         """
         not_done = fs
         while not_done:
@@ -237,22 +311,91 @@ class Future(object):
                 yield f
 
     def wait(self, timeout=None):
-        """Wait for the results to be available.
+        """Wait for the solver to receive a response for a submitted problem.
+
+        Blocking call that waits for a :class:`Future` object to complete.
 
         Args:
-            timeout (float): Maximum number of seconds to wait
+            timeout (float, optional, default=None): Maximum number of seconds to await completion.
+                If None, waits indefinitely.
+
+        Returns:
+            Boolean: True if solver recieved a response.
+
+        Examples:
+            This example creates a solver using the local system's default D-Wave Cloud Client
+            configuration file, submits a simple QUBO problem to a remote D-Wave resource for
+            100 samples, and tries waiting for 10 seconds for sampling to complete.
+
+            >>> import dwave.cloud as dc
+            >>> client = dc.Client.from_config()
+            >>> solver = client.get_solver()
+            >>> u, v = next(iter(solver.edges))
+            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            >>> computation = solver.sample_qubo(Q, num_reads=100)   # doctest: +SKIP
+            >>> computation.wait(timeout=10)    # doctest: +SKIP
+            False
+            >>> computation.remote_status
+            u'IN_PROGRESS'
+            >>> computation.wait(timeout=10)  # doctest: +SKIP
+            True
+            >>> computation.remote_status   # doctest: +SKIP
+            u'COMPLETED'
+            >>> client.close()
         """
         return self._results_ready_event.wait(timeout)
 
     def done(self):
-        """Test whether a response has arrived."""
+        """Check whether the solver received a response for a submitted problem.
+
+        Non-blocking call that checks whether the solver has received a response from
+        the remote resource.
+
+        Returns:
+            Boolean: True if solver recieved a response.
+
+        Examples:
+            This example creates a solver using the local system's default D-Wave Cloud Client
+            configuration file, submits a simple QUBO problem to a remote D-Wave resource for
+            100 samples, and checks a couple of times whether sampling is completed.
+
+            >>> import dwave.cloud as dc
+            >>> client = dc.Client.from_config()
+            >>> solver = Client.get_solver()
+            >>> u, v = next(iter(solver.edges))
+            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            >>> computation = solver.sample_qubo(Q, num_reads=100)   # doctest: +SKIP
+            >>> computation.done()  # doctest: +SKIP
+            False
+            >>> computation.done()   # doctest: +SKIP
+            True
+            >>> client.close()
+        """
         return self._message is not None or self.error is not None
 
     def cancel(self):
         """Try to cancel the problem corresponding to this result.
 
-        An effort will be made to prevent the execution of the corresponding problem
-        but there are no guarantees.
+        Non-blocking call to the remote resource in a best-effort attempt to prevent execution of a problem.
+
+        Examples:
+            This example creates a solver using the local system's default D-Wave Cloud Client
+            configuration file, submits a simple QUBO problem to a remote D-Wave resource for
+            100 samples, and tries (and in this case succeeds) to cancel it.
+
+            >>> import dwave.cloud as dc
+            >>> client = dc.Client.from_config()
+            >>> solver = Client.get_solver()
+            >>> u, v = next(iter(solver.edges))
+            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            >>> computation = solver.sample_qubo(Q, num_reads=100)   # doctest: +SKIP
+            >>> computation.cancel()  # doctest: +SKIP
+            >>> computation.done()   # doctest: +SKIP
+            True
+            >>> computation.remote_status    # doctest: +SKIP
+            u'CANCELLED'
+            >>> client.close()
+
         """
         # Don't need to cancel something already finished
         if self.done():
@@ -273,38 +416,113 @@ class Future(object):
                 self.solver.client._cancel(self.id, self)
 
     def result(self):
-        """Blocking call to retrieve the result.
+        """Results for a submitted job.
+
+        Retrives result data in a :class:`Future` object that the solver submitted to a remote resource.
+        First calls to access this data are blocking.
 
         Returns:
-            dict with the results. Should be considered read-only.
+            dict: Results of the submitted job. Should be considered read-only.
+
+        Examples:
+            This example creates a solver using the local system's default D-Wave Cloud Client
+            configuration file, submits a simple QUBO problem (representing a Boolean NOT gate
+            by a penalty function) to a remote D-Wave resource for 5 samples, and prints part
+            of the returned result (the relevant samples).
+
+            >>> from dwave.cloud import Client
+            >>> with Client.from_config() as client:  # doctest: +SKIP
+            ...     solver = client.get_solver()
+            ...     u, v = next(iter(solver.edges))
+            ...     Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            ...     computation = solver.sample_qubo(Q, num_reads=5)
+            ...     for i in range(5):
+            ...         print(computation.result()['samples'][i][u], computation.result()['samples'][i][v])
+            ...
+            ...
+            (0, 1)
+            (1, 0)
+            (1, 0)
+            (0, 1)
+            (0, 1)
+
         """
         self._load_result()
         return self._result
 
     @property
     def energies(self):
-        """The energy buffer, blocks if needed.
+        """Energy buffer for the submitted job.
+
+        First calls to access data of a :class:`Future` object are blocking; subsequent access
+        to this property is non-blocking.
 
         Returns:
-            list or numpy matrix of doubles.
+            list or numpy matrix of doubles: Energies for each set of samples.
+
+        Examples:
+            This example creates a solver using the local system's default D-Wave Cloud Client
+            configuration file, submits a random Ising problem (+1 or -1 values of linear and
+            quadratic biases on all nodes and edges, respectively, of the solver's garph) to
+            a remote D-Wave resource for 10 samples, and prints the returned energies.
+
+            >>> import random
+            >>> from dwave.cloud import Client
+            >>> with Client.from_config() as client:  # doctest: +SKIP
+            ...     solver = client.get_solver()
+            ...     linear = {index: random.choice([-1, 1]) for index in solver.nodes}
+            ...     quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
+            ...     computation = solver.sample_ising(linear, quad, num_reads=10)
+            ...     print(computation.energies)
+            ...
+            [-3976.0, -3974.0, -3972.0, -3970.0, -3968.0, -3968.0, -3966.0,
+             -3964.0, -3964.0, -3960.0]
         """
         return self.result()['energies']
 
     @property
     def samples(self):
-        """The state buffer, blocks if needed.
+        """State buffer for the submitted job.
+
+        First calls to access data of a :class:`Future` object are blocking; subsequent access
+        to this property is non-blocking.
 
         Returns:
-            list of lists or numpy matrix.
+            list of lists or numpy matrix: Samples on the nodes of solver's graph.
+
+        Examples:
+            This example creates a solver using the local system's default D-Wave Cloud Client
+            configuration file, submits a simple QUBO problem (representing a Boolean NOT gate
+            by a penalty function) to a remote D-Wave resource for 5 samples, and prints part
+            of the returned result (the relevant samples).
+
+            >>> from dwave.cloud import Client
+            >>> with Client.from_config() as client:  # doctest: +SKIP
+            ...     solver = client.get_solver()
+            ...     u, v = next(iter(solver.edges))
+            ...     Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            ...     computation = solver.sample_qubo(Q, num_reads=5)
+            ...     for i in range(5):
+            ...         print(computation.samples[i][u], computation.samples[i][v])
+            ...
+            ...
+            (1, 0)
+            (0, 1)
+            (0, 1)
+            (1, 0)
+            (0, 1)
         """
         return self.result()['samples']
 
     @property
     def occurrences(self):
-        """The occurrences buffer, blocks if needed.
+        """Occurrences buffer for the submitted job.
+
+        First calls to access data of a :class:`Future` object are blocking; subsequent access
+        to this property is non-blocking.
 
         Returns:
-            list or numpy matrix of doubles.
+            list or numpy matrix of doubles: Occurrences.
         """
         self._load_result()
         if 'occurrences' in self._result:
@@ -316,13 +534,34 @@ class Future(object):
 
     @property
     def timing(self):
-        """Information about the time the solver took in operation.
+        """Timing information about a solver operation.
 
-        The response is a mapping from string keys to numeric values.
-        The exact keys used depend on the solver.
+        Mapping from string keys to numeric values representing timing details
+        for a submitted job as returned from the remote resource. Keys are dependant on
+        the particular solver.
+
+        First calls to access data of a :class:`Future` object are blocking; subsequent access
+        to this property is non-blocking.
 
         Returns:
-            dict
+            dict: Mapping from string keys to numeric values representing timing information.
+
+        Examples:
+            This example creates a client using the local system's default D-Wave Cloud Client
+            configuration file, which is configured to access a D-Wave 2000Q QPU, submits a
+            simple :term:`Ising` problem (opposite linear biases on two coupled qubits) for
+            5 samples, and prints timing information for the job.
+
+            >>> from dwave.cloud import Client
+            >>> with Client.from_config() as client:
+            ...     solver = client.get_solver()
+            ...     u, v = next(iter(solver.edges))
+            ...     computation = solver.sample_ising({u: -1, v: 1},{}, num_reads=5)   # doctest: +SKIP
+            ...     print(computation.timing)
+            ...
+            {u'total_real_time': 10961, u'anneal_time_per_run': 20,
+            >>> # Snipped above response for brevity
+
         """
         return self.result()['timing']
 
