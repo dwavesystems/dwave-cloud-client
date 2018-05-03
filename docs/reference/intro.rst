@@ -112,7 +112,19 @@ values set explicitly or through configuration file, see the
 Interactive CLI Configuration
 -----------------------------
 
-TODO
+As part of the installation of the D-Wave Cloud Client package, a `dwave` executable
+is installed; for example, in a virtual environment it might be installed as
+`<virtual_environment>\\Scripts\\dwave.exe`. Running this file from your system's
+console opens an interactive command line interface (CLI) that guides you through
+setting up a D-Wave Cloud Client configuration file. It also provides additional helpful
+functionality; for example:
+
+* List and update existing configuration files on your system
+* Establish a connection to (ping) a solver based on a configuration file and
+  return timing information
+* Show configured solvers information
+
+Run *dwave* -\\-\ *help* for information on all the CLI options.
 
 Work Flow
 =========
