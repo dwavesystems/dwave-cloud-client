@@ -57,6 +57,17 @@ data and configuration folders see the homebase_ tool.)
 
 .. _homebase: https://github.com/dwavesystems/homebase
 
+You can check the directories searched by :func:`~dwave.cloud.config.get_configfile_paths`
+from a console using the :ref:`interactive CLI utility <interactiveCliConfiguration>`;
+for example::
+
+  $ dwave config ls -m
+  /etc/xdg/xdg-ubuntu/dwave/dwave.conf
+  /usr/share/upstart/xdg/dwave/dwave.conf
+  /etc/xdg/dwave/dwave.conf
+  /home/jane/.config/dwave/dwave.conf
+  ./dwave.conf
+
 A single D-Wave Cloud Client configuration file can contain multiple profiles, each
 defining a separate combination of communication parameters such as the URL to the
 remote resource, authentication token, solver, etc.
@@ -101,7 +112,7 @@ can be set in environment variables; for example:
 
 * ``DWAVE_CONFIG_FILE`` may select the configuration file path.
 * ``DWAVE_PROFILE`` may select the name of a profile (section).
-* ``DWAVE_API_CLIENT`` may select the API client class.
+* ``DWAVE_API_TOKEN`` may select the API token.
 
 For details on supported environment variables and prioritizing between these and
 values set explicitly or through configuration file, see the
