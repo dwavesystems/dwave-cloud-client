@@ -5,7 +5,8 @@ manages interactions between the remote resource and your submitted problems.
 Your solver instantiates a :class:`Future` object for its calls, via D-Wave Sampler API
 (SAPI) servers, to the remote resource.
 
-You can interact with the :class:`Future` object for pending calls: monitoring problem status,
+You can interact through the :class:`Future` object with pending (running) or completed
+computation---sampling on a QPU or software solver---executed remotely, monitoring problem status,
 waiting for and retrieving results, cancelling enqueued jobs, etc.
 
 Some :class:`Future` methods are blocking.
@@ -41,6 +42,8 @@ class Future(object):
     requests to complete and parse returned messages.
 
     Objects are blocked for the duration of any data accessed on the remote resource.
+
+    .. warning:: :class:`Future` objects are not intended to be directly created. Problem submittal is initiated by :class:`~dwave.cloud.solver.Solver` and executed by the client.
 
     Args:
         solver: Solver responsible for this :class:`Future` object.
@@ -190,7 +193,8 @@ class Future(object):
             configuration file, submits a simple QUBO problem to a remote D-Wave resource 3 times
             for differing numers of samples, and waits for sampling to complete on any
             two of the submissions. The wait ends with the completion of two submissions while
-            the third is still in progress.
+            the third is still in progress. (A more typical approach would use something
+            like :code:`first = next(Future.as_completed(computation))` instead.)
 
             >>> import dwave.cloud as dc
             >>> client = dc.Client.from_config()
@@ -320,7 +324,7 @@ class Future(object):
                 If None, waits indefinitely.
 
         Returns:
-            Boolean: True if solver recieved a response.
+            Boolean: True if solver received a response.
 
         Examples:
             This example creates a solver using the local system's default D-Wave Cloud Client
@@ -352,7 +356,7 @@ class Future(object):
         the remote resource.
 
         Returns:
-            Boolean: True if solver recieved a response.
+            Boolean: True if solver received a response.
 
         Examples:
             This example creates a solver using the local system's default D-Wave Cloud Client
