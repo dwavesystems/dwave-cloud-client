@@ -16,12 +16,18 @@ except SyntaxError:
 
 # Package requirements, minimal pinning
 install_requires = ['requests[socks]>=2.18', 'six>=1.10', 'homebase>=1.0',
-                    'click>=6.7', 'python-dateutil>=2.7','pyreadline>=2.1']
+                    'click>=6.7', 'python-dateutil>=2.7']
 
 # Package extras requirements
 extras_require = {
     'test': ['requests_mock', 'mock', 'numpy', 'coverage'],
-    ':python_version == "2.7"': ['futures', 'configparser']
+
+    # python2 backports
+    ':python_version == "2.7"': ['futures', 'configparser'],
+
+    # readline support differs for Windows vs. POSIX (Linux/Darwin)
+    ':platform_system == "Windows"': ['pyreadline>=2'],
+    ':os_name == "posix"': ['gnureadline>=6']
 }
 
 # Packages provided. Only include packages under the 'dwave' namespace.
