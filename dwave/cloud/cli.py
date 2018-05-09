@@ -1,4 +1,5 @@
 import os
+import logging
 
 import click
 from timeit import default_timer as timer
@@ -15,9 +16,16 @@ from dwave.cloud.config import (
     get_configfile_paths)
 
 
+def enable_logging(ctx, param, value):
+    if value and not ctx.resilient_parsing:
+        logging.getLogger('dwave.cloud').setLevel(logging.DEBUG)
+
+
 @click.group()
 @click.version_option(prog_name=__title__, version=__version__)
-def cli():
+@click.option('--debug', is_flag=True, callback=enable_logging,
+              help='Enable debug logging.')
+def cli(debug=False):
     """D-Wave Cloud Client interactive configuration tool."""
 
 
