@@ -360,6 +360,7 @@ class Client(object):
         config = load_config(
             config_file=config_file, profile=profile, client=client,
             endpoint=endpoint, token=token, solver=solver, proxy=proxy)
+        _LOGGER.debug("Config loaded: %r", config)
 
         # fallback to legacy `.dwrc` if key variables missing
         if legacy_config_fallback and (
@@ -367,6 +368,7 @@ class Client(object):
             config = legacy_load_config(
                 profile=profile, client=client,
                 endpoint=endpoint, token=token, solver=solver, proxy=proxy)
+            _LOGGER.debug("Legacy config loaded: %r", config)
 
         # manual override of other (client-custom) arguments
         config.update(kwargs)
@@ -374,6 +376,8 @@ class Client(object):
         from dwave.cloud import qpu, sw
         _clients = {'qpu': qpu.Client, 'sw': sw.Client}
         _client = config.pop('client', None) or 'qpu'
+
+        _LOGGER.debug("Final config used for %s.Client(): %r", _client, config)
         return _clients[_client](**config)
 
     def __init__(self, endpoint=None, token=None, solver=None, proxy=None,
