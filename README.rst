@@ -28,8 +28,9 @@ compromising the quality of interactions and workflow.
 
 Example
 -------
-This example instantiates a D-Wave Cloud Client and :term:`solver` based on the local
-system`s auto-detected default configuration file and samples a random :term:`Ising` problem
+
+This example instantiates a D-Wave Cloud Client and solver based on the local
+system`s auto-detected default configuration file and samples a random Ising problem
 tailored to fit the solver`s graph.
 
 .. code-block:: python
