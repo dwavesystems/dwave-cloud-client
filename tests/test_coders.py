@@ -60,3 +60,29 @@ class TestCoders(unittest.TestCase):
         self.assertEqual(request['lin'],  'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAPh/AAAAAAAA+H8=')
         # [-1]
         self.assertEqual(request['quad'], 'AAAAAAAA8L8=')
+
+    def test_qpu_request_encoding_sub_qubits_implicit_biases(self):
+        """Biases don't have to be specified for qubits to be active."""
+
+        solver = get_solver()
+        linear = {}
+        quadratic = {(0,3): -1}
+        request = encode_bqm_as_qp(solver, linear, quadratic)
+        self.assertEqual(request['format'], 'qp')
+        # [0, NaN, NaN, 0]
+        self.assertEqual(request['lin'],  'AAAAAAAAAAAAAAAAAAD4fwAAAAAAAPh/AAAAAAAAAAA=')
+        # [-1]
+        self.assertEqual(request['quad'], 'AAAAAAAA8L8=')
+
+    def test_qpu_request_encoding_sub_qubits_implicit_couplings(self):
+        """Couplings should be zero for active qubits, if not specified."""
+
+        solver = get_solver()
+        linear = {0: 0, 3: 0}
+        quadratic = {}
+        request = encode_bqm_as_qp(solver, linear, quadratic)
+        self.assertEqual(request['format'], 'qp')
+        # [0, NaN, NaN, 0]
+        self.assertEqual(request['lin'],  'AAAAAAAAAAAAAAAAAAD4fwAAAAAAAPh/AAAAAAAAAAA=')
+        # [-1]
+        self.assertEqual(request['quad'], 'AAAAAAAAAAA=')
