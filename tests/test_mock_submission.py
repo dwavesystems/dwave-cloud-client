@@ -95,12 +95,17 @@ def cancel_reply(id_, solver_name):
     })
 
 
-now = datetime.utcnow().replace(tzinfo=UTC)
-continue_reply_eta_min = now + timedelta(seconds=10)
-continue_reply_eta_max = now + timedelta(seconds=30)
+def timestamp_in_future(seconds=0):
+    now = datetime.utcnow().replace(tzinfo=UTC)
+    return now + timedelta(seconds=seconds)
 
-def continue_reply(id_, solver_name, with_eta=False):
+
+def continue_reply(id_, solver_name, now=None, eta_min=None, eta_max=None):
     """A reply saying a problem is still in the queue."""
+
+    if not now:
+        now = datetime.utcnow().replace(tzinfo=UTC)
+
     resp = {
         "status": "PENDING",
         "solved_on": None,
@@ -109,10 +114,13 @@ def continue_reply(id_, solver_name, with_eta=False):
         "type": "ising",
         "id": id_
     }
-    if with_eta:
+    if eta_min:
         resp.update({
-            "earliest_completion_time": continue_reply_eta_min.isoformat(),
-            "latest_completion_time": continue_reply_eta_max.isoformat(),
+            "earliest_completion_time": eta_min.isoformat(),
+        })
+    if eta_max:
+        resp.update({
+            "latest_completion_time": eta_max.isoformat(),
         })
     return json.dumps(resp)
 
@@ -208,9 +216,10 @@ class MockSubmission(_QueryTest):
     def test_submit_continue_then_ok_reply(self):
         """Handle polling for a complete problem."""
         with Client('endpoint', 'token') as client:
+            eta_min, eta_max = timestamp_in_future(10), timestamp_in_future(30)
             client.session = mock.Mock()
             client.session.post = lambda a, _: choose_reply(a, {
-                'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123', with_eta=True)
+                'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123', eta_min=eta_min, eta_max=eta_max)
             })
             client.session.get = lambda a: choose_reply(a, {
                 'endpoint/problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
@@ -226,8 +235,8 @@ class MockSubmission(_QueryTest):
             self._check(results, linear, quad, 100)
 
             # test future has eta_min and eta_max parsed correctly
-            self.assertEqual(results.eta_min, continue_reply_eta_min)
-            self.assertEqual(results.eta_max, continue_reply_eta_max)
+            self.assertEqual(results.eta_min, eta_min)
+            self.assertEqual(results.eta_max, eta_max)
 
     def test_submit_continue_then_error_reply(self):
         """Handle polling for an error message."""
@@ -348,9 +357,10 @@ class MockSubmission(_QueryTest):
         "eta_min/earliest_completion_time should be respected if present in response"
 
         with Client('endpoint', 'token') as client:
+            eta_min, eta_max = timestamp_in_future(10), timestamp_in_future(30)
             client.session = mock.Mock()
             client.session.post = lambda path, _: choose_reply(path, {
-                'endpoint/problems/': '[%s]' % continue_reply('1', 'abc123', with_eta=True)
+                'endpoint/problems/': '[%s]' % continue_reply('1', 'abc123', eta_min=eta_min, eta_max=eta_max)
             })
             client.session.get = lambda path: choose_reply(path, {
                 'endpoint/problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
@@ -374,7 +384,7 @@ class MockSubmission(_QueryTest):
         with Client('endpoint', 'token') as client:
             client.session = mock.Mock()
             client.session.post = lambda path, _: choose_reply(path, {
-                'endpoint/problems/': '[%s]' % continue_reply('1', 'abc123', with_eta=False)
+                'endpoint/problems/': '[%s]' % continue_reply('1', 'abc123')
             })
             client.session.get = lambda path: choose_reply(path, {
                 'endpoint/problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
