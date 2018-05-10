@@ -195,8 +195,9 @@ def decode_qp_numpy(msg, return_matrix=True):
                          dtype=byte_type))
 
     # Clip off the extra bits from encoding
-    bits = np.reshape(bits, (num_solutions, bits.size // num_solutions))
-    bits = np.delete(bits, range(num_variables, bits.shape[1]), 1)
+    if num_solutions:
+        bits = np.reshape(bits, (num_solutions, bits.size // num_solutions))
+        bits = np.delete(bits, range(num_variables, bits.shape[1]), 1)
 
     # Switch from bits to spins
     default = 3
