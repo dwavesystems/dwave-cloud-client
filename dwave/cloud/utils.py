@@ -3,6 +3,7 @@ from __future__ import division, absolute_import
 from datetime import datetime
 from dateutil.tz import UTC
 from functools import wraps
+import itertools
 
 import six
 import readline
@@ -29,6 +30,7 @@ def evaluate_ising(linear, quad, state):
     Returns:
         Energy of the state evaluated by the given energy function.
     """
+
     # If we were given a numpy array cast to list
     if _numpy and isinstance(state, np.ndarray):
         return evaluate_ising(linear, quad, state.tolist())
@@ -40,6 +42,16 @@ def evaluate_ising(linear, quad, state):
     for (index_a, index_b), value in six.iteritems(quad):
         energy += value * state[index_a] * state[index_b]
     return energy
+
+
+def active_qubits(linear, quadratic):
+    """Calculate a set of all active qubits. Qubit is "active" if it has
+    bias or coupling attached."""
+
+    active = set(linear)
+    for edge, _ in six.iteritems(quadratic):
+        active.update(edge)
+    return active
 
 
 def uniform_iterator(sequence):
@@ -60,6 +72,17 @@ def uniform_get(sequence, index, default=None):
         return sequence.get(index, default)
     else:
         return sequence[index] if index < len(sequence) else default
+
+
+def strip_head(sequence, values):
+    """Strips elements of `values` from the beginning of `sequence`."""
+    values = set(values)
+    return list(itertools.dropwhile(lambda x: x in values, sequence))
+
+
+def strip_tail(sequence, values):
+    """Strip `values` from the end of `sequence`."""
+    return list(reversed(list(strip_head(reversed(sequence), values))))
 
 
 def readline_input(prompt, prefill=''):

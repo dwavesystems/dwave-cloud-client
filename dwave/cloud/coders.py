@@ -3,7 +3,8 @@ from __future__ import division, absolute_import
 import struct
 import base64
 
-from dwave.cloud.utils import uniform_iterator, uniform_get
+from dwave.cloud.utils import (
+    uniform_iterator, uniform_get, strip_tail, active_qubits)
 
 __all__ = ['encode_bqm_as_qp', 'decode_qp', 'decode_qp_numpy']
 
@@ -25,20 +26,25 @@ def encode_bqm_as_qp(solver, linear, quadratic):
     Returns:
         encoded submission dictionary
     """
+    active = active_qubits(linear, quadratic)
 
     # Encode linear terms. The coefficients of the linear terms of the objective
     # are encoded as an array of little endian 64 bit doubles.
     # This array is then base64 encoded into a string safe for json.
     # The order of the terms is determined by the _encoding_qubits property
     # specified by the server.
-    lin = [uniform_get(linear, qubit, 0) for qubit in solver._encoding_qubits]
+    # Note: only active qubits are coded with double, inactive with NaN
+    nan = float('nan')
+    lin = [uniform_get(linear, qubit, 0 if qubit in active else nan)
+           for qubit in solver._encoding_qubits]
     lin = base64.b64encode(struct.pack('<' + ('d' * len(lin)), *lin))
 
     # Encode the coefficients of the quadratic terms of the objective
     # in the same manner as the linear terms, in the order given by the
-    # _encoding_couplers property
-    quad = [quadratic.get(edge, 0) + quadratic.get((edge[1], edge[0]), 0)
-            for edge in solver._encoding_couplers]
+    # _encoding_couplers property, discarding tailing zero couplings
+    quad = [quadratic.get((q1,q2), 0) + quadratic.get((q2,q1), 0)
+            for (q1,q2) in solver._encoding_couplers
+            if q1 in active and q2 in active]
     quad = base64.b64encode(struct.pack('<' + ('d' * len(quad)), *quad))
 
     # The name for this encoding is 'qp' and is explicitly included in the
@@ -192,8 +198,9 @@ def decode_qp_numpy(msg, return_matrix=True):
                          dtype=byte_type))
 
     # Clip off the extra bits from encoding
-    bits = np.reshape(bits, (num_solutions, bits.size // num_solutions))
-    bits = np.delete(bits, range(num_variables, bits.shape[1]), 1)
+    if num_solutions:
+        bits = np.reshape(bits, (num_solutions, bits.size // num_solutions))
+        bits = np.delete(bits, range(num_variables, bits.shape[1]), 1)
 
     # Switch from bits to spins
     default = 3

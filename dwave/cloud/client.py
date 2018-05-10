@@ -751,6 +751,7 @@ class Client(object):
         try:
             status = message['status']
             _LOGGER.debug("Handling response for %s with status %s", message['id'], status)
+            _LOGGER.trace("Handling response: %r", message)
 
             # The future may not have the ID set yet
             with future._single_cancel_lock:
