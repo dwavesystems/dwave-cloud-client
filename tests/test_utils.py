@@ -1,7 +1,8 @@
 import unittest
 from collections import OrderedDict
 
-from dwave.cloud.utils import readline_input, uniform_iterator, uniform_get
+from dwave.cloud.utils import (
+    readline_input, uniform_iterator, uniform_get, strip_head, strip_tail)
 from dwave.cloud.testing import mock
 
 
@@ -21,6 +22,18 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(uniform_get(l, 0), 0)
         self.assertEqual(uniform_get(l, 2), None)
         self.assertEqual(uniform_get(l, 2, default=0), 0)
+
+    def test_strip_head(self):
+        self.assertEqual(strip_head([0, 0, 1, 2], [0]), [1, 2])
+        self.assertEqual(strip_head([1], [0]), [1])
+        self.assertEqual(strip_head([1], []), [1])
+        self.assertEqual(strip_head([0, 0, 1, 2], [0, 1, 2]), [])
+
+    def test_strip_tail(self):
+        self.assertEqual(strip_tail([1, 2, 0, 0], [0]), [1, 2])
+        self.assertEqual(strip_tail([1], [0]), [1])
+        self.assertEqual(strip_tail([1], []), [1])
+        self.assertEqual(strip_tail([0, 0, 1, 2], [0, 1, 2]), [])
 
     def test_readline_input(self):
         val = "value"
