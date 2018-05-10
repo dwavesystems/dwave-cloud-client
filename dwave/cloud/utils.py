@@ -3,6 +3,7 @@ from __future__ import division, absolute_import
 from datetime import datetime
 from dateutil.tz import UTC
 from functools import wraps
+import itertools
 
 import six
 import readline
@@ -60,6 +61,17 @@ def uniform_get(sequence, index, default=None):
         return sequence.get(index, default)
     else:
         return sequence[index] if index < len(sequence) else default
+
+
+def strip_head(sequence, values):
+    """Strips elements of `values` from the beginning of `sequence`."""
+    values = set(values)
+    return list(itertools.dropwhile(lambda x: x in values, sequence))
+
+
+def strip_tail(sequence, values):
+    """Strip `values` from the end of `sequence`."""
+    return list(reversed(list(strip_head(reversed(sequence), values))))
 
 
 def readline_input(prompt, prefill=''):
