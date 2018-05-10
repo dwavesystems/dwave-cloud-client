@@ -30,6 +30,7 @@ def evaluate_ising(linear, quad, state):
     Returns:
         Energy of the state evaluated by the given energy function.
     """
+
     # If we were given a numpy array cast to list
     if _numpy and isinstance(state, np.ndarray):
         return evaluate_ising(linear, quad, state.tolist())
@@ -41,6 +42,16 @@ def evaluate_ising(linear, quad, state):
     for (index_a, index_b), value in six.iteritems(quad):
         energy += value * state[index_a] * state[index_b]
     return energy
+
+
+def active_qubits(linear, quadratic):
+    """Calculate a set of all active qubits. Qubit is "active" if it has
+    bias or coupling attached."""
+
+    active = set(linear)
+    for edge, _ in six.iteritems(quadratic):
+        active.update(edge)
+    return active
 
 
 def uniform_iterator(sequence):

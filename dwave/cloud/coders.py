@@ -3,7 +3,8 @@ from __future__ import division, absolute_import
 import struct
 import base64
 
-from dwave.cloud.utils import uniform_iterator, uniform_get, strip_tail
+from dwave.cloud.utils import (
+    uniform_iterator, uniform_get, strip_tail, active_qubits)
 
 __all__ = ['encode_bqm_as_qp', 'decode_qp', 'decode_qp_numpy']
 
@@ -25,6 +26,7 @@ def encode_bqm_as_qp(solver, linear, quadratic):
     Returns:
         encoded submission dictionary
     """
+    active = active_qubits(linear, quadratic)
 
     # Encode linear terms. The coefficients of the linear terms of the objective
     # are encoded as an array of little endian 64 bit doubles.
@@ -33,7 +35,8 @@ def encode_bqm_as_qp(solver, linear, quadratic):
     # specified by the server.
     # Note: only active qubits are coded with double, inactive with NaN
     nan = float('nan')
-    lin = [uniform_get(linear, qubit, nan) for qubit in solver._encoding_qubits]
+    lin = [uniform_get(linear, qubit, 0 if qubit in active else nan)
+           for qubit in solver._encoding_qubits]
     lin = base64.b64encode(struct.pack('<' + ('d' * len(lin)), *lin))
 
     # Encode the coefficients of the quadratic terms of the objective

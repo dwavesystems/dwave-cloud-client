@@ -43,5 +43,20 @@ class TestCoders(unittest.TestCase):
         quadratic = {key: -1 for key in sorted(list(solver.undirected_edges))[:1]}
         request = encode_bqm_as_qp(solver, linear, quadratic)
         self.assertEqual(request['format'], 'qp')
+        # [1, 1, NaN, NaN]
         self.assertEqual(request['lin'],  'AAAAAAAA8D8AAAAAAADwPwAAAAAAAPh/AAAAAAAA+H8=')
+        # [-1]
+        self.assertEqual(request['quad'], 'AAAAAAAA8L8=')
+
+    def test_qpu_request_encoding_missing_qubits(self):
+        """Qubits don't have to be specified with biases only, but also with couplings."""
+
+        solver = get_solver()
+        linear = {}
+        quadratic = {(0, 1): -1}
+        request = encode_bqm_as_qp(solver, linear, quadratic)
+        self.assertEqual(request['format'], 'qp')
+        # [0, 0, NaN, NaN]
+        self.assertEqual(request['lin'],  'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAPh/AAAAAAAA+H8=')
+        # [-1]
         self.assertEqual(request['quad'], 'AAAAAAAA8L8=')
