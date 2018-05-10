@@ -98,8 +98,6 @@ class Submission(_QueryTest):
 
             # Build a linear problem
             linear = [0] * (max(solver.nodes) + 1)
-            for index in solver.nodes:
-                linear[index] = 1
             quad = {}
 
             # Add a variable that shouldn't exist
@@ -116,9 +114,7 @@ class Submission(_QueryTest):
             solver = client.get_solver()
 
             # Build a linear problem
-            linear = [0] * (max(solver.nodes) + 1)
-            for index in solver.nodes:
-                linear[index] = 1
+            linear = [1] * (max(solver.nodes) + 1)
             quad = {}
 
             # Solve the problem
@@ -215,13 +211,13 @@ class Submission(_QueryTest):
             linear = [0] * (max(solver.nodes) + 1)
             for index in solver.nodes:
                 linear[index] = random.choice([-1, 1])
-
-            # Build a
             quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
+
+            max_num_reads = max(solver.properties.get('num_reads_range', [1, 100]))
 
             result_list = []
             for _ in range(1000):
-                results = solver.sample_ising(linear, quad, num_reads=10000)
+                results = solver.sample_ising(linear, quad, num_reads=max_num_reads)
                 result_list.append([results, linear, quad])
 
             [r[0].cancel() for r in result_list]
@@ -230,7 +226,7 @@ class Submission(_QueryTest):
                 # Responses must be canceled or correct
                 try:
                     # Did we get the right number of samples?
-                    self.assertTrue(10000 == sum(results.occurrences))
+                    self.assertTrue(max_num_reads == sum(results.occurrences))
 
                     # Make sure the number of occurrences and energies are all correct
                     for energy, state in zip(results.energies, results.samples):
