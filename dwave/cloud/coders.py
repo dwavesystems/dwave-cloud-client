@@ -42,9 +42,9 @@ def encode_bqm_as_qp(solver, linear, quadratic):
     # Encode the coefficients of the quadratic terms of the objective
     # in the same manner as the linear terms, in the order given by the
     # _encoding_couplers property, discarding tailing zero couplings
-    quad = [quadratic.get(edge, 0) + quadratic.get((edge[1], edge[0]), 0)
-            for edge in solver._encoding_couplers]
-    quad = strip_tail(quad, [0])
+    quad = [quadratic.get((q1,q2), 0) + quadratic.get((q2,q1), 0)
+            for (q1,q2) in solver._encoding_couplers
+            if q1 in active and q2 in active]
     quad = base64.b64encode(struct.pack('<' + ('d' * len(quad)), *quad))
 
     # The name for this encoding is 'qp' and is explicitly included in the
