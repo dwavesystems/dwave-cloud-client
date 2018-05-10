@@ -241,6 +241,7 @@ class Solver(object):
             'type': type_,
             'params': params
         })
+        _LOGGER.trace("Encoded sample request: %s", body)
 
         future = Future(solver=self, id_=None, return_matrix=self.return_matrix,
                         submission_data=(type_, linear, quadratic, params))
