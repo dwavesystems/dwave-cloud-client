@@ -24,7 +24,9 @@ def get_solver():
 
 class TestCoders(unittest.TestCase):
 
-    def test_qpu_request_encoding(self):
+    def test_qpu_request_encoding_all_qubits(self):
+        """Test biases and coupling strengths are properly encoded (base64 little-endian doubles)."""
+
         solver = get_solver()
         linear = {index: 1 for index in solver.nodes}
         quadratic = {key: -1 for key in solver.undirected_edges}
@@ -32,3 +34,14 @@ class TestCoders(unittest.TestCase):
         self.assertEqual(request['format'], 'qp')
         self.assertEqual(request['lin'],  'AAAAAAAA8D8AAAAAAADwPwAAAAAAAPA/AAAAAAAA8D8=')
         self.assertEqual(request['quad'], 'AAAAAAAA8L8AAAAAAADwvwAAAAAAAPC/AAAAAAAA8L8=')
+
+    def test_qpu_request_encoding_sub_qubits(self):
+        """Inactive qubits should be encoded as NaNs. Inactive couplers should be omitted."""
+
+        solver = get_solver()
+        linear = {index: 1 for index in sorted(list(solver.nodes))[:2]}
+        quadratic = {key: -1 for key in sorted(list(solver.undirected_edges))[:1]}
+        request = encode_bqm_as_qp(solver, linear, quadratic)
+        self.assertEqual(request['format'], 'qp')
+        self.assertEqual(request['lin'],  'AAAAAAAA8D8AAAAAAADwPwAAAAAAAPh/AAAAAAAA+H8=')
+        self.assertEqual(request['quad'], 'AAAAAAAA8L8=')
