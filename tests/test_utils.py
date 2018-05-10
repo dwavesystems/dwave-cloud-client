@@ -2,7 +2,8 @@ import unittest
 from collections import OrderedDict
 
 from dwave.cloud.utils import (
-    readline_input, uniform_iterator, uniform_get, strip_head, strip_tail)
+    readline_input, uniform_iterator, uniform_get, strip_head, strip_tail,
+    active_qubits)
 from dwave.cloud.testing import mock
 
 
@@ -34,6 +35,19 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(strip_tail([1], [0]), [1])
         self.assertEqual(strip_tail([1], []), [1])
         self.assertEqual(strip_tail([0, 0, 1, 2], [0, 1, 2]), [])
+
+    def test_active_qubits_dict(self):
+        self.assertEqual(active_qubits({}, {}), set())
+        self.assertEqual(active_qubits({0: 0}, {}), {0})
+        self.assertEqual(active_qubits({}, {(0, 1): 0}), {0, 1})
+        self.assertEqual(active_qubits({2: 0}, {(0, 1): 0}), {0, 1, 2})
+
+    def test_active_qubits_list(self):
+        self.assertEqual(active_qubits([], {}), set())
+        self.assertEqual(active_qubits([2], {}), {0})
+        self.assertEqual(active_qubits([2, 2, 0], {}), {0, 1, 2})
+        self.assertEqual(active_qubits([], {(0, 1): 0}), {0, 1})
+        self.assertEqual(active_qubits([0, 0], {(0, 2): 0}), {0, 1, 2})
 
     def test_readline_input(self):
         val = "value"
