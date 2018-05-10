@@ -278,8 +278,6 @@ class Solver(object):
             ...
             False
             True
-
-
         """
         for key, value in uniform_iterator(linear):
             if value != 0 and key not in self.nodes:
