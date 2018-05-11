@@ -6,15 +6,12 @@ from dwave.cloud.qpu import Client
 from dwave.cloud.computation import Future
 
 
-# increase logging verbosity for root logger
-logging.getLogger('dwave.cloud').setLevel(logging.DEBUG)
-
 # setup local logger
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
 handler = logging.StreamHandler()
 handler.setFormatter(formatter)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 logger.addHandler(handler)
 
 

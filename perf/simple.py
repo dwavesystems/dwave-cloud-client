@@ -5,15 +5,12 @@ import logging
 from dwave.cloud.qpu import Client
 
 
-# increase logging verbosity for root logger
-logging.getLogger('dwave.cloud').setLevel(logging.DEBUG)
-
 # setup local logger
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
 handler = logging.StreamHandler()
 handler.setFormatter(formatter)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 logger.addHandler(handler)
 
 
@@ -24,11 +21,16 @@ with Client.from_config(profile='prod') as client:
     solver = client.get_solver()
     comp = solver.sample_qubo({})
 
-    logger.info("Computation")
+    logger.info("Problem submitted:")
     logger.info(" - time received: %s", comp.time_received)
     logger.info(" - time solved: %s", comp.time_solved)
     logger.info(" - parse time: %s", comp.parse_time)
     logger.info(" - remote status: %s", comp.remote_status)
+    logger.info(" - min_eta: %s", comp.eta_min)
 
     result = comp.result()
-    logger.info("Result received.")
+    logger.info("Result received:")
+    logger.info(" - time received: %s", comp.time_received)
+    logger.info(" - time solved: %s", comp.time_solved)
+    logger.info(" - parse time: %s", comp.parse_time)
+    logger.info(" - remote status: %s", comp.remote_status)
