@@ -1,5 +1,5 @@
 """
-Interface to software :term:`sampler`\ s available through the D-Wave API.
+Interface to software :term:`sampler`s available through the D-Wave API.
 
 Software samplers have the same interface (response) as QPU samplers, with
 classical software resources generating samples.
