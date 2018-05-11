@@ -1,4 +1,5 @@
 import os
+import ast
 import logging
 
 import click
@@ -249,3 +250,85 @@ def solvers(config_file, profile, id):
             for k,v in sorted(solver.properties.items()):
                 click.echo("    {}: {}".format(k, trunc(v)))
             click.echo()
+
+
+@cli.command()
+@click.option('--config-file', '-c', default=None,
+              type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
+@click.option('--profile', '-p', default=None,
+              help='Connection profile (section) name')
+@click.option('--solver', '-s', 'solver_name', default=None,
+              help='Solver name to use')
+@click.option('--biases', '-h', default=None,
+              help='List/dict of biases for Ising model problem formulation')
+@click.option('--couplings', '-j', default=None,
+              help='List/dict of couplings for Ising model problem formulation')
+@click.option('--num-reads', '-n', default=1, type=int,
+              help='Number of reads/samples')
+@click.option('--verbose', '-v', default=False, is_flag=True,
+              help='Increase output verbosity')
+def sample(config_file, profile, solver_name, biases, couplings, num_reads, verbose):
+    """Submit Ising-formulated problem and return samples."""
+
+    # TODO: de-dup wrt ping
+
+    try:
+        client = Client.from_config(config_file=config_file, profile=profile)
+    except Exception as e:
+        click.echo("Invalid configuration: {}".format(e))
+        return 1
+    if config_file:
+        click.echo("Using configuration file: {}".format(config_file))
+    if profile:
+        click.echo("Using profile: {}".format(profile))
+    click.echo("Using endpoint: {}".format(client.endpoint))
+
+    try:
+        solvers = client.get_solvers()
+    except SolverAuthenticationError:
+        click.echo("Authentication error. Check credentials in your configuration file.")
+        return 1
+    except (InvalidAPIResponseError, UnsupportedSolverError):
+        click.echo("Invalid or unexpected API response.")
+        return 2
+
+    if solver_name and solver_name in solvers:
+        solver = solvers[solver_name]
+    else:
+        try:
+            solver = client.get_solver()
+        except (ValueError, KeyError):
+            if solvers:
+                _, solver = next(iter(solvers.items()))
+            else:
+                click.echo("No solvers available.")
+                return 1
+
+    click.echo("Using solver: {}".format(solver.id))
+
+    try:
+        linear = ast.literal_eval(biases) if biases else []
+    except Exception as e:
+        click.echo("Invalid biases: {}".format(e))
+
+    try:
+        quadratic = ast.literal_eval(couplings) if couplings else {}
+    except Exception as e:
+        click.echo("Invalid couplings: {}".format(e))
+
+    click.echo("Using qubit biases: {!r}".format(linear))
+    click.echo("Using qubit couplings: {!r}".format(quadratic))
+    click.echo("Number of samples: {}".format(num_reads))
+
+    try:
+        result = solver.sample_ising(linear, quadratic, num_reads=num_reads).result()
+    except Exception as e:
+        click.echo(e)
+        return 2
+
+    if verbose:
+        click.echo("Result: {!r}".format(result))
+
+    click.echo("Samples: {!r}".format(result['samples']))
+    click.echo("Occurrences: {!r}".format(result['occurrences']))
+    click.echo("Energies: {!r}".format(result['energies']))
