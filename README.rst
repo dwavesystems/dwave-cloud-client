@@ -83,10 +83,10 @@ To install from source (available on GitHub in `dwavesystems/dwave-cloud-client`
 License
 -------
 
-Released under the Apache License 2.0. See LICENSE file.
+Released under the Apache License 2.0. See `<LICENSE>`_ file.
 
 
 Contribution
 ------------
 
-See CONTRIBUTING.rst file.
+See `<CONTRIBUTING.rst>`_ file.
