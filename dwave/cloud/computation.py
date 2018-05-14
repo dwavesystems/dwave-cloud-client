@@ -462,7 +462,7 @@ class Future(object):
         to this property is non-blocking.
 
         Returns:
-            list or numpy matrix of doubles: Energies for each set of samples.
+            list or NumPy matrix of doubles: Energies for each set of samples.
 
         Examples:
             This example creates a solver using the local system's default D-Wave Cloud Client
@@ -492,7 +492,7 @@ class Future(object):
         to this property is non-blocking.
 
         Returns:
-            list of lists or numpy matrix: Samples on the nodes of solver's graph.
+            list of lists or NumPy matrix: Samples on the nodes of solver's graph.
 
         Examples:
             This example creates a solver using the local system's default D-Wave Cloud Client
@@ -526,7 +526,35 @@ class Future(object):
         to this property is non-blocking.
 
         Returns:
-            list or numpy matrix of doubles: Occurrences.
+            list or NumPy matrix of doubles: Occurrences. When returned results are
+            ordered in a histogram, `occurrences` indicates the number of times a particular
+            solution recurred.
+
+        Examples:
+            This example creates a solver using the local system's default D-Wave Cloud Client
+            configuration file, submits a simple Ising problem with several ground states to a
+            remote D-Wave resource for 20 samples, and prints the returned results, which
+            are ordered as a histogram. The problem's ground states tend to recur frequently,
+            and so those solutions have `occurrences` greater than 1.
+
+            >>> from dwave.cloud import Client
+            >>> with Client.from_config() as client:  # doctest: +SKIP
+            ...     solver = client.get_solver()
+            ...     solver.parameters['answer_mode']='histogram'
+            ...     quad = {(16, 20): -1, (17, 20): 1, (16, 21): 1, (17, 21): 1}
+            ...     computation = solver.sample_ising({}, quad, num_reads=500)
+            ...     for i in range(len(computation.occurrences)):
+            ...         print(computation.samples[i][16],computation.samples[i][17], computation.samples[i][20], computation.samples[i][21], ' --> ', computation.energies[i], computation.occurrences[i])
+            ...
+            (-1, 1, -1, -1, ' --> ', -2.0, 41)
+            (-1, -1, -1, 1, ' --> ', -2.0, 53)
+            (1, -1, 1, 1, ' --> ', -2.0, 55)
+            (1, 1, -1, -1, ' --> ', -2.0, 52)
+            (1, 1, 1, -1, ' --> ', -2.0, 60)
+            (1, -1, 1, -1, ' --> ', -2.0, 196)
+            (-1, 1, -1, 1, ' --> ', -2.0, 15)
+            (-1, -1, 1, 1, ' --> ', -2.0, 28)
+
         """
         self._load_result()
         if 'occurrences' in self._result:
