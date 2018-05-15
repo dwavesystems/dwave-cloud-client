@@ -540,9 +540,8 @@ class Future(object):
             >>> from dwave.cloud import Client
             >>> with Client.from_config() as client:  # doctest: +SKIP
             ...     solver = client.get_solver()
-            ...     solver.parameters['answer_mode']='histogram'
             ...     quad = {(16, 20): -1, (17, 20): 1, (16, 21): 1, (17, 21): 1}
-            ...     computation = solver.sample_ising({}, quad, num_reads=500)
+            ...     computation = solver.sample_ising({}, quad, num_reads=500, answer_mode='histogram')
             ...     for i in range(len(computation.occurrences)):
             ...         print(computation.samples[i][16],computation.samples[i][17], computation.samples[i][20], computation.samples[i][21], ' --> ', computation.energies[i], computation.occurrences[i])
             ...
