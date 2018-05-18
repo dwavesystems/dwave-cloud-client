@@ -6,7 +6,8 @@ import click
 from timeit import default_timer as timer
 
 from dwave.cloud import Client
-from dwave.cloud.utils import readline_input, click_info_switch
+from dwave.cloud.utils import (
+    readline_input, click_info_switch, generate_valid_random_problem)
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError,
@@ -263,11 +264,14 @@ def solvers(config_file, profile, id):
               help='List/dict of biases for Ising model problem formulation')
 @click.option('--couplings', '-j', default=None,
               help='List/dict of couplings for Ising model problem formulation')
+@click.option('--random-problem', '-r', default=False, is_flag=True,
+              help='Submit a valid random problem using all qubits')
 @click.option('--num-reads', '-n', default=1, type=int,
               help='Number of reads/samples')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Increase output verbosity')
-def sample(config_file, profile, solver_name, biases, couplings, num_reads, verbose):
+def sample(config_file, profile, solver_name, biases, couplings, random_problem,
+           num_reads, verbose):
     """Submit Ising-formulated problem and return samples."""
 
     # TODO: de-dup wrt ping
@@ -306,15 +310,17 @@ def sample(config_file, profile, solver_name, biases, couplings, num_reads, verb
 
     click.echo("Using solver: {}".format(solver.id))
 
-    try:
-        linear = ast.literal_eval(biases) if biases else []
-    except Exception as e:
-        click.echo("Invalid biases: {}".format(e))
-
-    try:
-        quadratic = ast.literal_eval(couplings) if couplings else {}
-    except Exception as e:
-        click.echo("Invalid couplings: {}".format(e))
+    if random_problem:
+        linear, quadratic = generate_valid_random_problem(solver)
+    else:
+        try:
+            linear = ast.literal_eval(biases) if biases else []
+        except Exception as e:
+            click.echo("Invalid biases: {}".format(e))
+        try:
+            quadratic = ast.literal_eval(couplings) if couplings else {}
+        except Exception as e:
+            click.echo("Invalid couplings: {}".format(e))
 
     click.echo("Using qubit biases: {!r}".format(linear))
     click.echo("Using qubit couplings: {!r}".format(quadratic))
