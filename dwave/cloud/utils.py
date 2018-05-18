@@ -158,3 +158,8 @@ def datetime_to_timestamp(dt):
 
     epoch = datetime.utcfromtimestamp(0).replace(tzinfo=UTC)
     return (dt - epoch).total_seconds()
+
+
+def strtrunc(s, maxlen=60):
+    s = str(s)
+    return s[:(maxlen-3)]+'...' if len(s) > maxlen else s

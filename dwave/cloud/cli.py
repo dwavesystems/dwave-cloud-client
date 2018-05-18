@@ -7,7 +7,7 @@ from timeit import default_timer as timer
 
 from dwave.cloud import Client
 from dwave.cloud.utils import (
-    readline_input, click_info_switch, generate_valid_random_problem)
+    readline_input, click_info_switch, generate_valid_random_problem, strtrunc)
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError,
@@ -227,10 +227,6 @@ def solvers(config_file, profile, id):
     all solvers available on configured endpoint.
     """
 
-    def trunc(s, maxlen=60):
-        s = str(s)
-        return s[:(maxlen-3)]+'...' if len(s) > maxlen else s
-
     with Client.from_config(config_file=config_file, profile=profile) as client:
         solvers = client.get_solvers().values()
 
@@ -245,11 +241,11 @@ def solvers(config_file, profile, id):
             click.echo("Solver: {}".format(solver.id))
             click.echo("  Parameters:")
             for param, desc in sorted(solver.parameters.items()):
-                click.echo("    {}: {}".format(param, trunc(desc) if desc else '?'))
+                click.echo("    {}: {}".format(param, strtrunc(desc) if desc else '?'))
             solver.properties.pop('parameters', None)
             click.echo("  Properties:")
             for k,v in sorted(solver.properties.items()):
-                click.echo("    {}: {}".format(k, trunc(v)))
+                click.echo("    {}: {}".format(k, strtrunc(v)))
             click.echo()
 
 
@@ -276,16 +272,19 @@ def sample(config_file, profile, solver_name, biases, couplings, random_problem,
 
     # TODO: de-dup wrt ping
 
+    def echo(s, maxlen=100):
+        click.echo(s if verbose else strtrunc(s, maxlen))
+
     try:
         client = Client.from_config(config_file=config_file, profile=profile)
     except Exception as e:
         click.echo("Invalid configuration: {}".format(e))
         return 1
     if config_file:
-        click.echo("Using configuration file: {}".format(config_file))
+        echo("Using configuration file: {}".format(config_file))
     if profile:
-        click.echo("Using profile: {}".format(profile))
-    click.echo("Using endpoint: {}".format(client.endpoint))
+        echo("Using profile: {}".format(profile))
+    echo("Using endpoint: {}".format(client.endpoint))
 
     try:
         solvers = client.get_solvers()
@@ -308,7 +307,7 @@ def sample(config_file, profile, solver_name, biases, couplings, random_problem,
                 click.echo("No solvers available.")
                 return 1
 
-    click.echo("Using solver: {}".format(solver.id))
+    echo("Using solver: {}".format(solver.id))
 
     if random_problem:
         linear, quadratic = generate_valid_random_problem(solver)
@@ -322,9 +321,9 @@ def sample(config_file, profile, solver_name, biases, couplings, random_problem,
         except Exception as e:
             click.echo("Invalid couplings: {}".format(e))
 
-    click.echo("Using qubit biases: {!r}".format(linear))
-    click.echo("Using qubit couplings: {!r}".format(quadratic))
-    click.echo("Number of samples: {}".format(num_reads))
+    echo("Using qubit biases: {!r}".format(linear))
+    echo("Using qubit couplings: {!r}".format(quadratic))
+    echo("Number of samples: {}".format(num_reads))
 
     try:
         result = solver.sample_ising(linear, quadratic, num_reads=num_reads).result()
@@ -335,6 +334,6 @@ def sample(config_file, profile, solver_name, biases, couplings, random_problem,
     if verbose:
         click.echo("Result: {!r}".format(result))
 
-    click.echo("Samples: {!r}".format(result['samples']))
-    click.echo("Occurrences: {!r}".format(result['occurrences']))
-    click.echo("Energies: {!r}".format(result['energies']))
+    echo("Samples: {!r}".format(result['samples']))
+    echo("Occurrences: {!r}".format(result['occurrences']))
+    echo("Energies: {!r}".format(result['energies']))
