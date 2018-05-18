@@ -4,6 +4,7 @@ from datetime import datetime
 from dateutil.tz import UTC
 from functools import wraps
 import itertools
+import random
 
 import six
 import readline
@@ -64,6 +65,19 @@ def active_qubits(linear, quadratic):
     for edge, _ in six.iteritems(quadratic):
         active.update(edge)
     return active
+
+
+def generate_valid_random_problem(solver):
+    """Generates an Ising problem formulation valid for a particular solver,
+    using all qubits and all couplings."""
+
+    h_range = solver.properties['h_range']
+    j_range = solver.properties['j_range']
+
+    lin = {qubit: random.uniform(*h_range) for qubit in solver.nodes}
+    quad = {edge: random.uniform(*j_range) for edge in solver.undirected_edges}
+
+    return lin, quad
 
 
 def uniform_iterator(sequence):

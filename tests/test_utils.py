@@ -3,7 +3,7 @@ from collections import OrderedDict
 
 from dwave.cloud.utils import (
     readline_input, uniform_iterator, uniform_get, strip_head, strip_tail,
-    active_qubits)
+    active_qubits, generate_valid_random_problem)
 from dwave.cloud.testing import mock
 
 
@@ -55,6 +55,18 @@ class TestUtils(unittest.TestCase):
             self.assertEqual(readline_input("prompt", val), val)
         with mock.patch("six.moves.input", side_effect=[val], create=True):
             self.assertEqual(readline_input("prompt", val+val), val)
+
+    def test_generate_valid_random_problem(self):
+        class MockSolver(object):
+            nodes = [0, 1, 3]
+            undirected_edges = {(0, 1), (1, 3), (0, 4)}
+            properties = dict(h_range=[2, 2], j_range=[-1, -1])
+        mock_solver = MockSolver()
+
+        lin, quad = generate_valid_random_problem(mock_solver)
+
+        self.assertDictEqual(lin, {0: 2.0, 1: 2.0, 3: 2.0})
+        self.assertDictEqual(quad, {(0, 1): -1.0, (1, 3): -1.0, (0, 4): -1.0})
 
 
 if __name__ == '__main__':
