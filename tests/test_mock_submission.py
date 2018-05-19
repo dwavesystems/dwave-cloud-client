@@ -116,11 +116,11 @@ def continue_reply(id_, solver_name, now=None, eta_min=None, eta_max=None):
     }
     if eta_min:
         resp.update({
-            "earliest_completion_time": eta_min.isoformat(),
+            "earliest_estimated_completion": eta_min.isoformat(),
         })
     if eta_max:
         resp.update({
-            "latest_completion_time": eta_max.isoformat(),
+            "latest_estimated_completion": eta_max.isoformat(),
         })
     return json.dumps(resp)
 
@@ -354,7 +354,7 @@ class MockSubmission(_QueryTest):
     @mock.patch.object(Client, "_POLL_THREAD_COUNT", 1)
     @mock.patch.object(Client, "_SUBMISSION_THREAD_COUNT", 1)
     def test_eta_min_is_respected_on_first_poll(self):
-        "eta_min/earliest_completion_time should be respected if present in response"
+        "eta_min/earliest_estimated_completion should be respected if present in response"
 
         with Client('endpoint', 'token') as client:
             eta_min, eta_max = timestamp_in_future(10), timestamp_in_future(30)
