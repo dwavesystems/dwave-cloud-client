@@ -775,11 +775,11 @@ class Client(object):
             if not future.time_solved and message.get('solved_on'):
                 future.time_solved = parse_datetime(message['solved_on'])
 
-            if not future.eta_min and message.get('earliest_completion_time'):
-                future.eta_min = parse_datetime(message['earliest_completion_time'])
+            if not future.eta_min and message.get('earliest_estimated_completion'):
+                future.eta_min = parse_datetime(message['earliest_estimated_completion'])
 
-            if not future.eta_max and message.get('latest_completion_time'):
-                future.eta_max = parse_datetime(message['latest_completion_time'])
+            if not future.eta_max and message.get('latest_estimated_completion'):
+                future.eta_max = parse_datetime(message['latest_estimated_completion'])
 
             if status == self.STATUS_COMPLETE:
                 # TODO: find a better way to differentiate between
@@ -879,7 +879,7 @@ class Client(object):
             # for poll priority we use timestamp of next scheduled poll
             at = time.time() + future._poll_backoff
 
-        _LOGGER.debug("Polling scheduled at %.2f with %.2f sec back-off for: %s",
+        _LOGGER.debug("Polling scheduled at %.2f with %.2f sec new back-off for: %s",
                       at, future._poll_backoff, future.id)
 
         self._poll_queue.put((at, future))
@@ -951,8 +951,11 @@ class Client(object):
                 if delay > 0:
                     _LOGGER.debug("Pausing polling %.2f sec for futures: %s", delay, ids)
                     time.sleep(delay)
+                else:
+                    _LOGGER.trace("Skipping non-positive delay of %.2f sec", delay)
 
                 try:
+                    _LOGGER.trace("Executing poll API request")
                     response = self.session.get(posixpath.join(self.endpoint, query_string))
 
                     if response.status_code == 401:
