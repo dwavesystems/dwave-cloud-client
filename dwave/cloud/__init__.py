@@ -26,7 +26,7 @@ logging.addLevelName(logging.TRACE, "TRACE")
 
 def _trace(logger, message, *args, **kwargs):
     if logger.isEnabledFor(logging.TRACE):
-        logger._log(logging.TRACE, message, *args, **kwargs)
+        logger._log(logging.TRACE, message, args, **kwargs)
 
 logging.Logger.trace = _trace
 
