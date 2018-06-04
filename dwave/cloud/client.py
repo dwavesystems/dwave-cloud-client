@@ -243,7 +243,7 @@ class Client(object):
                 configuration file.
 
         Returns:
-            :class:`~dwave.cloud.client.Client` (:class:`dwave.cloud.qpu.Client` or :class:`dwave.cloud.sw.Client`, default=\ :class:`dwave.cloud.qpu.Client`):
+            :class:`~dwave.cloud.client.Client` (:class:`dwave.cloud.qpu.Client` or :class:`dwave.cloud.sw.Client`, default=:class:`dwave.cloud.qpu.Client`):
                 Appropriate instance of a QPU or software client.
 
         Raises:
@@ -545,7 +545,7 @@ class Client(object):
 
         Makes a blocking web call to `{endpoint}/solvers/remote/``, where `{endpoint}`
         is a URL configured for the client, caches the result,
-        and populates a list of available :term:`solver`\ s described through :class:`.Solver`
+        and populates a list of available :term:`solver`s described through :class:`.Solver`
         instances.
 
         To submit a sampling problem to the D-Wave API, select a solver from the returned list,
