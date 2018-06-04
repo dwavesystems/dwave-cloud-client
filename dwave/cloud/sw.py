@@ -64,11 +64,7 @@ class Client(BaseClient):
 
                 @staticmethod
                 def is_solver_handled(solver):
-                    if not solver:
-                        return False
                     return solver.id.startswith('My_SW_Solver')
 
         """
-        if not solver:
-            return False
-        return solver.id.startswith('c4-sw_')
+        return solver.is_software

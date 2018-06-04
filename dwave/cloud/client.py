@@ -232,7 +232,7 @@ class Client(object):
 
             legacy_config_fallback (bool, default=True):
                 If True (the default) and loading from a standard D-Wave Cloud Client configuration
-                file (``dwave.conf``) fails, tries loading a legacy configuration file (``~\.dwrc``).
+                file (``dwave.conf``) fails, tries loading a legacy configuration file (``~/.dwrc``).
 
         Other Parameters:
             Unrecognized keys (str):
@@ -533,10 +533,8 @@ class Client(object):
 
                 @staticmethod
                 def is_solver_handled(solver):
-                    if not solver:
-                        return False
                     return solver.id.startswith('My_Solver_')
-        
+
         """
         return True
 

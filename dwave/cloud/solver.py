@@ -134,6 +134,18 @@ class Solver(object):
     def __str__(self):
         return "Solver(id={!r})".format(self.id)
 
+    @property
+    def is_qpu(self):
+        "Is this a QPU-based solver?"
+        # TODO: add a field for this in SAPI response; for now base decision on id/name
+        return not self.id.startswith('c4-sw_')
+
+    @property
+    def is_software(self):
+        "Is this a software-based solver?"
+        # TODO: add a field for this in SAPI response; for now base decision on id/name
+        return self.id.startswith('c4-sw_')
+
     def sample_ising(self, linear, quadratic, **params):
         """Sample from the specified Ising model.
 
