@@ -72,7 +72,7 @@ class Client(BaseClient):
 
                 @staticmethod
                 def is_solver_handled(solver):
-                    return solver.id.startswith('2000Q')
+                    return solver and solver.id.startswith('2000Q')
 
         """
-        return solver.is_qpu
+        return solver and solver.is_qpu

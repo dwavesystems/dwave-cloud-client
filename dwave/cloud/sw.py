@@ -64,7 +64,7 @@ class Client(BaseClient):
 
                 @staticmethod
                 def is_solver_handled(solver):
-                    return solver.id.startswith('My_SW_Solver')
+                    return solver and solver.id.startswith('My_SW_Solver')
 
         """
-        return solver.is_software
+        return solver and solver.is_software

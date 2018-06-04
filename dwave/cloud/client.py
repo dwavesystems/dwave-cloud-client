@@ -533,7 +533,7 @@ class Client(object):
 
                 @staticmethod
                 def is_solver_handled(solver):
-                    return solver.id.startswith('My_Solver_')
+                    return solver and solver.id.startswith('My_Solver_')
 
         """
         return True
