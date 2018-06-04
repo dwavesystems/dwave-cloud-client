@@ -180,6 +180,25 @@ class MockSolverLoading(unittest.TestCase):
         self.assertFalse(Client.is_solver_handled(solver_object('c4-sw_')))
         self.assertFalse(Client.is_solver_handled(None))
 
+    def test_solver_feature_properties(self):
+        self.assertTrue(solver_object('dw2000').is_qpu)
+        self.assertFalse(solver_object('dw2000').is_software)
+        self.assertFalse(solver_object('c4-sw_x').is_qpu)
+        self.assertTrue(solver_object('c4-sw_x').is_software)
+
+        self.assertFalse(solver_object('dw2000').is_vfyc)
+        self.assertEqual(solver_object('dw2000').num_qubits, 3)
+        self.assertFalse(solver_object('dw2000').has_flux_biases)
+
+        data = json.loads(solver_data('test'))
+        data['properties']['vfyc'] = 'error'
+        self.assertFalse(Solver(None, data).is_vfyc)
+        data['properties']['vfyc'] = True
+        self.assertTrue(Solver(None, data).is_vfyc)
+
+        data['properties']['parameters']['flux_biases'] = '...'
+        self.assertTrue(Solver(None, data).has_flux_biases)
+
 
 class GetEvent(Exception):
     """Throws exception when mocked client submits an HTTP GET request."""
