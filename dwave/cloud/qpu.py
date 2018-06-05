@@ -72,11 +72,7 @@ class Client(BaseClient):
 
                 @staticmethod
                 def is_solver_handled(solver):
-                    if not solver:
-                        return False
-                    return solver.id.startswith('2000Q')
+                    return solver and solver.id.startswith('2000Q')
 
         """
-        if not solver:
-            return False
-        return not solver.id.startswith('c4-sw_')
+        return solver and solver.is_qpu

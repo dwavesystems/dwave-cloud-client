@@ -9,6 +9,7 @@ import unittest
 
 from dwave.cloud.config import load_config
 from dwave.cloud.qpu import Client
+from dwave.cloud.solver import Solver
 from dwave.cloud.exceptions import SolverAuthenticationError
 from dwave.cloud.testing import mock
 import dwave.cloud
@@ -111,6 +112,86 @@ class ClientFactory(unittest.TestCase):
                 # test fallback is avoided (legacy config skipped)
                 self.assertRaises(
                     ValueError, dwave.cloud.Client.from_config, legacy_config_fallback=False)
+
+
+class FeatureBasedSolverSelection(unittest.TestCase):
+    """Test Client.solvers()."""
+
+    def setUp(self):
+        # mock solvers
+        self.solver1 = Solver(client=None, data={
+            "properties": {
+                "supported_problem_types": ["qubo", "ising"],
+                "qubits": [0, 1, 2],
+                "couplers": [[0, 1], [0, 2], [1, 2]],
+                "num_qubits": 3,
+                "parameters": {"num_reads": "Number of samples to return."}
+            },
+            "id": "solver1",
+            "description": "A test solver 1"
+        })
+        self.solver2 = Solver(client=None, data={
+            "properties": {
+                "supported_problem_types": ["qubo", "ising"],
+                "qubits": [0, 1, 2, 3, 4],
+                "couplers": [[0, 1], [0, 2], [1, 2], [2, 3], [3, 4]],
+                "num_qubits": 5,
+                "parameters": {
+                    "num_reads": "Number of samples to return.",
+                    "flux_biases": "Supported ..."
+                },
+                "vfyc": True
+            },
+            "id": "solver2",
+            "description": "A test solver 2"
+        })
+        self.solvers = [self.solver1, self.solver2]
+
+        # mock client
+        self.client = Client('endpoint', 'token')
+        self.client._solvers = {
+            self.solver1.id: self.solver1,
+            self.solver2.id: self.solver2
+        }
+        self.client._all_solvers_ready = True
+
+    def shutDown(self):
+        self.client.close()
+
+    def assertSolvers(self, container, members):
+        return set(container) == set(members)
+
+    def test_default(self):
+        self.assertSolvers(self.client.solvers(), self.solvers)
+
+    def test_one_boolean(self):
+        self.assertSolvers(self.client.solvers(vfyc=False), [self.solver1])
+        self.assertSolvers(self.client.solvers(vfyc=True), [self.solver2])
+        self.assertSolvers(self.client.solvers(flux_biases=False), [self.solver1])
+        self.assertSolvers(self.client.solvers(flux_biases=True), [self.solver2])
+
+    def test_boolean_combo(self):
+        self.assertSolvers(self.client.solvers(vfyc=False, flux_biases=True), [])
+        self.assertSolvers(self.client.solvers(vfyc=True, flux_biases=True), [self.solver2])
+
+    def test_int_range(self):
+        self.assertSolvers(self.client.solvers(num_qubits=3), [self.solver1])
+        self.assertSolvers(self.client.solvers(num_qubits=4), [])
+        self.assertSolvers(self.client.solvers(num_qubits=5), [self.solver2])
+
+        self.assertSolvers(self.client.solvers(num_qubits=[3, 5]), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits=[2, None]), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits=[None, 6]), self.solvers)
+
+        self.assertSolvers(self.client.solvers(num_qubits=[2, 4]), [self.solver1])
+        self.assertSolvers(self.client.solvers(num_qubits=[4, None]), [self.solver2])
+
+    def test_range_boolean_combo(self):
+        self.assertSolvers(self.client.solvers(num_qubits=3, vfyc=True), [])
+        self.assertSolvers(self.client.solvers(num_qubits=[3, None], vfyc=True), [self.solver2])
+        self.assertSolvers(self.client.solvers(num_qubits=[None, 4], vfyc=True), [])
+        self.assertSolvers(self.client.solvers(num_qubits=[None, 4], flux_biases=False), [self.solver1])
+        self.assertSolvers(self.client.solvers(num_qubits=5, flux_biases=True), [self.solver2])
 
 
 if __name__ == '__main__':

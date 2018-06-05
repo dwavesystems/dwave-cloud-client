@@ -232,7 +232,7 @@ class Client(object):
 
             legacy_config_fallback (bool, default=True):
                 If True (the default) and loading from a standard D-Wave Cloud Client configuration
-                file (``dwave.conf``) fails, tries loading a legacy configuration file (``~\.dwrc``).
+                file (``dwave.conf``) fails, tries loading a legacy configuration file (``~/.dwrc``).
 
         Other Parameters:
             Unrecognized keys (str):
@@ -533,10 +533,8 @@ class Client(object):
 
                 @staticmethod
                 def is_solver_handled(solver):
-                    if not solver:
-                        return False
-                    return solver.id.startswith('My_Solver_')
-        
+                    return solver and solver.id.startswith('My_Solver_')
+
         """
         return True
 
@@ -572,8 +570,8 @@ class Client(object):
              u'2000Q_ONLINE_SOLVER2': <dwave.cloud.solver.Solver at 0x7e84828>}
             >>> # code that uses client
             >>> client.close() # doctest: +SKIP
-
         """
+
         with self._solvers_lock:
             if self._all_solvers_ready and not refresh:
                 return self._solvers
@@ -603,6 +601,65 @@ class Client(object):
 
             self._all_solvers_ready = True
             return self._solvers
+
+    def solvers(self, qpu=None, software=None, vfyc=None,
+                flux_biases=None, num_qubits=None, refresh=False):
+        """Returns a filtered list of solvers handled by this client.
+
+        Args:
+            qpu (bool, default=None):
+                Should solver be QPU based?
+
+            software (bool, default=None):
+                Should solver be software based?
+
+            vfyc (bool, default=None):
+                Should solver work on "virtual full-yield chip"?
+
+            flux_biases (bool, default=None):
+                Should solver accept flux biases?
+
+            num_qubits (int/[int,int], default=None):
+                What's the range (or exact number) of qubits solver should handle?
+
+        Returns:
+            list[Solver]: List of all solvers that satisfy the above conditions.
+
+        Examples:
+            Get a solver not based on VFYC, with 2048 qubits:
+
+                solver = client.solvers(vfyc=True, num_qubits=2048)[0]
+
+            Get all solvers that have between 1024 and 2048 qubits:
+
+                solvers = client.solvers(num_qubits=[1024, 2048])
+
+            Get all solvers that have at least 2000 qubits:
+
+                solvers = client.solvers(num_qubits=[2000, None])
+        """
+
+        def predicate(solver):
+            if qpu is not None and solver.is_qpu != qpu:
+                return False
+            if software is not None and solver.is_software != software:
+                return False
+            if vfyc is not None and solver.is_vfyc != vfyc:
+                return False
+            if flux_biases is not None and solver.has_flux_biases != flux_biases:
+                return False
+            if num_qubits is not None:
+                if isinstance(num_qubits, list) and len(num_qubits) == 2:
+                    min_qubits, max_qubits = num_qubits
+                else:
+                    min_qubits, max_qubits = num_qubits, num_qubits
+                if min_qubits is not None and solver.num_qubits < min_qubits:
+                    return False
+                if max_qubits is not None and max_qubits < solver.num_qubits:
+                    return False
+            return True
+
+        return list(filter(predicate, self.get_solvers(refresh=refresh).values()))
 
     def get_solver(self, name=None, refresh=False):
         """Load the configuration for a single solver.
