@@ -44,6 +44,7 @@ def solver_data(id_, incomplete=False):
 def solver_object(id_, incomplete=False):
     return Solver(client=None, data=json.loads(solver_data(id_, incomplete)))
 
+
 # Define the endpoinds
 all_solver_url = '{}/solvers/remote/'.format(url)
 solver1_url = '{}/solvers/remote/{}/'.format(url, solver_name)
