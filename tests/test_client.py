@@ -8,7 +8,7 @@ from __future__ import absolute_import
 import unittest
 
 from dwave.cloud.config import load_config
-from dwave.cloud.qpu import Client
+from dwave.cloud.client import Client
 from dwave.cloud.solver import Solver
 from dwave.cloud.exceptions import SolverAuthenticationError
 from dwave.cloud.testing import mock
@@ -79,8 +79,34 @@ class ClientFactory(unittest.TestCase):
             with dwave.cloud.Client.from_config() as client:
                 self.assertEqual(client.endpoint, 'endpoint')
                 self.assertEqual(client.token, 'token')
-                self.assertIsInstance(client, dwave.cloud.qpu.Client)
+                self.assertIsInstance(client, dwave.cloud.client.Client)
                 self.assertNotIsInstance(client, dwave.cloud.sw.Client)
+                self.assertNotIsInstance(client, dwave.cloud.qpu.Client)
+
+    def test_client_type(self):
+        conf = {k: k for k in 'endpoint token'.split()}
+        def mocked_load_config(**kwargs):
+            kwargs.update(conf)
+            return kwargs
+
+        with mock.patch("dwave.cloud.client.load_config", mocked_load_config):
+            with dwave.cloud.Client.from_config() as client:
+                self.assertIsInstance(client, dwave.cloud.client.Client)
+
+            with dwave.cloud.client.Client.from_config() as client:
+                self.assertIsInstance(client, dwave.cloud.client.Client)
+
+            with dwave.cloud.qpu.Client.from_config() as client:
+                self.assertIsInstance(client, dwave.cloud.qpu.Client)
+
+            with dwave.cloud.sw.Client.from_config() as client:
+                self.assertIsInstance(client, dwave.cloud.sw.Client)
+
+            with dwave.cloud.Client.from_config(client='qpu') as client:
+                self.assertIsInstance(client, dwave.cloud.qpu.Client)
+
+            with dwave.cloud.qpu.Client.from_config(client='base') as client:
+                self.assertIsInstance(client, dwave.cloud.client.Client)
 
     def test_custom_kwargs(self):
         conf = {k: k for k in 'endpoint token'.split()}

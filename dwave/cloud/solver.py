@@ -131,7 +131,7 @@ class Solver(object):
         if 'annealing_time_range' in self.properties:
             self._params[self._PARAMETER_ENABLE_HARDWARE] = True
 
-    def __str__(self):
+    def __repr__(self):
         return "Solver(id={!r})".format(self.id)
 
     @property
