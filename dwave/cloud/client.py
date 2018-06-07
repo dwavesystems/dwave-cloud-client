@@ -374,8 +374,8 @@ class Client(object):
         config.update(kwargs)
 
         from dwave.cloud import qpu, sw
-        _clients = {'qpu': qpu.Client, 'sw': sw.Client}
-        _client = config.pop('client', None) or 'qpu'
+        _clients = {'qpu': qpu.Client, 'sw': sw.Client, 'base': cls}
+        _client = config.pop('client', None) or 'base'
 
         _LOGGER.debug("Final config used for %s.Client(): %r", _client, config)
         return _clients[_client](**config)
@@ -624,6 +624,13 @@ class Client(object):
 
         Returns:
             list[Solver]: List of all solvers that satisfy the above conditions.
+
+        Note:
+            Client subclasses (e.g. :class:`dwave.cloud.qpu.Client` or
+            :class:`dwave.cloud.sw.Client`) already filter solvers by resource
+            type, so for ``qpu`` and ``software`` filters to have effect, you
+            need to call :meth:`.solvers` on the base :class:`~dwave.cloud.client.Client`
+            class.
 
         Examples:
             Get a solver not based on VFYC, with 2048 qubits:
