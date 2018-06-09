@@ -109,7 +109,8 @@ class Client(object):
     ANY_STATUS_ONGOING = [STATUS_IN_PROGRESS, STATUS_PENDING]
     ANY_STATUS_NO_RESULT = [STATUS_FAILED, STATUS_CANCELLED]
 
-    # Number of problems to include in a status query
+    # Number of problems to include in a submit/status query
+    _SUBMIT_BATCH_SIZE = 20
     _STATUS_QUERY_SIZE = 100
 
     # Number of worker threads for each problem processing task
@@ -761,7 +762,7 @@ class Client(object):
                     break
 
                 ready_problems = [item]
-                while True:
+                while len(ready_problems) < self._SUBMIT_BATCH_SIZE:
                     try:
                         ready_problems.append(self._submission_queue.get_nowait())
                     except queue.Empty:
