@@ -1,5 +1,7 @@
 from __future__ import absolute_import, print_function
 
+import base64
+import struct
 import unittest
 import itertools
 
@@ -23,6 +25,10 @@ def get_solver():
 
 
 class TestCoders(unittest.TestCase):
+    nan = float('nan')
+
+    def encode_doubles(self, values):
+        return base64.b64encode(struct.pack('<' + ('d' * len(values)), *values)).decode('utf-8')
 
     def test_qpu_request_encoding_all_qubits(self):
         """Test biases and coupling strengths are properly encoded (base64 little-endian doubles)."""
@@ -32,8 +38,8 @@ class TestCoders(unittest.TestCase):
         quadratic = {key: -1 for key in solver.undirected_edges}
         request = encode_bqm_as_qp(solver, linear, quadratic)
         self.assertEqual(request['format'], 'qp')
-        self.assertEqual(request['lin'],  'AAAAAAAA8D8AAAAAAADwPwAAAAAAAPA/AAAAAAAA8D8=')
-        self.assertEqual(request['quad'], 'AAAAAAAA8L8AAAAAAADwvwAAAAAAAPC/AAAAAAAA8L8=')
+        self.assertEqual(request['lin'],  self.encode_doubles([1, 1, 1, 1]))
+        self.assertEqual(request['quad'], self.encode_doubles([-1, -1, -1, -1]))
 
     def test_qpu_request_encoding_sub_qubits(self):
         """Inactive qubits should be encoded as NaNs. Inactive couplers should be omitted."""
@@ -44,9 +50,9 @@ class TestCoders(unittest.TestCase):
         request = encode_bqm_as_qp(solver, linear, quadratic)
         self.assertEqual(request['format'], 'qp')
         # [1, 1, NaN, NaN]
-        self.assertEqual(request['lin'],  'AAAAAAAA8D8AAAAAAADwPwAAAAAAAPh/AAAAAAAA+H8=')
+        self.assertEqual(request['lin'],  self.encode_doubles([1, 1, self.nan, self.nan]))
         # [-1]
-        self.assertEqual(request['quad'], 'AAAAAAAA8L8=')
+        self.assertEqual(request['quad'], self.encode_doubles([-1]))
 
     def test_qpu_request_encoding_missing_qubits(self):
         """Qubits don't have to be specified with biases only, but also with couplings."""
@@ -57,9 +63,9 @@ class TestCoders(unittest.TestCase):
         request = encode_bqm_as_qp(solver, linear, quadratic)
         self.assertEqual(request['format'], 'qp')
         # [0, 0, NaN, NaN]
-        self.assertEqual(request['lin'],  'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAPh/AAAAAAAA+H8=')
+        self.assertEqual(request['lin'],  self.encode_doubles([0, 0, self.nan, self.nan]))
         # [-1]
-        self.assertEqual(request['quad'], 'AAAAAAAA8L8=')
+        self.assertEqual(request['quad'], self.encode_doubles([-1]))
 
     def test_qpu_request_encoding_sub_qubits_implicit_biases(self):
         """Biases don't have to be specified for qubits to be active."""
@@ -70,9 +76,9 @@ class TestCoders(unittest.TestCase):
         request = encode_bqm_as_qp(solver, linear, quadratic)
         self.assertEqual(request['format'], 'qp')
         # [0, NaN, NaN, 0]
-        self.assertEqual(request['lin'],  'AAAAAAAAAAAAAAAAAAD4fwAAAAAAAPh/AAAAAAAAAAA=')
+        self.assertEqual(request['lin'],  self.encode_doubles([0, self.nan, self.nan, 0]))
         # [-1]
-        self.assertEqual(request['quad'], 'AAAAAAAA8L8=')
+        self.assertEqual(request['quad'], self.encode_doubles([-1]))
 
     def test_qpu_request_encoding_sub_qubits_implicit_couplings(self):
         """Couplings should be zero for active qubits, if not specified."""
@@ -83,6 +89,6 @@ class TestCoders(unittest.TestCase):
         request = encode_bqm_as_qp(solver, linear, quadratic)
         self.assertEqual(request['format'], 'qp')
         # [0, NaN, NaN, 0]
-        self.assertEqual(request['lin'],  'AAAAAAAAAAAAAAAAAAD4fwAAAAAAAPh/AAAAAAAAAAA=')
-        # [-1]
-        self.assertEqual(request['quad'], 'AAAAAAAAAAA=')
+        self.assertEqual(request['lin'],  self.encode_doubles([0, self.nan, self.nan, 0]))
+        # [0]
+        self.assertEqual(request['quad'], self.encode_doubles([0]))
