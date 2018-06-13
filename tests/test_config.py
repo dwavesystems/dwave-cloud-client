@@ -77,14 +77,13 @@ class TestConfig(unittest.TestCase):
         self.assertRaises(ConfigFileReadError, load_config_from_files, filenames=['/path/to/non/existing/config'])
 
     def test_config_file_detection_cwd(self):
-        configpath = "./dwave.conf"
+        configpath = os.path.join('.', 'dwave.conf')
         with mock.patch("os.path.exists", lambda path: path == configpath):
             self.assertEqual(get_configfile_paths(), [configpath])
 
     def test_config_file_detection_user(self):
         if sys.platform == 'win32':
-            # TODO
-            pass
+            configpath = os.path.expanduser("~\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf")
         elif sys.platform == 'darwin':
             configpath = os.path.expanduser("~/Library/Application Support/dwave/dwave.conf")
         else:
@@ -95,10 +94,9 @@ class TestConfig(unittest.TestCase):
 
     def test_config_file_detection_system(self):
         if sys.platform == 'win32':
-            # TODO
-            pass
+            configpath = os.path.expandvars("%SYSTEMDRIVE%\\ProgramData\\dwavesystem\\dwave\\dwave.conf")
         elif sys.platform == 'darwin':
-            configpath = os.path.expanduser("/Library/Application Support/dwave/dwave.conf")
+            configpath = "/Library/Application Support/dwave/dwave.conf"
         else:
             configpath = "/etc/xdg/dwave/dwave.conf"
 

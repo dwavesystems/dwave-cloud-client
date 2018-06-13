@@ -45,36 +45,43 @@ class TestCli(unittest.TestCase):
         with runner.isolated_filesystem():
             touch('dwave.conf')
             with mock.patch('dwave.cloud.config.homebase.site_config_dir_list',
-                            lambda **kw: ['/system1', '/system2']):
+                            lambda **kw: ['system1', 'system2']):
                 with mock.patch('dwave.cloud.config.homebase.user_config_dir',
-                                lambda **kw: '/user'):
+                                lambda **kw: 'user'):
                     with mock.patch('os.path.exists', lambda *x: True):
                         # test listing of all auto-detected config files
                         result = runner.invoke(cli, [
                             'config', 'ls'
                         ])
                         self.assertEqual(result.output.strip(), '\n'.join([
-                            '/system1/dwave.conf', '/system2/dwave.conf',
-                            '/user/dwave.conf', './dwave.conf']))
+                            os.path.join('system1', 'dwave.conf'),
+                            os.path.join('system2', 'dwave.conf'),
+                            os.path.join('user', 'dwave.conf'),
+                            os.path.join('.', 'dwave.conf')
+                        ]))
 
                         # test --system
                         result = runner.invoke(cli, [
                             'config', 'ls', '--system'
                         ])
                         self.assertEqual(result.output.strip(), '\n'.join([
-                            '/system1/dwave.conf', '/system2/dwave.conf']))
+                            os.path.join('system1', 'dwave.conf'),
+                            os.path.join('system2', 'dwave.conf')
+                        ]))
 
                         # test --user
                         result = runner.invoke(cli, [
                             'config', 'ls', '--user'
                         ])
-                        self.assertEqual(result.output.strip(), '/user/dwave.conf')
+                        self.assertEqual(result.output.strip(),
+                                         os.path.join('user', 'dwave.conf'))
 
                         # test --local
                         result = runner.invoke(cli, [
                             'config', 'ls', '--local'
                         ])
-                        self.assertEqual(result.output.strip(), './dwave.conf')
+                        self.assertEqual(result.output.strip(),
+                                         os.path.join('.', 'dwave.conf'))
 
                     # test --include-missing (none of the examined paths exist)
                     with mock.patch('os.path.exists', lambda *x: False):
@@ -83,8 +90,11 @@ class TestCli(unittest.TestCase):
                             'config', 'ls', '--include-missing'
                         ])
                         self.assertEqual(result.output.strip(), '\n'.join([
-                            '/system1/dwave.conf', '/system2/dwave.conf',
-                            '/user/dwave.conf', './dwave.conf']))
+                            os.path.join('system1', 'dwave.conf'),
+                            os.path.join('system2', 'dwave.conf'),
+                            os.path.join('user', 'dwave.conf'),
+                            os.path.join('.', 'dwave.conf')
+                        ]))
 
                         # test none exists
                         result = runner.invoke(cli, [
@@ -97,19 +107,23 @@ class TestCli(unittest.TestCase):
                             'config', 'ls', '--system', '--include-missing'
                         ])
                         self.assertEqual(result.output.strip(), '\n'.join([
-                            '/system1/dwave.conf', '/system2/dwave.conf']))
+                            os.path.join('system1', 'dwave.conf'),
+                            os.path.join('system2', 'dwave.conf')
+                        ]))
 
                         # test --user
                         result = runner.invoke(cli, [
                             'config', 'ls', '--user', '--include-missing'
                         ])
-                        self.assertEqual(result.output.strip(), '/user/dwave.conf')
+                        self.assertEqual(result.output.strip(),
+                                         os.path.join('user', 'dwave.conf'))
 
                         # test --local
                         result = runner.invoke(cli, [
                             'config', 'ls', '--local', '--include-missing'
                         ])
-                        self.assertEqual(result.output.strip(), './dwave.conf')
+                        self.assertEqual(result.output.strip(),
+                                         os.path.join('.', 'dwave.conf'))
 
     def test_configure_inspect(self):
         runner = CliRunner()
