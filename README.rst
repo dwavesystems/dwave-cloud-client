@@ -1,17 +1,22 @@
 .. image:: https://img.shields.io/pypi/v/dwave-cloud-client.svg
     :target: https://pypi.python.org/pypi/dwave-cloud-client
+    :alt: Last version on PyPI
 
 .. image:: https://travis-ci.org/dwavesystems/dwave-cloud-client.svg?branch=master
     :target: https://travis-ci.org/dwavesystems/dwave-cloud-client
-    :alt: Travis Status
+    :alt: Linux/Mac build status
+
+.. image:: https://ci.appveyor.com/api/projects/status/6a2wjq9xtgtr2t2c/branch/master?svg=true
+    :target: https://ci.appveyor.com/project/dwave-adtt/dwave-cloud-client/branch/master
+    :alt: Windows build status
 
 .. image:: https://coveralls.io/repos/github/dwavesystems/dwave-cloud-client/badge.svg?branch=master
     :target: https://coveralls.io/github/dwavesystems/dwave-cloud-client?branch=master
-    :alt: Coverage Report
+    :alt: Coverage report
 
 .. image:: https://readthedocs.org/projects/dwave-cloud-client/badge/?version=latest
     :target: http://dwave-cloud-client.readthedocs.io/en/latest/?badge=latest
-    :alt: Documentation Status
+    :alt: Documentation status
 
 .. index-start-marker
 
