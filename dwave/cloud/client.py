@@ -223,8 +223,8 @@ class Client(object):
 
             solver (str, default=None):
                 Default :term:`solver` to use in :meth:`~dwave.cloud.client.Client.get_solver`.
-                If undefined, all calls to :meth:`~dwave.cloud.client.Client.get_solver`
-                must explicitly specify the solver name/id.
+                If undefined, :meth:`~dwave.cloud.client.Client.get_solver` will return the
+                first solver available.
 
             proxy (str, default=None):
                 URL for proxy to use in connections to D-Wave API. Can include
@@ -549,7 +549,8 @@ class Client(object):
 
         To submit a sampling problem to the D-Wave API, select a solver from the returned list,
         and execute a ``sampling_*`` method on it. Alternatively, use the :meth:`.get_solver` method
-        if you know the solver ID (name) or have it defined in your configuration file.
+        if you know the solver ID (name), have it defined in your configuration file, or are just
+        interested in fetching any/first solver.
 
         Args:
             refresh (bool, default=False):
@@ -679,6 +680,8 @@ class Client(object):
         Args:
             name (str):
                 ID of the requested solver. ``None`` returns the default solver.
+                If default solver is not configured, ``None`` returns the first available
+                solver in ``Client``'s class (QPU/software/base).
 
             refresh (bool):
                 Return solver from cache (if cached with ``get_solvers()``),
@@ -713,7 +716,13 @@ class Client(object):
             if self.default_solver:
                 name = self.default_solver
             else:
-                raise ValueError("No name or default name provided when loading solver.")
+                # get the first appropriate solver
+                from dwave.cloud import qpu, sw
+                try:
+                    return self.solvers(qpu=isinstance(self, qpu.Client),
+                                        software=isinstance(self, sw.Client))[0]
+                except IndexError:
+                    raise SolverError("No solvers available to this client")
 
         with self._solvers_lock:
             if refresh or name not in self._solvers:
