@@ -69,6 +69,13 @@ class SolverLoading(unittest.TestCase):
         with Client(**config) as client:
             self.assertEqual(client.get_solver(config['solver']).id, config['solver'])
 
+    def test_get_any_qpu_solver(self):
+        with Client(endpoint=config['endpoint'], token=config['token'], client='qpu') as client:
+            self.assertEqual(client.get_solver(), client.solvers(qpu=True)[0])
+
+        with Client(endpoint=config['endpoint'], token=config['token'], client='sw') as client:
+            self.assertEqual(client.get_solver(), client.solvers(software=True)[0])
+
 
 class ClientFactory(unittest.TestCase):
     """Test client factory."""
