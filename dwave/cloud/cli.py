@@ -143,6 +143,8 @@ def create(config_file, profile):
     for var, prompt in zip(variables, prompts):
         default_val = config.get(profile, var, fallback=None)
         val = default_text_input(prompt, default_val)
+        if val:
+            val = os.path.expandvars(val)
         if val != default_val:
             config.set(profile, var, val)
 
