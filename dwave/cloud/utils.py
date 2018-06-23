@@ -7,7 +7,6 @@ import itertools
 import random
 
 import six
-import readline
 import click
 
 # Use numpy if available for fast decoding
@@ -18,7 +17,7 @@ except ImportError:  # pragma: no cover
     _numpy = False
 
 __all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
-           'readline_input', 'click_info_switch', 'datetime_to_timestamp']
+           'default_text_input', 'click_info_switch', 'datetime_to_timestamp']
 
 
 def evaluate_ising(linear, quad, state):
@@ -110,18 +109,6 @@ def strip_head(sequence, values):
 def strip_tail(sequence, values):
     """Strip `values` from the end of `sequence`."""
     return list(reversed(list(strip_head(reversed(sequence), values))))
-
-
-def readline_input(prompt, prefill=''):
-    """Provide an editable default for ``input()``."""
-    # see: https://stackoverflow.com/q/2533120/
-    # NB: pyreadline on Windows doesn't support insert_text
-    # NB: gnureadline on MacOS seemingly also doesn't handle this
-    readline.set_startup_hook(lambda: readline.insert_text(prefill))
-    try:
-        return six.moves.input(prompt)
-    finally:
-        readline.set_startup_hook()
 
 
 def default_text_input(prompt, default=None, optional=True):

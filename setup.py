@@ -23,11 +23,7 @@ extras_require = {
     'test': ['requests_mock', 'mock', 'numpy', 'coverage'],
 
     # python2 backports
-    ':python_version == "2.7"': ['futures', 'configparser'],
-
-    # readline support differs for Windows vs. POSIX (Linux/Darwin)
-    ':platform_system == "Windows"': ['pyreadline>=2'],
-    ':os_name == "posix"': ['gnureadline>=6']
+    ':python_version == "2.7"': ['futures', 'configparser']
 }
 
 # Packages provided. Only include packages under the 'dwave' namespace.
