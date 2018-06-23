@@ -2,8 +2,9 @@ import unittest
 from collections import OrderedDict
 
 from dwave.cloud.utils import (
-    readline_input, uniform_iterator, uniform_get, strip_head, strip_tail,
-    active_qubits, generate_valid_random_problem)
+    uniform_iterator, uniform_get, strip_head, strip_tail,
+    active_qubits, generate_valid_random_problem,
+    default_text_input)
 from dwave.cloud.testing import mock
 
 
@@ -49,12 +50,12 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(active_qubits([], {(0, 1): 0}), {0, 1})
         self.assertEqual(active_qubits([0, 0], {(0, 2): 0}), {0, 1, 2})
 
-    def test_readline_input(self):
+    def test_default_text_input(self):
         val = "value"
         with mock.patch("six.moves.input", side_effect=[val], create=True):
-            self.assertEqual(readline_input("prompt", val), val)
+            self.assertEqual(default_text_input("prompt", val), val)
         with mock.patch("six.moves.input", side_effect=[val], create=True):
-            self.assertEqual(readline_input("prompt", val+val), val)
+            self.assertEqual(default_text_input("prompt", val+val), val)
 
     def test_generate_valid_random_problem(self):
         class MockSolver(object):

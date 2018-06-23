@@ -22,7 +22,7 @@ class TestCli(unittest.TestCase):
     def test_config_create(self):
         config_file = 'dwave.conf'
         profile = 'profile'
-        values = 'endpoint token client solver proxy'.split()
+        values = 'endpoint token client solver'.split()
 
         runner = CliRunner()
         with runner.isolated_filesystem():

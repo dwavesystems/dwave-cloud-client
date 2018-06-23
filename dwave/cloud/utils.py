@@ -7,7 +7,7 @@ import itertools
 import random
 
 import six
-import readline
+import click
 
 # Use numpy if available for fast decoding
 try:
@@ -17,7 +17,7 @@ except ImportError:  # pragma: no cover
     _numpy = False
 
 __all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
-           'readline_input', 'click_info_switch', 'datetime_to_timestamp']
+           'default_text_input', 'click_info_switch', 'datetime_to_timestamp']
 
 
 def evaluate_ising(linear, quad, state):
@@ -111,14 +111,25 @@ def strip_tail(sequence, values):
     return list(reversed(list(strip_head(reversed(sequence), values))))
 
 
-def readline_input(prompt, prefill=''):
-    """Provide an editable default for ``input()``."""
-    # see: https://stackoverflow.com/q/2533120/
-    readline.set_startup_hook(lambda: readline.insert_text(prefill))
-    try:
-        return six.moves.input(prompt)
-    finally:
-        readline.set_startup_hook()
+def default_text_input(prompt, default=None, optional=True):
+    if default:
+        prompt = "{} [{}]: ".format(prompt, default)
+    else:
+        if optional:
+            prompt = "{} [skip]: ".format(prompt)
+        else:
+            prompt = "{}: ".format(prompt)
+
+    line = ''
+    while not line:
+        line = six.moves.input(prompt)
+        if not line:
+            line = default
+        if not line:
+            if optional:
+                break
+            click.echo("Input required, please try again.")
+    return line
 
 
 def click_info_switch(f):
