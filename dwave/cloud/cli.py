@@ -138,8 +138,7 @@ def create(config_file, profile):
     prompts = ['API endpoint URL',
                'Authentication token',
                'Client class (qpu or sw)',
-               'Solver',
-               'Proxy URL']
+               'Default solver']
     for var, prompt in zip(variables, prompts):
         default_val = config.get(profile, var, fallback=None)
         val = default_text_input(prompt, default_val)
