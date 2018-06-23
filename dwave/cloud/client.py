@@ -35,6 +35,7 @@ import requests
 import posixpath
 import collections
 from itertools import chain
+from operator import attrgetter
 
 from dateutil.parser import parse as parse_datetime
 from six.moves import queue, range
@@ -668,7 +669,9 @@ class Client(object):
                     return False
             return True
 
-        return list(filter(predicate, self.get_solvers(refresh=refresh).values()))
+        solvers = list(filter(predicate, self.get_solvers(refresh=refresh).values()))
+        solvers.sort(key=attrgetter('id'))
+        return solvers
 
     def get_solver(self, name=None, refresh=False):
         """Load the configuration for a single solver.
@@ -717,12 +720,10 @@ class Client(object):
                 name = self.default_solver
             else:
                 # get the first appropriate solver
-                from dwave.cloud import qpu, sw
                 try:
-                    return self.solvers(qpu=isinstance(self, qpu.Client),
-                                        software=isinstance(self, sw.Client))[0]
+                    return self.solvers()[0]
                 except IndexError:
-                    raise SolverError("No solvers available to this client")
+                    raise SolverError("No solvers available this client can handle")
 
         with self._solvers_lock:
             if refresh or name not in self._solvers:

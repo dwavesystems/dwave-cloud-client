@@ -10,7 +10,7 @@ import unittest
 from dwave.cloud.config import load_config
 from dwave.cloud.client import Client
 from dwave.cloud.solver import Solver
-from dwave.cloud.exceptions import SolverAuthenticationError
+from dwave.cloud.exceptions import SolverAuthenticationError, SolverError
 from dwave.cloud.testing import mock
 import dwave.cloud
 
@@ -69,12 +69,21 @@ class SolverLoading(unittest.TestCase):
         with Client(**config) as client:
             self.assertEqual(client.get_solver(config['solver']).id, config['solver'])
 
-    def test_get_any_qpu_solver(self):
-        with Client(endpoint=config['endpoint'], token=config['token'], client='qpu') as client:
-            self.assertEqual(client.get_solver(), client.solvers(qpu=True)[0])
+    def test_get_solver_no_defaults(self):
+        from dwave.cloud import qpu, sw
+        with qpu.Client(endpoint=config['endpoint'], token=config['token']) as client:
+            solvers = client.solvers(qpu=True)
+            if solvers:
+                self.assertEqual(client.get_solver(), solvers[0])
+            else:
+                self.assertRaises(SolverError, client.get_solver)
 
-        with Client(endpoint=config['endpoint'], token=config['token'], client='sw') as client:
-            self.assertEqual(client.get_solver(), client.solvers(software=True)[0])
+        with sw.Client(endpoint=config['endpoint'], token=config['token']) as client:
+            solvers = client.solvers(software=True)
+            if solvers:
+                self.assertEqual(client.get_solver(), solvers[0])
+            else:
+                self.assertRaises(SolverError, client.get_solver)
 
 
 class ClientFactory(unittest.TestCase):
