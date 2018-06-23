@@ -7,7 +7,7 @@ from timeit import default_timer as timer
 
 from dwave.cloud import Client
 from dwave.cloud.utils import (
-    readline_input, click_info_switch, generate_valid_random_problem, strtrunc)
+    default_text_input, click_info_switch, generate_valid_random_problem, strtrunc)
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError,
@@ -98,7 +98,7 @@ def create(config_file, profile):
         else:
             config_file = get_default_configfile_path()
             click.echo("Configuration file not found; the default location is: {}".format(config_file))
-        config_file = readline_input("Confirm configuration file path (editable): ", config_file)
+        config_file = default_text_input("Configuration file path", config_file)
 
     # create config_file path
     config_base = os.path.dirname(config_file)
@@ -127,24 +127,21 @@ def create(config_file, profile):
         else:
             profiles = 'create new'
             default_profile = 'prod'
-        while not profile:
-            profile = readline_input("Profile (%s): " % profiles, default_profile)
-            if not profile:
-                click.echo("Profile name cannot be empty.")
+        profile = default_text_input("Profile (%s)" % profiles, default_profile, optional=False)
 
     if not config.has_section(profile):
         config.add_section(profile)
 
     # fill out the profile variables
     variables = 'endpoint token client solver proxy'.split()
-    prompts = ['API endpoint URL (editable): ',
-               'Authentication token (editable): ',
-               'Client class (qpu or sw): ',
-               'Solver (can be left blank): ',
-               'Proxy URL (can be left blank): ']
+    prompts = ['API endpoint URL',
+               'Authentication token',
+               'Client class (qpu or sw)',
+               'Solver',
+               'Proxy URL']
     for var, prompt in zip(variables, prompts):
         default_val = config.get(profile, var, fallback=None)
-        val = readline_input(prompt, default_val)
+        val = default_text_input(prompt, default_val)
         if val != default_val:
             config.set(profile, var, val)
 

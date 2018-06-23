@@ -8,6 +8,7 @@ import random
 
 import six
 import readline
+import click
 
 # Use numpy if available for fast decoding
 try:
@@ -114,11 +115,34 @@ def strip_tail(sequence, values):
 def readline_input(prompt, prefill=''):
     """Provide an editable default for ``input()``."""
     # see: https://stackoverflow.com/q/2533120/
+    # NB: pyreadline on Windows doesn't support insert_text
+    # NB: gnureadline on MacOS seemingly also doesn't handle this
     readline.set_startup_hook(lambda: readline.insert_text(prefill))
     try:
         return six.moves.input(prompt)
     finally:
         readline.set_startup_hook()
+
+
+def default_text_input(prompt, default=None, optional=True):
+    if default:
+        prompt = "{} [{}]: ".format(prompt, default)
+    else:
+        if optional:
+            prompt = "{} [skip]: ".format(prompt)
+        else:
+            prompt = "{}: ".format(prompt)
+
+    line = ''
+    while not line:
+        line = six.moves.input(prompt)
+        if not line:
+            line = default
+        if not line:
+            if optional:
+                break
+            click.echo("Input required, please try again.")
+    return line
 
 
 def click_info_switch(f):
