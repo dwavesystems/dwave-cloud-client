@@ -99,6 +99,7 @@ def create(config_file, profile):
             config_file = get_default_configfile_path()
             click.echo("Configuration file not found; the default location is: {}".format(config_file))
         config_file = default_text_input("Configuration file path", config_file)
+        config_file = os.path.expanduser(config_file)
 
     # create config_file path
     config_base = os.path.dirname(config_file)
