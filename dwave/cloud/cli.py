@@ -1,13 +1,18 @@
 import os
 import ast
+import json
 import logging
+import datetime
 
 import click
 from timeit import default_timer as timer
+from datetime import datetime, timedelta
+from dateutil.tz import UTC
 
 from dwave.cloud import Client
 from dwave.cloud.utils import (
-    default_text_input, click_info_switch, generate_valid_random_problem, strtrunc)
+    default_text_input, click_info_switch, generate_valid_random_problem,
+    datetime_to_timestamp, strtrunc)
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError,
@@ -163,29 +168,52 @@ def create(config_file, profile):
               type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
 @click.option('--profile', '-p', default=None,
               help='Connection profile (section) name')
-def ping(config_file, profile):
+@click.option('--json', 'json_output', default=False, is_flag=True,
+              help='JSON output')
+def ping(config_file, profile, json_output):
     """Ping the QPU by submitting a single-qubit problem."""
+
+    def output_error(msg, *values):
+        if json_output:
+            click.echo(json.dumps({"error": msg.format(*values)}))
+        else:
+            click.echo(msg.format(*values))
+
+    now = datetime.utcnow().replace(tzinfo=UTC)
+    info = dict(datetime=now.isoformat(), timestamp=datetime_to_timestamp(now))
+
+    def stage_info(msg, **kwargs):
+        info.update(kwargs)
+        if not json_output:
+            click.echo(msg.format(**kwargs))
+
+    def flush_info():
+        if json_output:
+            click.echo(json.dumps(info))
 
     try:
         client = Client.from_config(config_file=config_file, profile=profile)
     except Exception as e:
-        click.echo("Invalid configuration: {}".format(e))
+        output_error("Invalid configuration: {}", e)
         return 1
     if config_file:
-        click.echo("Using configuration file: {}".format(config_file))
+        stage_info("Using configuration file: {config_file}", config_file=config_file)
     if profile:
-        click.echo("Using profile: {}".format(profile))
-    click.echo("Using endpoint: {}".format(client.endpoint))
+        stage_info("Using profile: {profile}", profile=profile)
+    stage_info("Using endpoint: {endpoint}", endpoint=client.endpoint)
 
     t0 = timer()
     try:
         solvers = client.get_solvers()
     except SolverAuthenticationError:
-        click.echo("Authentication error. Check credentials in your configuration file.")
-        return 1
-    except (InvalidAPIResponseError, UnsupportedSolverError):
-        click.echo("Invalid or unexpected API response.")
+        output_error("Authentication error. Check credentials in your configuration file.")
         return 2
+    except (InvalidAPIResponseError, UnsupportedSolverError):
+        output_error("Invalid or unexpected API response.")
+        return 3
+    except Exception as e:
+        output_error("Unexpected error: {}", e)
+        return 4
 
     try:
         solver = client.get_solver()
@@ -195,23 +223,28 @@ def ping(config_file, profile):
         if solvers:
             _, solver = next(iter(solvers.items()))
         else:
-            click.echo("No solvers available.")
-            return 1
+            output_error("No solvers available.")
+            return 5
 
     t1 = timer()
-    click.echo("Using solver: {}".format(solver.id))
+    stage_info("Using solver: {solver_id}", solver_id=solver.id)
 
-    timing = solver.sample_ising({0: 1}, {}).timing
+    try:
+        timing = solver.sample_ising({0: 1}, {}).timing
+    except Exception as e:
+        output_error("Sampling error: {}", e)
+        return 6
     t2 = timer()
 
-    click.echo("\nWall clock time:")
-    click.echo(" * Solver definition fetch: {:.3f} ms".format((t1-t0)*1000.0))
-    click.echo(" * Problem submit and results fetch: {:.3f} ms".format((t2-t1)*1000.0))
-    click.echo(" * Total: {:.3f} ms".format((t2-t0)*1000.0))
-    click.echo("\nQPU timing:")
+    stage_info("\nWall clock time:")
+    stage_info(" * Solver definition fetch: {wallclock_solver_definition:.3f} ms", wallclock_solver_definition=(t1-t0)*1000.0)
+    stage_info(" * Problem submit and results fetch: {wallclock_sampling:.3f} ms", wallclock_sampling=(t2-t1)*1000.0)
+    stage_info(" * Total: {wallclock_total:.3f} ms", wallclock_total=(t2-t0)*1000.0)
+    stage_info("\nQPU timing:")
     for component, duration in timing.items():
-        click.echo(" * {} = {} us".format(component, duration))
-    return 0
+        stage_info(" * %(name)s = {%(name)s} us" % {"name": component}, **{component: duration})
+
+    flush_info()
 
 
 @cli.command()
