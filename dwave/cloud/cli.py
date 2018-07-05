@@ -229,7 +229,11 @@ def ping(config_file, profile, json_output):
     t1 = timer()
     stage_info("Using solver: {solver_id}", solver_id=solver.id)
 
-    timing = solver.sample_ising({0: 1}, {}).timing
+    try:
+        timing = solver.sample_ising({0: 1}, {}).timing
+    except Exception as e:
+        output_error("Sampling error: {}", e)
+        return 6
     t2 = timer()
 
     stage_info("\nWall clock time:")
