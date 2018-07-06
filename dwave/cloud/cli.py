@@ -142,7 +142,7 @@ def create(config_file, profile):
     variables = 'endpoint token client solver proxy'.split()
     prompts = ['API endpoint URL',
                'Authentication token',
-               'Client class (qpu or sw)',
+               'Default client class (qpu or sw)',
                'Default solver']
     for var, prompt in zip(variables, prompts):
         default_val = config.get(profile, var, fallback=None)
