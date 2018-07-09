@@ -251,7 +251,7 @@ class Solver(object):
 
         # Check the parameters before submitting
         for key in combined_params:
-            if key not in self.parameters:
+            if key not in self.parameters and not key.startswith('x_'):
                 raise KeyError("{} is not a parameter of this solver.".format(key))
 
         body = json.dumps({
