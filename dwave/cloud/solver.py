@@ -53,9 +53,6 @@ class Solver(object):
 
     """
 
-    # Special flag to notify the system a solver needs access to special hardware
-    _PARAMETER_ENABLE_HARDWARE = 'use_hardware'
-
     # Classes of problems the remote solver has to support (at least one of these)
     # in order for `Solver` to be able to abstract, or use, that solver
     _HANDLED_PROBLEM_TYPES = {"ising", "qubo"}
@@ -125,11 +122,6 @@ class Solver(object):
 
         # Create a set of default parameters for the queries
         self._params = {}
-
-        # As a heuristic to guess if this is a hardware sampler check if
-        # the 'annealing_time_range' property is set.
-        if 'annealing_time_range' in self.properties:
-            self._params[self._PARAMETER_ENABLE_HARDWARE] = True
 
     def __repr__(self):
         return "Solver(id={!r})".format(self.id)
@@ -259,7 +251,7 @@ class Solver(object):
 
         # Check the parameters before submitting
         for key in combined_params:
-            if key not in self.parameters and key != self._PARAMETER_ENABLE_HARDWARE:
+            if key not in self.parameters:
                 raise KeyError("{} is not a parameter of this solver.".format(key))
 
         body = json.dumps({
