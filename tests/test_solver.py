@@ -14,7 +14,7 @@ import numpy
 
 from dwave.cloud.utils import evaluate_ising
 from dwave.cloud.qpu import Client
-from dwave.cloud.exceptions import CanceledFutureError
+from dwave.cloud.exceptions import CanceledFutureError, SolverFailureError
 import dwave.cloud.computation
 
 from tests import config
@@ -43,6 +43,14 @@ class PropertyLoading(unittest.TestCase):
             assert 'not_a_parameter' not in solver.parameters
             with self.assertRaises(KeyError):
                 solver.sample_ising({}, {}, not_a_parameter=True)
+
+    def test_submit_experimental_parameter(self):
+        """Ensure that the experimental parameters are populated."""
+        with Client(**config) as client:
+            solver = client.get_solver()
+            assert 'x_test' not in solver.parameters
+            with self.assertRaises(SolverFailureError):
+                self.assertTrue(solver.sample_ising([0], {}, x_test=123).result())
 
     def test_read_connectivity(self):
         """Ensure that the edge set is populated."""
