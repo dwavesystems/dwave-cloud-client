@@ -252,7 +252,9 @@ def ping(config_file, profile, json_output):
               type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
 @click.option('--profile', '-p', default=None, help='Connection profile name')
 @click.option('--id', default=None, help='Solver ID/name')
-def solvers(config_file, profile, id):
+@click.option('--list', 'list_solvers', default=False, is_flag=True,
+              help='List available solvers, one per line')
+def solvers(config_file, profile, id, list_solvers):
     """Get solver details.
 
     Unless solver name/id specified, fetch and display details for
@@ -267,6 +269,11 @@ def solvers(config_file, profile, id):
             if not solvers:
                 click.echo("Solver {} not found.".format(id))
                 return 1
+
+        if list_solvers:
+            for solver in solvers:
+                click.echo(solver.id)
+            return
 
         # ~YAML output
         for solver in solvers:
