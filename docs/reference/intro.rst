@@ -137,6 +137,15 @@ functionality; for example:
 
 Run *dwave* -\\-\ *help* for information on all the CLI options.
 
+.. note:: If you work in a Bash shell and want command completion for `dwave`, add
+
+          .. code-block:: bash
+
+             eval "$(_DWAVE_COMPLETE=source <path>/dwave)"
+
+          to your shell's `.bashrc` configuration file, where `<path>` is the absolute
+          path to the installed `dwave` executable, for example `/home/Mary/my-quantum-app/env/bin`.
+
 Work Flow
 =========
 
