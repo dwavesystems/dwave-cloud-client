@@ -641,7 +641,7 @@ class Client(object):
         Examples:
             Get a solver not based on VFYC, with 2048 qubits:
 
-                solver = client.solvers(vfyc=True, num_qubits=2048)[0]
+                solver = client.solvers(vfyc=False, num_qubits=2048)[0]
 
             Get all solvers that have between 1024 and 2048 qubits:
 
@@ -650,6 +650,10 @@ class Client(object):
             Get all solvers that have at least 2000 qubits:
 
                 solvers = client.solvers(num_qubits=[2000, None])
+
+            Get the first QPU solver that accepts flux biases:
+
+                solver = client.solvers(qpu=True, flux_biases=True)[0]
         """
 
         def predicate(solver):
