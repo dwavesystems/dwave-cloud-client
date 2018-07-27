@@ -44,7 +44,7 @@ from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config
 from dwave.cloud.solver import Solver
-from dwave.cloud.utils import datetime_to_timestamp
+from dwave.cloud.utils import datetime_to_timestamp, TimeoutingHTTPAdapter
 
 __all__ = ['Client']
 
@@ -383,7 +383,7 @@ class Client(object):
         return _clients[_client](**config)
 
     def __init__(self, endpoint=None, token=None, solver=None, proxy=None,
-                 permissive_ssl=False, **kwargs):
+                 permissive_ssl=False, timeout=60, **kwargs):
         """To setup the connection a pipeline of queues/workers is constructed.
 
         There are five interactions with the server the connection manages:
@@ -405,9 +405,12 @@ class Client(object):
         self.endpoint = endpoint
         self.token = token
         self.default_solver = solver
+        self.timeout = float(timeout)
 
         # Create a :mod:`requests` session. `requests` will manage our url parsing, https, etc.
         self.session = requests.Session()
+        self.session.mount('http://', TimeoutingHTTPAdapter(timeout=self.timeout))
+        self.session.mount('https://', TimeoutingHTTPAdapter(timeout=self.timeout))
         self.session.headers.update({'X-Auth-Token': self.token,
                                      'User-Agent': self.USER_AGENT})
         self.session.proxies = {'http': proxy, 'https': proxy}

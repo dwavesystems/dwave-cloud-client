@@ -8,6 +8,7 @@ import random
 
 import six
 import click
+import requests
 
 # Use numpy if available for fast decoding
 try:
@@ -174,3 +175,31 @@ def datetime_to_timestamp(dt):
 def strtrunc(s, maxlen=60):
     s = str(s)
     return s[:(maxlen-3)]+'...' if len(s) > maxlen else s
+
+
+class TimeoutingHTTPAdapter(requests.adapters.HTTPAdapter):
+    """Sets a default timeout for all adapter (think session) requests. It is
+    overridden with per-request timeout. But it can not be reset back to
+    infinite wait (``None``).
+
+    Usage:
+
+        s = requests.Session()
+        s.mount("http://", TimeoutingHTTPAdapter(timeout=5))
+        s.mount("https://", TimeoutingHTTPAdapter(timeout=5))
+
+        s.get('http://httpbin.org/delay/6')                 # -> timeouts after 5sec
+        s.get('http://httpbin.org/delay/6', timeout=10)     # -> completes after 6sec
+
+    The alternative is to set ``timeout`` on each request manually/explicitly,
+    subclass ``Session``, or monkeypatch ``Session.request()``.
+    """
+
+    def __init__(self, timeout=None, *args, **kwargs):
+        self.timeout = timeout
+        super(TimeoutingHTTPAdapter, self).__init__(*args, **kwargs)
+
+    def send(self, *args, **kwargs):
+        # can't use setdefault because caller always sets timeout kwarg
+        kwargs['timeout'] = self.timeout
+        return super(TimeoutingHTTPAdapter, self).send(*args, **kwargs)
