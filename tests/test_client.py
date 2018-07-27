@@ -49,7 +49,7 @@ class TestTimeout(unittest.TestCase):
     """Test timeout works for all Client connections."""
 
     def test_timeout(self):
-        with self.assertRaises(requests.exceptions.Timeout):
+        with self.assertRaises(dwave.cloud.exceptions.ConnectionTimeout):
             with Client(timeout=0.00001, **config) as client:
                 client.solvers()
 

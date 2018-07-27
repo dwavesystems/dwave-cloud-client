@@ -24,6 +24,16 @@ class UnsupportedSolverError(SolverError):
     """The solver we received from the API is not supported by the client."""
 
 
+class Timeout(Exception):
+    """General timeout error."""
+
+class ConnectionTimeout(Timeout):
+    """REST API request timed out."""
+
+class PollingTimeout(Timeout):
+    """Problem polling timed out."""
+
+
 class CanceledFutureError(Exception):
     """An exception raised when code tries to read from a canceled future."""
 

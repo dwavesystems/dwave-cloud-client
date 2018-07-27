@@ -583,8 +583,10 @@ class Client(object):
                 return self._solvers
 
             _LOGGER.debug("Requesting list of all solver data.")
-            response = self.session.get(
-                posixpath.join(self.endpoint, 'solvers/remote/'))
+            try:
+                response = self.session.get(posixpath.join(self.endpoint, 'solvers/remote/'))
+            except requests.exceptions.Timeout:
+                raise ConnectionTimeout
 
             if response.status_code == 401:
                 raise SolverAuthenticationError
@@ -734,8 +736,11 @@ class Client(object):
 
         with self._solvers_lock:
             if refresh or name not in self._solvers:
-                response = self.session.get(
-                    posixpath.join(self.endpoint, 'solvers/remote/{}/'.format(name)))
+                try:
+                    response = self.session.get(
+                        posixpath.join(self.endpoint, 'solvers/remote/{}/'.format(name)))
+                except requests.exceptions.Timeout:
+                    raise ConnectionTimeout
 
                 if response.status_code == 401:
                     raise SolverAuthenticationError
@@ -789,7 +794,10 @@ class Client(object):
                 _LOGGER.debug("Submitting %d problems", len(ready_problems))
                 body = '[' + ','.join(mess.body for mess in ready_problems) + ']'
                 try:
-                    response = self.session.post(posixpath.join(self.endpoint, 'problems/'), body)
+                    try:
+                        response = self.session.post(posixpath.join(self.endpoint, 'problems/'), body)
+                    except requests.exceptions.Timeout:
+                        raise ConnectionTimeout
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()
@@ -924,7 +932,12 @@ class Client(object):
                 # body of the delete query.
                 try:
                     body = [item[0] for item in item_list]
-                    self.session.delete(posixpath.join(self.endpoint, 'problems/'), json=body)
+
+                    try:
+                        self.session.delete(posixpath.join(self.endpoint, 'problems/'), json=body)
+                    except requests.exceptions.Timeout:
+                        raise ConnectionTimeout
+
                 except Exception as err:
                     for _, future in item_list:
                         if future is not None:
@@ -1038,7 +1051,11 @@ class Client(object):
 
                 try:
                     _LOGGER.trace("Executing poll API request")
-                    response = self.session.get(posixpath.join(self.endpoint, query_string))
+
+                    try:
+                        response = self.session.get(posixpath.join(self.endpoint, query_string))
+                    except requests.exceptions.Timeout:
+                        raise ConnectionTimeout
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()
@@ -1093,7 +1110,10 @@ class Client(object):
                 # Submit the query
                 query_string = 'problems/{}/'.format(future.id)
                 try:
-                    response = self.session.get(posixpath.join(self.endpoint, query_string))
+                    try:
+                        response = self.session.get(posixpath.join(self.endpoint, query_string))
+                    except requests.exceptions.Timeout:
+                        raise ConnectionTimeout
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()
