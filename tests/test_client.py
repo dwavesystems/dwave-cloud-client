@@ -6,6 +6,7 @@ test_mock_solver_loading.py duplicates some of these tests against a mock server
 from __future__ import absolute_import
 
 import unittest
+import requests.exceptions
 
 from dwave.cloud.config import load_config
 from dwave.cloud.client import Client
@@ -41,6 +42,16 @@ class ConnectivityTests(unittest.TestCase):
         """Connect with valid connection settings (url/token/proxy/etc)."""
         with Client(**config) as client:
             self.assertTrue(len(client.get_solvers()) > 0)
+
+
+@unittest.skipUnless(config, "No live server configuration available.")
+class TestTimeout(unittest.TestCase):
+    """Test timeout works for all Client connections."""
+
+    def test_timeout(self):
+        with self.assertRaises(dwave.cloud.exceptions.ConnectionTimeout):
+            with Client(timeout=0.00001, **config) as client:
+                client.solvers()
 
 
 @unittest.skipUnless(config, "No live server configuration available.")

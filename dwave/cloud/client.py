@@ -44,7 +44,7 @@ from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config
 from dwave.cloud.solver import Solver
-from dwave.cloud.utils import datetime_to_timestamp
+from dwave.cloud.utils import datetime_to_timestamp, TimeoutingHTTPAdapter
 
 __all__ = ['Client']
 
@@ -383,7 +383,7 @@ class Client(object):
         return _clients[_client](**config)
 
     def __init__(self, endpoint=None, token=None, solver=None, proxy=None,
-                 permissive_ssl=False, **kwargs):
+                 permissive_ssl=False, timeout=60, **kwargs):
         """To setup the connection a pipeline of queues/workers is constructed.
 
         There are five interactions with the server the connection manages:
@@ -405,9 +405,12 @@ class Client(object):
         self.endpoint = endpoint
         self.token = token
         self.default_solver = solver
+        self.timeout = float(timeout)
 
         # Create a :mod:`requests` session. `requests` will manage our url parsing, https, etc.
         self.session = requests.Session()
+        self.session.mount('http://', TimeoutingHTTPAdapter(timeout=self.timeout))
+        self.session.mount('https://', TimeoutingHTTPAdapter(timeout=self.timeout))
         self.session.headers.update({'X-Auth-Token': self.token,
                                      'User-Agent': self.USER_AGENT})
         self.session.proxies = {'http': proxy, 'https': proxy}
@@ -580,8 +583,10 @@ class Client(object):
                 return self._solvers
 
             _LOGGER.debug("Requesting list of all solver data.")
-            response = self.session.get(
-                posixpath.join(self.endpoint, 'solvers/remote/'))
+            try:
+                response = self.session.get(posixpath.join(self.endpoint, 'solvers/remote/'))
+            except requests.exceptions.Timeout:
+                raise ConnectionTimeout
 
             if response.status_code == 401:
                 raise SolverAuthenticationError
@@ -638,7 +643,7 @@ class Client(object):
         Examples:
             Get a solver not based on VFYC, with 2048 qubits:
 
-                solver = client.solvers(vfyc=True, num_qubits=2048)[0]
+                solver = client.solvers(vfyc=False, num_qubits=2048)[0]
 
             Get all solvers that have between 1024 and 2048 qubits:
 
@@ -647,6 +652,10 @@ class Client(object):
             Get all solvers that have at least 2000 qubits:
 
                 solvers = client.solvers(num_qubits=[2000, None])
+
+            Get the first QPU solver that accepts flux biases:
+
+                solver = client.solvers(qpu=True, flux_biases=True)[0]
         """
 
         def predicate(solver):
@@ -727,8 +736,11 @@ class Client(object):
 
         with self._solvers_lock:
             if refresh or name not in self._solvers:
-                response = self.session.get(
-                    posixpath.join(self.endpoint, 'solvers/remote/{}/'.format(name)))
+                try:
+                    response = self.session.get(
+                        posixpath.join(self.endpoint, 'solvers/remote/{}/'.format(name)))
+                except requests.exceptions.Timeout:
+                    raise ConnectionTimeout
 
                 if response.status_code == 401:
                     raise SolverAuthenticationError
@@ -782,7 +794,10 @@ class Client(object):
                 _LOGGER.debug("Submitting %d problems", len(ready_problems))
                 body = '[' + ','.join(mess.body for mess in ready_problems) + ']'
                 try:
-                    response = self.session.post(posixpath.join(self.endpoint, 'problems/'), body)
+                    try:
+                        response = self.session.post(posixpath.join(self.endpoint, 'problems/'), body)
+                    except requests.exceptions.Timeout:
+                        raise ConnectionTimeout
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()
@@ -917,7 +932,12 @@ class Client(object):
                 # body of the delete query.
                 try:
                     body = [item[0] for item in item_list]
-                    self.session.delete(posixpath.join(self.endpoint, 'problems/'), json=body)
+
+                    try:
+                        self.session.delete(posixpath.join(self.endpoint, 'problems/'), json=body)
+                    except requests.exceptions.Timeout:
+                        raise ConnectionTimeout
+
                 except Exception as err:
                     for _, future in item_list:
                         if future is not None:
@@ -1031,7 +1051,11 @@ class Client(object):
 
                 try:
                     _LOGGER.trace("Executing poll API request")
-                    response = self.session.get(posixpath.join(self.endpoint, query_string))
+
+                    try:
+                        response = self.session.get(posixpath.join(self.endpoint, query_string))
+                    except requests.exceptions.Timeout:
+                        raise ConnectionTimeout
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()
@@ -1086,7 +1110,10 @@ class Client(object):
                 # Submit the query
                 query_string = 'problems/{}/'.format(future.id)
                 try:
-                    response = self.session.get(posixpath.join(self.endpoint, query_string))
+                    try:
+                        response = self.session.get(posixpath.join(self.endpoint, query_string))
+                    except requests.exceptions.Timeout:
+                        raise ConnectionTimeout
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()

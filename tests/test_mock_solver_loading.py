@@ -4,6 +4,8 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 import os
 import json
 import unittest
+
+import requests
 import requests_mock
 
 from dwave.cloud.qpu import Client, Solver
@@ -228,6 +230,12 @@ token = file-prod-token
 endpoint = file-alpha-url
 token = file-alpha-token
 solver = alpha-solver
+
+[custom]
+endpoint = http://httpbin.org/delay/10
+token = 123
+permissive_ssl = True
+timeout = 15
 """
 
 
@@ -328,3 +336,24 @@ class MockLegacyConfiguration(unittest.TestCase):
         with mock.patch("dwave.cloud.config.open", side_effect=OSError, create=True):
             with mock.patch("os.path.exists", lambda fn: True):
                 self.assertRaises(ConfigFileReadError, legacy_load_config)
+
+    def test_custom_options(self):
+        """Test custom options (timeout, permissive_ssl) are propagated to Client."""
+        timeout = 15
+
+        with mock.patch("dwave.cloud.config.open", iterable_mock_open(config_body), create=True):
+            with Client.from_config('config_file', profile='custom') as client:
+                # check permissive_ssl and timeout custom params passed-thru
+                self.assertFalse(client.session.verify)
+                self.assertEqual(client.timeout, timeout)
+
+                # verify client uses those properly
+                def mock_send(*args, **kwargs):
+                    self.assertEqual(kwargs.get('timeout'), timeout)
+                    response = requests.Response()
+                    response.status_code = 200
+                    response._content = b'{}'
+                    return response
+
+                with mock.patch("requests.adapters.HTTPAdapter.send", mock_send):
+                    client.solvers()
