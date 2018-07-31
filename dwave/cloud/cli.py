@@ -7,12 +7,11 @@ import datetime
 import click
 from timeit import default_timer as timer
 from datetime import datetime, timedelta
-from dateutil.tz import UTC
 
 from dwave.cloud import Client
 from dwave.cloud.utils import (
     default_text_input, click_info_switch, generate_valid_random_problem,
-    datetime_to_timestamp, strtrunc)
+    datetime_to_timestamp, utcnow, strtrunc)
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError,
@@ -179,7 +178,7 @@ def ping(config_file, profile, json_output):
         else:
             click.echo(msg.format(*values))
 
-    now = datetime.utcnow().replace(tzinfo=UTC)
+    now = utcnow()
     info = dict(datetime=now.isoformat(), timestamp=datetime_to_timestamp(now))
 
     def stage_info(msg, **kwargs):
@@ -230,7 +229,8 @@ def ping(config_file, profile, json_output):
     stage_info("Using solver: {solver_id}", solver_id=solver.id)
 
     try:
-        timing = solver.sample_ising({0: 1}, {}).timing
+        future = solver.sample_ising({0: 1}, {})
+        timing = future.timing
     except Exception as e:
         output_error("Sampling error: {}", e)
         return 6
@@ -239,6 +239,8 @@ def ping(config_file, profile, json_output):
     stage_info("\nWall clock time:")
     stage_info(" * Solver definition fetch: {wallclock_solver_definition:.3f} ms", wallclock_solver_definition=(t1-t0)*1000.0)
     stage_info(" * Problem submit and results fetch: {wallclock_sampling:.3f} ms", wallclock_sampling=(t2-t1)*1000.0)
+    stage_info(" * Future resolve time: {wallclock_future_resolve:.3f} ms",
+               wallclock_future_resolve=(future.time_resolved - future.time_created).total_seconds()*1000.0)
     stage_info(" * Total: {wallclock_total:.3f} ms", wallclock_total=(t2-t0)*1000.0)
     stage_info("\nQPU timing:")
     for component, duration in timing.items():
