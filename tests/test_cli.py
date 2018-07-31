@@ -173,7 +173,9 @@ class TestCli(unittest.TestCase):
                                             '--profile', profile])
 
             # proper arguments passed to Client.from_config?
-            m.from_config.assert_called_with(config_file=config_file, profile=profile)
+            m.from_config.assert_called_with(
+                config_file=config_file, profile=profile,
+                request_timeout=60, polling_timeout=None)
 
             # get solver called?
             c = m.from_config(config_file=config_file, profile=profile)

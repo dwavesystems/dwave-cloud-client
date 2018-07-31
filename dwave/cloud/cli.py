@@ -168,9 +168,13 @@ def create(config_file, profile):
               type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
 @click.option('--profile', '-p', default=None,
               help='Connection profile (section) name')
+@click.option('--request-timeout', default=60, type=float,
+              help='Connection and read timeouts (in seconds) for all API requests')
+@click.option('--polling-timeout', default=None, type=float,
+              help='Problem polling timeout in seconds (time-to-solution timeout)')
 @click.option('--json', 'json_output', default=False, is_flag=True,
               help='JSON output')
-def ping(config_file, profile, json_output):
+def ping(config_file, profile, json_output, request_timeout, polling_timeout):
     """Ping the QPU by submitting a single-qubit problem."""
 
     def output_error(msg, *values):
@@ -192,7 +196,9 @@ def ping(config_file, profile, json_output):
             click.echo(json.dumps(info))
 
     try:
-        client = Client.from_config(config_file=config_file, profile=profile)
+        client = Client.from_config(
+            config_file=config_file, profile=profile,
+            request_timeout=request_timeout, polling_timeout=polling_timeout)
     except Exception as e:
         output_error("Invalid configuration: {!r}", e)
         return 1
