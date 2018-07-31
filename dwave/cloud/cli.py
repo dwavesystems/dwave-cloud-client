@@ -15,7 +15,8 @@ from dwave.cloud.utils import (
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError,
-    ConfigFileReadError, ConfigFileParseError)
+    ConfigFileReadError, ConfigFileParseError,
+    RequestTimeout, PollingTimeout)
 from dwave.cloud.config import (
     load_profile_from_files, load_config_from_files, get_default_config,
     get_configfile_path, get_default_configfile_path,
@@ -193,7 +194,7 @@ def ping(config_file, profile, json_output):
     try:
         client = Client.from_config(config_file=config_file, profile=profile)
     except Exception as e:
-        output_error("Invalid configuration: {}", e)
+        output_error("Invalid configuration: {!r}", e)
         return 1
     if config_file:
         stage_info("Using configuration file: {config_file}", config_file=config_file)
@@ -210,9 +211,12 @@ def ping(config_file, profile, json_output):
     except (InvalidAPIResponseError, UnsupportedSolverError):
         output_error("Invalid or unexpected API response.")
         return 3
-    except Exception as e:
-        output_error("Unexpected error: {}", e)
+    except RequestTimeout:
+        output_error("API connection timed out.")
         return 4
+    except Exception as e:
+        output_error("Unexpected error: {!r}", e)
+        return 5
 
     try:
         solver = client.get_solver()
@@ -223,7 +227,10 @@ def ping(config_file, profile, json_output):
             _, solver = next(iter(solvers.items()))
         else:
             output_error("No solvers available.")
-            return 5
+            return 6
+    except RequestTimeout:
+        output_error("API connection timed out.")
+        return 7
 
     t1 = timer()
     stage_info("Using solver: {solver_id}", solver_id=solver.id)
@@ -231,16 +238,20 @@ def ping(config_file, profile, json_output):
     try:
         future = solver.sample_ising({0: 1}, {})
         timing = future.timing
+    except RequestTimeout:
+        output_error("API connection timed out.")
+        return 8
+    except PollingTimeout:
+        output_error("Polling timeout exceeded.")
+        return 9
     except Exception as e:
-        output_error("Sampling error: {}", e)
-        return 6
+        output_error("Sampling error: {!r}", e)
+        return 10
     t2 = timer()
 
     stage_info("\nWall clock time:")
     stage_info(" * Solver definition fetch: {wallclock_solver_definition:.3f} ms", wallclock_solver_definition=(t1-t0)*1000.0)
     stage_info(" * Problem submit and results fetch: {wallclock_sampling:.3f} ms", wallclock_sampling=(t2-t1)*1000.0)
-    stage_info(" * Future resolve time: {wallclock_future_resolve:.3f} ms",
-               wallclock_future_resolve=(future.time_resolved - future.time_created).total_seconds()*1000.0)
     stage_info(" * Total: {wallclock_total:.3f} ms", wallclock_total=(t2-t0)*1000.0)
     stage_info("\nQPU timing:")
     for component, duration in timing.items():
@@ -253,10 +264,10 @@ def ping(config_file, profile, json_output):
 @click.option('--config-file', '-c', default=None,
               type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
 @click.option('--profile', '-p', default=None, help='Connection profile name')
-@click.option('--id', default=None, help='Solver ID/name')
+@click.option('--id', 'solver_id', default=None, help='Solver ID/name')
 @click.option('--list', 'list_solvers', default=False, is_flag=True,
               help='List available solvers, one per line')
-def solvers(config_file, profile, id, list_solvers):
+def solvers(config_file, profile, solver_id, list_solvers):
     """Get solver details.
 
     Unless solver name/id specified, fetch and display details for
@@ -266,10 +277,10 @@ def solvers(config_file, profile, id, list_solvers):
     with Client.from_config(config_file=config_file, profile=profile) as client:
         solvers = client.get_solvers().values()
 
-        if id:
-            solvers = filter(lambda s: s.id == id, solvers)
+        if solver_id:
+            solvers = filter(lambda s: s.id == solver_id, solvers)
             if not solvers:
-                click.echo("Solver {} not found.".format(id))
+                click.echo("Solver {} not found.".format(solver_id))
                 return 1
 
         if list_solvers:
