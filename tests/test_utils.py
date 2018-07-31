@@ -1,10 +1,11 @@
 import unittest
 from collections import OrderedDict
+from datetime import datetime
 
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_head, strip_tail,
     active_qubits, generate_valid_random_problem,
-    default_text_input)
+    default_text_input, utcnow)
 from dwave.cloud.testing import mock
 
 
@@ -68,6 +69,13 @@ class TestUtils(unittest.TestCase):
 
         self.assertDictEqual(lin, {0: 2.0, 1: 2.0, 3: 2.0})
         self.assertDictEqual(quad, {(0, 1): -1.0, (1, 3): -1.0, (0, 4): -1.0})
+
+    def test_utcnow(self):
+        t = utcnow()
+        now = datetime.utcnow()
+        self.assertEqual(t.utcoffset().total_seconds(), 0.0)
+        unaware = t.replace(tzinfo=None)
+        self.assertLess((now - unaware).total_seconds(), 1.0)
 
 
 if __name__ == '__main__':

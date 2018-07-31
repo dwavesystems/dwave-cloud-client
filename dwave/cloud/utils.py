@@ -172,6 +172,11 @@ def datetime_to_timestamp(dt):
     return (dt - epoch).total_seconds()
 
 
+def utcnow():
+    """Returns tz-aware now in UTC."""
+    return datetime.utcnow().replace(tzinfo=UTC)
+
+
 def strtrunc(s, maxlen=60):
     s = str(s)
     return s[:(maxlen-3)]+'...' if len(s) > maxlen else s

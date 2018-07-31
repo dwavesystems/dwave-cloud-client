@@ -44,7 +44,7 @@ from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config
 from dwave.cloud.solver import Solver
-from dwave.cloud.utils import datetime_to_timestamp, TimeoutingHTTPAdapter
+from dwave.cloud.utils import datetime_to_timestamp, utcnow, TimeoutingHTTPAdapter
 
 __all__ = ['Client']
 
@@ -974,8 +974,9 @@ class Client(object):
             # for poll priority we use timestamp of next scheduled poll
             at = time.time() + future._poll_backoff
 
-        _LOGGER.debug("Polling scheduled at %.2f with %.2f sec new back-off for: %s",
-                      at, future._poll_backoff, future.id)
+        future_age = (utcnow() - future.time_created).total_seconds()
+        _LOGGER.debug("Polling scheduled at %.2f with %.2f sec new back-off for: %s (age: %.2f sec)",
+                      at, future._poll_backoff, future.id, future_age)
 
         self._poll_queue.put((at, future))
 
