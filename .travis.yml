@@ -42,6 +42,7 @@ matrix:
           env: TOXENV=py27
           before_install:
             - brew update
+            - pip install virtualenv
             - virtualenv env -p python2
             - source env/bin/activate
           deploy:
