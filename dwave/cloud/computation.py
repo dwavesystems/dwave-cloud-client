@@ -22,6 +22,7 @@ import functools
 from concurrent.futures import TimeoutError
 
 from dwave.cloud.coders import decode_qp, decode_qp_numpy
+from dwave.cloud.utils import utcnow
 
 # Use numpy if available for fast decoding
 try:
@@ -90,11 +91,17 @@ class Future(object):
         #: The id the server will use to identify this problem, None until the id is actually known
         self.id = id_
 
+        #: `datetime` the Future was created (immediately before enqueued in Client's submit queue)
+        self.time_created = utcnow()
+
         #: `datetime` corresponding to the time when the problem was accepted by the server (None before then)
         self.time_received = None
 
         #: `datetime` corresponding to the time when the problem was completed by the server (None before then)
         self.time_solved = None
+
+        #: `datetime` the Future was resolved (marked as done; succeeded or failed), or None before then
+        self.time_resolved = None
 
         # estimated `earliest_completion_time` as returned on problem submit
         self.eta_min = None
@@ -155,6 +162,7 @@ class Future(object):
 
     def _signal_ready(self):
         """Signal all the events waiting on this future."""
+        self.time_resolved = utcnow()
         self._results_ready_event.set()
         [ev.set() for ev in self._other_events]
 
@@ -375,7 +383,7 @@ class Future(object):
             True
             >>> client.close()
         """
-        return self._message is not None or self.error is not None
+        return self._results_ready_event.is_set()
 
     def cancel(self):
         """Try to cancel the problem corresponding to this result.

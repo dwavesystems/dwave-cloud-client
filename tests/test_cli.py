@@ -170,10 +170,14 @@ class TestCli(unittest.TestCase):
                 touch(config_file)
                 result = runner.invoke(cli, ['ping',
                                             '--config-file', config_file,
-                                            '--profile', profile])
+                                            '--profile', profile,
+                                            '--request-timeout', '.5',
+                                            '--polling-timeout', '30'])
 
             # proper arguments passed to Client.from_config?
-            m.from_config.assert_called_with(config_file=config_file, profile=profile)
+            m.from_config.assert_called_with(
+                config_file=config_file, profile=profile,
+                request_timeout=0.5, polling_timeout=30)
 
             # get solver called?
             c = m.from_config(config_file=config_file, profile=profile)

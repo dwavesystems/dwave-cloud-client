@@ -42,9 +42,9 @@ from six.moves import queue, range
 
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
-from dwave.cloud.config import load_config, legacy_load_config
+from dwave.cloud.config import load_config, legacy_load_config, parse_float
 from dwave.cloud.solver import Solver
-from dwave.cloud.utils import datetime_to_timestamp, TimeoutingHTTPAdapter
+from dwave.cloud.utils import datetime_to_timestamp, utcnow, TimeoutingHTTPAdapter
 
 __all__ = ['Client']
 
@@ -383,7 +383,7 @@ class Client(object):
         return _clients[_client](**config)
 
     def __init__(self, endpoint=None, token=None, solver=None, proxy=None,
-                 permissive_ssl=False, timeout=60, **kwargs):
+                 permissive_ssl=False, request_timeout=60, polling_timeout=None, **kwargs):
         """To setup the connection a pipeline of queues/workers is constructed.
 
         There are five interactions with the server the connection manages:
@@ -405,12 +405,13 @@ class Client(object):
         self.endpoint = endpoint
         self.token = token
         self.default_solver = solver
-        self.timeout = float(timeout)
+        self.request_timeout = parse_float(request_timeout)
+        self.polling_timeout = parse_float(polling_timeout)
 
         # Create a :mod:`requests` session. `requests` will manage our url parsing, https, etc.
         self.session = requests.Session()
-        self.session.mount('http://', TimeoutingHTTPAdapter(timeout=self.timeout))
-        self.session.mount('https://', TimeoutingHTTPAdapter(timeout=self.timeout))
+        self.session.mount('http://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
+        self.session.mount('https://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
         self.session.headers.update({'X-Auth-Token': self.token,
                                      'User-Agent': self.USER_AGENT})
         self.session.proxies = {'http': proxy, 'https': proxy}
@@ -586,7 +587,7 @@ class Client(object):
             try:
                 response = self.session.get(posixpath.join(self.endpoint, 'solvers/remote/'))
             except requests.exceptions.Timeout:
-                raise ConnectionTimeout
+                raise RequestTimeout
 
             if response.status_code == 401:
                 raise SolverAuthenticationError
@@ -740,7 +741,7 @@ class Client(object):
                     response = self.session.get(
                         posixpath.join(self.endpoint, 'solvers/remote/{}/'.format(name)))
                 except requests.exceptions.Timeout:
-                    raise ConnectionTimeout
+                    raise RequestTimeout
 
                 if response.status_code == 401:
                     raise SolverAuthenticationError
@@ -797,7 +798,7 @@ class Client(object):
                     try:
                         response = self.session.post(posixpath.join(self.endpoint, 'problems/'), body)
                     except requests.exceptions.Timeout:
-                        raise ConnectionTimeout
+                        raise RequestTimeout
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()
@@ -936,7 +937,7 @@ class Client(object):
                     try:
                         self.session.delete(posixpath.join(self.endpoint, 'problems/'), json=body)
                     except requests.exceptions.Timeout:
-                        raise ConnectionTimeout
+                        raise RequestTimeout
 
                 except Exception as err:
                     for _, future in item_list:
@@ -974,8 +975,17 @@ class Client(object):
             # for poll priority we use timestamp of next scheduled poll
             at = time.time() + future._poll_backoff
 
-        _LOGGER.debug("Polling scheduled at %.2f with %.2f sec new back-off for: %s",
-                      at, future._poll_backoff, future.id)
+        now = utcnow()
+        future_age = (now - future.time_created).total_seconds()
+        _LOGGER.debug("Polling scheduled at %.2f with %.2f sec new back-off for: %s (age: %.2f sec)",
+                      at, future._poll_backoff, future.id, future_age)
+
+        # don't enqueue for next poll if polling_timeout is exceeded by then
+        future_age_on_next_poll = future_age + (at - datetime_to_timestamp(now))
+        if self.polling_timeout is not None and future_age_on_next_poll > self.polling_timeout:
+            _LOGGER.debug("Polling timeout exceeded before next poll: %.2f sec > %.2f sec, aborting polling!",
+                          future_age_on_next_poll, self.polling_timeout)
+            raise PollingTimeout
 
         self._poll_queue.put((at, future))
 
@@ -1055,7 +1065,7 @@ class Client(object):
                     try:
                         response = self.session.get(posixpath.join(self.endpoint, query_string))
                     except requests.exceptions.Timeout:
-                        raise ConnectionTimeout
+                        raise RequestTimeout
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()
@@ -1113,7 +1123,7 @@ class Client(object):
                     try:
                         response = self.session.get(posixpath.join(self.endpoint, query_string))
                     except requests.exceptions.Timeout:
-                        raise ConnectionTimeout
+                        raise RequestTimeout
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()
