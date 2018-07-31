@@ -383,7 +383,7 @@ class Client(object):
         return _clients[_client](**config)
 
     def __init__(self, endpoint=None, token=None, solver=None, proxy=None,
-                 permissive_ssl=False, timeout=60, **kwargs):
+                 permissive_ssl=False, timeout=60, polling_timeout=None, **kwargs):
         """To setup the connection a pipeline of queues/workers is constructed.
 
         There are five interactions with the server the connection manages:
@@ -406,6 +406,10 @@ class Client(object):
         self.token = token
         self.default_solver = solver
         self.timeout = float(timeout)
+        try:
+            self.polling_timeout = float(polling_timeout)
+        except:
+            self.polling_timeout = None
 
         # Create a :mod:`requests` session. `requests` will manage our url parsing, https, etc.
         self.session = requests.Session()
@@ -974,9 +978,17 @@ class Client(object):
             # for poll priority we use timestamp of next scheduled poll
             at = time.time() + future._poll_backoff
 
-        future_age = (utcnow() - future.time_created).total_seconds()
+        now = utcnow()
+        future_age = (now - future.time_created).total_seconds()
         _LOGGER.debug("Polling scheduled at %.2f with %.2f sec new back-off for: %s (age: %.2f sec)",
                       at, future._poll_backoff, future.id, future_age)
+
+        # don't enqueue for next poll if polling_timeout is exceeded by then
+        future_age_on_next_poll = future_age + (at - datetime_to_timestamp(now))
+        if self.polling_timeout is not None and future_age_on_next_poll > self.polling_timeout:
+            _LOGGER.debug("Polling timeout exceeded before next poll: %.2f sec > %.2f sec, aborting polling!",
+                          future_age_on_next_poll, self.polling_timeout)
+            raise PollingTimeout
 
         self._poll_queue.put((at, future))
 
