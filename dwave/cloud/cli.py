@@ -168,7 +168,7 @@ def create(config_file, profile):
               type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
 @click.option('--profile', '-p', default=None,
               help='Connection profile (section) name')
-@click.option('--request-timeout', default=60, type=float,
+@click.option('--request-timeout', default=None, type=float,
               help='Connection and read timeouts (in seconds) for all API requests')
 @click.option('--polling-timeout', default=None, type=float,
               help='Problem polling timeout in seconds (time-to-solution timeout)')
@@ -195,10 +195,13 @@ def ping(config_file, profile, json_output, request_timeout, polling_timeout):
         if json_output:
             click.echo(json.dumps(info))
 
+    config = dict(config_file=config_file, profile=profile)
+    if request_timeout is not None:
+        config.update(request_timeout=request_timeout)
+    if polling_timeout is not None:
+        config.update(polling_timeout=polling_timeout)
     try:
-        client = Client.from_config(
-            config_file=config_file, profile=profile,
-            request_timeout=request_timeout, polling_timeout=polling_timeout)
+        client = Client.from_config(**config)
     except Exception as e:
         output_error("Invalid configuration: {!r}", e)
         return 1
