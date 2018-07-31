@@ -100,6 +100,9 @@ class Future(object):
         #: `datetime` corresponding to the time when the problem was completed by the server (None before then)
         self.time_solved = None
 
+        #: `datetime` the Future was resolved (marked as done; succeeded or failed), or None before then
+        self.time_resolved = None
+
         # estimated `earliest_completion_time` as returned on problem submit
         self.eta_min = None
 
@@ -159,6 +162,7 @@ class Future(object):
 
     def _signal_ready(self):
         """Signal all the events waiting on this future."""
+        self.time_resolved = utcnow()
         self._results_ready_event.set()
         [ev.set() for ev in self._other_events]
 
