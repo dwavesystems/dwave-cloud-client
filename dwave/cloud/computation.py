@@ -379,7 +379,7 @@ class Future(object):
             True
             >>> client.close()
         """
-        return self._message is not None or self.error is not None
+        return self._results_ready_event.is_set()
 
     def cancel(self):
         """Try to cancel the problem corresponding to this result.
