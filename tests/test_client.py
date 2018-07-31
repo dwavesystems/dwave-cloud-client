@@ -45,13 +45,18 @@ class ConnectivityTests(unittest.TestCase):
 
 
 @unittest.skipUnless(config, "No live server configuration available.")
-class TestTimeout(unittest.TestCase):
+class TestTimeouts(unittest.TestCase):
     """Test timeout works for all Client connections."""
 
-    def test_timeout(self):
-        with self.assertRaises(dwave.cloud.exceptions.ConnectionTimeout):
-            with Client(timeout=0.00001, **config) as client:
+    def test_request_timeout(self):
+        with self.assertRaises(dwave.cloud.exceptions.RequestTimeout):
+            with Client(request_timeout=0.00001, **config) as client:
                 client.solvers()
+
+    def test_polling_timeout(self):
+        with self.assertRaises(dwave.cloud.exceptions.PollingTimeout):
+            with Client(polling_timeout=0.00001, **config) as client:
+                client.get_solver().sample_qubo({}).result()
 
 
 @unittest.skipUnless(config, "No live server configuration available.")

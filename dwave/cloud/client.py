@@ -383,7 +383,7 @@ class Client(object):
         return _clients[_client](**config)
 
     def __init__(self, endpoint=None, token=None, solver=None, proxy=None,
-                 permissive_ssl=False, timeout=60, polling_timeout=None, **kwargs):
+                 permissive_ssl=False, request_timeout=60, polling_timeout=None, **kwargs):
         """To setup the connection a pipeline of queues/workers is constructed.
 
         There are five interactions with the server the connection manages:
@@ -405,7 +405,10 @@ class Client(object):
         self.endpoint = endpoint
         self.token = token
         self.default_solver = solver
-        self.timeout = float(timeout)
+        try:
+            self.request_timeout = float(request_timeout)
+        except:
+            self.request_timeout = None
         try:
             self.polling_timeout = float(polling_timeout)
         except:
@@ -413,8 +416,8 @@ class Client(object):
 
         # Create a :mod:`requests` session. `requests` will manage our url parsing, https, etc.
         self.session = requests.Session()
-        self.session.mount('http://', TimeoutingHTTPAdapter(timeout=self.timeout))
-        self.session.mount('https://', TimeoutingHTTPAdapter(timeout=self.timeout))
+        self.session.mount('http://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
+        self.session.mount('https://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
         self.session.headers.update({'X-Auth-Token': self.token,
                                      'User-Agent': self.USER_AGENT})
         self.session.proxies = {'http': proxy, 'https': proxy}
@@ -590,7 +593,7 @@ class Client(object):
             try:
                 response = self.session.get(posixpath.join(self.endpoint, 'solvers/remote/'))
             except requests.exceptions.Timeout:
-                raise ConnectionTimeout
+                raise RequestTimeout
 
             if response.status_code == 401:
                 raise SolverAuthenticationError
@@ -744,7 +747,7 @@ class Client(object):
                     response = self.session.get(
                         posixpath.join(self.endpoint, 'solvers/remote/{}/'.format(name)))
                 except requests.exceptions.Timeout:
-                    raise ConnectionTimeout
+                    raise RequestTimeout
 
                 if response.status_code == 401:
                     raise SolverAuthenticationError
@@ -801,7 +804,7 @@ class Client(object):
                     try:
                         response = self.session.post(posixpath.join(self.endpoint, 'problems/'), body)
                     except requests.exceptions.Timeout:
-                        raise ConnectionTimeout
+                        raise RequestTimeout
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()
@@ -940,7 +943,7 @@ class Client(object):
                     try:
                         self.session.delete(posixpath.join(self.endpoint, 'problems/'), json=body)
                     except requests.exceptions.Timeout:
-                        raise ConnectionTimeout
+                        raise RequestTimeout
 
                 except Exception as err:
                     for _, future in item_list:
@@ -1068,7 +1071,7 @@ class Client(object):
                     try:
                         response = self.session.get(posixpath.join(self.endpoint, query_string))
                     except requests.exceptions.Timeout:
-                        raise ConnectionTimeout
+                        raise RequestTimeout
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()
@@ -1126,7 +1129,7 @@ class Client(object):
                     try:
                         response = self.session.get(posixpath.join(self.endpoint, query_string))
                     except requests.exceptions.Timeout:
-                        raise ConnectionTimeout
+                        raise RequestTimeout
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()

@@ -235,7 +235,8 @@ solver = alpha-solver
 endpoint = http://httpbin.org/delay/10
 token = 123
 permissive_ssl = True
-timeout = 15
+request_timeout = 15
+polling_timeout = 180
 """
 
 
@@ -338,18 +339,20 @@ class MockLegacyConfiguration(unittest.TestCase):
                 self.assertRaises(ConfigFileReadError, legacy_load_config)
 
     def test_custom_options(self):
-        """Test custom options (timeout, permissive_ssl) are propagated to Client."""
-        timeout = 15
+        """Test custom options (request_timeout, polling_timeout, permissive_ssl) are propagated to Client."""
+        request_timeout = 15
+        polling_timeout = 180
 
         with mock.patch("dwave.cloud.config.open", iterable_mock_open(config_body), create=True):
             with Client.from_config('config_file', profile='custom') as client:
-                # check permissive_ssl and timeout custom params passed-thru
+                # check permissive_ssl and timeouts custom params passed-thru
                 self.assertFalse(client.session.verify)
-                self.assertEqual(client.timeout, timeout)
+                self.assertEqual(client.request_timeout, request_timeout)
+                self.assertEqual(client.polling_timeout, polling_timeout)
 
                 # verify client uses those properly
                 def mock_send(*args, **kwargs):
-                    self.assertEqual(kwargs.get('timeout'), timeout)
+                    self.assertEqual(kwargs.get('timeout'), request_timeout)
                     response = requests.Response()
                     response.status_code = 200
                     response._content = b'{}'

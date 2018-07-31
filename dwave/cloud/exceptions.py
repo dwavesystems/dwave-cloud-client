@@ -27,7 +27,7 @@ class UnsupportedSolverError(SolverError):
 class Timeout(Exception):
     """General timeout error."""
 
-class ConnectionTimeout(Timeout):
+class RequestTimeout(Timeout):
     """REST API request timed out."""
 
 class PollingTimeout(Timeout):
