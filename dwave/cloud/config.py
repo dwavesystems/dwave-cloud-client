@@ -32,6 +32,17 @@ CONF_AUTHOR = "dwavesystem"
 CONF_FILENAME = "dwave.conf"
 
 
+def parse_float(s):
+    """Parse value as returned by ConfigParse as float.
+
+    NB: we need this instead of ``ConfigParser.getfloat`` when we're parsing
+    values downstream."""
+
+    if s is None or s == '':
+        return None
+    return float(s)
+
+
 def get_configfile_paths(system=True, user=True, local=True, only_existing=True):
     """Return a list of local configuration file paths.
 

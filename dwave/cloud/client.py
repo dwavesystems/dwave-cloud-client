@@ -42,7 +42,7 @@ from six.moves import queue, range
 
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
-from dwave.cloud.config import load_config, legacy_load_config
+from dwave.cloud.config import load_config, legacy_load_config, parse_float
 from dwave.cloud.solver import Solver
 from dwave.cloud.utils import datetime_to_timestamp, utcnow, TimeoutingHTTPAdapter
 
@@ -405,14 +405,8 @@ class Client(object):
         self.endpoint = endpoint
         self.token = token
         self.default_solver = solver
-        try:
-            self.request_timeout = float(request_timeout)
-        except:
-            self.request_timeout = None
-        try:
-            self.polling_timeout = float(polling_timeout)
-        except:
-            self.polling_timeout = None
+        self.request_timeout = parse_float(request_timeout)
+        self.polling_timeout = parse_float(polling_timeout)
 
         # Create a :mod:`requests` session. `requests` will manage our url parsing, https, etc.
         self.session = requests.Session()
