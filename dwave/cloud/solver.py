@@ -254,11 +254,14 @@ class Solver(object):
             if key not in self.parameters and not key.startswith('x_'):
                 raise KeyError("{} is not a parameter of this solver.".format(key))
 
+        # transform some of the parameters in-place
+        self._format_params(combined_params)
+
         body = json.dumps({
             'solver': self.id,
             'data': encode_bqm_as_qp(self, linear, quadratic),
             'type': type_,
-            'params': params
+            'params': combined_params
         })
         _LOGGER.trace("Encoded sample request: %s", body)
 
@@ -268,6 +271,18 @@ class Solver(object):
         _LOGGER.debug("Submitting new problem to: %s", self.id)
         self.client._submit(body, future)
         return future
+
+    def _format_params(self, params):
+        """Reformat some of the parameters for sapi."""
+        if 'initial_state' in params:
+            # NB: at this moment the error raised when initial_state does not match lin/quad (in
+            # active qubits) is not very informative, but there is also no clean way to check here
+            # that they match because lin can be either a list or a dict. In the future it would be
+            # good to check.
+            initial_state = params['initial_state']
+            if isinstance(initial_state, dict):
+                params['initial_state'] = [initial_state.get(v, 3) for v in range(self.properties['num_qubits'])]
+            # else: support old format
 
     def check_problem(self, linear, quadratic):
         """Test if an Ising model matches the graph provided by the solver.
