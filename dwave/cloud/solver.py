@@ -255,7 +255,7 @@ class Solver(object):
                 raise KeyError("{} is not a parameter of this solver.".format(key))
 
         # transform some of the parameters in-place
-        self._format_params(combined_params)
+        self._format_params(type_, combined_params)
 
         body = json.dumps({
             'solver': self.id,
@@ -272,7 +272,7 @@ class Solver(object):
         self.client._submit(body, future)
         return future
 
-    def _format_params(self, params):
+    def _format_params(self, type_, params):
         """Reformat some of the parameters for sapi."""
         if 'initial_state' in params:
             # NB: at this moment the error raised when initial_state does not match lin/quad (in
@@ -281,7 +281,16 @@ class Solver(object):
             # good to check.
             initial_state = params['initial_state']
             if isinstance(initial_state, dict):
-                params['initial_state'] = [initial_state.get(v, 3) for v in range(self.properties['num_qubits'])]
+                if type_ == 'ising' and any(v == 0 for v in initial_state.values()):
+                    # initial_state is in qubo format, coerce to Ising
+                    initial_state = [2*initial_state.get(v, 2)-1 for v in range(self.properties['num_qubits'])]
+                elif type_ == 'qubo' and any(v == -1 for v in initial_state.values()):
+                    # initial_state is in ising format, coerce to QUBO
+                    initial_state = [(initial_state.get(v, 5)+1)//2 for v in range(self.properties['num_qubits'])]
+                else:
+                    initial_state = [initial_state.get(v, 3) for v in range(self.properties['num_qubits'])]
+
+                params['initial_state'] = initial_state
             # else: support old format
 
     def check_problem(self, linear, quadratic):
