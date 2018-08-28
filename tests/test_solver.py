@@ -181,6 +181,28 @@ class Submission(_QueryTest):
             # Solve the problem
             self._submit_and_check(solver, linear, quad)
 
+    def test_reverse_annealing(self):
+        with Client(**config) as client:
+            solver = client.get_solver()
+
+            # skip if we don't have access to the initial_state parameter for reverse annealing
+            if 'initial_state' not in solver.parameters:
+                raise unittest.SkipTest
+
+            anneal_schedule = [(0, 1), (55.00000000000001, 0.45), (155.0, 0.45), (210.0, 1)]
+
+            # make some subset of the qubits active
+            active = [v for v in solver.properties['qubits'] if v % 2]
+
+            # make an initial state, ising problem
+            initial_state = {v: 2*bool(v % 3)-1 for v in active}
+
+            h = {v: 0.0 for v in active}
+            J = {(u, v): -1 for (u, v) in solver.properties['couplers'] if v in h and u in h}
+
+            # doesn't catch fire
+            solver.sample_ising(h, J, anneal_schedule=anneal_schedule, initial_state=initial_state).samples
+
     def test_submit_batch(self):
         """Submit batch of problems."""
         # Connect
