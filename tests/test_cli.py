@@ -1,6 +1,7 @@
 import unittest
 import tempfile
 import os
+import json
 
 from click.testing import CliRunner
 
@@ -197,6 +198,37 @@ class TestCli(unittest.TestCase):
                                      '--config-file', test_config_path,
                                      '--profile', test_config_profile])
         self.assertEqual(result.exit_code, 0)
+
+    @unittest.skipUnless(config, "No live server configuration available.")
+    def test_ping_json_live(self):
+        runner = CliRunner()
+        result = runner.invoke(cli, ['ping',
+                                     '--config-file', test_config_path,
+                                     '--profile', test_config_profile,
+                                     '--json'])
+
+        res = json.loads(result.output)
+        self.assertIn('timestamp', res)
+        self.assertIn('datetime', res)
+        self.assertIn('solver_id', res)
+        self.assertIn('code', res)
+        self.assertEqual(result.exit_code, 0)
+
+    @unittest.skipUnless(config, "No live server configuration available.")
+    def test_ping_json_timeout_error_live(self):
+        runner = CliRunner()
+        result = runner.invoke(cli, ['ping',
+                                     '--config-file', test_config_path,
+                                     '--profile', test_config_profile,
+                                     '--polling-timeout', '0.00001',
+                                     '--json'])
+
+        res = json.loads(result.output)
+        self.assertIn('timestamp', res)
+        self.assertIn('datetime', res)
+        self.assertIn('code', res)
+        self.assertIn('error', res)
+        self.assertEqual(result.exit_code, 9)
 
     def test_sample(self):
         config_file = 'dwave.conf'

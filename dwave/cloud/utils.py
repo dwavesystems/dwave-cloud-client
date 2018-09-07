@@ -208,3 +208,12 @@ class TimeoutingHTTPAdapter(requests.adapters.HTTPAdapter):
         # can't use setdefault because caller always sets timeout kwarg
         kwargs['timeout'] = self.timeout
         return super(TimeoutingHTTPAdapter, self).send(*args, **kwargs)
+
+
+class CLIError(Exception):
+    """CLI command error that includes the error code in addition to the
+    standard error message."""
+
+    def __init__(self, message, code):
+        super(CLIError, self).__init__(message)
+        self.code = code
