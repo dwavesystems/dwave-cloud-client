@@ -1,4 +1,5 @@
 import os
+import sys
 import ast
 import json
 import logging
@@ -11,7 +12,7 @@ from datetime import datetime, timedelta
 from dwave.cloud import Client
 from dwave.cloud.utils import (
     default_text_input, click_info_switch, generate_valid_random_problem,
-    datetime_to_timestamp, utcnow, strtrunc)
+    datetime_to_timestamp, utcnow, strtrunc, CLIError)
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError,
@@ -163,6 +164,76 @@ def create(config_file, profile):
     return 0
 
 
+def _ping(config_file, profile, request_timeout, polling_timeout, output):
+    """Helper method for the ping command that uses `output()` for info output
+    and raises `CLIError()` on handled errors.
+
+    This function is invariant to output format and/or error signaling mechanism.
+    """
+
+    config = dict(config_file=config_file, profile=profile)
+    if request_timeout is not None:
+        config.update(request_timeout=request_timeout)
+    if polling_timeout is not None:
+        config.update(polling_timeout=polling_timeout)
+    try:
+        client = Client.from_config(**config)
+    except Exception as e:
+        raise CLIError("Invalid configuration: {}".format(e), code=1)
+    if config_file:
+        output("Using configuration file: {config_file}", config_file=config_file)
+    if profile:
+        output("Using profile: {profile}", profile=profile)
+    output("Using endpoint: {endpoint}", endpoint=client.endpoint)
+
+    t0 = timer()
+    try:
+        solvers = client.get_solvers()
+    except SolverAuthenticationError:
+        raise CLIError("Authentication error. Check credentials in your configuration file.", 2)
+    except (InvalidAPIResponseError, UnsupportedSolverError):
+        raise CLIError("Invalid or unexpected API response.", 3)
+    except RequestTimeout:
+        raise CLIError("API connection timed out.", 4)
+    except Exception as e:
+        raise CLIError("Unexpected error while fetching solvers: {!r}".format(e), 5)
+
+    try:
+        solver = client.get_solver()
+    except (ValueError, KeyError):
+        # if not otherwise defined (ValueError), or unavailable (KeyError),
+        # just use the first solver
+        if solvers:
+            _, solver = next(iter(solvers.items()))
+        else:
+            raise CLIError("No solvers available.", 6)
+    except RequestTimeout:
+        raise CLIError("API connection timed out.", 7)
+
+    t1 = timer()
+    output("Using solver: {solver_id}", solver_id=solver.id)
+
+    try:
+        future = solver.sample_ising({0: 1}, {})
+        timing = future.timing
+    except RequestTimeout:
+        raise CLIError("API connection timed out.", 8)
+    except PollingTimeout:
+        raise CLIError("Polling timeout exceeded.", 9)
+    except Exception as e:
+        CLIError("Sampling error: {!r}".format(e), 10)
+
+    t2 = timer()
+
+    output("\nWall clock time:")
+    output(" * Solver definition fetch: {wallclock_solver_definition:.3f} ms", wallclock_solver_definition=(t1-t0)*1000.0)
+    output(" * Problem submit and results fetch: {wallclock_sampling:.3f} ms", wallclock_sampling=(t2-t1)*1000.0)
+    output(" * Total: {wallclock_total:.3f} ms", wallclock_total=(t2-t0)*1000.0)
+    output("\nQPU timing:")
+    for component, duration in timing.items():
+        output(" * %(name)s = {%(name)s} us" % {"name": component}, **{component: duration})
+
+
 @cli.command()
 @click.option('--config-file', '-c', default=None,
               type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
@@ -177,96 +248,28 @@ def create(config_file, profile):
 def ping(config_file, profile, json_output, request_timeout, polling_timeout):
     """Ping the QPU by submitting a single-qubit problem."""
 
-    def output_error(msg, *values):
-        if json_output:
-            click.echo(json.dumps({"error": msg.format(*values)}))
-        else:
-            click.echo(msg.format(*values))
-
     now = utcnow()
-    info = dict(datetime=now.isoformat(), timestamp=datetime_to_timestamp(now))
+    info = dict(datetime=now.isoformat(), timestamp=datetime_to_timestamp(now), code=0)
 
-    def stage_info(msg, **kwargs):
+    def output(fmt, **kwargs):
         info.update(kwargs)
         if not json_output:
-            click.echo(msg.format(**kwargs))
+            click.echo(fmt.format(**kwargs))
 
-    def flush_info():
+    def flush():
         if json_output:
             click.echo(json.dumps(info))
 
-    config = dict(config_file=config_file, profile=profile)
-    if request_timeout is not None:
-        config.update(request_timeout=request_timeout)
-    if polling_timeout is not None:
-        config.update(polling_timeout=polling_timeout)
     try:
-        client = Client.from_config(**config)
-    except Exception as e:
-        output_error("Invalid configuration: {!r}", e)
-        return 1
-    if config_file:
-        stage_info("Using configuration file: {config_file}", config_file=config_file)
-    if profile:
-        stage_info("Using profile: {profile}", profile=profile)
-    stage_info("Using endpoint: {endpoint}", endpoint=client.endpoint)
-
-    t0 = timer()
-    try:
-        solvers = client.get_solvers()
-    except SolverAuthenticationError:
-        output_error("Authentication error. Check credentials in your configuration file.")
-        return 2
-    except (InvalidAPIResponseError, UnsupportedSolverError):
-        output_error("Invalid or unexpected API response.")
-        return 3
-    except RequestTimeout:
-        output_error("API connection timed out.")
-        return 4
-    except Exception as e:
-        output_error("Unexpected error: {!r}", e)
-        return 5
-
-    try:
-        solver = client.get_solver()
-    except (ValueError, KeyError):
-        # if not otherwise defined (ValueError), or unavailable (KeyError),
-        # just use the first solver
-        if solvers:
-            _, solver = next(iter(solvers.items()))
-        else:
-            output_error("No solvers available.")
-            return 6
-    except RequestTimeout:
-        output_error("API connection timed out.")
-        return 7
-
-    t1 = timer()
-    stage_info("Using solver: {solver_id}", solver_id=solver.id)
-
-    try:
-        future = solver.sample_ising({0: 1}, {})
-        timing = future.timing
-    except RequestTimeout:
-        output_error("API connection timed out.")
-        return 8
-    except PollingTimeout:
-        output_error("Polling timeout exceeded.")
-        return 9
-    except Exception as e:
-        output_error("Sampling error: {!r}", e)
-        return 10
-    t2 = timer()
-
-    stage_info("\nWall clock time:")
-    stage_info(" * Solver definition fetch: {wallclock_solver_definition:.3f} ms", wallclock_solver_definition=(t1-t0)*1000.0)
-    stage_info(" * Problem submit and results fetch: {wallclock_sampling:.3f} ms", wallclock_sampling=(t2-t1)*1000.0)
-    stage_info(" * Total: {wallclock_total:.3f} ms", wallclock_total=(t2-t0)*1000.0)
-    stage_info("\nQPU timing:")
-    for component, duration in timing.items():
-        stage_info(" * %(name)s = {%(name)s} us" % {"name": component}, **{component: duration})
-
-    flush_info()
+        _ping(config_file, profile, request_timeout, polling_timeout, output)
+    except CLIError as error:
+        output("Error: {error} (code: {code})", error=str(error), code=error.code)
+        sys.exit(error.code)
+    except Exception as error:
+        output("Unhandled error: {error}", error=str(error))
+        sys.exit(127)
+    finally:
+        flush()
 
 
 @cli.command()
