@@ -222,6 +222,8 @@ def _ping(config_file, profile, request_timeout, polling_timeout, output):
         raise CLIError("Polling timeout exceeded.", 9)
     except Exception as e:
         CLIError("Sampling error: {!r}".format(e), 10)
+    finally:
+        output("Submitted problem ID: {problem_id}", problem_id=future.id)
 
     t2 = timer()
 
