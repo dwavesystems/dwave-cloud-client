@@ -17,6 +17,8 @@ from __future__ import division, absolute_import
 import json
 import logging
 
+from collections import Mapping
+
 from dwave.cloud.exceptions import *
 from dwave.cloud.coders import encode_bqm_as_qp
 from dwave.cloud.utils import uniform_iterator, uniform_get
@@ -280,7 +282,7 @@ class Solver(object):
             # that they match because lin can be either a list or a dict. In the future it would be
             # good to check.
             initial_state = params['initial_state']
-            if isinstance(initial_state, dict):
+            if isinstance(initial_state, Mapping):
                 if type_ == 'ising' and any(v == 0 for v in initial_state.values()):
                     # initial_state is in qubo format, coerce to Ising
                     initial_state = [2*initial_state.get(v, 2)-1 for v in range(self.properties['num_qubits'])]
