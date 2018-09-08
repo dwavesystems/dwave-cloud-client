@@ -186,7 +186,8 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "parameters": {"num_reads": "Number of samples to return."}
             },
             "id": "solver1",
-            "description": "A test solver 1"
+            "description": "A test solver 1",
+            "status": "online"
         })
         self.solver2 = Solver(client=None, data={
             "properties": {
@@ -251,6 +252,9 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.solvers(num_qubits=[None, 4], flux_biases=False), [self.solver1])
         self.assertSolvers(self.client.solvers(num_qubits=5, flux_biases=True), [self.solver2])
 
+    def test_online(self):
+        self.assertSolvers(self.client.solvers(online=None), self.solvers)
+        self.assertSolvers(self.client.solvers(online=False), [])
 
 if __name__ == '__main__':
     unittest.main()
