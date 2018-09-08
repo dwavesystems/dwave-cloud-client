@@ -35,7 +35,8 @@ def solver_data(id_, incomplete=False):
             "parameters": {"num_reads": "Number of samples to return."}
         },
         "id": id_,
-        "description": "A test solver"
+        "description": "A test solver",
+        "status": "ONLINE"
     }
 
     if incomplete:
@@ -201,6 +202,14 @@ class MockSolverLoading(unittest.TestCase):
 
         data['properties']['parameters']['flux_biases'] = '...'
         self.assertTrue(Solver(None, data).has_flux_biases)
+
+        # test `.is_online` property
+        self.assertTrue(solver_object('dw2000').is_online)
+        data = json.loads(solver_data('test'))
+        data['status'] = 'offline'
+        self.assertFalse(Solver(None, data).is_online)
+        del data['status']
+        self.assertTrue(Solver(None, data).is_online)
 
 
 class GetEvent(Exception):

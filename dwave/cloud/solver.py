@@ -146,6 +146,11 @@ class Solver(object):
         return self.properties.get('vfyc', False) == True
 
     @property
+    def is_online(self):
+        "Is this solver online (or offline)?"
+        return self.data.get('status', 'online').lower() == 'online'
+
+    @property
     def num_qubits(self):
         "The number of active (encoding) qubits."
         return len(self.nodes)
