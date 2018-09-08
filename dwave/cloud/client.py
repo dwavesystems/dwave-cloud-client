@@ -612,7 +612,7 @@ class Client(object):
             return self._solvers
 
     def solvers(self, qpu=None, software=None, vfyc=None,
-                flux_biases=None, num_qubits=None, refresh=False):
+                flux_biases=None, num_qubits=None, online=True, refresh=False):
         """Returns a filtered list of solvers handled by this client.
 
         Args:
@@ -630,6 +630,12 @@ class Client(object):
 
             num_qubits (int/[int,int], default=None):
                 What's the range (or exact number) of qubits solver should handle?
+
+            online (bool, default=True):
+                Should solver be online?
+
+            refresh (bool, default=False):
+                Force refresh cached list of solvers/properties
 
         Returns:
             list[Solver]: List of all solvers that satisfy the above conditions.
@@ -677,6 +683,8 @@ class Client(object):
                     return False
                 if max_qubits is not None and max_qubits < solver.num_qubits:
                     return False
+            if online is not None and solver.is_online != online:
+                return False
             return True
 
         solvers = list(filter(predicate, self.get_solvers(refresh=refresh).values()))
