@@ -242,8 +242,15 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.solvers(num_qubits=[2, None]), self.solvers)
         self.assertSolvers(self.client.solvers(num_qubits=[None, 6]), self.solvers)
 
+        self.assertSolvers(self.client.solvers(num_qubits=(3, 5)), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits=(2, None)), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits=(None, 6)), self.solvers)
+
         self.assertSolvers(self.client.solvers(num_qubits=[2, 4]), [self.solver1])
         self.assertSolvers(self.client.solvers(num_qubits=[4, None]), [self.solver2])
+
+        self.assertSolvers(self.client.solvers(num_qubits=(2, 4)), [self.solver1])
+        self.assertSolvers(self.client.solvers(num_qubits=(4, None)), [self.solver2])
 
     def test_range_boolean_combo(self):
         self.assertSolvers(self.client.solvers(num_qubits=3, vfyc=True), [])

@@ -654,7 +654,7 @@ class Client(object):
 
             Get all solvers that have between 1024 and 2048 qubits:
 
-                solvers = client.solvers(num_qubits=[1024, 2048])
+                solvers = client.solvers(num_qubits=(1024, 2048))
 
             Get all solvers that have at least 2000 qubits:
 
@@ -675,7 +675,7 @@ class Client(object):
             if flux_biases is not None and solver.has_flux_biases != flux_biases:
                 return False
             if num_qubits is not None:
-                if isinstance(num_qubits, list) and len(num_qubits) == 2:
+                if isinstance(num_qubits, (list, tuple)) and len(num_qubits) == 2:
                     min_qubits, max_qubits = num_qubits
                 else:
                     min_qubits, max_qubits = num_qubits, num_qubits
