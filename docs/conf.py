@@ -90,4 +90,15 @@ InstanceAttributeDocumenter.add_directive_header = iad_add_directive_header
 
 
 # Link to Python standard lib objects
-intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
+intersphinx_mapping = {'python': ('https://docs.python.org/3', None),
+    'dimod': ('https://docs.ocean.dwavesys.com/projects/dimod/en/latest/', None),
+    'binarycsp': ('https://docs.ocean.dwavesys.com/projects/binarycsp/en/latest/', None),
+    'cloud-client': ('https://docs.ocean.dwavesys.com/projects/cloud-client/en/latest/', None),
+    'neal': ('https://docs.ocean.dwavesys.com/projects/neal/en/latest/', None),
+    'networkx': ('https://docs.ocean.dwavesys.com/projects/dwave-networkx/en/latest/', None),
+    'system': ('https://docs.ocean.dwavesys.com/projects/system/en/latest/', None),
+    'penaltymodel': ('https://docs.ocean.dwavesys.com/projects/penaltymodel/en/latest/', None),
+    'minorminer': ('https://docs.ocean.dwavesys.com/projects/minorminer/en/latest/', None),
+    'qbsolv': ('https://docs.ocean.dwavesys.com/projects/qbsolv/en/latest/', None),
+    'oceandocs': ('https://docs.ocean.dwavesys.com/en/latest/', None),
+    'sysdocs_gettingstarted': ('https://docs.dwavesys.com/docs/latest/', None)}
