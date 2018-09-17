@@ -27,6 +27,7 @@ Examples:
 
 from __future__ import division, absolute_import
 
+import re
 import sys
 import time
 import logging
@@ -611,11 +612,15 @@ class Client(object):
             self._all_solvers_ready = True
             return self._solvers
 
-    def solvers(self, qpu=None, software=None, vfyc=None,
+    def solvers(self, name=None, qpu=None, software=None, vfyc=None,
                 flux_biases=None, num_qubits=None, online=True, refresh=False):
         """Returns a filtered list of solvers handled by this client.
 
         Args:
+            name (str, default=None):
+                Regular expression a solver name/id must match. Note: your regex
+                *must match the complete solver name*, not just prefix of suffix.
+
             qpu (bool, default=None):
                 Should solver be QPU based?
 
@@ -663,6 +668,12 @@ class Client(object):
             Get the first QPU solver that accepts flux biases:
 
                 solver = client.solvers(qpu=True, flux_biases=True)[0]
+
+            Assuming only one of the two solvers named `solver1` and `solver2`
+            can be online at once, return the one that is:
+
+                solver = client.solvers(online=True, name='solver[12]')[0]
+                solver = client.solvers(online=True, name='solver1|solver2')[0]
         """
 
         def predicate(solver):
@@ -684,6 +695,8 @@ class Client(object):
                 if max_qubits is not None and max_qubits < solver.num_qubits:
                     return False
             if online is not None and solver.is_online != online:
+                return False
+            if name is not None and re.match("^{}$".format(name), solver.id):
                 return False
             return True
 
