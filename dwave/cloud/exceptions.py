@@ -14,6 +14,9 @@ class SolverError(Exception):
 class SolverFailureError(SolverError):
     """An exception raised when there is a remote failure calling a solver."""
 
+class SolverOfflineError(SolverError):
+    """Action attempted on an offline solver."""
+
 class SolverAuthenticationError(SolverError):
     """An exception raised when there is an authentication error."""
 
