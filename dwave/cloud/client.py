@@ -901,7 +901,12 @@ class Client(object):
                 future._set_error(CanceledFutureError())
             else:
                 # Return an error to the future object
-                future._set_error(SolverFailureError(message.get('error_message', 'An unknown error has occurred.')))
+                errmsg = message.get('error_message', 'An unknown error has occurred.')
+                if 'solver is offline' in errmsg.lower():
+                    err = SolverOfflineError(errmsg)
+                else:
+                    err = SolverFailureError(errmsg)
+                future._set_error(err)
 
         except Exception as error:
             # If there were any unhandled errors we need to release the
