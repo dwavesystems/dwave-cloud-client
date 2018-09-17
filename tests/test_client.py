@@ -263,5 +263,16 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.solvers(online=None), self.solvers)
         self.assertSolvers(self.client.solvers(online=False), [])
 
+    def test_name(self):
+        self.assertSolvers(self.client.solvers(name='solver1'), [self.solver1])
+        self.assertSolvers(self.client.solvers(name='solver2'), [self.solver2])
+        self.assertSolvers(self.client.solvers(name='solver'), [])
+        self.assertSolvers(self.client.solvers(name='olver1'), [])
+        self.assertSolvers(self.client.solvers(name='.*1'), [self.solver1])
+        self.assertSolvers(self.client.solvers(name='.*[12].*'), self.solvers)
+        self.assertSolvers(self.client.solvers(name='solver[12]'), self.solvers)
+        self.assertSolvers(self.client.solvers(name='^solver(1|2)$'), self.solvers)
+
+
 if __name__ == '__main__':
     unittest.main()
