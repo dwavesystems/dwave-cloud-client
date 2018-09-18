@@ -696,7 +696,7 @@ class Client(object):
                     return False
             if online is not None and solver.is_online != online:
                 return False
-            if name is not None and re.match("^{}$".format(name), solver.id):
+            if name is not None and not re.match("^{}$".format(name), solver.id):
                 return False
             return True
 
@@ -704,7 +704,7 @@ class Client(object):
         solvers.sort(key=attrgetter('id'))
         return solvers
 
-    def get_solver(self, name=None, refresh=False):
+    def get_solver(self, name=None, features=None, refresh=False):
         """Load the configuration for a single solver.
 
         Makes a blocking web call to `{endpoint}/solvers/remote/{solver_name}/`, where `{endpoint}`
@@ -716,6 +716,12 @@ class Client(object):
                 ID of the requested solver. ``None`` returns the default solver.
                 If default solver is not configured, ``None`` returns the first available
                 solver in ``Client``'s class (QPU/software/base).
+
+            features (dict, optional):
+                Dictionary of features this solver has to have. For a list of
+                feature names and values, see: :meth:`Client.solvers`. Specifying solver
+                name overrides features. To include (possibly partial) name match requirement,
+                use the ``name`` feature inside ``features`` dictionary.
 
             refresh (bool):
                 Return solver from cache (if cached with ``get_solvers()``),
@@ -745,16 +751,24 @@ class Client(object):
             >>> client.close() # doctest: +SKIP
 
         """
-        _LOGGER.debug("Looking for solver: %s", name)
+        _LOGGER.debug("Looking for solver with name=%r or features=%r", name, features)
         if name is None:
-            if self.default_solver:
-                name = self.default_solver
-            else:
-                # get the first appropriate solver
+            if features is not None:
+                # get the first solver that satisfies all features
                 try:
-                    return self.solvers()[0]
+                    return self.solvers(**features)[0]
                 except IndexError:
-                    raise SolverError("No solvers available this client can handle")
+                    raise SolverError("No solvers with the required features available")
+
+            else:
+                if self.default_solver:
+                    name = self.default_solver
+                else:
+                    # get the first available solver
+                    try:
+                        return self.solvers(online=True)[0]
+                    except IndexError:
+                        raise SolverError("No solvers available this client can handle")
 
         with self._solvers_lock:
             if refresh or name not in self._solvers:
