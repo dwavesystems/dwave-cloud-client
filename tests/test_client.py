@@ -218,7 +218,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.client.close()
 
     def assertSolvers(self, container, members):
-        return set(container) == set(members)
+        self.assertEqual(set(container), set(members))
 
     def test_default(self):
         self.assertSolvers(self.client.solvers(), self.solvers)
