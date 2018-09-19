@@ -68,12 +68,14 @@ def active_qubits(linear, quadratic):
     return active
 
 
-def generate_valid_random_problem(solver):
+def generate_valid_random_problem(solver, h_range=None, j_range=None):
     """Generates an Ising problem formulation valid for a particular solver,
     using all qubits and all couplings."""
 
-    h_range = solver.properties['h_range']
-    j_range = solver.properties['j_range']
+    if h_range is None:
+        h_range = solver.properties['h_range']
+    if j_range is None:
+        j_range = solver.properties['j_range']
 
     lin = {qubit: random.uniform(*h_range) for qubit in solver.nodes}
     quad = {edge: random.uniform(*j_range) for edge in solver.undirected_edges}

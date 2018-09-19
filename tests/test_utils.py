@@ -70,6 +70,18 @@ class TestUtils(unittest.TestCase):
         self.assertDictEqual(lin, {0: 2.0, 1: 2.0, 3: 2.0})
         self.assertDictEqual(quad, {(0, 1): -1.0, (1, 3): -1.0, (0, 4): -1.0})
 
+    def test_generate_valid_random_problem_with_user_constrained_ranges(self):
+        class MockSolver(object):
+            nodes = [0, 1, 3]
+            undirected_edges = {(0, 1), (1, 3), (0, 4)}
+            properties = dict(h_range=[2, 2], j_range=[-1, -1])
+        mock_solver = MockSolver()
+
+        lin, quad = generate_valid_random_problem(mock_solver, h_range=[0,0], j_range=[1,1])
+
+        self.assertDictEqual(lin, {0: 0.0, 1: 0.0, 3: 0.0})
+        self.assertDictEqual(quad, {(0, 1): 1.0, (1, 3): 1.0, (0, 4): 1.0})
+
     def test_utcnow(self):
         t = utcnow()
         now = datetime.utcnow()
