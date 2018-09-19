@@ -45,7 +45,8 @@ from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config, parse_float
 from dwave.cloud.solver import Solver
-from dwave.cloud.utils import datetime_to_timestamp, utcnow, TimeoutingHTTPAdapter
+from dwave.cloud.utils import (
+    datetime_to_timestamp, utcnow, TimeoutingHTTPAdapter, epochnow)
 
 __all__ = ['Client']
 
@@ -124,6 +125,9 @@ class Client(object):
     # Poll back-off interval [sec]
     _POLL_BACKOFF_MIN = 1
     _POLL_BACKOFF_MAX = 60
+
+    # Tolerance for server-client clocks difference (approx) [sec]
+    _CLOCK_DIFF_MAX = 1
 
     # Poll grouping time frame; two scheduled polls are grouped if closer than [sec]:
     _POLL_GROUP_TIMEFRAME = 2
@@ -832,6 +836,7 @@ class Client(object):
                 try:
                     try:
                         response = self.session.post(posixpath.join(self.endpoint, 'problems/'), body)
+                        localtime_of_response = epochnow()
                     except requests.exceptions.Timeout:
                         raise RequestTimeout
 
@@ -853,6 +858,7 @@ class Client(object):
 
                 # Pass on the information
                 for submission, res in zip(ready_problems, message):
+                    submission.future._set_clock_diff(response, localtime_of_response)
                     self._handle_problem_status(res, submission.future)
                     self._submission_queue.task_done()
 
@@ -993,6 +999,16 @@ class Client(object):
         except Exception as err:
             _LOGGER.exception(err)
 
+    def _is_clock_diff_acceptable(self, future):
+        if not future or future.clock_diff is None:
+            return False
+
+        _LOGGER.debug("Detected (server,client) clock offset: approx. %.2f sec. "
+                      "Acceptable offset is: %.2f sec",
+                      future.clock_diff, self._CLOCK_DIFF_MAX)
+
+        return future.clock_diff <= self._CLOCK_DIFF_MAX
+
     def _poll(self, future):
         """Enqueue a problem to poll the server for status."""
 
@@ -1001,10 +1017,14 @@ class Client(object):
             future._poll_backoff = self._POLL_BACKOFF_MIN
 
             # if we have ETA of results, schedule the first poll for then
-            if future.eta_min:
+            if future.eta_min and self._is_clock_diff_acceptable(future):
                 at = datetime_to_timestamp(future.eta_min)
+                _LOGGER.debug("Response ETA indicated and local clock reliable. "
+                              "Scheduling first polling at +%.2f sec", at - epochnow())
             else:
                 at = time.time() + future._poll_backoff
+                _LOGGER.debug("Response ETA not indicated, or local clock unreliable. "
+                              "Scheduling first polling at +%.2f sec", at - epochnow())
 
         else:
             # update exponential poll back-off, clipped to a range
@@ -1017,7 +1037,7 @@ class Client(object):
 
         now = utcnow()
         future_age = (now - future.time_created).total_seconds()
-        _LOGGER.debug("Polling scheduled at %.2f with %.2f sec new back-off for: %s (age: %.2f sec)",
+        _LOGGER.debug("Polling scheduled at %.2f with %.2f sec new back-off for: %s (future's age: %.2f sec)",
                       at, future._poll_backoff, future.id, future_age)
 
         # don't enqueue for next poll if polling_timeout is exceeded by then

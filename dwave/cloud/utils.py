@@ -5,6 +5,7 @@ from dateutil.tz import UTC
 from functools import wraps
 import itertools
 import random
+import time
 
 import six
 import click
@@ -18,7 +19,8 @@ except ImportError:  # pragma: no cover
     _numpy = False
 
 __all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
-           'default_text_input', 'click_info_switch', 'datetime_to_timestamp']
+           'default_text_input', 'click_info_switch', 'datetime_to_timestamp',
+           'datetime_to_timestamp', 'utcnow', 'epochnow']
 
 
 def evaluate_ising(linear, quad, state):
@@ -175,6 +177,16 @@ def datetime_to_timestamp(dt):
 def utcnow():
     """Returns tz-aware now in UTC."""
     return datetime.utcnow().replace(tzinfo=UTC)
+
+
+def epochnow():
+    """Returns now as UNIX timestamp.
+
+    Invariant:
+        epochnow() ~= datetime_to_timestamp(utcnow())
+
+    """
+    return time.time()
 
 
 def strtrunc(s, maxlen=60):

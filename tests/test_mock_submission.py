@@ -10,6 +10,7 @@ import threading
 from datetime import datetime, timedelta
 from dateutil.tz import UTC
 from dateutil.parser import parse as parse_datetime
+from requests.structures import CaseInsensitiveDict
 
 from dwave.cloud.utils import evaluate_ising
 from dwave.cloud.qpu import Client, Solver
@@ -95,7 +96,7 @@ def cancel_reply(id_, solver_name):
     })
 
 
-def timestamp_in_future(seconds=0):
+def datetime_in_future(seconds=0):
     now = datetime.utcnow().replace(tzinfo=UTC)
     return now + timedelta(seconds=seconds)
 
@@ -104,7 +105,7 @@ def continue_reply(id_, solver_name, now=None, eta_min=None, eta_max=None):
     """A reply saying a problem is still in the queue."""
 
     if not now:
-        now = datetime.utcnow().replace(tzinfo=UTC)
+        now = datetime_in_future(0)
 
     resp = {
         "status": "PENDING",
@@ -125,12 +126,17 @@ def continue_reply(id_, solver_name, now=None, eta_min=None, eta_max=None):
     return json.dumps(resp)
 
 
-def choose_reply(path, replies):
+def choose_reply(path, replies, date=None):
     """Choose the right response based on the path and make a mock response."""
+
+    if date is None:
+        date = datetime_in_future(0)
+
     if path in replies:
-        response = mock.Mock(['json', 'raise_for_status'])
+        response = mock.Mock(['json', 'raise_for_status', 'headers'])
         response.status_code = 200
         response.json.side_effect = lambda: json.loads(replies[path])
+        response.headers = CaseInsensitiveDict({'Date': date.isoformat()})
         return response
     else:
         raise NotImplementedError(path)
@@ -216,15 +222,16 @@ class MockSubmission(_QueryTest):
     def test_submit_continue_then_ok_reply(self):
         """Handle polling for a complete problem."""
         with Client('endpoint', 'token') as client:
-            eta_min, eta_max = timestamp_in_future(10), timestamp_in_future(30)
+            now = datetime_in_future(0)
+            eta_min, eta_max = datetime_in_future(10), datetime_in_future(30)
             client.session = mock.Mock()
             client.session.post = lambda a, _: choose_reply(a, {
-                'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123', eta_min=eta_min, eta_max=eta_max)
-            })
+                'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123', eta_min=eta_min, eta_max=eta_max, now=now)
+            }, date=now)
             client.session.get = lambda a: choose_reply(a, {
                 'endpoint/problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
                 'endpoint/problems/123/': complete_reply('123', 'abc123')
-            })
+            }, date=now)
             solver = Solver(client, solver_data('abc123'))
 
             # Build a problem
@@ -357,15 +364,16 @@ class MockSubmission(_QueryTest):
         "eta_min/earliest_estimated_completion should be respected if present in response"
 
         with Client('endpoint', 'token') as client:
-            eta_min, eta_max = timestamp_in_future(10), timestamp_in_future(30)
+            now = datetime_in_future(0)
+            eta_min, eta_max = datetime_in_future(10), datetime_in_future(30)
             client.session = mock.Mock()
             client.session.post = lambda path, _: choose_reply(path, {
-                'endpoint/problems/': '[%s]' % continue_reply('1', 'abc123', eta_min=eta_min, eta_max=eta_max)
-            })
+                'endpoint/problems/': '[%s]' % continue_reply('1', 'abc123', eta_min=eta_min, eta_max=eta_max, now=now)
+            }, date=now)
             client.session.get = lambda path: choose_reply(path, {
                 'endpoint/problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
                 'endpoint/problems/1/': complete_reply('1', 'abc123')
-            })
+            }, date=now)
 
             solver = Solver(client, solver_data('abc123'))
 
@@ -382,14 +390,42 @@ class MockSubmission(_QueryTest):
         "First poll happens with minimal delay if eta_min missing"
 
         with Client('endpoint', 'token') as client:
+            now = datetime_in_future(0)
             client.session = mock.Mock()
             client.session.post = lambda path, _: choose_reply(path, {
                 'endpoint/problems/': '[%s]' % continue_reply('1', 'abc123')
-            })
+            }, date=now)
             client.session.get = lambda path: choose_reply(path, {
                 'endpoint/problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
                 'endpoint/problems/1/': complete_reply('1', 'abc123')
-            })
+            }, date=now)
+
+            solver = Solver(client, solver_data('abc123'))
+
+            def assert_no_delay(s):
+                s and self.assertTrue(
+                    abs(s - client._POLL_BACKOFF_MIN) < client._POLL_BACKOFF_MIN / 10.0)
+
+            with mock.patch('time.sleep', assert_no_delay):
+                future = solver.sample_qubo({})
+                future.result()
+
+    @mock.patch.object(Client, "_POLL_THREAD_COUNT", 1)
+    @mock.patch.object(Client, "_SUBMISSION_THREAD_COUNT", 1)
+    def test_immediate_polling_with_local_clock_unsynced(self):
+        """First poll happens with minimal delay if local clock is way off from
+        the remote/server clock."""
+
+        with Client('endpoint', 'token') as client:
+            badnow = datetime_in_future(100)
+            client.session = mock.Mock()
+            client.session.post = lambda path, _: choose_reply(path, {
+                'endpoint/problems/': '[%s]' % continue_reply('1', 'abc123')
+            }, date=badnow)
+            client.session.get = lambda path: choose_reply(path, {
+                'endpoint/problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
+                'endpoint/problems/1/': complete_reply('1', 'abc123')
+            }, date=badnow)
 
             solver = Solver(client, solver_data('abc123'))
 

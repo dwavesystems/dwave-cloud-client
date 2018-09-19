@@ -21,8 +21,10 @@ import six
 import functools
 from concurrent.futures import TimeoutError
 
+from dateutil.parser import parse
+
 from dwave.cloud.coders import decode_qp, decode_qp_numpy
-from dwave.cloud.utils import utcnow
+from dwave.cloud.utils import utcnow, datetime_to_timestamp
 
 # Use numpy if available for fast decoding
 try:
@@ -112,6 +114,9 @@ class Future(object):
         # Track how long it took us to parse the data
         self.parse_time = None
 
+        # approx. server-client clocks difference in seconds
+        self.clock_diff = None
+
         # Data from the server before it is parsed
         self._message = None
 
@@ -175,6 +180,18 @@ class Future(object):
     def _remove_event(self, event):
         """Remove a completion event from this future."""
         self._other_events.remove(event)
+
+    def _set_clock_diff(self, server_response, localtime_of_response):
+        """Calculate and set the `.clock_diff`, based on headers from a server
+        response, and the local time of response received.
+
+        Based on `clock_diff`, `eta_min`/`eta_max` may or may not make sense.
+        """
+        try:
+            server_time = datetime_to_timestamp(parse(server_response.headers['date']))
+        except:
+            server_time = 0
+        self.clock_diff = abs(server_time - localtime_of_response)
 
     @staticmethod
     def wait_multiple(futures, min_done=None, timeout=None):
