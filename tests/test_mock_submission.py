@@ -390,14 +390,42 @@ class MockSubmission(_QueryTest):
         "First poll happens with minimal delay if eta_min missing"
 
         with Client('endpoint', 'token') as client:
+            now = datetime_in_future(0)
             client.session = mock.Mock()
             client.session.post = lambda path, _: choose_reply(path, {
                 'endpoint/problems/': '[%s]' % continue_reply('1', 'abc123')
-            })
+            }, date=now)
             client.session.get = lambda path: choose_reply(path, {
                 'endpoint/problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
                 'endpoint/problems/1/': complete_reply('1', 'abc123')
-            })
+            }, date=now)
+
+            solver = Solver(client, solver_data('abc123'))
+
+            def assert_no_delay(s):
+                s and self.assertTrue(
+                    abs(s - client._POLL_BACKOFF_MIN) < client._POLL_BACKOFF_MIN / 10.0)
+
+            with mock.patch('time.sleep', assert_no_delay):
+                future = solver.sample_qubo({})
+                future.result()
+
+    @mock.patch.object(Client, "_POLL_THREAD_COUNT", 1)
+    @mock.patch.object(Client, "_SUBMISSION_THREAD_COUNT", 1)
+    def test_immediate_polling_with_local_clock_unsynced(self):
+        """First poll happens with minimal delay if local clock is way off from
+        the remote/server clock."""
+
+        with Client('endpoint', 'token') as client:
+            badnow = datetime_in_future(100)
+            client.session = mock.Mock()
+            client.session.post = lambda path, _: choose_reply(path, {
+                'endpoint/problems/': '[%s]' % continue_reply('1', 'abc123')
+            }, date=badnow)
+            client.session.get = lambda path: choose_reply(path, {
+                'endpoint/problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
+                'endpoint/problems/1/': complete_reply('1', 'abc123')
+            }, date=badnow)
 
             solver = Solver(client, solver_data('abc123'))
 
