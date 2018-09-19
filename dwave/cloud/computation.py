@@ -187,7 +187,10 @@ class Future(object):
 
         Based on `clock_diff`, `eta_min`/`eta_max` may or may not make sense.
         """
-        server_time = datetime_to_timestamp(parse(server_response.headers['date']))
+        try:
+            server_time = datetime_to_timestamp(parse(server_response.headers['date']))
+        except:
+            server_time = 0
         self.clock_diff = abs(server_time - localtime_of_response)
 
     @staticmethod
