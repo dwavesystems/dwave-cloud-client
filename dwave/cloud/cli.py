@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 from dwave.cloud import Client
 from dwave.cloud.utils import (
-    default_text_input, click_info_switch, generate_valid_random_problem,
+    default_text_input, click_info_switch, generate_random_ising_problem,
     datetime_to_timestamp, utcnow, strtrunc, CLIError)
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
@@ -376,7 +376,7 @@ def sample(config_file, profile, solver_name, biases, couplings, random_problem,
     echo("Using solver: {}".format(solver.id))
 
     if random_problem:
-        linear, quadratic = generate_valid_random_problem(solver)
+        linear, quadratic = generate_random_ising_problem(solver)
     else:
         try:
             linear = ast.literal_eval(biases) if biases else []
