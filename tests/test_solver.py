@@ -40,7 +40,7 @@ class PropertyLoading(unittest.TestCase):
         """Ensure that the parameters are populated."""
         with Client(**config) as client:
             solver = client.get_solver()
-            assert 'not_a_parameter' not in solver.parameters
+            self.assertNotIn('not_a_parameter', solver.parameters)
             with self.assertRaises(KeyError):
                 solver.sample_ising({}, {}, not_a_parameter=True)
 
@@ -48,7 +48,7 @@ class PropertyLoading(unittest.TestCase):
         """Ensure that the experimental parameters are populated."""
         with Client(**config) as client:
             solver = client.get_solver()
-            assert 'x_test' not in solver.parameters
+            self.assertNotIn('x_test', solver.parameters)
             with self.assertRaises(SolverFailureError):
                 self.assertTrue(solver.sample_ising([0], {}, x_test=123).result())
 

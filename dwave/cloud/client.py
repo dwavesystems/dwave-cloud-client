@@ -875,9 +875,20 @@ class Client(object):
             This method is always run inside of a daemon thread.
         """
         try:
-            status = message['status']
-            _LOGGER.debug("Handling response for %s with status %s", message['id'], status)
             _LOGGER.trace("Handling response: %r", message)
+            _LOGGER.debug("Handling response for %s with status %s", message.get('id'), message.get('status'))
+
+            # Handle errors in batch mode
+            if 'error_code' in message and 'error_msg' in message:
+                raise SolverFailureError(message['error_msg'])
+
+            if 'status' not in message:
+                raise InvalidAPIResponseError("'status' missing in problem description response")
+            if 'id' not in message:
+                raise InvalidAPIResponseError("'id' missing in problem description response")
+
+            future.id = message['id']
+            future.remote_status = status = message['status']
 
             # The future may not have the ID set yet
             with future._single_cancel_lock:
@@ -890,10 +901,6 @@ class Client(object):
                         self._cancel(message['id'], future)
                     # If a cancel request could meaningfully be sent it has been now
                     future._cancel_sent = True
-
-            # Set the id field in the future
-            future.id = message['id']
-            future.remote_status = status
 
             if not future.time_received and message.get('submitted_on'):
                 future.time_received = parse_datetime(message['submitted_on'])
@@ -925,15 +932,14 @@ class Client(object):
                 self._poll(future)
             elif status == self.STATUS_CANCELLED:
                 # If canceled return error
-                future._set_error(CanceledFutureError())
+                raise CanceledFutureError()
             else:
                 # Return an error to the future object
                 errmsg = message.get('error_message', 'An unknown error has occurred.')
                 if 'solver is offline' in errmsg.lower():
-                    err = SolverOfflineError(errmsg)
+                    raise SolverOfflineError(errmsg)
                 else:
-                    err = SolverFailureError(errmsg)
-                future._set_error(err)
+                    raise SolverFailureError(errmsg)
 
         except Exception as error:
             # If there were any unhandled errors we need to release the
