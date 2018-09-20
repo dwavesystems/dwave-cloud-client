@@ -12,7 +12,7 @@ from datetime import datetime
 
 import numpy
 
-from dwave.cloud.utils import evaluate_ising
+from dwave.cloud.utils import evaluate_ising, generate_random_ising_problem
 from dwave.cloud.qpu import Client
 from dwave.cloud.exceptions import CanceledFutureError, SolverFailureError
 import dwave.cloud.computation
@@ -64,11 +64,11 @@ class _QueryTest(unittest.TestCase):
         results = solver.sample_ising(linear, quad, num_reads=100, **param)
 
         # Did we get the right number of samples?
-        self.assertTrue(100 == sum(results.occurrences))
+        self.assertEqual(100, sum(results.occurrences))
 
         # Make sure the number of occurrences and energies are all correct
         for energy, state in zip(results.energies, results.samples):
-            self.assertTrue(energy == evaluate_ising(linear, quad, state))
+            self.assertAlmostEqual(energy, evaluate_ising(linear, quad, state))
 
         return results
 
@@ -100,16 +100,13 @@ class Submission(_QueryTest):
 
     def test_submit_extra_qubit(self):
         """Submit a defective problem with an unsupported variable."""
-        # Connect
+
         with Client(**config) as client:
             solver = client.get_solver()
 
-            # Build a linear problem
-            linear = [0] * (max(solver.nodes) + 1)
-            quad = {}
-
-            # Add a variable that shouldn't exist
-            linear.append(1)
+            # Build a linear problem and add a variable that shouldn't exist
+            linear, quad = generate_random_ising_problem(solver)
+            linear[max(solver.nodes) + 1] = 1
 
             with self.assertRaises(ValueError):
                 results = solver.sample_ising(linear, quad)
@@ -117,68 +114,45 @@ class Submission(_QueryTest):
 
     def test_submit_linear_problem(self):
         """Submit a problem with all the linear terms populated."""
-        # Connect
+
         with Client(**config) as client:
             solver = client.get_solver()
-
-            # Build a linear problem
-            linear = [1] * (max(solver.nodes) + 1)
-            quad = {}
-
-            # Solve the problem
-            self._submit_and_check(solver, linear, quad)
+            linear, quad = generate_random_ising_problem(solver)
+            self._submit_and_check(solver, linear, {})
 
     def test_submit_full_problem(self):
         """Submit a problem with all supported coefficients set."""
-        # Connect
+
         with Client(**config) as client:
             solver = client.get_solver()
-
-            # Build a linear problem
-            linear = [0] * (max(solver.nodes) + 1)
-            for index in solver.nodes:
-                linear[index] = random.choice([-1, 1])
-
-            # Build a
-            quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
-
-            # Solve the problem
+            linear, quad = generate_random_ising_problem(solver)
             self._submit_and_check(solver, linear, quad)
 
-    def test_submit_dict_problem(self):
-        """Submit a problem using a dict for the linear terms."""
-        # Connect
+    def test_submit_list_problem(self):
+        """Submit a problem using a list for the linear terms."""
+
         with Client(**config) as client:
             solver = client.get_solver()
 
-            # Build a problem
-            linear = {index: random.choice([-1, 1]) for index in solver.nodes}
+            nan = float('nan')
+            linear = [0 if qubit in solver.nodes else nan for qubit in range(0, max(solver.nodes)+1)]
             quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
 
-            # Solve the problem
             self._submit_and_check(solver, linear, quad)
 
     def test_submit_partial_problem(self):
         """Submit a problem with only some of the terms set."""
-        # Connect
+
         with Client(**config) as client:
             solver = client.get_solver()
 
-            # Build a linear problem
-            linear = [0] * (max(solver.nodes) + 1)
-            for index in solver.nodes:
-                linear[index] = random.choice([-1, 1])
-
-            # Build a
-            quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
-
-            # Remove half the qubits
+            # Build a linear problem, then remove half the qubits
+            linear, quad = generate_random_ising_problem(solver)
             nodes = list(solver.nodes)
             for index in nodes[0:len(nodes)//2]:
-                linear[index] = 0
+                del linear[index]
                 quad = {key: value for key, value in quad.items() if index not in key}
 
-            # Solve the problem
             self._submit_and_check(solver, linear, quad)
 
     def test_reverse_annealing(self):
@@ -232,43 +206,31 @@ class Submission(_QueryTest):
 
     def test_submit_batch(self):
         """Submit batch of problems."""
-        # Connect
+
         with Client(**config) as client:
             solver = client.get_solver()
 
             result_list = []
             for _ in range(100):
-
-                # Build a linear problem
-                linear = [0] * (max(solver.nodes) + 1)
-                for index in solver.nodes:
-                    linear[index] = random.choice([-1, 1])
-
-                # Build a
-                quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
-
+                linear, quad = generate_random_ising_problem(solver)
                 results = solver.sample_ising(linear, quad, num_reads=10)
                 result_list.append([results, linear, quad])
 
             for results, linear, quad in result_list:
                 # Did we get the right number of samples?
-                self.assertTrue(10 == sum(results.occurrences))
+                self.assertEqual(10, sum(results.occurrences))
 
                 # Make sure the number of occurrences and energies are all correct
                 for energy, state in zip(results.energies, results.samples):
-                    self.assertTrue(energy == evaluate_ising(linear, quad, state))
+                    self.assertAlmostEqual(energy, evaluate_ising(linear, quad, state))
 
     def test_cancel_batch(self):
         """Submit batch of problems, then cancel them."""
-        # Connect
+
         with Client(**config) as client:
             solver = client.get_solver()
 
-            # Build a linear problem
-            linear = [0] * (max(solver.nodes) + 1)
-            for index in solver.nodes:
-                linear[index] = random.choice([-1, 1])
-            quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
+            linear, quad = generate_random_ising_problem(solver)
 
             max_num_reads = max(solver.properties.get('num_reads_range', [1, 100]))
 
@@ -283,27 +245,22 @@ class Submission(_QueryTest):
                 # Responses must be canceled or correct
                 try:
                     # Did we get the right number of samples?
-                    self.assertTrue(max_num_reads == sum(results.occurrences))
+                    self.assertEqual(max_num_reads, sum(results.occurrences))
 
                     # Make sure the number of occurrences and energies are all correct
                     for energy, state in zip(results.energies, results.samples):
-                        self.assertTrue(energy == evaluate_ising(linear, quad, state))
+                        self.assertAlmostEqual(energy, evaluate_ising(linear, quad, state))
+
                 except CanceledFutureError:
                     pass
 
     def test_wait_many(self):
         """Submit a batch of problems then use `wait_multiple` to wait on all of them."""
-        # Connect
+
         with Client(**config) as client:
             solver = client.get_solver()
 
-            # Build a linear problem
-            linear = [0] * (max(solver.nodes) + 1)
-            for index in solver.nodes:
-                linear[index] = random.choice([-1, 1])
-
-            # Build a
-            quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
+            linear, quad = generate_random_ising_problem(solver)
 
             result_list = []
             for _ in range(100):
@@ -317,25 +274,20 @@ class Submission(_QueryTest):
 
             for results, linear, quad in result_list:
                 # Did we get the right number of samples?
-                self.assertTrue(40 == sum(results.occurrences))
+                self.assertEqual(40, sum(results.occurrences))
 
                 # Make sure the number of occurrences and energies are all correct
                 for energy, state in zip(results.energies, results.samples):
-                    self.assertTrue(energy == evaluate_ising(linear, quad, state))
+                    self.assertAlmostEqual(energy, evaluate_ising(linear, quad, state))
 
     def test_as_completed(self):
         """Submit a batch of problems then use `as_completed` to iterate over
         all of them."""
 
-        # Connect
         with Client(**config) as client:
             solver = client.get_solver()
 
-            # Build a problem
-            linear = [0] * (max(solver.nodes) + 1)
-            for index in solver.nodes:
-                linear[index] = random.choice([-1, 1])
-            quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
+            linear, quad = generate_random_ising_problem(solver)
 
             # Sample the solution 100x40 times
             computations = [solver.sample_ising(linear, quad, num_reads=40) for _ in range(100)]
@@ -343,9 +295,9 @@ class Submission(_QueryTest):
             # Go over computations, one by one, as they're done and check they're OK
             for computation in dwave.cloud.computation.Future.as_completed(computations):
                 self.assertTrue(computation.done())
-                self.assertTrue(40 == sum(computation.occurrences))
+                self.assertEqual(40, sum(computation.occurrences))
                 for energy, state in zip(computation.energies, computation.samples):
-                    self.assertTrue(energy == evaluate_ising(linear, quad, state))
+                    self.assertAlmostEqual(energy, evaluate_ising(linear, quad, state))
 
 
 @unittest.skipUnless(config, "No live server configuration available.")
