@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from dateutil.tz import UTC
 from dateutil.parser import parse as parse_datetime
 
-from dwave.cloud.utils import evaluate_ising
+from dwave.cloud.utils import evaluate_ising, generate_random_ising_problem
 from dwave.cloud.qpu import Client, Solver
 from dwave.cloud.exceptions import SolverFailureError, CanceledFutureError
 from dwave.cloud.testing import mock
@@ -80,6 +80,14 @@ def error_reply(id_, solver_name, error):
         "type": "ising",
         "id": id_,
         "error_message": error
+    })
+
+
+def immediate_error_reply(code, msg):
+    """A reply saying an error has occurred (before scheduling for execution)."""
+    return json.dumps({
+        "error_code": code,
+        "error_msg": msg
     })
 
 
@@ -194,6 +202,20 @@ class MockSubmission(_QueryTest):
             linear = {index: 1 for index in solver.nodes}
             quad = {key: -1 for key in solver.undirected_edges}
             results = solver.sample_ising(linear, quad, num_reads=100)
+
+            with self.assertRaises(SolverFailureError):
+                results.samples
+
+    def test_submit_immediate_error_reply(self):
+        """Handle an (obvious) error on problem submission."""
+        with Client('endpoint', 'token') as client:
+            client.session = mock.Mock()
+            client.session.post = lambda a, _: choose_reply(a, {
+                'endpoint/problems/': '[%s]' % immediate_error_reply(400, "Missing parameter 'num_reads' in problem JSON")})
+            solver = Solver(client, solver_data('abc123'))
+
+            linear, quad = generate_random_ising_problem(solver)
+            results = solver.sample_ising(linear, quad)
 
             with self.assertRaises(SolverFailureError):
                 results.samples
