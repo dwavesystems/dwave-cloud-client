@@ -193,13 +193,13 @@ class Submission(_QueryTest):
             # ising state, qubo problem
             initial_state_ising = {v: 2*bool(v % 3)-1 for v in active}
             Q = {(v, v): 1 for v in active}
-            fq = solver.sample_qubo(Q, anneal_schedule=anneal_schedule, initial_state=initial_state)
+            fq = solver.sample_qubo(Q, anneal_schedule=anneal_schedule, initial_state=initial_state_ising)
 
             # qubo state, ising problem
             initial_state_qubo = {v: bool(v % 3) for v in active}
             h = {v: 1 for v in active}
             J = {}
-            fi = solver.sample_ising(h, J, anneal_schedule=anneal_schedule, initial_state=initial_state)
+            fi = solver.sample_ising(h, J, anneal_schedule=anneal_schedule, initial_state=initial_state_qubo)
 
             fq.samples
             fi.samples
