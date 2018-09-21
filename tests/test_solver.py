@@ -134,8 +134,7 @@ class Submission(_QueryTest):
         with Client(**config) as client:
             solver = client.get_solver()
 
-            nan = float('nan')
-            linear = [0 if qubit in solver.nodes else nan for qubit in range(0, max(solver.nodes)+1)]
+            linear = [1 if qubit in solver.nodes else 0 for qubit in range(0, max(solver.nodes)+1)]
             quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
 
             self._submit_and_check(solver, linear, quad)
