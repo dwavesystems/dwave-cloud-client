@@ -14,9 +14,9 @@
     :target: https://coveralls.io/github/dwavesystems/dwave-cloud-client?branch=master
     :alt: Coverage report
 
-.. image:: https://readthedocs.org/projects/dwave-cloud-client/badge/?version=latest
-    :target: http://dwave-cloud-client.readthedocs.io/en/latest/?badge=latest
-    :alt: Documentation status
+.. image:: https://readthedocs.com/projects/d-wave-systems-dwave-cloud-client/badge/?version=latest
+    :target: https://docs.ocean.dwavesys.com/projects/cloud-client/en/latest/?badge=latest
+    :alt: Documentation Status
 
 .. index-start-marker
 
