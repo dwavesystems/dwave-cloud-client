@@ -59,8 +59,8 @@ class Future(object):
         configuration file, submits a simple QUBO problem to a remote D-Wave resource for
         100 samples, and checks a couple of times whether the sampling is completed.
 
-        >>> import dwave.cloud as dc
-        >>> client = dc.Client.from_config()
+        >>> from dwave.cloud import Client
+        >>> client = Client.from_config()
         >>> solver = client.get_solver()
         >>> u, v = next(iter(solver.edges))
         >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
@@ -221,8 +221,8 @@ class Future(object):
             the third is still in progress. (A more typical approach would use something
             like :code:`first = next(Future.as_completed(computation))` instead.)
 
-            >>> import dwave.cloud as dc
-            >>> client = dc.Client.from_config()
+            >>> from dwave.cloud import Client
+            >>> client = Client.from_config()
             >>> solver = client.get_solver()
             >>> u, v = next(iter(solver.edges))
             >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
@@ -313,8 +313,8 @@ class Future(object):
             for differing numers of samples, and yields timing information for each job
             as it completes.
 
-            >>> import dwave.cloud as dc
-            >>> client = dc.Client.from_config()
+            >>> from dwave.cloud import Client
+            >>> client = Client.from_config()
             >>> solver = client.get_solver()
             >>> u, v = next(iter(solver.edges))
             >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
@@ -356,8 +356,8 @@ class Future(object):
             configuration file, submits a simple QUBO problem to a remote D-Wave resource for
             100 samples, and tries waiting for 10 seconds for sampling to complete.
 
-            >>> import dwave.cloud as dc
-            >>> client = dc.Client.from_config()
+            >>> from dwave.cloud import Client
+            >>> client = Client.from_config()
             >>> solver = client.get_solver()
             >>> u, v = next(iter(solver.edges))
             >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
@@ -388,9 +388,9 @@ class Future(object):
             configuration file, submits a simple QUBO problem to a remote D-Wave resource for
             100 samples, and checks a couple of times whether sampling is completed.
 
-            >>> import dwave.cloud as dc
-            >>> client = dc.Client.from_config()
-            >>> solver = Client.get_solver()
+            >>> from dwave.cloud import Client
+            >>> client = Client.from_config()
+            >>> solver = client.get_solver()
             >>> u, v = next(iter(solver.edges))
             >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
             >>> computation = solver.sample_qubo(Q, num_reads=100)   # doctest: +SKIP
@@ -412,9 +412,9 @@ class Future(object):
             configuration file, submits a simple QUBO problem to a remote D-Wave resource for
             100 samples, and tries (and in this case succeeds) to cancel it.
 
-            >>> import dwave.cloud as dc
-            >>> client = dc.Client.from_config()
-            >>> solver = Client.get_solver()
+            >>> from dwave.cloud import Client
+            >>> client = Client.from_config()
+            >>> solver = client.get_solver()
             >>> u, v = next(iter(solver.edges))
             >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
             >>> computation = solver.sample_qubo(Q, num_reads=100)   # doctest: +SKIP
