@@ -249,6 +249,6 @@ Terminology
         sampler provides ‘sample_qubo’ and ‘sample_ising’ methods as well as the generic
         BQM sampler method.
 
-    Solver
+    solver
         A resource that runs a problem. Some solvers interface to the QPU; others leverage CPU
         and GPU resources.
