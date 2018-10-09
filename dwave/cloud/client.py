@@ -737,9 +737,9 @@ class Client(object):
 
             features (dict, optional):
                 Dictionary of features this solver has to have. For a list of
-                feature names and values, see: :meth:`Client.solvers`. Specifying solver
-                name overrides features. To include (possibly partial) name match requirement,
-                use the ``name`` feature inside ``features`` dictionary.
+                feature names and values, see: :meth:`~dwave.cloud.client.Client.solvers`.
+                Specifying solver name overrides features. To include (possibly partial)
+                name match requirement, use the ``name`` feature inside ``features`` dictionary.
 
             refresh (bool):
                 Return solver from cache (if cached with ``get_solvers()``),

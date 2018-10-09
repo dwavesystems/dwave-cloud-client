@@ -43,6 +43,7 @@ Methods
    :toctree: generated
 
    client.Client.from_config
+   client.Client.solvers
    client.Client.get_solver
    client.Client.get_solvers
    client.Client.is_solver_handled
