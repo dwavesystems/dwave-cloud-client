@@ -209,14 +209,22 @@ class MockSolverLoading(unittest.TestCase):
         self.assertEqual(solver_object('dw2000').num_qubits, 3)
         self.assertFalse(solver_object('dw2000').has_flux_biases)
 
+        # test .is_vfyc
         data = json.loads(solver_data('test'))
         data['properties']['vfyc'] = 'error'
         self.assertFalse(Solver(None, data).is_vfyc)
         data['properties']['vfyc'] = True
         self.assertTrue(Solver(None, data).is_vfyc)
 
+        # test .has_flux_biases
+        self.assertFalse(Solver(None, data).has_flux_biases)
         data['properties']['parameters']['flux_biases'] = '...'
         self.assertTrue(Solver(None, data).has_flux_biases)
+
+        # test .has_anneal_schedule
+        self.assertFalse(Solver(None, data).has_anneal_schedule)
+        data['properties']['parameters']['anneal_schedule'] = '...'
+        self.assertTrue(Solver(None, data).has_anneal_schedule)
 
         # test `.is_online` property
         self.assertTrue(solver_object('dw2000').is_online)

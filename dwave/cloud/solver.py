@@ -174,6 +174,11 @@ class Solver(object):
         "Solver supports/accepts ``flux_biases``."
         return 'flux_biases' in self.parameters
 
+    @property
+    def has_anneal_schedule(self):
+        "Solver supports/accepts ``anneal_schedule``."
+        return 'anneal_schedule' in self.parameters
+
     def sample_ising(self, linear, quadratic, **params):
         """Sample from the specified Ising model.
 

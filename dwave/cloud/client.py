@@ -631,7 +631,8 @@ class Client(object):
             return self._solvers
 
     def solvers(self, name=None, qpu=None, software=None, vfyc=None,
-                flux_biases=None, num_qubits=None, online=True, refresh=False):
+                flux_biases=None, anneal_schedule=None,
+                num_qubits=None, online=True, refresh=False):
         """Returns a filtered list of solvers handled by this client.
 
         Args:
@@ -650,6 +651,9 @@ class Client(object):
 
             flux_biases (bool, default=None):
                 Should solver accept flux biases?
+
+            anneal_schedule (bool, default=None):
+                Should solver accept anneal schedule?
 
             num_qubits (int/[int,int], default=None):
                 What's the range (or exact number) of qubits solver should handle?
@@ -671,24 +675,24 @@ class Client(object):
             class.
 
         Examples:
-            Get a solver not based on VFYC, with 2048 qubits:
+            Get a solver not based on VFYC, with 2048 qubits::
 
                 solver = client.solvers(vfyc=False, num_qubits=2048)[0]
 
-            Get all solvers that have between 1024 and 2048 qubits:
+            Get all solvers that have between 1024 and 2048 qubits::
 
                 solvers = client.solvers(num_qubits=(1024, 2048))
 
-            Get all solvers that have at least 2000 qubits:
+            Get all solvers that have at least 2000 qubits::
 
                 solvers = client.solvers(num_qubits=[2000, None])
 
-            Get the first QPU solver that accepts flux biases:
+            Get the first QPU solver that accepts flux biases::
 
                 solver = client.solvers(qpu=True, flux_biases=True)[0]
 
-            Assuming only one of the two solvers named `solver1` and `solver2`
-            can be online at once, return the one that is:
+            Assuming only one of the two solvers named ``solver1`` and ``solver2``
+            can be online at once, return the one that is::
 
                 solver = client.solvers(online=True, name='solver[12]')[0]
                 solver = client.solvers(online=True, name='solver1|solver2')[0]
@@ -702,6 +706,8 @@ class Client(object):
             if vfyc is not None and solver.is_vfyc != vfyc:
                 return False
             if flux_biases is not None and solver.has_flux_biases != flux_biases:
+                return False
+            if anneal_schedule is not None and solver.has_anneal_schedule != anneal_schedule:
                 return False
             if num_qubits is not None:
                 if isinstance(num_qubits, (list, tuple)) and len(num_qubits) == 2:
