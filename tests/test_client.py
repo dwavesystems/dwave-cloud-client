@@ -212,7 +212,8 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "num_qubits": 5,
                 "parameters": {
                     "num_reads": "Number of samples to return.",
-                    "flux_biases": "Supported ..."
+                    "flux_biases": "Supported ...",
+                    "anneal_schedule": "Supported ..."
                 },
                 "vfyc": True
             },
@@ -277,6 +278,10 @@ class FeatureBasedSolverSelection(unittest.TestCase):
     def test_online(self):
         self.assertSolvers(self.client.solvers(online=None), self.solvers)
         self.assertSolvers(self.client.solvers(online=False), [])
+
+    def test_anneal_schedule(self):
+        self.assertSolvers(self.client.solvers(anneal_schedule=None), self.solvers)
+        self.assertSolvers(self.client.solvers(anneal_schedule=True), [self.solver2])
 
     def test_name(self):
         self.assertSolvers(self.client.solvers(name='solver1'), [self.solver1])
