@@ -49,8 +49,9 @@ import threading
 import requests
 import posixpath
 import collections
+import operator
 from itertools import chain
-from operator import attrgetter
+from functools import partial
 
 from dateutil.parser import parse as parse_datetime
 from six.moves import queue, range
@@ -630,10 +631,14 @@ class Client(object):
             self._all_solvers_ready = True
             return self._solvers
 
-    def solvers(self, name=None, qpu=None, software=None, vfyc=None,
-                flux_biases=None, anneal_schedule=None,
-                num_qubits=None, online=True, refresh=False):
+    def solvers(self, name=None, qpu=None, software=None, online=True,
+                refresh=False, **filters):
         """Returns a filtered list of solvers handled by this client.
+
+        Apart from a few inferred features (`name`, `qpu`, `software`, and
+        `online`), filtering works similar to Django QuerySet filtering on all
+        available solver parameters/properties (use keyword arguments of form:
+        `<name>__<operator>=<value>`)
 
         Args:
             name (str, default=None):
@@ -646,23 +651,61 @@ class Client(object):
             software (bool, default=None):
                 Should solver be software based?
 
-            vfyc (bool, default=None):
-                Should solver work on "virtual full-yield chip"?
-
-            flux_biases (bool, default=None):
-                Should solver accept flux biases?
-
-            anneal_schedule (bool, default=None):
-                Should solver accept anneal schedule?
-
-            num_qubits (int/[int,int], default=None):
-                What's the range (or exact number) of qubits solver should handle?
-
             online (bool, default=True):
                 Should solver be online?
 
             refresh (bool, default=False):
                 Force refresh cached list of solvers/properties
+
+        Filtering forms:
+            <parameter> (bool),
+            <parameter>__available (bool),
+            <parameter>__<operator> (object <value>):
+                Ensures solver supports `parameter`. General operator form can
+                be used, but that usually doesn't make sense for parameters,
+                since values are human-readable descriptions. Default operator
+                if `available`.
+
+            <property> (bool),
+            <property>__eq (bool),
+            <property>__<operator> (object <value>):
+                Ensures the value of solver's `property`, after applying
+                `operator` equals the righthand side `value`. Default operator
+                is `eq`.
+
+        Operators:
+            available, lt, lte, gt, gte, eq, within, contains, regex
+
+        Common solver parameters:
+            flux_biases:
+                Should solver accept flux biases?
+            anneal_schedule:
+                Should solver accept anneal schedule?
+
+        Common solver properties:
+            num_qubits (int):
+                Number of qubits available.
+            vfyc (bool):
+                Should solver work on "virtual full-yield chip"?
+            max_anneal_schedule_points (int):
+                Piecewise linear annealing schedule points.
+            h_range ([int,int]), j_range ([int,int]):
+                Biases/couplings values range.
+            num_reads_range ([int,int]):
+                Range of allowed values for `num_reads` parameter.
+
+        Filtering examples:
+            client.solvers(
+                num_qubits__gt=2000,                # we need more than 2000 q
+                num_qubits__lt=4000,                # .. but less than 4000 q
+                num_qubits__within=(2000, 4000),    # = alternative to the above
+                vfyc=True,                          # we require fully yielded Chimera
+                anneal_schedule=True,               # we need support for custom anneal schedule
+                max_anneal_schedule_points__gte=4,  # we need at least 4 points for our anneal schedule
+                num_reads_range__contains=1000,     # solver must support returning 1000 reads
+                extended_j_range__contains=(-2, 2), # we need extended J range to contain (-2,2)
+                chip_id__regex='DW_.*'              # chip id prefix must be DW_
+            )
 
         Returns:
             list[Solver]: List of all solvers that satisfy the above conditions.
@@ -675,17 +718,17 @@ class Client(object):
             class.
 
         Examples:
-            Get a solver not based on VFYC, with 2048 qubits::
+            Get all solvers not based on VFYC, with 2048 qubits::
 
-                solver = client.solvers(vfyc=False, num_qubits=2048)[0]
+                solver = client.solvers(vfyc=False, num_qubits=2048)
 
             Get all solvers that have between 1024 and 2048 qubits::
 
-                solvers = client.solvers(num_qubits=(1024, 2048))
+                solvers = client.solvers(num_qubits__within=(1024, 2048))
 
             Get all solvers that have at least 2000 qubits::
 
-                solvers = client.solvers(num_qubits=[2000, None])
+                solvers = client.solvers(num_qubits__gte=2000)
 
             Get the first QPU solver that accepts flux biases::
 
@@ -696,36 +739,73 @@ class Client(object):
 
                 solver = client.solvers(online=True, name='solver[12]')[0]
                 solver = client.solvers(online=True, name='solver1|solver2')[0]
+                solver = client.solvers(online=True, chip_id__regex='solver[12]')[0]
         """
 
-        def predicate(solver):
+        def within_op(prop, val):
+            """Is LHS `prop` fully contained within `val`?"""
+
+            # `val` must be a 2-element list/tuple range.
+            if not isinstance(val, (list, tuple)) or not len(val) == 2:
+                raise ValueError("2-element list/tuple range required for RHS value")
+            rlo, rhi = min(val), max(val)
+
+            # `prop` can be a single value, or a range (2-list/2-tuple).
+            if isinstance(prop, (list, tuple)) and len(prop) == 2:
+                # prop range within val range?
+                llo, lhi = min(prop), max(prop)
+                return llo >= rlo and lhi <= rhi
+            else:
+                # prop value within val range?
+                return rlo <= prop <= rhi
+
+        def contains_op(prop, val):
+            """Does LHS `prop` fully contain RHS `val`?"""
+            try:
+                return within_op(val, prop)
+            except ValueError:
+                raise ValueError("2-element list/tuple range required for LHS value")
+
+        ops = {
+            'lt': operator.lt,
+            'lte': operator.le,
+            'gt': operator.gt,
+            'gte': operator.ge,
+            'eq': operator.eq,
+            'available': lambda prop, _: prop is not None,
+            'within': within_op,
+            'contains': contains_op,
+            'regex': lambda prop, val: re.match("^{}$".format(val), prop)
+        }
+
+        def meta_predicate(solver):
             if qpu is not None and solver.is_qpu != qpu:
                 return False
             if software is not None and solver.is_software != software:
                 return False
-            if vfyc is not None and solver.is_vfyc != vfyc:
-                return False
-            if flux_biases is not None and solver.has_flux_biases != flux_biases:
-                return False
-            if anneal_schedule is not None and solver.has_anneal_schedule != anneal_schedule:
-                return False
-            if num_qubits is not None:
-                if isinstance(num_qubits, (list, tuple)) and len(num_qubits) == 2:
-                    min_qubits, max_qubits = num_qubits
-                else:
-                    min_qubits, max_qubits = num_qubits, num_qubits
-                if min_qubits is not None and solver.num_qubits < min_qubits:
-                    return False
-                if max_qubits is not None and max_qubits < solver.num_qubits:
-                    return False
             if online is not None and solver.is_online != online:
                 return False
             if name is not None and not re.match("^{}$".format(name), solver.id):
                 return False
             return True
 
-        solvers = list(filter(predicate, self.get_solvers(refresh=refresh).values()))
-        solvers.sort(key=attrgetter('id'))
+        def simple_predicate(solver, name, opname, val):
+            if name in solver.parameters:
+                op = ops[opname or 'available']
+                return op(solver.parameters[name], val)
+            elif name in solver.properties:
+                op = ops[opname or 'eq']
+                return op(solver.properties[name], val)
+            return False
+
+        predicates = [meta_predicate]
+        for lhs, val in filters.items():
+            propname, opname = (lhs.rsplit('__', 1) + [None])[:2]
+            predicates.append(partial(simple_predicate, name=propname, opname=opname, val=val))
+
+        solvers = self.get_solvers(refresh=refresh).values()
+        solvers = [s for s in solvers if all(p(s) for p in predicates)]
+        solvers.sort(key=operator.attrgetter('id'))
         return solvers
 
     def get_solver(self, name=None, features=None, refresh=False):
@@ -744,8 +824,9 @@ class Client(object):
             features (dict, optional):
                 Dictionary of features this solver has to have. For a list of
                 feature names and values, see: :meth:`~dwave.cloud.client.Client.solvers`.
-                Specifying solver name overrides features. To include (possibly partial)
-                name match requirement, use the ``name`` feature inside ``features`` dictionary.
+                Specifying the ``name`` parameter overrides the ``feature`` parameter.
+                To require a (full or partial) name match, use the ``features`` parameter
+                to specify a value for its ``name`` key.
 
             refresh (bool):
                 Return solver from cache (if cached with ``get_solvers()``),

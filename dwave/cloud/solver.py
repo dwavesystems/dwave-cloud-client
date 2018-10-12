@@ -157,7 +157,7 @@ class Solver(object):
     @property
     def is_vfyc(self):
         "Is this a virtual full-yield chip?"
-        return self.properties.get('vfyc', False) == True
+        return self.properties.get('vfyc') == True
 
     @property
     def is_online(self):

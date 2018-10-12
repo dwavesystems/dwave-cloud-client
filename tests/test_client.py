@@ -240,9 +240,9 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.solvers(), self.solvers)
 
     def test_one_boolean(self):
-        self.assertSolvers(self.client.solvers(vfyc=False), [self.solver1])
+        self.assertSolvers(self.client.solvers(vfyc__available=True), [self.solver2])
         self.assertSolvers(self.client.solvers(vfyc=True), [self.solver2])
-        self.assertSolvers(self.client.solvers(flux_biases=False), [self.solver1])
+        self.assertSolvers(self.client.solvers(flux_biases__available=True), [self.solver2])
         self.assertSolvers(self.client.solvers(flux_biases=True), [self.solver2])
 
     def test_boolean_combo(self):
@@ -254,25 +254,23 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.solvers(num_qubits=4), [])
         self.assertSolvers(self.client.solvers(num_qubits=5), [self.solver2])
 
-        self.assertSolvers(self.client.solvers(num_qubits=[3, 5]), self.solvers)
-        self.assertSolvers(self.client.solvers(num_qubits=[2, None]), self.solvers)
-        self.assertSolvers(self.client.solvers(num_qubits=[None, 6]), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits__within=[3, 5]), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits__gte=2), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits__lte=6), self.solvers)
 
-        self.assertSolvers(self.client.solvers(num_qubits=(3, 5)), self.solvers)
-        self.assertSolvers(self.client.solvers(num_qubits=(2, None)), self.solvers)
-        self.assertSolvers(self.client.solvers(num_qubits=(None, 6)), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits__within=(3, 5)), self.solvers)
 
-        self.assertSolvers(self.client.solvers(num_qubits=[2, 4]), [self.solver1])
-        self.assertSolvers(self.client.solvers(num_qubits=[4, None]), [self.solver2])
+        self.assertSolvers(self.client.solvers(num_qubits__within=[2, 4]), [self.solver1])
+        self.assertSolvers(self.client.solvers(num_qubits__gt=4), [self.solver2])
 
-        self.assertSolvers(self.client.solvers(num_qubits=(2, 4)), [self.solver1])
-        self.assertSolvers(self.client.solvers(num_qubits=(4, None)), [self.solver2])
+        self.assertSolvers(self.client.solvers(num_qubits__within=(2, 4)), [self.solver1])
+        self.assertSolvers(self.client.solvers(num_qubits__gt=4), [self.solver2])
 
     def test_range_boolean_combo(self):
         self.assertSolvers(self.client.solvers(num_qubits=3, vfyc=True), [])
-        self.assertSolvers(self.client.solvers(num_qubits=[3, None], vfyc=True), [self.solver2])
-        self.assertSolvers(self.client.solvers(num_qubits=[None, 4], vfyc=True), [])
-        self.assertSolvers(self.client.solvers(num_qubits=[None, 4], flux_biases=False), [self.solver1])
+        self.assertSolvers(self.client.solvers(num_qubits__gte=3, vfyc=True), [self.solver2])
+        self.assertSolvers(self.client.solvers(num_qubits__lte=4, vfyc=True), [])
+        self.assertSolvers(self.client.solvers(num_qubits__within=(3, 6), flux_biases=True), [self.solver2])
         self.assertSolvers(self.client.solvers(num_qubits=5, flux_biases=True), [self.solver2])
 
     def test_online(self):
@@ -280,7 +278,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.solvers(online=False), [])
 
     def test_anneal_schedule(self):
-        self.assertSolvers(self.client.solvers(anneal_schedule=None), self.solvers)
+        self.assertSolvers(self.client.solvers(anneal_schedule__available=True), [self.solver2])
         self.assertSolvers(self.client.solvers(anneal_schedule=True), [self.solver2])
 
     def test_name(self):
