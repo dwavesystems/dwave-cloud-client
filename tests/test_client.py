@@ -198,7 +198,10 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "qubits": [0, 1, 2],
                 "couplers": [[0, 1], [0, 2], [1, 2]],
                 "num_qubits": 3,
-                "parameters": {"num_reads": "Number of samples to return."}
+                "parameters": {
+                    "num_reads": "Number of samples to return.",
+                    "postprocess": "either 'sampling' or 'optimization'"
+                }
             },
             "id": "solver1",
             "description": "A test solver 1",
@@ -220,13 +223,26 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             "id": "solver2",
             "description": "A test solver 2"
         })
-        self.solvers = [self.solver1, self.solver2]
+        self.solver3 = Solver(client=None, data={
+            "properties": {
+                "supported_problem_types": ["qubo", "ising"],
+                "qubits": [0, 1],
+                "couplers": [[0, 1]],
+                "num_qubits": 7,
+                "parameters": {"num_reads": "Number of samples to return."},
+                "vfyc": False
+            },
+            "id": "c4-sw_solver3",
+            "description": "A test of software solver"
+        })
+        self.solvers = [self.solver1, self.solver2, self.solver3]
 
         # mock client
         self.client = Client('endpoint', 'token')
         self.client._solvers = {
             self.solver1.id: self.solver1,
-            self.solver2.id: self.solver2
+            self.solver2.id: self.solver2,
+            self.solver3.id: self.solver3
         }
         self.client._all_solvers_ready = True
 
@@ -239,9 +255,31 @@ class FeatureBasedSolverSelection(unittest.TestCase):
     def test_default(self):
         self.assertSolvers(self.client.solvers(), self.solvers)
 
+    def test_online(self):
+        self.assertSolvers(self.client.solvers(online=None), self.solvers)
+        self.assertSolvers(self.client.solvers(online=True), self.solvers)
+        self.assertSolvers(self.client.solvers(online=False), [])
+
+    def test_qpu_software(self):
+        self.assertSolvers(self.client.solvers(qpu=True), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.solvers(software=False), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.solvers(qpu=False), [self.solver3])
+        self.assertSolvers(self.client.solvers(software=True), [self.solver3])
+
+    def test_name(self):
+        self.assertSolvers(self.client.solvers(name='solver1'), [self.solver1])
+        self.assertSolvers(self.client.solvers(name='solver2'), [self.solver2])
+        self.assertSolvers(self.client.solvers(name='solver'), [])
+        self.assertSolvers(self.client.solvers(name='olver1'), [])
+        self.assertSolvers(self.client.solvers(name='.*1'), [self.solver1])
+        self.assertSolvers(self.client.solvers(name='.*[12].*'), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.solvers(name='solver[12]'), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.solvers(name='^solver(1|2)$'), [self.solver1, self.solver2])
+
     def test_one_boolean(self):
-        self.assertSolvers(self.client.solvers(vfyc__available=True), [self.solver2])
+        self.assertSolvers(self.client.solvers(vfyc__available=True), [self.solver2, self.solver3])
         self.assertSolvers(self.client.solvers(vfyc=True), [self.solver2])
+        self.assertSolvers(self.client.solvers(vfyc=False), [self.solver3])
         self.assertSolvers(self.client.solvers(flux_biases__available=True), [self.solver2])
         self.assertSolvers(self.client.solvers(flux_biases=True), [self.solver2])
 
@@ -254,17 +292,17 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.solvers(num_qubits=4), [])
         self.assertSolvers(self.client.solvers(num_qubits=5), [self.solver2])
 
-        self.assertSolvers(self.client.solvers(num_qubits__within=[3, 5]), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits__within=[3, 7]), self.solvers)
         self.assertSolvers(self.client.solvers(num_qubits__gte=2), self.solvers)
-        self.assertSolvers(self.client.solvers(num_qubits__lte=6), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits__lte=8), self.solvers)
 
-        self.assertSolvers(self.client.solvers(num_qubits__within=(3, 5)), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits__within=(3, 7)), self.solvers)
 
         self.assertSolvers(self.client.solvers(num_qubits__within=[2, 4]), [self.solver1])
-        self.assertSolvers(self.client.solvers(num_qubits__gt=4), [self.solver2])
+        self.assertSolvers(self.client.solvers(num_qubits__gt=4), [self.solver2, self.solver3])
 
         self.assertSolvers(self.client.solvers(num_qubits__within=(2, 4)), [self.solver1])
-        self.assertSolvers(self.client.solvers(num_qubits__gt=4), [self.solver2])
+        self.assertSolvers(self.client.solvers(num_qubits__gt=4), [self.solver2, self.solver3])
 
     def test_range_boolean_combo(self):
         self.assertSolvers(self.client.solvers(num_qubits=3, vfyc=True), [])
@@ -273,23 +311,9 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.solvers(num_qubits__within=(3, 6), flux_biases=True), [self.solver2])
         self.assertSolvers(self.client.solvers(num_qubits=5, flux_biases=True), [self.solver2])
 
-    def test_online(self):
-        self.assertSolvers(self.client.solvers(online=None), self.solvers)
-        self.assertSolvers(self.client.solvers(online=False), [])
-
     def test_anneal_schedule(self):
         self.assertSolvers(self.client.solvers(anneal_schedule__available=True), [self.solver2])
         self.assertSolvers(self.client.solvers(anneal_schedule=True), [self.solver2])
-
-    def test_name(self):
-        self.assertSolvers(self.client.solvers(name='solver1'), [self.solver1])
-        self.assertSolvers(self.client.solvers(name='solver2'), [self.solver2])
-        self.assertSolvers(self.client.solvers(name='solver'), [])
-        self.assertSolvers(self.client.solvers(name='olver1'), [])
-        self.assertSolvers(self.client.solvers(name='.*1'), [self.solver1])
-        self.assertSolvers(self.client.solvers(name='.*[12].*'), self.solvers)
-        self.assertSolvers(self.client.solvers(name='solver[12]'), self.solvers)
-        self.assertSolvers(self.client.solvers(name='^solver(1|2)$'), self.solvers)
 
 
 if __name__ == '__main__':
