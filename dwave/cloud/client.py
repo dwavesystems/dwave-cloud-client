@@ -742,29 +742,29 @@ class Client(object):
                 solver = client.solvers(online=True, chip_id__regex='solver[12]')[0]
         """
 
-        def within_op(prop, val):
-            """Is LHS `prop` fully contained within `val`?"""
+        def covers_op(prop, val):
+            """Does LHS `prop` (range) fully cover RHS `val` (range or item)?"""
 
-            # `val` must be a 2-element list/tuple range.
-            if not isinstance(val, (list, tuple)) or not len(val) == 2:
-                raise ValueError("2-element list/tuple range required for RHS value")
-            rlo, rhi = min(val), max(val)
-
-            # `prop` can be a single value, or a range (2-list/2-tuple).
-            if isinstance(prop, (list, tuple)) and len(prop) == 2:
-                # prop range within val range?
-                llo, lhi = min(prop), max(prop)
-                return llo >= rlo and lhi <= rhi
-            else:
-                # prop value within val range?
-                return rlo <= prop <= rhi
-
-        def contains_op(prop, val):
-            """Does LHS `prop` fully contain RHS `val`?"""
-            try:
-                return within_op(val, prop)
-            except ValueError:
+            # `prop` must be a 2-element list/tuple range.
+            if not isinstance(prop, (list, tuple)) or not len(prop) == 2:
                 raise ValueError("2-element list/tuple range required for LHS value")
+            llo, lhi = min(prop), max(prop)
+
+            # `val` can be a single value, or a range (2-list/2-tuple).
+            if isinstance(val, (list, tuple)) and len(val) == 2:
+                # val range within prop range?
+                rlo, rhi = min(val), max(val)
+                return llo <= rlo and lhi >= rhi
+            else:
+                # val item within prop range?
+                return llo <= val <= lhi
+
+        def coveredby_op(prop, val):
+            """Is LHS `prop` (range or item) fully covered by RHS `val` (range)?"""
+            try:
+                return covers_op(val, prop)
+            except ValueError:
+                raise ValueError("2-element list/tuple range required for RHS value")
 
         ops = {
             'lt': operator.lt,
@@ -773,9 +773,13 @@ class Client(object):
             'gte': operator.ge,
             'eq': operator.eq,
             'available': lambda prop, _: prop is not None,
-            'within': within_op,
-            'contains': contains_op,
-            'regex': lambda prop, val: re.match("^{}$".format(val), prop)
+            'regex': lambda prop, val: re.match("^{}$".format(val), prop),
+            # range operations
+            'covers': covers_op,
+            'within': coveredby_op,
+            # membership tests
+            'in': lambda prop, val: prop in val,
+            'contains': lambda prop, val: val in prop
         }
 
         def meta_predicate(solver):
@@ -789,7 +793,7 @@ class Client(object):
                 return False
             return True
 
-        def simple_predicate(solver, name, opname, val):
+        def predicate(solver, name, opname, val):
             if name in solver.parameters:
                 op = ops[opname or 'available']
                 return op(solver.parameters[name], val)
@@ -801,7 +805,7 @@ class Client(object):
         predicates = [meta_predicate]
         for lhs, val in filters.items():
             propname, opname = (lhs.rsplit('__', 1) + [None])[:2]
-            predicates.append(partial(simple_predicate, name=propname, opname=opname, val=val))
+            predicates.append(partial(predicate, name=propname, opname=opname, val=val))
 
         solvers = self.get_solvers(refresh=refresh).values()
         solvers = [s for s in solvers if all(p(s) for p in predicates)]
