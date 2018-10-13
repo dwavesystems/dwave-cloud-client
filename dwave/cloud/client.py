@@ -772,7 +772,7 @@ class Client(object):
             'gt': operator.gt,
             'gte': operator.ge,
             'eq': operator.eq,
-            'available': lambda prop, _: prop is not None,
+            'available': lambda prop, val: prop is not None if val else prop is None,
             'regex': lambda prop, val: re.match("^{}$".format(val), prop),
             # range operations
             'covers': covers_op,
@@ -800,7 +800,9 @@ class Client(object):
             elif name in solver.properties:
                 op = ops[opname or 'eq']
                 return op(solver.properties[name], val)
-            return False
+            else:
+                op = ops[opname or 'eq']
+                return op(solver.parameters.get(name), val) or op(solver.properties.get(name), val)
 
         predicates = [meta_predicate]
         for lhs, val in filters.items():

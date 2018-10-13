@@ -276,14 +276,22 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.solvers(name='solver[12]'), [self.solver1, self.solver2])
         self.assertSolvers(self.client.solvers(name='^solver(1|2)$'), [self.solver1, self.solver2])
 
-    def test_one_boolean(self):
-        self.assertSolvers(self.client.solvers(vfyc__available=True), [self.solver2, self.solver3])
-        self.assertSolvers(self.client.solvers(vfyc=True), [self.solver2])
-        self.assertSolvers(self.client.solvers(vfyc=False), [self.solver3])
-        self.assertSolvers(self.client.solvers(flux_biases__available=True), [self.solver2])
-        self.assertSolvers(self.client.solvers(flux_biases=True), [self.solver2])
+    def test_parameter_availability_check(self):
+        self.assertSolvers(self.client.solvers(postprocess__available=True), [self.solver1])
+        self.assertSolvers(self.client.solvers(postprocess=True), [self.solver1])
+        self.assertSolvers(self.client.solvers(parameters__contains='flux_biases'), [self.solver2])
+        self.assertSolvers(self.client.solvers(parameters__contains='num_reads'), self.solvers)
 
-    def test_boolean_combo(self):
+    def test_property_availability_check(self):
+        self.assertSolvers(self.client.solvers(vfyc__available=True), [self.solver2, self.solver3])
+        self.assertSolvers(self.client.solvers(vfyc__eq=True), [self.solver2])
+        self.assertSolvers(self.client.solvers(vfyc=True), [self.solver2])
+
+        self.assertSolvers(self.client.solvers(vfyc__available=False), [self.solver1])
+        self.assertSolvers(self.client.solvers(vfyc__eq=False), [self.solver3])
+        self.assertSolvers(self.client.solvers(vfyc=False), [self.solver3])
+
+    def test_availability_combo(self):
         self.assertSolvers(self.client.solvers(vfyc=False, flux_biases=True), [])
         self.assertSolvers(self.client.solvers(vfyc=True, flux_biases=True), [self.solver2])
 
