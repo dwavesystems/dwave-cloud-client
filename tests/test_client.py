@@ -198,6 +198,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "qubits": [0, 1, 2],
                 "couplers": [[0, 1], [0, 2], [1, 2]],
                 "num_qubits": 3,
+                "num_reads_range": [0, 100],
                 "parameters": {
                     "num_reads": "Number of samples to return.",
                     "postprocess": "either 'sampling' or 'optimization'"
@@ -213,6 +214,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "qubits": [0, 1, 2, 3, 4],
                 "couplers": [[0, 1], [0, 2], [1, 2], [2, 3], [3, 4]],
                 "num_qubits": 5,
+                "num_reads_range": [0, 200],
                 "parameters": {
                     "num_reads": "Number of samples to return.",
                     "flux_biases": "Supported ...",
@@ -229,6 +231,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "qubits": [0, 1],
                 "couplers": [[0, 1]],
                 "num_qubits": 7,
+                "num_reads_range": [0, 1000],
                 "parameters": {"num_reads": "Number of samples to return."},
                 "vfyc": False
             },
@@ -295,22 +298,60 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.solvers(vfyc=False, flux_biases=True), [])
         self.assertSolvers(self.client.solvers(vfyc=True, flux_biases=True), [self.solver2])
 
-    def test_int_range(self):
+    def test_relational_ops(self):
         self.assertSolvers(self.client.solvers(num_qubits=3), [self.solver1])
+        self.assertSolvers(self.client.solvers(num_qubits__eq=3), [self.solver1])
         self.assertSolvers(self.client.solvers(num_qubits=4), [])
         self.assertSolvers(self.client.solvers(num_qubits=5), [self.solver2])
 
-        self.assertSolvers(self.client.solvers(num_qubits__within=[3, 7]), self.solvers)
         self.assertSolvers(self.client.solvers(num_qubits__gte=2), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits__gte=5), [self.solver2, self.solver3])
+        self.assertSolvers(self.client.solvers(num_qubits__gt=5), [self.solver3])
+
         self.assertSolvers(self.client.solvers(num_qubits__lte=8), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits__lte=7), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits__lt=7), [self.solver1, self.solver2])
 
-        self.assertSolvers(self.client.solvers(num_qubits__within=(3, 7)), self.solvers)
-
+    def test_range_ops(self):
+        # value within range
+        self.assertSolvers(self.client.solvers(num_qubits__within=[3, 7]), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits__within=[3, 5]), [self.solver1, self.solver2])
         self.assertSolvers(self.client.solvers(num_qubits__within=[2, 4]), [self.solver1])
-        self.assertSolvers(self.client.solvers(num_qubits__gt=4), [self.solver2, self.solver3])
-
         self.assertSolvers(self.client.solvers(num_qubits__within=(2, 4)), [self.solver1])
-        self.assertSolvers(self.client.solvers(num_qubits__gt=4), [self.solver2, self.solver3])
+        self.assertSolvers(self.client.solvers(num_qubits__within=(4, 2)), [self.solver1])
+
+        # range within (covered by) range
+        self.assertSolvers(self.client.solvers(num_reads_range__within=(0, 500)), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.solvers(num_reads_range__within=(1, 500)), [])
+
+        # range covering a value (value included in range)
+        self.assertSolvers(self.client.solvers(num_reads_range__covers=0), self.solvers)
+        self.assertSolvers(self.client.solvers(num_reads_range__covers=150), [self.solver2, self.solver3])
+        self.assertSolvers(self.client.solvers(num_reads_range__covers=550), [self.solver3])
+        self.assertSolvers(self.client.solvers(num_reads_range__covers=1000), [self.solver3])
+        self.assertSolvers(self.client.solvers(num_reads_range__covers=1001), [])
+
+        # range covering a range
+        self.assertSolvers(self.client.solvers(num_reads_range__covers=(10, 90)), self.solvers)
+        self.assertSolvers(self.client.solvers(num_reads_range__covers=(110, 200)), [self.solver2, self.solver3])
+
+    def test_membership_ops(self):
+        # property contains
+        self.assertSolvers(self.client.solvers(supported_problem_types__contains="qubo"), self.solvers)
+        self.assertSolvers(self.client.solvers(supported_problem_types__contains="undef"), [])
+        self.assertSolvers(self.client.solvers(couplers__contains=[0, 1]), self.solvers)
+        self.assertSolvers(self.client.solvers(couplers__contains=[0, 2]), [self.solver1, self.solver2])
+
+        # property in
+        self.assertSolvers(self.client.solvers(num_qubits__in=[3, 5]), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.solvers(num_qubits__in=[7]), [self.solver3])
+        self.assertSolvers(self.client.solvers(num_qubits__in=[]), [])
+
+    def test_regex(self):
+        self.assertSolvers(self.client.solvers(num_reads__regex='.*number.*'), [])
+        self.assertSolvers(self.client.solvers(num_reads__regex='.*Number.*'), self.solvers)
+        self.assertSolvers(self.client.solvers(num_reads__regex='Number.*'), self.solvers)
+        self.assertSolvers(self.client.solvers(num_reads__regex='Number'), [])
 
     def test_range_boolean_combo(self):
         self.assertSolvers(self.client.solvers(num_qubits=3, vfyc=True), [])
