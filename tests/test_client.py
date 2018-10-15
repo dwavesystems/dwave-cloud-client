@@ -294,6 +294,10 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.solvers(vfyc__eq=False), [self.solver3])
         self.assertSolvers(self.client.solvers(vfyc=False), [self.solver3])
 
+        # non-existing params/props have value of None
+        self.assertSolvers(self.client.solvers(vfyc__eq=None), [self.solver1])
+        self.assertSolvers(self.client.solvers(vfyc=None), [self.solver1])
+
     def test_availability_combo(self):
         self.assertSolvers(self.client.solvers(vfyc=False, flux_biases=True), [])
         self.assertSolvers(self.client.solvers(vfyc=True, flux_biases=True), [self.solver2])

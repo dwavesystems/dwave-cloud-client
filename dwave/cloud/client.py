@@ -718,9 +718,20 @@ class Client(object):
             class.
 
         Examples:
-            Get all solvers not based on VFYC, with 2048 qubits::
+            Get all solvers based on VFYC, with 2048 qubits::
 
-                solver = client.solvers(vfyc=False, num_qubits=2048)
+                solver = client.solvers(vfyc=True, num_qubits=2048)
+                solver = client.solvers(vfyc__eq=True, num_qubits__eq=2048)
+
+            Get all solvers *not* based on VFYC, with 2048 qubits::
+
+                solver = client.solvers(vfyc__available=False, num_qubits=2048)
+
+            (identical to:
+
+                solver = client.solvers(vfyc__in=[False, None], num_qubits=2048)
+
+            because ``vfyc`` might not be exposed as solver property if equal `False`.)
 
             Get all solvers that have between 1024 and 2048 qubits::
 
@@ -740,6 +751,14 @@ class Client(object):
                 solver = client.solvers(online=True, name='solver[12]')[0]
                 solver = client.solvers(online=True, name='solver1|solver2')[0]
                 solver = client.solvers(online=True, chip_id__regex='solver[12]')[0]
+
+            Get all solvers that contain a coupler ``(0, 128)``::
+
+                solver = client.solvers(couplers__contains=[0, 128])
+
+            Get all solvers that support 1000 for ``num_reads``:
+
+                solver = client.solvers(num_reads_range__covers=1000)
         """
 
         def covers_op(prop, val):
