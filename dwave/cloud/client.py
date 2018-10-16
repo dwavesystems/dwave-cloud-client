@@ -664,7 +664,7 @@ class Client(object):
                 Ensures solver supports `parameter`. General operator form can
                 be used, but that usually doesn't make sense for parameters,
                 since values are human-readable descriptions. Default operator
-                if `available`.
+                is `available`.
 
             <property> (bool),
             <property>__eq (bool),
@@ -672,6 +672,9 @@ class Client(object):
                 Ensures the value of solver's `property`, after applying
                 `operator` equals the righthand side `value`. Default operator
                 is `eq`.
+
+            Note: if non-existing parameter/property name/key given, the default
+            operator is `eq`.
 
         Operators:
             available, lt, lte, gt, gte, eq, within, contains, regex
@@ -685,6 +688,8 @@ class Client(object):
         Common solver properties:
             num_qubits (int):
                 Number of qubits available.
+            num_active_qubits (int):
+                Number of active qubits. Less then or equal to `num_qubits`.
             vfyc (bool):
                 Should solver work on "virtual full-yield chip"?
             max_anneal_schedule_points (int):

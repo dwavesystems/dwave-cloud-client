@@ -209,6 +209,13 @@ class MockSolverLoading(unittest.TestCase):
         self.assertEqual(solver_object('dw2000').num_qubits, 3)
         self.assertFalse(solver_object('dw2000').has_flux_biases)
 
+        # test .num_qubits vs .num_actual_qubits
+        data = json.loads(solver_data('test'))
+        data['properties']['num_qubits'] = 7
+        solver = Solver(None, data)
+        self.assertEqual(solver.num_qubits, 7)
+        self.assertEqual(solver.num_active_qubits, 3)
+
         # test .is_vfyc
         data = json.loads(solver_data('test'))
         data['properties']['vfyc'] = 'error'
