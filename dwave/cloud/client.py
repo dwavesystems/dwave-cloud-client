@@ -636,7 +636,7 @@ class Client(object):
         """Returns a filtered list of solvers handled by this client.
 
         Apart from a few inferred features (`name`, `qpu`, `software`, and
-        `online`), filtering works similar to Django QuerySet filtering on all
+        `online`), filtering works similarly to Django QuerySet filtering on all
         available solver parameters/properties (use keyword arguments of form:
         `<name>__<operator>=<value>`)
 
@@ -732,6 +732,9 @@ class Client(object):
             Get all solvers based on VFYC, with 2048 qubits::
 
                 solver = client.solvers(vfyc=True, num_qubits=2048)
+
+            or, equivalently with::
+
                 solver = client.solvers(vfyc__eq=True, num_qubits__eq=2048)
 
             Get all solvers *not* based on VFYC, with 2048 qubits::
@@ -744,28 +747,11 @@ class Client(object):
 
             because ``vfyc`` might not be exposed as solver property if equal to `False`.)
 
-            Get all solvers that have between 1024 and 2048 qubits::
+            Get all solvers that contain a coupler between qubits 0 and 128, accept
+            flux biases and have at least 1000 qubits::
 
-                solvers = client.solvers(num_qubits__within=(1024, 2048))
-
-            Get all solvers that have at least 2000 qubits::
-
-                solvers = client.solvers(num_qubits__gte=2000)
-
-            Get the first QPU solver that accepts flux biases::
-
-                solver = client.solvers(qpu=True, flux_biases=True)[0]
-
-            Assuming only one of the two solvers (named ``solver1`` and ``solver2``)
-            can be online at once, return the one that is::
-
-                solver = client.solvers(online=True, name='solver[12]')[0]
-                solver = client.solvers(online=True, name='solver1|solver2')[0]
-                solver = client.solvers(online=True, chip_id__regex='solver[12]')[0]
-
-            Get all solvers that contain a coupler between qubits 0 and 128::
-
-                solver = client.solvers(couplers__contains=[0, 128])
+                solver = client.solvers(couplers__contains=[0, 128],
+                                        flux_biases=True, num_qubits__gte=1000)
 
             Get all solvers that support 1000 for ``num_reads``:
 
