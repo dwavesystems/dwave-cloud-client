@@ -278,6 +278,11 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.solvers(name__regex='solver[12]'), [self.solver1, self.solver2])
         self.assertSolvers(self.client.solvers(name__regex='^solver(1|2)$'), [self.solver1, self.solver2])
 
+    def test_num_qubits(self):
+        self.assertSolvers(self.client.solvers(num_qubits=5), [self.solver2])
+        self.assertSolvers(self.client.solvers(num_active_qubits=2), [self.solver3])
+        self.assertSolvers(self.client.solvers(num_active_qubits__in=[2, 3]), [self.solver1, self.solver3])
+
     def test_parameter_availability_check(self):
         self.assertSolvers(self.client.solvers(postprocess__available=True), [self.solver1])
         self.assertSolvers(self.client.solvers(postprocess=True), [self.solver1])
@@ -289,6 +294,10 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.solvers(vfyc__eq=True), [self.solver2])
         self.assertSolvers(self.client.solvers(vfyc=True), [self.solver2])
 
+        # inverse of vfyc=True
+        self.assertSolvers(self.client.solvers(vfyc__in=[False, None]), [self.solver1, self.solver3])
+
+        # vfyc unavailable or unadvertized
         self.assertSolvers(self.client.solvers(vfyc__available=False), [self.solver1])
         self.assertSolvers(self.client.solvers(vfyc__eq=False), [self.solver3])
         self.assertSolvers(self.client.solvers(vfyc=False), [self.solver3])

@@ -730,8 +730,8 @@ class Client(object):
                 num_qubits__within=(2000, 4000),    # = alternative to the above
                 num_active_qubits=1089,             # we are very particular about active qubit count
                 vfyc=True,                          # we require fully yielded Chimera
+                vfyc__in=[False, None],             # inverse of the above
                 vfyc__available=False,              # we want solvers that do not advertize the vfyc property
-                vfyc__in=[False, None],             # = alternative for the above
                 anneal_schedule=True,               # we need support for custom anneal schedule
                 max_anneal_schedule_points__gte=4,  # we need at least 4 points for our anneal schedule
                 num_reads_range__covers=1000,       # solver must support returning 1000 reads
