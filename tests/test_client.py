@@ -259,7 +259,6 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.solvers(), self.solvers)
 
     def test_online(self):
-        self.assertSolvers(self.client.solvers(online=None), self.solvers)
         self.assertSolvers(self.client.solvers(online=True), self.solvers)
         self.assertSolvers(self.client.solvers(online=False), [])
 
@@ -274,10 +273,10 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.solvers(name='solver2'), [self.solver2])
         self.assertSolvers(self.client.solvers(name='solver'), [])
         self.assertSolvers(self.client.solvers(name='olver1'), [])
-        self.assertSolvers(self.client.solvers(name='.*1'), [self.solver1])
-        self.assertSolvers(self.client.solvers(name='.*[12].*'), [self.solver1, self.solver2])
-        self.assertSolvers(self.client.solvers(name='solver[12]'), [self.solver1, self.solver2])
-        self.assertSolvers(self.client.solvers(name='^solver(1|2)$'), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.solvers(name__regex='.*1'), [self.solver1])
+        self.assertSolvers(self.client.solvers(name__regex='.*[12].*'), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.solvers(name__regex='solver[12]'), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.solvers(name__regex='^solver(1|2)$'), [self.solver1, self.solver2])
 
     def test_parameter_availability_check(self):
         self.assertSolvers(self.client.solvers(postprocess__available=True), [self.solver1])
