@@ -198,7 +198,11 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "qubits": [0, 1, 2],
                 "couplers": [[0, 1], [0, 2], [1, 2]],
                 "num_qubits": 3,
-                "parameters": {"num_reads": "Number of samples to return."}
+                "num_reads_range": [0, 100],
+                "parameters": {
+                    "num_reads": "Number of samples to return.",
+                    "postprocess": "either 'sampling' or 'optimization'"
+                }
             },
             "id": "solver1",
             "description": "A test solver 1",
@@ -210,6 +214,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "qubits": [0, 1, 2, 3, 4],
                 "couplers": [[0, 1], [0, 2], [1, 2], [2, 3], [3, 4]],
                 "num_qubits": 5,
+                "num_reads_range": [0, 200],
                 "parameters": {
                     "num_reads": "Number of samples to return.",
                     "flux_biases": "Supported ...",
@@ -220,13 +225,27 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             "id": "solver2",
             "description": "A test solver 2"
         })
-        self.solvers = [self.solver1, self.solver2]
+        self.solver3 = Solver(client=None, data={
+            "properties": {
+                "supported_problem_types": ["qubo", "ising"],
+                "qubits": [0, 1],
+                "couplers": [[0, 1]],
+                "num_qubits": 7,
+                "num_reads_range": [0, 1000],
+                "parameters": {"num_reads": "Number of samples to return."},
+                "vfyc": False
+            },
+            "id": "c4-sw_solver3",
+            "description": "A test of software solver"
+        })
+        self.solvers = [self.solver1, self.solver2, self.solver3]
 
         # mock client
         self.client = Client('endpoint', 'token')
         self.client._solvers = {
             self.solver1.id: self.solver1,
-            self.solver2.id: self.solver2
+            self.solver2.id: self.solver2,
+            self.solver3.id: self.solver3
         }
         self.client._all_solvers_ready = True
 
@@ -239,59 +258,123 @@ class FeatureBasedSolverSelection(unittest.TestCase):
     def test_default(self):
         self.assertSolvers(self.client.solvers(), self.solvers)
 
-    def test_one_boolean(self):
-        self.assertSolvers(self.client.solvers(vfyc=False), [self.solver1])
-        self.assertSolvers(self.client.solvers(vfyc=True), [self.solver2])
-        self.assertSolvers(self.client.solvers(flux_biases=False), [self.solver1])
-        self.assertSolvers(self.client.solvers(flux_biases=True), [self.solver2])
-
-    def test_boolean_combo(self):
-        self.assertSolvers(self.client.solvers(vfyc=False, flux_biases=True), [])
-        self.assertSolvers(self.client.solvers(vfyc=True, flux_biases=True), [self.solver2])
-
-    def test_int_range(self):
-        self.assertSolvers(self.client.solvers(num_qubits=3), [self.solver1])
-        self.assertSolvers(self.client.solvers(num_qubits=4), [])
-        self.assertSolvers(self.client.solvers(num_qubits=5), [self.solver2])
-
-        self.assertSolvers(self.client.solvers(num_qubits=[3, 5]), self.solvers)
-        self.assertSolvers(self.client.solvers(num_qubits=[2, None]), self.solvers)
-        self.assertSolvers(self.client.solvers(num_qubits=[None, 6]), self.solvers)
-
-        self.assertSolvers(self.client.solvers(num_qubits=(3, 5)), self.solvers)
-        self.assertSolvers(self.client.solvers(num_qubits=(2, None)), self.solvers)
-        self.assertSolvers(self.client.solvers(num_qubits=(None, 6)), self.solvers)
-
-        self.assertSolvers(self.client.solvers(num_qubits=[2, 4]), [self.solver1])
-        self.assertSolvers(self.client.solvers(num_qubits=[4, None]), [self.solver2])
-
-        self.assertSolvers(self.client.solvers(num_qubits=(2, 4)), [self.solver1])
-        self.assertSolvers(self.client.solvers(num_qubits=(4, None)), [self.solver2])
-
-    def test_range_boolean_combo(self):
-        self.assertSolvers(self.client.solvers(num_qubits=3, vfyc=True), [])
-        self.assertSolvers(self.client.solvers(num_qubits=[3, None], vfyc=True), [self.solver2])
-        self.assertSolvers(self.client.solvers(num_qubits=[None, 4], vfyc=True), [])
-        self.assertSolvers(self.client.solvers(num_qubits=[None, 4], flux_biases=False), [self.solver1])
-        self.assertSolvers(self.client.solvers(num_qubits=5, flux_biases=True), [self.solver2])
-
     def test_online(self):
-        self.assertSolvers(self.client.solvers(online=None), self.solvers)
+        self.assertSolvers(self.client.solvers(online=True), self.solvers)
         self.assertSolvers(self.client.solvers(online=False), [])
 
-    def test_anneal_schedule(self):
-        self.assertSolvers(self.client.solvers(anneal_schedule=None), self.solvers)
-        self.assertSolvers(self.client.solvers(anneal_schedule=True), [self.solver2])
+    def test_qpu_software(self):
+        self.assertSolvers(self.client.solvers(qpu=True), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.solvers(software=False), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.solvers(qpu=False), [self.solver3])
+        self.assertSolvers(self.client.solvers(software=True), [self.solver3])
 
     def test_name(self):
         self.assertSolvers(self.client.solvers(name='solver1'), [self.solver1])
         self.assertSolvers(self.client.solvers(name='solver2'), [self.solver2])
         self.assertSolvers(self.client.solvers(name='solver'), [])
         self.assertSolvers(self.client.solvers(name='olver1'), [])
-        self.assertSolvers(self.client.solvers(name='.*1'), [self.solver1])
-        self.assertSolvers(self.client.solvers(name='.*[12].*'), self.solvers)
-        self.assertSolvers(self.client.solvers(name='solver[12]'), self.solvers)
-        self.assertSolvers(self.client.solvers(name='^solver(1|2)$'), self.solvers)
+        self.assertSolvers(self.client.solvers(name__regex='.*1'), [self.solver1])
+        self.assertSolvers(self.client.solvers(name__regex='.*[12].*'), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.solvers(name__regex='solver[12]'), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.solvers(name__regex='^solver(1|2)$'), [self.solver1, self.solver2])
+
+    def test_num_qubits(self):
+        self.assertSolvers(self.client.solvers(num_qubits=5), [self.solver2])
+        self.assertSolvers(self.client.solvers(num_active_qubits=2), [self.solver3])
+        self.assertSolvers(self.client.solvers(num_active_qubits__in=[2, 3]), [self.solver1, self.solver3])
+
+    def test_parameter_availability_check(self):
+        self.assertSolvers(self.client.solvers(postprocess__available=True), [self.solver1])
+        self.assertSolvers(self.client.solvers(postprocess=True), [self.solver1])
+        self.assertSolvers(self.client.solvers(parameters__contains='flux_biases'), [self.solver2])
+        self.assertSolvers(self.client.solvers(parameters__contains='num_reads'), self.solvers)
+
+    def test_property_availability_check(self):
+        self.assertSolvers(self.client.solvers(vfyc__available=True), [self.solver2, self.solver3])
+        self.assertSolvers(self.client.solvers(vfyc__eq=True), [self.solver2])
+        self.assertSolvers(self.client.solvers(vfyc=True), [self.solver2])
+
+        # inverse of vfyc=True
+        self.assertSolvers(self.client.solvers(vfyc__in=[False, None]), [self.solver1, self.solver3])
+
+        # vfyc unavailable or unadvertized
+        self.assertSolvers(self.client.solvers(vfyc__available=False), [self.solver1])
+        self.assertSolvers(self.client.solvers(vfyc__eq=False), [self.solver3])
+        self.assertSolvers(self.client.solvers(vfyc=False), [self.solver3])
+
+        # non-existing params/props have value of None
+        self.assertSolvers(self.client.solvers(vfyc__eq=None), [self.solver1])
+        self.assertSolvers(self.client.solvers(vfyc=None), [self.solver1])
+
+    def test_availability_combo(self):
+        self.assertSolvers(self.client.solvers(vfyc=False, flux_biases=True), [])
+        self.assertSolvers(self.client.solvers(vfyc=True, flux_biases=True), [self.solver2])
+
+    def test_relational_ops(self):
+        self.assertSolvers(self.client.solvers(num_qubits=3), [self.solver1])
+        self.assertSolvers(self.client.solvers(num_qubits__eq=3), [self.solver1])
+        self.assertSolvers(self.client.solvers(num_qubits=4), [])
+        self.assertSolvers(self.client.solvers(num_qubits=5), [self.solver2])
+
+        self.assertSolvers(self.client.solvers(num_qubits__gte=2), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits__gte=5), [self.solver2, self.solver3])
+        self.assertSolvers(self.client.solvers(num_qubits__gt=5), [self.solver3])
+
+        self.assertSolvers(self.client.solvers(num_qubits__lte=8), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits__lte=7), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits__lt=7), [self.solver1, self.solver2])
+
+    def test_range_ops(self):
+        # value within range
+        self.assertSolvers(self.client.solvers(num_qubits__within=[3, 7]), self.solvers)
+        self.assertSolvers(self.client.solvers(num_qubits__within=[3, 5]), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.solvers(num_qubits__within=[2, 4]), [self.solver1])
+        self.assertSolvers(self.client.solvers(num_qubits__within=(2, 4)), [self.solver1])
+        self.assertSolvers(self.client.solvers(num_qubits__within=(4, 2)), [self.solver1])
+
+        # range within (covered by) range
+        self.assertSolvers(self.client.solvers(num_reads_range__within=(0, 500)), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.solvers(num_reads_range__within=(1, 500)), [])
+
+        # range covering a value (value included in range)
+        self.assertSolvers(self.client.solvers(num_reads_range__covers=0), self.solvers)
+        self.assertSolvers(self.client.solvers(num_reads_range__covers=150), [self.solver2, self.solver3])
+        self.assertSolvers(self.client.solvers(num_reads_range__covers=550), [self.solver3])
+        self.assertSolvers(self.client.solvers(num_reads_range__covers=1000), [self.solver3])
+        self.assertSolvers(self.client.solvers(num_reads_range__covers=1001), [])
+
+        # range covering a range
+        self.assertSolvers(self.client.solvers(num_reads_range__covers=(10, 90)), self.solvers)
+        self.assertSolvers(self.client.solvers(num_reads_range__covers=(110, 200)), [self.solver2, self.solver3])
+
+    def test_membership_ops(self):
+        # property contains
+        self.assertSolvers(self.client.solvers(supported_problem_types__contains="qubo"), self.solvers)
+        self.assertSolvers(self.client.solvers(supported_problem_types__contains="undef"), [])
+        self.assertSolvers(self.client.solvers(couplers__contains=[0, 1]), self.solvers)
+        self.assertSolvers(self.client.solvers(couplers__contains=[0, 2]), [self.solver1, self.solver2])
+
+        # property in
+        self.assertSolvers(self.client.solvers(num_qubits__in=[3, 5]), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.solvers(num_qubits__in=[7]), [self.solver3])
+        self.assertSolvers(self.client.solvers(num_qubits__in=[]), [])
+
+    def test_regex(self):
+        self.assertSolvers(self.client.solvers(num_reads__regex='.*number.*'), [])
+        self.assertSolvers(self.client.solvers(num_reads__regex='.*Number.*'), self.solvers)
+        self.assertSolvers(self.client.solvers(num_reads__regex='Number.*'), self.solvers)
+        self.assertSolvers(self.client.solvers(num_reads__regex='Number'), [])
+
+    def test_range_boolean_combo(self):
+        self.assertSolvers(self.client.solvers(num_qubits=3, vfyc=True), [])
+        self.assertSolvers(self.client.solvers(num_qubits__gte=3, vfyc=True), [self.solver2])
+        self.assertSolvers(self.client.solvers(num_qubits__lte=4, vfyc=True), [])
+        self.assertSolvers(self.client.solvers(num_qubits__within=(3, 6), flux_biases=True), [self.solver2])
+        self.assertSolvers(self.client.solvers(num_qubits=5, flux_biases=True), [self.solver2])
+
+    def test_anneal_schedule(self):
+        self.assertSolvers(self.client.solvers(anneal_schedule__available=True), [self.solver2])
+        self.assertSolvers(self.client.solvers(anneal_schedule=True), [self.solver2])
 
 
 if __name__ == '__main__':

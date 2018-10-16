@@ -157,7 +157,7 @@ class Solver(object):
     @property
     def is_vfyc(self):
         "Is this a virtual full-yield chip?"
-        return self.properties.get('vfyc', False) == True
+        return self.properties.get('vfyc') == True
 
     @property
     def is_online(self):
@@ -165,9 +165,14 @@ class Solver(object):
         return self.data.get('status', 'online').lower() == 'online'
 
     @property
-    def num_qubits(self):
+    def num_active_qubits(self):
         "The number of active (encoding) qubits."
         return len(self.nodes)
+
+    @property
+    def num_qubits(self):
+        "Nominal number of qubits on chip (includes active AND inactive)."
+        return self.properties.get('num_qubits')
 
     @property
     def has_flux_biases(self):
