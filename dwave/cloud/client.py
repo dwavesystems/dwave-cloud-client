@@ -657,6 +657,9 @@ class Client(object):
             refresh (bool, default=False):
                 Force refresh cached list of solvers/properties
 
+            **filters:
+                See `Filtering forms` and `Operators` below
+
         Filtering forms:
             <parameter> (bool),
             <parameter>__available (bool),
@@ -677,7 +680,9 @@ class Client(object):
             operator is `eq`.
 
         Operators:
-            available, lt, lte, gt, gte, eq, within, contains, regex
+            available, eq, lt, lte, gt, gte, regex,
+            covers, within,
+            in, contains
 
         Common solver parameters:
             flux_biases:
@@ -707,13 +712,14 @@ class Client(object):
                 vfyc=True,                          # we require fully yielded Chimera
                 anneal_schedule=True,               # we need support for custom anneal schedule
                 max_anneal_schedule_points__gte=4,  # we need at least 4 points for our anneal schedule
-                num_reads_range__contains=1000,     # solver must support returning 1000 reads
-                extended_j_range__contains=(-2, 2), # we need extended J range to contain (-2,2)
+                num_reads_range__covers=1000,       # solver must support returning 1000 reads
+                extended_j_range__covers=(-2, 2),   # we need extended J range to contain (-2,2)
+                couplings__contains=[0, 128],       # coupling (edge between) (0, 128) has to exist
                 chip_id__regex='DW_.*'              # chip id prefix must be DW_
             )
 
         Returns:
-            list[Solver]: List of all solvers that satisfy the above conditions.
+            list[Solver]: List of all solvers that satisfy the conditions.
 
         Note:
             Client subclasses (e.g. :class:`dwave.cloud.qpu.Client` or
@@ -732,11 +738,11 @@ class Client(object):
 
                 solver = client.solvers(vfyc__available=False, num_qubits=2048)
 
-            (identical to:
+            (identical to::
 
                 solver = client.solvers(vfyc__in=[False, None], num_qubits=2048)
 
-            because ``vfyc`` might not be exposed as solver property if equal `False`.)
+            because ``vfyc`` might not be exposed as solver property if equal to `False`.)
 
             Get all solvers that have between 1024 and 2048 qubits::
 
@@ -750,14 +756,14 @@ class Client(object):
 
                 solver = client.solvers(qpu=True, flux_biases=True)[0]
 
-            Assuming only one of the two solvers named ``solver1`` and ``solver2``
+            Assuming only one of the two solvers (named ``solver1`` and ``solver2``)
             can be online at once, return the one that is::
 
                 solver = client.solvers(online=True, name='solver[12]')[0]
                 solver = client.solvers(online=True, name='solver1|solver2')[0]
                 solver = client.solvers(online=True, chip_id__regex='solver[12]')[0]
 
-            Get all solvers that contain a coupler ``(0, 128)``::
+            Get all solvers that contain a coupler between qubits 0 and 128::
 
                 solver = client.solvers(couplers__contains=[0, 128])
 
@@ -783,7 +789,7 @@ class Client(object):
                 # val item within prop range?
                 return llo <= val <= lhi
 
-        def coveredby_op(prop, val):
+        def within_op(prop, val):
             """Is LHS `prop` (range or item) fully covered by RHS `val` (range)?"""
             try:
                 return covers_op(val, prop)
@@ -800,7 +806,7 @@ class Client(object):
             'regex': lambda prop, val: re.match("^{}$".format(val), prop),
             # range operations
             'covers': covers_op,
-            'within': coveredby_op,
+            'within': within_op,
             # membership tests
             'in': lambda prop, val: prop in val,
             'contains': lambda prop, val: val in prop
@@ -826,7 +832,7 @@ class Client(object):
                 return op(solver.properties[name], val)
             else:
                 op = ops[opname or 'eq']
-                return op(solver.parameters.get(name), val) or op(solver.properties.get(name), val)
+                return op(None, val)
 
         predicates = [meta_predicate]
         for lhs, val in filters.items():
