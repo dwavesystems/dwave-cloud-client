@@ -426,7 +426,7 @@ def get_default_config():
 
         # Solver name used for sampling. If defining the solver in config,
         # make sure that solver is provided on the endpoint used.
-        solver = DW_2000Q_2
+        solver = DW_2000Q_3
 
         # Proxy URL (including authentication credentials) that shall be used
         # for all requests to D-Wave API endpoint URL.
