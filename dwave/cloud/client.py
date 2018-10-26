@@ -737,7 +737,7 @@ class Client(object):
                 num_reads_range__covers=1000,       # solver must support returning 1000 reads
                 extended_j_range__covers=(-2, 2),   # we need extended J range to contain (-2,2)
                 couplings__contains=[0, 128],       # coupling (edge between) (0, 128) has to exist
-                name='DW_2000Q_2',                  # full solver name/id match
+                name='DW_2000Q_3',                  # full solver name/id match
                 name__regex='.*2000.*',             # partial/regex-based solver name match
                 chip_id__regex='DW_.*'              # chip id prefix must be DW_
             )
