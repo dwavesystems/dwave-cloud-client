@@ -479,11 +479,6 @@ class Client(object):
         self._solvers_lock = threading.RLock()
         self._all_solvers_ready = False
 
-        # Set the parameters for requests; disable SSL verification if needed
-        self._request_parameters = {}
-        if permissive_ssl:
-            self._request_parameters['verify'] = False
-
     def close(self):
         """Perform a clean shutdown.
 
