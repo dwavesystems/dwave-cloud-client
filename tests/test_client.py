@@ -371,6 +371,13 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.solvers(qubits__issuperset={0, 1}), self.solvers)
         self.assertSolvers(self.client.solvers(qubits__issuperset={1, 2}), [self.solver1, self.solver2])
 
+        # unhashable types
+        self.assertSolvers(self.client.solvers(couplers__issuperset=[[0, 1]]), self.solvers)
+        self.assertSolvers(self.client.solvers(couplers__issuperset={(0, 1)}), self.solvers)
+        self.assertSolvers(self.client.solvers(couplers__issuperset={(0, 1), (0, 2)}), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.solvers(couplers__issuperset={(0, 1), (0, 2), (2, 3)}), [self.solver2])
+        self.assertSolvers(self.client.solvers(couplers__issuperset={(0, 1), (0, 2), (2, 3), (0, 5)}), [])
+
     def test_regex(self):
         self.assertSolvers(self.client.solvers(num_reads__regex='.*number.*'), [])
         self.assertSolvers(self.client.solvers(num_reads__regex='.*Number.*'), self.solvers)

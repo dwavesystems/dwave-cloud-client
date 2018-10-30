@@ -769,6 +769,13 @@ class Client(object):
             except ValueError:
                 raise ValueError("2-element list/tuple range required for RHS value")
 
+        def _set(iterable):
+            """Like set(iterable), but works for lists as items in iterable."""
+            first = next(iter(iterable))
+            if isinstance(first, list):
+                return set(tuple(x) for x in iterable)
+            return set(iterable)
+
         # available filtering operators
         ops = {
             'lt': operator.lt,
@@ -785,8 +792,8 @@ class Client(object):
             'in': lambda prop, val: prop in val,
             'contains': lambda prop, val: val in prop,
             # set tests
-            'issubset': lambda prop, val: set(prop).issubset(val),
-            'issuperset': lambda prop, val: set(prop).issuperset(val),
+            'issubset': lambda prop, val: _set(prop).issubset(_set(val)),
+            'issuperset': lambda prop, val: _set(prop).issuperset(_set(val)),
         }
 
         # features available as `Solver` attribute/properties
