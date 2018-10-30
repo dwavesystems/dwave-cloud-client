@@ -359,6 +359,18 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.solvers(num_qubits__in=[7]), [self.solver3])
         self.assertSolvers(self.client.solvers(num_qubits__in=[]), [])
 
+    def test_set_ops(self):
+        # property issubset
+        self.assertSolvers(self.client.solvers(supported_problem_types__issubset=("qubo", "ising", "other")), self.solvers)
+        self.assertSolvers(self.client.solvers(supported_problem_types__issubset=["qubo", "ising"]), self.solvers)
+        self.assertSolvers(self.client.solvers(supported_problem_types__issubset=["ising", "qubo"]), self.solvers)
+        self.assertSolvers(self.client.solvers(supported_problem_types__issubset={"ising", "qubo"}), self.solvers)
+        self.assertSolvers(self.client.solvers(supported_problem_types__issubset=("unicorn", "ising", "other")), [])
+
+        # property issuperset
+        self.assertSolvers(self.client.solvers(qubits__issuperset={0, 1}), self.solvers)
+        self.assertSolvers(self.client.solvers(qubits__issuperset={1, 2}), [self.solver1, self.solver2])
+
     def test_regex(self):
         self.assertSolvers(self.client.solvers(num_reads__regex='.*number.*'), [])
         self.assertSolvers(self.client.solvers(num_reads__regex='.*Number.*'), self.solvers)

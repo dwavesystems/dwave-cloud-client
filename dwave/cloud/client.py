@@ -676,7 +676,8 @@ class Client(object):
         Operators:
             available, eq, lt, lte, gt, gte, regex,
             covers, within,
-            in, contains
+            in, contains,
+            issubset, issuperset
 
         Inferred features:
             name (str):
@@ -718,7 +719,8 @@ class Client(object):
             need to call :meth:`.solvers` on the base :class:`~dwave.cloud.client.Client`
             class.
 
-        Examples:
+        Examples::
+
             client.solvers(
                 num_qubits__gt=2000,                # we need more than 2000 q
                 num_qubits__lt=4000,                # .. but less than 4000 q
@@ -731,7 +733,12 @@ class Client(object):
                 max_anneal_schedule_points__gte=4,  # we need at least 4 points for our anneal schedule
                 num_reads_range__covers=1000,       # solver must support returning 1000 reads
                 extended_j_range__covers=(-2, 2),   # we need extended J range to contain (-2,2)
-                couplings__contains=[0, 128],       # coupling (edge between) (0, 128) has to exist
+                couplings__contains=[0, 128],       # coupling (edge between) (0,128) has to exist
+                couplings__issuperset=[[0,128], [0,4]],
+                                                    # two couplings required: (0,128) and (0,4)
+                qubits__issuperset={0, 4, 215},     # qubits 0, 4 and 215 have to exist
+                supported_problem_types__issubset={'ising', 'qubo'},
+                                                    # require both Ising and QUBO support
                 name='DW_2000Q_3',                  # full solver name/id match
                 name__regex='.*2000.*',             # partial/regex-based solver name match
                 chip_id__regex='DW_.*'              # chip id prefix must be DW_
@@ -776,7 +783,10 @@ class Client(object):
             'within': within_op,
             # membership tests
             'in': lambda prop, val: prop in val,
-            'contains': lambda prop, val: val in prop
+            'contains': lambda prop, val: val in prop,
+            # set tests
+            'issubset': lambda prop, val: set(prop).issubset(val),
+            'issuperset': lambda prop, val: set(prop).issuperset(val),
         }
 
         # features available as `Solver` attribute/properties
