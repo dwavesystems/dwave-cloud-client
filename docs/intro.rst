@@ -12,14 +12,23 @@ and scheduling for quantum annealing resources at D-Wave Systems.
 This package provides a minimal Python interface to that layer without
 compromising the quality of interactions and workflow.
 
+The D-Wave Cloud Client :class:`~dwave.cloud.solver.Solver` class enables low-level control of problem
+submission. It is used, for example, by the :std:doc:`dwave-system <system:index>`
+:class:`~dwave.system.samplers.DWaveSampler`, which enables quick incorporation
+of the D-Wave system as a sampler in your code.
+
+
 Configuration
 =============
 
 It's recommended you set up your D-Wave Cloud Client configuration through the
 :ref:`interactive CLI utility <interactiveCliConfiguration>`.
 
-D-Wave Cloud Client provides multiple options for configuring communication with
-a :term:`solver`:
+As described in Ocean Documentation's :std:doc:`Using a D-Wave System <oceandocs:overview/dwavesys>`,
+for your code to access remote D-Wave compute resources, you must configure
+communication through SAPI; for example, your code needs the SAPI URL and your API
+token for authentication. D-Wave Cloud Client provides multiple options for configuring
+the required information:
 
 * One or more locally saved :ref:`configuration files <configurationFiles>`.
 * :ref:`Environment variables <environmentVariables>`
@@ -32,10 +41,10 @@ These options can be flexibly used together.
 Configuration Files
 -------------------
 
-If a D-Wave Cloud Client configuration file is not specified when instantiating a
+If a D-Wave Cloud Client configuration file is not explicitly specified when instantiating a
 client or solver, auto-detection searches for candidate files in a number of standard
-directories, depending on your local system's operating system, you can list with the
-:func:`~dwave.cloud.config.get_configfile_paths` method.
+directories, depending on your local system's operating system. You can see the standard
+locations with the :func:`~dwave.cloud.config.get_configfile_paths` method.
 
 For example, on a Unix system, depending on its flavor, these might include (in order)::
 
@@ -44,11 +53,11 @@ For example, on a Unix system, depending on its flavor, these might include (in 
           ~/.config/dwave/dwave.conf
           ./dwave.conf
 
-while on Windows 7+, configuration files are expected to be located under::
+On Windows 7+, configuration files are expected to be located under::
 
       C:\\Users\\<username>\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf
 
-and on Mac OS X under::
+On Mac OS X::
 
      ~/Library/Application Support/dwave/dwave.conf
 
@@ -115,7 +124,7 @@ can be set in environment variables; for example:
 * ``DWAVE_API_TOKEN`` may select the API token.
 
 For details on supported environment variables and prioritizing between these and
-values set explicitly or through configuration file, see the
+values set explicitly or through a configuration file, see the
 :func:`~dwave.cloud.config.load_config` method.
 
 .. _interactiveCliConfiguration:
@@ -131,9 +140,8 @@ setting up a D-Wave Cloud Client configuration file. It also provides additional
 functionality; for example:
 
 * List and update existing configuration files on your system
-* Establish a connection to (ping) a solver based on a configuration file and
-  return timing information
-* Show configured solvers information
+* Establish a connection to (ping) a solver and return timing information
+* Show information on configured solvers
 
 Run *dwave* -\\-\ *help* for information on all the CLI options.
 
@@ -156,18 +164,18 @@ A :term:`solver` is a resource for solving problems. Solvers are responsible for
     - Adding problems to a client's submission queue
 
 Solvers that provide sampling for solving :term:`Ising` and :term:`QUBO` problems, such
-as a D-Wave 2000Q QPU or a software :term:`sampler` such as the
-`dimod <https://github.com/dwavesystems/dimod>`_ simulated annealing sampler,
-are typically remote resources. While the D-Wave Cloud Client
+as a D-Wave 2000Q :term:`sampler` :class:`~dwave.system.samplers.DWaveSampler` or software sampler
+:class:`~neal.sampler.SimulatedAnnealingSampler`, might be remote resources.
+While the D-Wave Cloud Client
 :class:`~dwave.cloud.solver.Solver` manages the submission of your problem,
-:class:`~dwave.cloud.client.Client` manages communication with the remote solver
+:class:`~dwave.cloud.client.Client` manages communication with remote solver
 resources, selecting and authenticating access to available solvers; for example,
 you can list all solvers available to a client with its
 :func:`~dwave.cloud.client.Client.get_solvers` method and select and return one with its
 :func:`~dwave.cloud.client.Client.get_solver` method.
 
-Preferred use is with a context manager (a :code:`with Client.from_config(...) as`
-construct) to ensure proper closure of all resources. The following example snippet
+Preferred use is with a context manager---a :code:`with Client.from_config(...) as`
+construct---to ensure proper closure of all resources. The following example snippet
 creates a client based on an auto-detected configuration file and instantiates
 a solver.
 
