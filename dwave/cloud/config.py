@@ -24,7 +24,183 @@ those parameters:
 * Environment variables
 * Direct setting of key values in functions
 
-These options can be flexibly used together.
+These options can be flexibly used together. The standard use is through
+the :func:`~dwave.cloud.client.Client.from_config` classmethod.
+
+Configuration values can be specified in multiple ways, ranked in the following
+order (with 1 the highest ranked):
+
+1. Values specified as keyword arguments
+2. Values specified as environment variables
+3. Values specified in the configuration file
+
+Configuration files comply with standard Windows INI-like format,
+parsable with Python's :mod:`configparser`. An optional ``defaults`` section
+provides default key-value pairs for all other sections. User-defined key-value
+pairs (unrecognized keys) are passed through to the client.
+
+Typically configuration files are created, inspected, and changed using interactive
+CLI commands from your system's console, such as :code:`dwave config create` and
+:code:`dwave config inspect` (run :code:`dwave --help` for information on CLI options).
+
+Environment variables:
+
+    ``DWAVE_CONFIG_FILE``: Configuration file path.
+
+    ``DWAVE_PROFILE``: Name of profile (section).
+
+    ``DWAVE_API_CLIENT``: API client class. Supported values are ``qpu`` or ``sw``.
+
+    ``DWAVE_API_ENDPOINT``: API endpoint URL.
+
+    ``DWAVE_API_TOKEN``: API authorization token.
+
+    ``DWAVE_API_SOLVER``: Default solver.
+
+    ``DWAVE_API_PROXY``: URL for proxy connections to D-Wave API.
+
+Examples:
+    The following are typical examples of using :func:`~dwave.cloud.client.Client.from_config`
+    to create a configured client.
+
+    This first example initializes :class:`~dwave.cloud.client.Client` from an
+    explicitly specified configuration file, "~/jane/my_path_to_config/my_cloud_conf.conf"::
+
+        [defaults]
+        endpoint = https://url.of.some.dwavesystem.com/sapi
+        client = qpu
+        token = ABC-123456789123456789123456789
+
+        [dw2000]
+        solver = EXAMPLE_2000Q_SYSTEM
+        token = DEF-987654321987654321987654321
+
+    The example code below creates a client object that connects to a D-Wave QPU,
+    using :class:`dwave.cloud.qpu.Client` and ``EXAMPLE_2000Q_SYSTEM`` as a default solver.
+
+    >>> from dwave.cloud import Client
+    >>> client = Client.from_config(config_file='~/jane/my_path_to_config/my_cloud_conf.conf')  # doctest: +SKIP
+    >>> # code that uses client
+    >>> client.close()
+
+    This second example auto-detects a configuration file on the local system following the
+    user/system configuration paths of :func:`get_configfile_paths`. It passes through
+    to the instantiated client an unrecognized key-value pair my_param=`my_value`.
+
+    >>> from dwave.cloud import Client
+    >>> client = Client.from_config(my_param=`my_value`)
+    >>> # code that uses client
+    >>> client.close()
+
+    This third example instantiates two clients, for managing both QPU and software
+    solvers. Common key-value pairs are taken from the defaults section of a shared
+    configuration file::
+
+        [defaults]
+        endpoint = https://url.of.some.dwavesystem.com/sapi
+        client = qpu
+
+        [dw2000A]
+        solver = EXAMPLE_2000Q_SYSTEM_A
+        token = ABC-123456789123456789123456789
+
+        [sw_solver]
+        client = sw
+        solver = c4-sw_sample
+        endpoint = https://url.of.some.software.resource.com/my_if
+        token = DEF-987654321987654321987654321
+
+        [dw2000B]
+        solver = EXAMPLE_2000Q_SYSTEM_B
+        proxy = http://user:pass@myproxy.com:8080/
+        token = XYZ-0101010100112341234123412341234
+
+    The example code below creates client objects for two QPU solvers (at the
+    same URL but each with its own solver ID and token) and one software solver.
+
+    >>> from dwave.cloud import Client
+    >>> client_qpu1 = Client.from_config(profile='dw2000A')    # doctest: +SKIP
+    >>> client_qpu1 = Client.from_config(profile='dw2000B')    # doctest: +SKIP
+    >>> client_sw1 = Client.from_config(profile='sw_solver')   # doctest: +SKIP
+    >>> client_qpu1.default_solver   # doctest: +SKIP
+    u'EXAMPLE_2000Q_SYSTEM_A'
+    >>> client_qpu2.endpoint   # doctest: +SKIP
+    u'https://url.of.some.dwavesystem.com/sapi'
+    >>> # code that uses client
+    >>> client_qpu1.close() # doctest: +SKIP
+    >>> client_qpu2.close() # doctest: +SKIP
+    >>> client_sw1.close() # doctest: +SKIP
+
+    This fourth example loads configurations auto-detected in more than one configuration
+    file, with the higher priority file (in the current working directory) supplementing
+    and overriding values from the lower priority user-local file. After instantiation,
+    an endpoint from the default section and client from the profile section is provided
+    from the user-local ``/usr/local/share/dwave/dwave.conf`` file::
+
+        [defaults]
+        endpoint = https://int.se.dwavesystems.com/sapi
+
+        [dw2000]
+        client = qpu
+        token = ABC-123456789123456789123456789
+
+    A solver is supplemented from the file in the current working directory, which also
+    overrides the token value. ``./dwave.conf`` is the file in the current directory::
+
+        [dw2000]
+        solver = EXAMPLE_2000Q_SYSTEM_A
+        token = DEF-987654321987654321987654321
+
+    >>> from dwave.cloud import Client
+    >>> client = Client.from_config()
+    >>> client.default_solver   # doctest: +SKIP
+    u'EXAMPLE_2000Q_SYSTEM_A'
+    >>> client.endpoint  # doctest: +SKIP
+    u'https://int.se.dwavesystems.com/sapi'
+    >>> client.token  # doctest: +SKIP
+    u'DEF-987654321987654321987654321'
+    >>> # code that uses client
+    >>> client.close() # doctest: +SKIP
+
+    The next example uses :func:`~dwave.cloud.config.load_config` to load profile values.
+    **Most users do not need to use this method.** It loads from the following configuration
+    file, dwave_c.conf, located in the current working directory, and specified explicitly::
+
+        [defaults]
+        endpoint = https://url.of.some.dwavesystem.com/sapi
+        client = qpu
+
+        [dw2000A]
+        client = sw
+        token = ABC-123456789123456789123456789
+        solver = EXAMPLE_2000Q
+
+        [dw2000B]
+        client = qpu
+        token = DEF-987654321987654321987654321
+
+    This configuration file contains two profiles in addition to the defaults section.
+    In the following example code, first no profile is specified, and the first profile
+    after the defaults section is loaded with the solver overridden by the environment
+    variable. Next, the second profile is selected
+    with the explicitly named solver overriding the environment variable setting.
+
+    >>> import dwave.cloud as dc
+    >>> import os
+    >>> os.environ['DWAVE_API_SOLVER'] = 'EXAMPLE_2000Q_SYSTEM'   # doctest: +SKIP
+    >>> dc.config.load_config("./dwave_c.conf")   # doctest: +SKIP
+    {'client': u'sw',
+     'endpoint': u'https://url.of.some.dwavesystem.com/sapi',
+     'proxy': None,
+     'solver': 'EXAMPLE_2000Q_SYSTEM',
+     'token': u'ABC-123456789123456789123456789'}
+    >>> dc.config.load_config("./dwave_c.conf", profile='dw2000B', solver='Solver3')   # doctest: +SKIP
+    {'client': u'qpu',
+     'endpoint': u'https://url.of.some.dwavesystem.com/sapi',
+     'proxy': None,
+     'solver': 'Solver3',
+     'token': u'DEF-987654321987654321987654321'}
+
 """
 
 import os
@@ -439,17 +615,14 @@ def load_config(config_file=None, profile=None, client=None,
                 endpoint=None, token=None, solver=None, proxy=None):
     """Load D-Wave Cloud Client configuration based on a configuration file.
 
-    Configuration files comply with standard Windows INI-like format,
-    parsable with Python's :mod:`configparser`. An optional ``defaults`` section
-    provides default key-value pairs for all other sections. User-defined key-value
-    pairs (unrecognized keys) are passed through to the client.
-
     Configuration values can be specified in multiple ways, ranked in the following
     order (with 1 the highest ranked):
 
     1. Values specified as keyword arguments in :func:`load_config()`
     2. Values specified as environment variables
     3. Values specified in the configuration file
+
+    Configuration-file format is described in :mod:`dwave.cloud.config`.
 
     If the location of the configuration file is not specified, auto-detection
     searches for existing configuration files in the standard directories
@@ -467,60 +640,39 @@ def load_config(config_file=None, profile=None, client=None,
     file is not explicitly specified, detected on the system, or defined via
     an environment variable.
 
-    Environment variables:
+    Environment variables: ``DWAVE_CONFIG_FILE``, ``DWAVE_PROFILE``, ``DWAVE_API_CLIENT``,
+    ``DWAVE_API_ENDPOINT``, ``DWAVE_API_TOKEN``, ``DWAVE_API_SOLVER``, ``DWAVE_API_PROXY``.
 
-        ``DWAVE_CONFIG_FILE``:
-            Configuration file path used if no configuration file is specified.
-
-        ``DWAVE_PROFILE``:
-            Name of profile (section) to use if no profile is specified.
-
-        ``DWAVE_API_CLIENT``:
-            API client class used if no client is specified. Supported values are
-            ``qpu`` or ``sw``.
-
-        ``DWAVE_API_ENDPOINT``:
-            API endpoint URL used if no endpoint is specified.
-
-        ``DWAVE_API_TOKEN``:
-            API authorization token used if no token is specified.
-
-        ``DWAVE_API_SOLVER``:
-            Default solver used if no solver is specified.
-
-        ``DWAVE_API_PROXY``:
-            URL for proxy connections to D-Wave API used if no proxy is specified.
+    Environment variables are described in :mod:`dwave.cloud.config`.
 
     Args:
 
         config_file (str/[str]/None/False/True, default=None):
             Path to configuration file(s).
 
-            If ``None``, the value is taken from ``DWAVE_CONFIG_FILE`` environment
+            If `None`, the value is taken from `DWAVE_CONFIG_FILE` environment
             variable if defined. If the environment variable is undefined or empty,
             auto-detection searches for existing configuration files in the standard
             directories of :func:`get_configfile_paths`.
 
-            If ``False``, loading from file(s) is skipped.
-
-            If ``True``, forces auto-detection (regardless of the ``DWAVE_CONFIG_FILE``
-            environment variable).
+            If `False`, loading from file(s) is skipped; if `True`, forces auto-detection
+            (regardless of the `DWAVE_CONFIG_FILE` environment variable).
 
         profile (str, default=None):
             Profile name (name of the profile section in the configuration file).
 
-            If undefined, inferred from ``DWAVE_PROFILE`` environment variable if
+            If undefined, inferred from `DWAVE_PROFILE` environment variable if
             defined. If the environment variable is undefined or empty, a profile is
             selected in the following order:
 
             1. From the default section if it includes a profile key.
             2. The first section (after the default section).
-            3. If no other section is defined besides ``[defaults]``, the defaults
+            3. If no other section is defined besides `[defaults]`, the defaults
                section is promoted and selected.
 
         client (str, default=None):
-            Client type used for accessing the API. Supported values are ``qpu``
-            for :class:`dwave.cloud.qpu.Client` and ``sw`` for
+            Client type used for accessing the API. Supported values are `qpu
+            for :class:`dwave.cloud.qpu.Client` and `sw` for
             :class:`dwave.cloud.sw.Client`.
 
         endpoint (str, default=None):
@@ -544,7 +696,7 @@ def load_config(config_file=None, profile=None, client=None,
             Mapping of configuration keys to values for the profile
             (section), as read from the configuration file and optionally overridden by
             environment values and specified keyword arguments.
-            Always contains the ``client``, ``endpoint``, ``token``, ``solver``, and ``proxy``
+            Always contains the `client`, `endpoint`, `token`, `solver`, and `proxy`
             keys.
 
     Raises:
@@ -558,43 +710,7 @@ def load_config(config_file=None, profile=None, client=None,
             Config file parse failed.
 
     Examples
-       This example loads profile values from the following configuration file, dwave_c.conf,
-       located in the current working directory, and specified explicitly::
-
-           [defaults]
-           endpoint = https://url.of.some.dwavesystem.com/sapi
-           client = qpu
-
-           [dw2000A]
-           client = sw
-           token = ABC-123456789123456789123456789
-           solver = EXAMPLE_2000Q
-
-           [dw2000B]
-           client = qpu
-           token = DEF-987654321987654321987654321
-
-       This configuration file contains two profiles in addition to the defaults section.
-       In the following example code, first no profile is specified, and the first profile
-       after the defaults section is loaded with the solver overridden by the environment
-       variable. Next, the second profile is selected
-       with the explicitly named solver overriding the environment variable setting.
-
-       >>> import dwave.cloud as dc
-       >>> import os
-       >>> os.environ['DWAVE_API_SOLVER'] = 'EXAMPLE_2000Q_SYSTEM'   # doctest: +SKIP
-       >>> dc.config.load_config("./dwave_c.conf")   # doctest: +SKIP
-       {'client': u'sw',
-        'endpoint': u'https://url.of.some.dwavesystem.com/sapi',
-        'proxy': None,
-        'solver': 'EXAMPLE_2000Q_SYSTEM',
-        'token': u'ABC-123456789123456789123456789'}
-       >>> dc.config.load_config("./dwave_c.conf", profile='dw2000B', solver='Solver3')   # doctest: +SKIP
-       {'client': u'qpu',
-        'endpoint': u'https://url.of.some.dwavesystem.com/sapi',
-        'proxy': None,
-        'solver': 'Solver3',
-        'token': u'DEF-987654321987654321987654321'}
+        Additional examples are given in :mod:`dwave.cloud.config`.
 
        This example loads the configuration from an auto-detected configuration file
        in the home directory of a Windows system user.
