@@ -235,8 +235,8 @@ class Future(object):
             the third is still in progress. (A more typical approach would use something
             like :code:`first = next(Future.as_completed(computation))` instead.)
 
-            >>> from dwave.cloud import Client
-            >>> client = Client.from_config()
+            >>> import dwave.cloud as dc
+            >>> client = dc.Client.from_config()
             >>> solver = client.get_solver()
             >>> u, v = next(iter(solver.edges))
             >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
@@ -327,8 +327,8 @@ class Future(object):
             for differing numers of samples, and yields timing information for each job
             as it completes.
 
-            >>> from dwave.cloud import Client
-            >>> client = Client.from_config()
+            >>> import dwave.cloud as dc
+            >>> client = dc.Client.from_config()
             >>> solver = client.get_solver()
             >>> u, v = next(iter(solver.edges))
             >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}

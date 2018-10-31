@@ -453,7 +453,7 @@ class Client(object):
         return True
 
     def get_solvers(self, refresh=False):
-        """List all solvers this client can provide and load solvers' data.
+        """List all solvers this client can provide, and load solvers' data.
 
         Makes a blocking web call to `{endpoint}/solvers/remote/``, where `{endpoint}`
         is a URL configured for the client, caches the result,
