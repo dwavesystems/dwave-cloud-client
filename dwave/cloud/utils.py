@@ -247,3 +247,60 @@ class CLIError(Exception):
     def __init__(self, message, code):
         super(CLIError, self).__init__(message)
         self.code = code
+
+
+class cached(object):
+    """Caching decorator with max-age/expiry, forced refresh, and
+    per-arguments-combo keys.
+
+    Example:
+        Cache for 5 minutes::
+
+            @cached(maxage=300)
+            def get_solvers(**features):
+                return requests.get(...)
+
+        Populate the cache on the first hit for a specific arguments combination::
+
+            get_solvers(name='asd', count=5)
+
+        Cache hit (note a different ordering of arguments)::
+
+            get_solvers(count=5, name='asd')
+
+        Not in cache::
+
+            get_solvers(count=10, name='asd')
+
+        But cache is refreshed, even on a hit, if ``refresh_=True``::
+
+            get_solvers(count=5, name='asd', refresh_=True)
+
+    """
+
+    def argshash(self, args, kwargs):
+        "Hash mutable arguments' containers with immutable keys and values."
+        a = [hash(v) for v in args]
+        b = sorted((hash(k), hash(v)) for k, v in kwargs.items())
+        return hash(repr(a) + repr(b))
+
+    def __init__(self, maxage=None):
+        self.maxage = maxage
+        self.cache = {}
+
+    def __call__(self, fn):
+        @wraps(fn)
+        def wrapper(*args, refresh_=False, **kwargs):
+            key = self.argshash(args, kwargs)
+            data = self.cache.get(key, {})
+            now = epochnow()
+
+            if not refresh_ and data.get('expires', 0) > now:
+                return data.get('val')
+
+            val = fn(*args, **kwargs)
+            self.cache[key] = dict(expires=now+self.maxage, val=val)
+
+            return val
+
+        return wrapper
