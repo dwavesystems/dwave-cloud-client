@@ -194,6 +194,20 @@ class TestCachedDecorator(unittest.TestCase):
             self.assertEqual(f(), 1)
             self.assertEqual(f(), 2)
 
+    def test_exceptions(self):
+        counter = count(0)
+
+        @cached()
+        def f():
+            # raises ZeroDivisionError only on first call
+            # we do not want to cache that!
+            return 1 / next(counter)
+
+        with mock.patch('dwave.cloud.utils.epochnow', lambda: 0):
+            self.assertRaises(ZeroDivisionError, f)
+            self.assertEqual(f(), 1)
+            self.assertEqual(f(), 0.5)
+
 
 if __name__ == '__main__':
     unittest.main()
