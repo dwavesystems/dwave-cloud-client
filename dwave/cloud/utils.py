@@ -285,7 +285,7 @@ class cached(object):
         return hash(repr(a) + repr(b))
 
     def __init__(self, maxage=None):
-        self.maxage = maxage
+        self.maxage = maxage or 0
         self.cache = {}
 
     def __call__(self, fn):
