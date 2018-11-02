@@ -144,6 +144,19 @@ class TestCachedDecorator(unittest.TestCase):
             self.assertEqual(f(2), 6)
             self.assertEqual(f(1), 3)
 
+    def test_args_collision(self):
+        counter = count()
+
+        @cached(maxage=300)
+        def f(*a, **b):
+            return next(counter)
+
+        with mock.patch('dwave.cloud.utils.epochnow', lambda: 0):
+            # NB: in python2, without hash seed randomization,
+            # hash('\0B') == hash('\0\0C')
+            self.assertEqual(f(x='\0B'), 0)
+            self.assertEqual(f(x='\0\0C'), 1)
+
     def test_expiry(self):
         counter = count()
 

@@ -280,9 +280,9 @@ class cached(object):
 
     def argshash(self, args, kwargs):
         "Hash mutable arguments' containers with immutable keys and values."
-        a = [hash(v) for v in args]
-        b = sorted((hash(k), hash(v)) for k, v in kwargs.items())
-        return hash(repr(a) + repr(b))
+        a = repr(args)
+        b = repr(sorted((repr(k), repr(v)) for k, v in kwargs.items()))
+        return a + b
 
     def __init__(self, maxage=None):
         self.maxage = maxage or 0
@@ -290,10 +290,14 @@ class cached(object):
 
     def __call__(self, fn):
         @wraps(fn)
-        def wrapper(*args, refresh_=False, **kwargs):
+        def wrapper(*args, **kwargs):
+            refresh_ = kwargs.get('refresh_', False)
+            if 'refresh_' in kwargs:
+                del kwargs['refresh_']
+            now = epochnow()
+
             key = self.argshash(args, kwargs)
             data = self.cache.get(key, {})
-            now = epochnow()
 
             if not refresh_ and data.get('expires', 0) > now:
                 return data.get('val')
