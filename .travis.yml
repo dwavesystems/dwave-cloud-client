@@ -31,8 +31,6 @@ matrix:
           language: generic
           env: TOXENV=py36
           before_install:
-            - brew update
-            - brew upgrade python
             - pip3 install virtualenv
             - virtualenv env -p python3
             - source env/bin/activate
@@ -41,7 +39,6 @@ matrix:
           language: generic
           env: TOXENV=py27
           before_install:
-            - brew update
             - pip install virtualenv
             - virtualenv env -p python2
             - source env/bin/activate
