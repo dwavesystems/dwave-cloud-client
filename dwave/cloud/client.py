@@ -575,7 +575,7 @@ class Client(object):
             raise SolverAuthenticationError
 
         if name is not None and response.status_code == 404:
-            raise KeyError("No solver with name={!r} available".format(name))
+            raise SolverNotFoundError("No solver with name={!r} available".format(name))
 
         response.raise_for_status()
         data = response.json()
@@ -583,7 +583,7 @@ class Client(object):
         if name is not None:
             data = [data]
 
-        _LOGGER.debug("Received solver data for %d solvers.", len(data))
+        _LOGGER.debug("Received solver data for %d solver(s).", len(data))
         _LOGGER.trace("Solver data received for solver name=%r: %r", name, data)
 
         solvers = {}
@@ -844,12 +844,21 @@ class Client(object):
             propname, opname = (lhs.rsplit('__', 1) + [None])[:2]
             predicates.append(partial(predicate, name=propname, opname=opname, val=val))
 
-        solvers = self.get_solvers(refresh=refresh).values()
+        _LOGGER.debug("Filtering solvers with predicates=%r", predicates)
+
+        # optimization for case when exact solver name/id is known:
+        # we can fetch only that solver
+        # NOTE: in future, complete feature-based filtering will be on server-side
+        query = dict(refresh_=refresh)
+        if 'name' in filters:
+            query['name'] = filters['name']
+
+        solvers = self._fetch_solvers(**query).values()
         solvers = [s for s in solvers if all(p(s) for p in predicates)]
         solvers.sort(key=operator.attrgetter('id'))
         return solvers
 
-    def get_solver(self, name=None, features=None, refresh=False):
+    def get_solver(self, name=None, refresh=False, **features):
         """Load the configuration for a single solver.
 
         Makes a blocking web call to `{endpoint}/solvers/remote/{solver_name}/`, where `{endpoint}`
@@ -862,10 +871,9 @@ class Client(object):
                 If default solver is not configured, ``None`` returns the first available
                 solver in ``Client``'s class (QPU/software/base).
 
-            features (dict, optional):
+            **features (keyword arguments, optional):
                 Dictionary of features this solver has to have. For a list of
                 feature names and values, see: :meth:`~dwave.cloud.client.Client.solvers`.
-                Specifying the ``name`` parameter overrides the ``feature`` parameter.
                 To require a (full or partial) name match, use the ``features`` parameter
                 to specify a value for its ``name`` key.
 
@@ -897,28 +905,22 @@ class Client(object):
             >>> client.close() # doctest: +SKIP
 
         """
-        _LOGGER.debug("Looking for solver with name=%r or features=%r", name, features)
+        _LOGGER.debug("Requested a solver that best matches features=%r", features)
 
+        # backward compatibility: name as the first feature
         if name is not None:
-            return self._fetch_solvers(name=name, refresh_=refresh)[name]
+            features.setdefault('name', name)
 
-        else:
-            if features is not None:
-                # get the first solver that satisfies all features
-                try:
-                    return self.solvers(**features)[0]
-                except IndexError:
-                    raise SolverError("No solvers with the required features available")
+        # in absence of other features, config/env solver name is used
+        if not features and self.default_solver:
+            features['name'] = self.default_solver
 
-            else:
-                if self.default_solver:
-                    return self._fetch_solvers(name=self.default_solver, refresh_=refresh)[self.default_solver]
-                else:
-                    # get the first available solver
-                    try:
-                        return self.solvers(online=True)[0]
-                    except IndexError:
-                        raise SolverError("No solvers available this client can handle")
+        # get the first solver that satisfies all features
+        try:
+            _LOGGER.debug("Fetching solvers according to features=%r", features)
+            return self.solvers(refresh=refresh, **features)[0]
+        except IndexError:
+            raise SolverNotFoundError("No solvers with the required features available")
 
     def _submit(self, body, future):
         """Enqueue a problem for submission to the server.

@@ -27,7 +27,8 @@ from dwave.cloud.client import Client, Solver
 from dwave.cloud.qpu import Client as QPUClient
 from dwave.cloud.sw import Client as SoftwareClient
 from dwave.cloud.exceptions import (
-    InvalidAPIResponseError, ConfigFileReadError, ConfigFileParseError)
+    InvalidAPIResponseError, ConfigFileReadError, ConfigFileParseError,
+    SolverError, SolverNotFoundError)
 from dwave.cloud.config import legacy_load_config, load_config
 from dwave.cloud.testing import mock, iterable_mock_open
 
@@ -144,8 +145,9 @@ class MockSolverLoading(unittest.TestCase):
 
                 # modify cached solver and re-fetch it
                 solver.id = 'different-solver'
-                # cached solver is returned?
-                self.assertEqual(client.get_solver(solver_name, refresh=False).id, solver.id)
+                # cached solver name doesn't match, so it won't be returned
+                with self.assertRaises(SolverError):
+                    client.get_solver(solver_name, refresh=False)
                 # cache is refreshed?
                 self.assertEqual(client.get_solver(solver_name, refresh=True).id, solver_name)
 
@@ -175,7 +177,7 @@ class MockSolverLoading(unittest.TestCase):
         with requests_mock.mock() as m:
             m.get(requests_mock.ANY, status_code=404)
             with Client(url, token) as client:
-                with self.assertRaises(KeyError):
+                with self.assertRaises(SolverNotFoundError):
                     client.get_solver(solver_name)
 
     def test_load_solver_missing_data(self):

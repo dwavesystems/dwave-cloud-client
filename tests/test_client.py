@@ -26,7 +26,8 @@ import requests.exceptions
 from dwave.cloud.config import load_config
 from dwave.cloud.client import Client
 from dwave.cloud.solver import Solver
-from dwave.cloud.exceptions import SolverAuthenticationError, SolverError
+from dwave.cloud.exceptions import (
+    SolverAuthenticationError, SolverError, SolverNotFoundError)
 from dwave.cloud.testing import mock
 import dwave.cloud
 
@@ -92,7 +93,7 @@ class SolverLoading(unittest.TestCase):
     def test_load_bad_solvers(self):
         """Try to load a nonexistent solver."""
         with Client(**config) as client:
-            with self.assertRaises(KeyError):
+            with self.assertRaises(SolverNotFoundError):
                 client.get_solver("not-a-solver")
 
     def test_load_any_solver(self):
