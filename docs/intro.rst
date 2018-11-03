@@ -12,16 +12,25 @@ and scheduling for quantum annealing resources at D-Wave Systems.
 This package provides a minimal Python interface to that layer without
 compromising the quality of interactions and workflow.
 
+The D-Wave Cloud Client :class:`~dwave.cloud.solver.Solver` class enables low-level control of problem
+submission. It is used, for example, by the :std:doc:`dwave-system <system:index>`
+:class:`~dwave.system.samplers.DWaveSampler`, which enables quick incorporation
+of the D-Wave system as a sampler in your code.
+
+
 Configuration
 =============
 
 It's recommended you set up your D-Wave Cloud Client configuration through the
 :ref:`interactive CLI utility <interactiveCliConfiguration>`.
 
-D-Wave Cloud Client provides multiple options for configuring communication with
-a :term:`solver`:
+As described in the :std:doc:`Using a D-Wave System <oceandocs:overview/dwavesys>` section
+of Ocean Documentation, for your code to access remote D-Wave compute resources, you must
+configure communication through SAPI; for example, your code needs the SAPI URL and your API
+token for authentication. D-Wave Cloud Client provides multiple options for configuring
+the required information:
 
-* One or more locally saved :ref:`configuration files <configurationFiles>`.
+* One or more locally saved :ref:`configuration files <configurationFiles>`
 * :ref:`Environment variables <environmentVariables>`
 * Direct setting of key values in functions
 
@@ -32,10 +41,10 @@ These options can be flexibly used together.
 Configuration Files
 -------------------
 
-If a D-Wave Cloud Client configuration file is not specified when instantiating a
+If a D-Wave Cloud Client configuration file is not explicitly specified when instantiating a
 client or solver, auto-detection searches for candidate files in a number of standard
-directories, depending on your local system's operating system, you can list with the
-:func:`~dwave.cloud.config.get_configfile_paths` method.
+directories, depending on your local system's operating system. You can see the standard
+locations with the :func:`~dwave.cloud.config.get_configfile_paths` method.
 
 For example, on a Unix system, depending on its flavor, these might include (in order)::
 
@@ -44,11 +53,11 @@ For example, on a Unix system, depending on its flavor, these might include (in 
           ~/.config/dwave/dwave.conf
           ./dwave.conf
 
-while on Windows 7+, configuration files are expected to be located under::
+On Windows 7+, configuration files are expected to be located under::
 
       C:\\Users\\<username>\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf
 
-and on Mac OS X under::
+On Mac OS X, configuration files are expected to be located under::
 
      ~/Library/Application Support/dwave/dwave.conf
 
@@ -72,10 +81,10 @@ A single D-Wave Cloud Client configuration file can contain multiple profiles, e
 defining a separate combination of communication parameters such as the URL to the
 remote resource, authentication token, solver, etc.
 Configuration files conform to a standard Windows INI-style format:
-profiles are defined by sections such as, ``[profile-a]`` and ``[profile-b]``.
-Default values for undefined profile keys are taken from the ``[defaults]`` section.
+profiles are defined by sections such as, `[profile-a]` and `[profile-b]`.
+Default values for undefined profile keys are taken from the `[defaults]` section.
 
-For example, if the configuration file, ``~/.config/dwave/dwave.conf``, selected
+For example, if the configuration file, `~/.config/dwave/dwave.conf`, selected
 through auto-detection as the default configuration, contains the following
 profiles::
 
@@ -93,30 +102,26 @@ profiles::
           token = DEF-987654321987654321987654321
           proxy = http://user:pass@myproxy.com:8080/
 
-You can instantiate a client for D-Wave 2000Q QPU remote resource with::
+You can instantiate clients for a D-Wave 2000Q QPU and a CPU with::
 
       >>> from dwave.cloud import Client
-      >>> client = Client.from_config(profile='dw2000')   # doctest: +SKIP
-
-and a client for a software solver with::
-
-      >>> client = Client.from_config(profile='software')   # doctest: +SKIP
+      >>> client_qpu = Client.from_config(profile='dw2000')   # doctest: +SKIP
+      >>> client_cpu = Client.from_config(profile='software')   # doctest: +SKIP
 
 .. _environmentVariables:
 
 Environment Variables
 ---------------------
 
-In addition to D-Wave Cloud Client configuration files, configuration information
-can be set in environment variables; for example:
+In addition to files, you can set configuration information through environment
+variables; for example:
 
 * ``DWAVE_CONFIG_FILE`` may select the configuration file path.
 * ``DWAVE_PROFILE`` may select the name of a profile (section).
 * ``DWAVE_API_TOKEN`` may select the API token.
 
 For details on supported environment variables and prioritizing between these and
-values set explicitly or through configuration file, see the
-:func:`~dwave.cloud.config.load_config` method.
+values set explicitly or through a configuration file, see :mod:`dwave.cloud.config`.
 
 .. _interactiveCliConfiguration:
 
@@ -131,9 +136,8 @@ setting up a D-Wave Cloud Client configuration file. It also provides additional
 functionality; for example:
 
 * List and update existing configuration files on your system
-* Establish a connection to (ping) a solver based on a configuration file and
-  return timing information
-* Show configured solvers information
+* Establish a connection to (ping) a solver and return timing information
+* Show information on configured solvers
 
 Run *dwave* -\\-\ *help* for information on all the CLI options.
 
@@ -149,37 +153,44 @@ Run *dwave* -\\-\ *help* for information on all the CLI options.
 Work Flow
 =========
 
-A :term:`solver` is a resource for solving problems. Solvers are responsible for:
+A typical workflow may include the following steps:
 
-    - Encoding submitted problems
-    - Checking submitted parameters
-    - Adding problems to a client's submission queue
+1. Instantiate a :class:`~dwave.cloud.client.Client` to manage communication
+   with remote :term:`solver` resources, selecting and authenticating access to
+   available solvers; for example, you can list all solvers available to a client with its
+   :func:`~dwave.cloud.client.Client.get_solvers` method and select and return one with its
+   :func:`~dwave.cloud.client.Client.get_solver` method.
 
-Solvers that provide sampling for solving :term:`Ising` and :term:`QUBO` problems, such
-as a D-Wave 2000Q QPU or a software :term:`sampler` such as the
-`dimod <https://github.com/dwavesystems/dimod>`_ simulated annealing sampler,
-are typically remote resources. While the D-Wave Cloud Client
-:class:`~dwave.cloud.solver.Solver` manages the submission of your problem,
-:class:`~dwave.cloud.client.Client` manages communication with the remote solver
-resources, selecting and authenticating access to available solvers; for example,
-you can list all solvers available to a client with its
-:func:`~dwave.cloud.client.Client.get_solvers` method and select and return one with its
-:func:`~dwave.cloud.client.Client.get_solver` method.
+   Preferred use is with a context manager---a :code:`with Client.from_config(...) as`
+   construct---to ensure proper closure of all resources. The following example snippet
+   creates a client based on an auto-detected configuration file and instantiates
+   a solver.
 
-Preferred use is with a context manager (a :code:`with Client.from_config(...) as`
-construct) to ensure proper closure of all resources. The following example snippet
-creates a client based on an auto-detected configuration file and instantiates
-a solver.
+   >>> with Client.from_config() as client:   # doctest: +SKIP
+   ...     solver = client.get_solver('2000Q_ONLINE_SOLVER')
 
->>> with Client.from_config() as client:   # doctest: +SKIP
-...     solver = client.get_solver('2000Q_ONLINE_SOLVER')
+   Alternatively, the following example snippet creates a client for software resources
+   that it later explicitly closes.
 
-Alternatively, the following example snippet creates a client for software resources
-that it later explicitly closes.
+   >>> client = Client.from_config(client='sw')   # doctest: +SKIP
+   >>> # code that uses client
+   >>> client.close()    # doctest: +SKIP
 
->>> client = Client.from_config(client='sw')   # doctest: +SKIP
->>> # code that uses client
->>> client.close()    # doctest: +SKIP
+2. Instantiate a selected :class:`~dwave.cloud.solver.Solver`, a resource for solving problems.
+   Solvers are responsible for:
+
+      - Encoding submitted problems
+      - Checking submitted parameters
+      - Adding problems to a client's submission queue
+
+   Solvers that provide sampling for solving :term:`Ising` and :term:`QUBO` problems,
+   such as a D-Wave 2000Q :term:`sampler` :class:`~dwave.system.samplers.DWaveSampler`
+   or software sampler :class:`~neal.sampler.SimulatedAnnealingSampler`, might be remote
+   resources.
+
+3. Submit your problem, using your solver, and then process the returned
+   :class:`~dwave.cloud.computation.Future`, instantiated by your solver to handle
+   remotely executed problem solving.
 
 Terminology
 ===========

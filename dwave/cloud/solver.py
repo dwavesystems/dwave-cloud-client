@@ -21,8 +21,9 @@ Solvers are responsible for:
     - Checking submitted parameters
     - Adding problems to a client's submission queue
 
-You can list all solvers available to a :class:`Client` with its :meth:`get_solvers` method
-and select and return one with its :meth:`get_solver` method.
+You can list all solvers available to a :class:`~dwave.cloud.client.Client` with its
+:func:`~dwave.cloud.client.Client.get_solvers` method and select and return one with its
+:func:`~dwave.cloud.client.Client.get_solver` method.
 
 """
 
