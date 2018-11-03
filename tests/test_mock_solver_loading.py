@@ -23,7 +23,9 @@ import unittest
 import requests
 import requests_mock
 
-from dwave.cloud.qpu import Client, Solver
+from dwave.cloud.client import Client, Solver
+from dwave.cloud.qpu import Client as QPUClient
+from dwave.cloud.sw import Client as SoftwareClient
 from dwave.cloud.exceptions import (
     InvalidAPIResponseError, ConfigFileReadError, ConfigFileParseError)
 from dwave.cloud.config import legacy_load_config, load_config
@@ -63,7 +65,7 @@ def solver_object(id_, incomplete=False):
     return Solver(client=None, data=json.loads(solver_data(id_, incomplete)))
 
 
-# Define the endpoinds
+# Define the endpoints
 all_solver_url = '{}/solvers/remote/'.format(url)
 solver1_url = '{}/solvers/remote/{}/'.format(url, solver_name)
 solver2_url = '{}/solvers/remote/{}/'.format(url, second_solver_name)
@@ -136,16 +138,15 @@ class MockSolverLoading(unittest.TestCase):
 
             # test default, cached solver get
             with Client(url, token) as client:
+                # fetch solver not present in cache
                 solver = client.get_solver(solver_name)
                 self.assertEqual(solver.id, solver_name)
 
-                # fetch solver not present in cache
-                client._solvers = {}
-                self.assertEqual(client.get_solver(solver_name).id, solver_name)
-
-                # re-fetch solver present in cache
-                solver = client.get_solver(solver_name)
+                # modify cached solver and re-fetch it
                 solver.id = 'different-solver'
+                # cached solver is returned?
+                self.assertEqual(client.get_solver(solver_name, refresh=False).id, solver.id)
+                # cache is refreshed?
                 self.assertEqual(client.get_solver(solver_name, refresh=True).id, solver_name)
 
     def test_load_all_solvers(self):
@@ -155,18 +156,18 @@ class MockSolverLoading(unittest.TestCase):
 
             # test default case, fetch all solvers for the first time
             with Client(url, token) as client:
-                self.assertEqual(len(client.get_solvers()), 2)
+                solvers = client.get_solvers()
+
+                self.assertEqual(len(solvers), 2)
 
                 # test default refresh
-                client._solvers = {}
+                solvers.clear()
                 self.assertEqual(len(client.get_solvers()), 0)
 
                 # test no refresh
-                client._solvers = {}
                 self.assertEqual(len(client.get_solvers(refresh=False)), 0)
 
                 # test refresh
-                client._solvers = {}
                 self.assertEqual(len(client.get_solvers(refresh=True)), 2)
 
     def test_load_missing_solver(self):
@@ -195,9 +196,18 @@ class MockSolverLoading(unittest.TestCase):
                     client.get_solver(solver_name)
 
     def test_solver_filtering_in_client(self):
+        # base client
         self.assertTrue(Client.is_solver_handled(solver_object('test')))
-        self.assertFalse(Client.is_solver_handled(solver_object('c4-sw_')))
-        self.assertFalse(Client.is_solver_handled(None))
+        self.assertTrue(Client.is_solver_handled(solver_object('c4-sw_')))
+        self.assertTrue(Client.is_solver_handled(None))
+        # qpu client
+        self.assertTrue(QPUClient.is_solver_handled(solver_object('test')))
+        self.assertFalse(QPUClient.is_solver_handled(solver_object('c4-sw_')))
+        self.assertFalse(QPUClient.is_solver_handled(None))
+        # sw client
+        self.assertFalse(SoftwareClient.is_solver_handled(solver_object('test')))
+        self.assertTrue(SoftwareClient.is_solver_handled(solver_object('c4-sw_')))
+        self.assertFalse(SoftwareClient.is_solver_handled(None))
 
     def test_solver_feature_properties(self):
         self.assertTrue(solver_object('dw2000').is_qpu)

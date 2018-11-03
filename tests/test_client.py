@@ -239,15 +239,15 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             "description": "A test of software solver"
         })
         self.solvers = [self.solver1, self.solver2, self.solver3]
-
-        # mock client
-        self.client = Client('endpoint', 'token')
-        self.client._solvers = {
+        self.solvermap = {
             self.solver1.id: self.solver1,
             self.solver2.id: self.solver2,
             self.solver3.id: self.solver3
         }
-        self.client._all_solvers_ready = True
+
+        # mock client
+        self.client = Client('endpoint', 'token')
+        self.client._fetch_solvers = lambda **kw: self.solvermap
 
     def shutDown(self):
         self.client.close()

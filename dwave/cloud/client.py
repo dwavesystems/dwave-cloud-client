@@ -61,7 +61,7 @@ from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config, parse_float
 from dwave.cloud.solver import Solver
 from dwave.cloud.utils import (
-    datetime_to_timestamp, utcnow, TimeoutingHTTPAdapter, epochnow)
+    datetime_to_timestamp, utcnow, TimeoutingHTTPAdapter, epochnow, cached)
 
 __all__ = ['Client']
 
@@ -146,6 +146,9 @@ class Client(object):
 
     # Poll grouping time frame; two scheduled polls are grouped if closer than [sec]:
     _POLL_GROUP_TIMEFRAME = 2
+
+    # Downloaded solver definition cache maxage [sec]
+    _SOLVERS_CACHE_MAXAGE = 300
 
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None,
@@ -474,10 +477,6 @@ class Client(object):
             worker.start()
             self._load_workers.append(worker)
 
-        # Prepare an empty set of solvers
-        self._solvers = {}
-        self._all_solvers_ready = False
-
     def close(self):
         """Perform a clean shutdown.
 
@@ -558,6 +557,52 @@ class Client(object):
         """
         return True
 
+    @cached(maxage=_SOLVERS_CACHE_MAXAGE)
+    def _fetch_solvers(self, name=None):
+        if name is not None:
+            _LOGGER.debug("Fetching definition of a solver with name=%r", name)
+            url = posixpath.join(self.endpoint, 'solvers/remote/{}/'.format(name))
+        else:
+            _LOGGER.debug("Fetching definitions of all available solvers")
+            url = posixpath.join(self.endpoint, 'solvers/remote/')
+
+        try:
+            response = self.session.get(url)
+        except requests.exceptions.Timeout:
+            raise RequestTimeout
+
+        if response.status_code == 401:
+            raise SolverAuthenticationError
+
+        if name is not None and response.status_code == 404:
+            raise KeyError("No solver with name={!r} available".format(name))
+
+        response.raise_for_status()
+        data = response.json()
+
+        if name is not None:
+            data = [data]
+
+        _LOGGER.debug("Received solver data for %d solvers.", len(data))
+        _LOGGER.trace("Solver data received for solver name=%r: %r", name, data)
+
+        solvers = {}
+        for solver_desc in data:
+            try:
+                solver = Solver(self, solver_desc)
+                if self.is_solver_handled(solver):
+                    solvers[solver.id] = solver
+                    _LOGGER.debug("Adding solver %r", solver)
+                else:
+                    _LOGGER.debug("Skipping solver %r (not handled by this client)", solver)
+
+            except UnsupportedSolverError as e:
+                _LOGGER.debug("Skipping solver due to %r", e)
+
+            # propagate all other/decoding errors, like InvalidAPIResponseError, etc.
+
+        return solvers
+
     def get_solvers(self, refresh=False):
         """List all solvers this client can provide and load solvers' data.
 
@@ -593,36 +638,7 @@ class Client(object):
             >>> client.close() # doctest: +SKIP
         """
 
-        if self._all_solvers_ready and not refresh:
-            return self._solvers
-
-        _LOGGER.debug("Requesting list of all solver data.")
-        try:
-            response = self.session.get(posixpath.join(self.endpoint, 'solvers/remote/'))
-        except requests.exceptions.Timeout:
-            raise RequestTimeout
-
-        if response.status_code == 401:
-            raise SolverAuthenticationError
-        response.raise_for_status()
-
-        _LOGGER.debug("Received list of all solver data.")
-        data = response.json()
-
-        for solver_desc in data:
-            try:
-                solver = Solver(self, solver_desc)
-                if self.is_solver_handled(solver):
-                    self._solvers[solver.id] = solver
-                    _LOGGER.debug("Adding solver %r", solver)
-                else:
-                    _LOGGER.debug("Skipping solver %r (not handled by this client)", solver)
-
-            except UnsupportedSolverError as e:
-                _LOGGER.debug("Skipping solver due to %r", e)
-
-        self._all_solvers_ready = True
-        return self._solvers
+        return self._fetch_solvers(refresh_=refresh)
 
     def solvers(self, refresh=False, **filters):
         """Returns a filtered list of solvers handled by this client.
@@ -768,7 +784,9 @@ class Client(object):
                 raise ValueError("2-element list/tuple range required for RHS value")
 
         def _set(iterable):
-            """Like set(iterable), but works for lists as items in iterable."""
+            """Like set(iterable), but works for lists as items in iterable.
+            Before constructing a set, lists are converted to tuples.
+            """
             first = next(iter(iterable))
             if isinstance(first, list):
                 return set(tuple(x) for x in iterable)
@@ -880,7 +898,11 @@ class Client(object):
 
         """
         _LOGGER.debug("Looking for solver with name=%r or features=%r", name, features)
-        if name is None:
+
+        if name is not None:
+            return self._fetch_solvers(name=name, refresh_=refresh)[name]
+
+        else:
             if features is not None:
                 # get the first solver that satisfies all features
                 try:
@@ -890,36 +912,13 @@ class Client(object):
 
             else:
                 if self.default_solver:
-                    name = self.default_solver
+                    return self._fetch_solvers(name=self.default_solver, refresh_=refresh)[self.default_solver]
                 else:
                     # get the first available solver
                     try:
                         return self.solvers(online=True)[0]
                     except IndexError:
                         raise SolverError("No solvers available this client can handle")
-
-        if refresh or name not in self._solvers:
-            try:
-                response = self.session.get(
-                    posixpath.join(self.endpoint, 'solvers/remote/{}/'.format(name)))
-            except requests.exceptions.Timeout:
-                raise RequestTimeout
-
-            if response.status_code == 401:
-                raise SolverAuthenticationError
-
-            if response.status_code == 404:
-                raise KeyError("No solver with the name {} was available".format(name))
-
-            response.raise_for_status()
-
-            solver = Solver(self, data=response.json())
-            if solver.id != name:
-                raise InvalidAPIResponseError(
-                    "Asked for solver named {!r}, got {!r}".format(name, solver.id))
-            self._solvers[name] = solver
-
-        return self._solvers[name]
 
     def _submit(self, body, future):
         """Enqueue a problem for submission to the server.

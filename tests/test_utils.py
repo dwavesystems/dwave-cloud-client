@@ -201,7 +201,7 @@ class TestCachedDecorator(unittest.TestCase):
         def f():
             # raises ZeroDivisionError only on first call
             # we do not want to cache that!
-            return 1 / next(counter)
+            return 1.0 / next(counter)
 
         with mock.patch('dwave.cloud.utils.epochnow', lambda: 0):
             self.assertRaises(ZeroDivisionError, f)
