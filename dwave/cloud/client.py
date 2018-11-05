@@ -61,7 +61,7 @@ from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config, parse_float
 from dwave.cloud.solver import Solver
 from dwave.cloud.utils import (
-    datetime_to_timestamp, utcnow, TimeoutingHTTPAdapter, epochnow)
+    datetime_to_timestamp, utcnow, TimeoutingHTTPAdapter, epochnow, cached)
 
 __all__ = ['Client']
 
@@ -146,6 +146,9 @@ class Client(object):
 
     # Poll grouping time frame; two scheduled polls are grouped if closer than [sec]:
     _POLL_GROUP_TIMEFRAME = 2
+
+    # Downloaded solver definition cache maxage [sec]
+    _SOLVERS_CACHE_MAXAGE = 300
 
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None,
@@ -362,11 +365,6 @@ class Client(object):
             worker.start()
             self._load_workers.append(worker)
 
-        # Prepare an empty set of solvers
-        self._solvers = {}
-        self._solvers_lock = threading.RLock()
-        self._all_solvers_ready = False
-
     def close(self):
         """Perform a clean shutdown.
 
@@ -447,6 +445,52 @@ class Client(object):
         """
         return True
 
+    @cached(maxage=_SOLVERS_CACHE_MAXAGE)
+    def _fetch_solvers(self, name=None):
+        if name is not None:
+            _LOGGER.debug("Fetching definition of a solver with name=%r", name)
+            url = posixpath.join(self.endpoint, 'solvers/remote/{}/'.format(name))
+        else:
+            _LOGGER.debug("Fetching definitions of all available solvers")
+            url = posixpath.join(self.endpoint, 'solvers/remote/')
+
+        try:
+            response = self.session.get(url)
+        except requests.exceptions.Timeout:
+            raise RequestTimeout
+
+        if response.status_code == 401:
+            raise SolverAuthenticationError
+
+        if name is not None and response.status_code == 404:
+            raise SolverNotFoundError("No solver with name={!r} available".format(name))
+
+        response.raise_for_status()
+        data = response.json()
+
+        if name is not None:
+            data = [data]
+
+        _LOGGER.debug("Received solver data for %d solver(s).", len(data))
+        _LOGGER.trace("Solver data received for solver name=%r: %r", name, data)
+
+        solvers = {}
+        for solver_desc in data:
+            try:
+                solver = Solver(self, solver_desc)
+                if self.is_solver_handled(solver):
+                    solvers[solver.id] = solver
+                    _LOGGER.debug("Adding solver %r", solver)
+                else:
+                    _LOGGER.debug("Skipping solver %r (not handled by this client)", solver)
+
+            except UnsupportedSolverError as e:
+                _LOGGER.debug("Skipping solver due to %r", e)
+
+            # propagate all other/decoding errors, like InvalidAPIResponseError, etc.
+
+        return solvers
+
     def get_solvers(self, refresh=False):
         """List all solvers this client can provide, and load solvers' data.
 
@@ -482,37 +526,7 @@ class Client(object):
             >>> client.close() # doctest: +SKIP
         """
 
-        with self._solvers_lock:
-            if self._all_solvers_ready and not refresh:
-                return self._solvers
-
-            _LOGGER.debug("Requesting list of all solver data.")
-            try:
-                response = self.session.get(posixpath.join(self.endpoint, 'solvers/remote/'))
-            except requests.exceptions.Timeout:
-                raise RequestTimeout
-
-            if response.status_code == 401:
-                raise SolverAuthenticationError
-            response.raise_for_status()
-
-            _LOGGER.debug("Received list of all solver data.")
-            data = response.json()
-
-            for solver_desc in data:
-                try:
-                    solver = Solver(self, solver_desc)
-                    if self.is_solver_handled(solver):
-                        self._solvers[solver.id] = solver
-                        _LOGGER.debug("Adding solver %r", solver)
-                    else:
-                        _LOGGER.debug("Skipping solver %r inappropriate for client", solver)
-
-                except UnsupportedSolverError as e:
-                    _LOGGER.debug("Skipping solver due to %r", e)
-
-            self._all_solvers_ready = True
-            return self._solvers
+        return self._fetch_solvers(refresh_=refresh)
 
     def solvers(self, refresh=False, **filters):
         """Returns a filtered list of solvers handled by this client.
@@ -658,7 +672,9 @@ class Client(object):
                 raise ValueError("2-element list/tuple range required for RHS value")
 
         def _set(iterable):
-            """Like set(iterable), but works for lists as items in iterable."""
+            """Like set(iterable), but works for lists as items in iterable.
+            Before constructing a set, lists are converted to tuples.
+            """
             first = next(iter(iterable))
             if isinstance(first, list):
                 return set(tuple(x) for x in iterable)
@@ -716,12 +732,21 @@ class Client(object):
             propname, opname = (lhs.rsplit('__', 1) + [None])[:2]
             predicates.append(partial(predicate, name=propname, opname=opname, val=val))
 
-        solvers = self.get_solvers(refresh=refresh).values()
+        _LOGGER.debug("Filtering solvers with predicates=%r", predicates)
+
+        # optimization for case when exact solver name/id is known:
+        # we can fetch only that solver
+        # NOTE: in future, complete feature-based filtering will be on server-side
+        query = dict(refresh_=refresh)
+        if 'name' in filters:
+            query['name'] = filters['name']
+
+        solvers = self._fetch_solvers(**query).values()
         solvers = [s for s in solvers if all(p(s) for p in predicates)]
         solvers.sort(key=operator.attrgetter('id'))
         return solvers
 
-    def get_solver(self, name=None, features=None, refresh=False):
+    def get_solver(self, name=None, refresh=False, **features):
         """Load the configuration for a single solver.
 
         Makes a blocking web call to `{endpoint}/solvers/remote/{solver_name}/`, where `{endpoint}`
@@ -734,10 +759,9 @@ class Client(object):
                 If default solver is not configured, ``None`` returns the first available
                 solver in ``Client``'s class (QPU/software/base).
 
-            features (dict, optional):
+            **features (keyword arguments, optional):
                 Dictionary of features this solver has to have. For a list of
                 feature names and values, see: :meth:`~dwave.cloud.client.Client.solvers`.
-                Specifying the ``name`` parameter overrides the ``feature`` parameter.
                 To require a (full or partial) name match, use the ``features`` parameter
                 to specify a value for its ``name`` key.
 
@@ -769,48 +793,22 @@ class Client(object):
             >>> client.close() # doctest: +SKIP
 
         """
-        _LOGGER.debug("Looking for solver with name=%r or features=%r", name, features)
-        if name is None:
-            if features is not None:
-                # get the first solver that satisfies all features
-                try:
-                    return self.solvers(**features)[0]
-                except IndexError:
-                    raise SolverError("No solvers with the required features available")
+        _LOGGER.debug("Requested a solver that best matches features=%r", features)
 
-            else:
-                if self.default_solver:
-                    name = self.default_solver
-                else:
-                    # get the first available solver
-                    try:
-                        return self.solvers(online=True)[0]
-                    except IndexError:
-                        raise SolverError("No solvers available this client can handle")
+        # backward compatibility: name as the first feature
+        if name is not None:
+            features.setdefault('name', name)
 
-        with self._solvers_lock:
-            if refresh or name not in self._solvers:
-                try:
-                    response = self.session.get(
-                        posixpath.join(self.endpoint, 'solvers/remote/{}/'.format(name)))
-                except requests.exceptions.Timeout:
-                    raise RequestTimeout
+        # in absence of other features, config/env solver name is used
+        if not features and self.default_solver:
+            features['name'] = self.default_solver
 
-                if response.status_code == 401:
-                    raise SolverAuthenticationError
-
-                if response.status_code == 404:
-                    raise KeyError("No solver with the name {} was available".format(name))
-
-                response.raise_for_status()
-
-                solver = Solver(self, data=response.json())
-                if solver.id != name:
-                    raise InvalidAPIResponseError(
-                        "Asked for solver named {!r}, got {!r}".format(name, solver.id))
-                self._solvers[name] = solver
-
-            return self._solvers[name]
+        # get the first solver that satisfies all features
+        try:
+            _LOGGER.debug("Fetching solvers according to features=%r", features)
+            return self.solvers(refresh=refresh, **features)[0]
+        except IndexError:
+            raise SolverNotFoundError("No solvers with the required features available")
 
     def _submit(self, body, future):
         """Enqueue a problem for submission to the server.

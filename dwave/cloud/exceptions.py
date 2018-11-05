@@ -28,6 +28,9 @@ class SolverError(Exception):
 class SolverFailureError(SolverError):
     """An exception raised when there is a remote failure calling a solver."""
 
+class SolverNotFoundError(SolverError):
+    """Solver with matching feature set not found / not available."""
+
 class SolverOfflineError(SolverError):
     """Action attempted on an offline solver."""
 

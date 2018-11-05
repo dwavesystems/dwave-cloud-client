@@ -28,7 +28,7 @@ from dateutil.parser import parse as parse_datetime
 from requests.structures import CaseInsensitiveDict
 
 from dwave.cloud.utils import evaluate_ising, generate_random_ising_problem
-from dwave.cloud.qpu import Client, Solver
+from dwave.cloud.client import Client, Solver
 from dwave.cloud.exceptions import SolverFailureError, CanceledFutureError
 from dwave.cloud.testing import mock
 

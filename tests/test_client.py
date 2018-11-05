@@ -26,7 +26,8 @@ import requests.exceptions
 from dwave.cloud.config import load_config
 from dwave.cloud.client import Client
 from dwave.cloud.solver import Solver
-from dwave.cloud.exceptions import SolverAuthenticationError, SolverError
+from dwave.cloud.exceptions import (
+    SolverAuthenticationError, SolverError, SolverNotFoundError)
 from dwave.cloud.testing import mock
 import dwave.cloud
 
@@ -92,7 +93,7 @@ class SolverLoading(unittest.TestCase):
     def test_load_bad_solvers(self):
         """Try to load a nonexistent solver."""
         with Client(**config) as client:
-            with self.assertRaises(KeyError):
+            with self.assertRaises(SolverNotFoundError):
                 client.get_solver("not-a-solver")
 
     def test_load_any_solver(self):
@@ -239,15 +240,15 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             "description": "A test of software solver"
         })
         self.solvers = [self.solver1, self.solver2, self.solver3]
-
-        # mock client
-        self.client = Client('endpoint', 'token')
-        self.client._solvers = {
+        self.solvermap = {
             self.solver1.id: self.solver1,
             self.solver2.id: self.solver2,
             self.solver3.id: self.solver3
         }
-        self.client._all_solvers_ready = True
+
+        # mock client
+        self.client = Client('endpoint', 'token')
+        self.client._fetch_solvers = lambda **kw: self.solvermap
 
     def shutDown(self):
         self.client.close()

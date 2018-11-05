@@ -14,16 +14,17 @@
 
 import unittest
 from collections import OrderedDict
+from itertools import count
 from datetime import datetime
 
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_head, strip_tail,
     active_qubits, generate_random_ising_problem,
-    default_text_input, utcnow)
+    default_text_input, utcnow, cached)
 from dwave.cloud.testing import mock
 
 
-class TestUtils(unittest.TestCase):
+class TestSimpleUtils(unittest.TestCase):
 
     def test_uniform_iterator(self):
         items = [('a', 1), ('b', 2)]
@@ -116,6 +117,96 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(t.utcoffset().total_seconds(), 0.0)
         unaware = t.replace(tzinfo=None)
         self.assertLess((now - unaware).total_seconds(), 1.0)
+
+
+class TestCachedDecorator(unittest.TestCase):
+
+    def test_args_hashing(self):
+        counter = count()
+
+        @cached(maxage=300)
+        def f(*a, **b):
+            return next(counter)
+
+        with mock.patch('dwave.cloud.utils.epochnow', lambda: 0):
+            self.assertEqual(f(), 0)
+            self.assertEqual(f(1), 1)
+            self.assertEqual(f(1, 2), 2)
+            self.assertEqual(f(1), 1)
+            self.assertEqual(f(1, refresh_=True), 3)
+            self.assertEqual(f(1, 2), 2)
+
+            self.assertEqual(f(a=1, b=2), 4)
+            self.assertEqual(f(b=2, a=1), 4)
+            self.assertEqual(f(b=2, a=1, refresh_=1), 5)
+            self.assertEqual(f(), 0)
+
+            self.assertEqual(f(2), 6)
+            self.assertEqual(f(1), 3)
+
+    def test_args_collision(self):
+        counter = count()
+
+        @cached(maxage=300)
+        def f(*a, **b):
+            return next(counter)
+
+        with mock.patch('dwave.cloud.utils.epochnow', lambda: 0):
+            # NB: in python2, without hash seed randomization,
+            # hash('\0B') == hash('\0\0C')
+            self.assertEqual(f(x='\0B'), 0)
+            self.assertEqual(f(x='\0\0C'), 1)
+
+    def test_expiry(self):
+        counter = count()
+
+        @cached(maxage=300)
+        def f(*a, **b):
+            return next(counter)
+
+        # populate
+        with mock.patch('dwave.cloud.utils.epochnow', lambda: 0):
+            self.assertEqual(f(), 0)
+            self.assertEqual(f(1), 1)
+            self.assertEqual(f(a=1, b=2), 2)
+
+        # verify expiry
+        with mock.patch('dwave.cloud.utils.epochnow', lambda: 301):
+            self.assertEqual(f(), 3)
+            self.assertEqual(f(1), 4)
+            self.assertEqual(f(a=1, b=2), 5)
+
+        # verify maxage
+        with mock.patch('dwave.cloud.utils.epochnow', lambda: 299):
+            self.assertEqual(f(), 3)
+            self.assertEqual(f(1), 4)
+            self.assertEqual(f(a=1, b=2), 5)
+
+    def test_default_maxage(self):
+        counter = count()
+
+        @cached()
+        def f(*a, **b):
+            return next(counter)
+
+        with mock.patch('dwave.cloud.utils.epochnow', lambda: 0):
+            self.assertEqual(f(), 0)
+            self.assertEqual(f(), 1)
+            self.assertEqual(f(), 2)
+
+    def test_exceptions(self):
+        counter = count(0)
+
+        @cached()
+        def f():
+            # raises ZeroDivisionError only on first call
+            # we do not want to cache that!
+            return 1.0 / next(counter)
+
+        with mock.patch('dwave.cloud.utils.epochnow', lambda: 0):
+            self.assertRaises(ZeroDivisionError, f)
+            self.assertEqual(f(), 1)
+            self.assertEqual(f(), 0.5)
 
 
 if __name__ == '__main__':

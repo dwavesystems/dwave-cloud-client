@@ -28,7 +28,7 @@ from datetime import datetime
 import numpy
 
 from dwave.cloud.utils import evaluate_ising, generate_random_ising_problem
-from dwave.cloud.qpu import Client
+from dwave.cloud.client import Client
 from dwave.cloud.exceptions import CanceledFutureError, SolverFailureError
 import dwave.cloud.computation
 
