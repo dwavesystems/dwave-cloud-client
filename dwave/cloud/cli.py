@@ -20,6 +20,7 @@ import logging
 import datetime
 
 import click
+import requests.exceptions
 from timeit import default_timer as timer
 from datetime import datetime, timedelta
 
@@ -209,6 +210,16 @@ def _ping(config_file, profile, request_timeout, polling_timeout, output):
         raise CLIError("Invalid or unexpected API response.", 3)
     except RequestTimeout:
         raise CLIError("API connection timed out.", 4)
+    except requests.exceptions.SSLError as e:
+        # we need to handle `ssl.SSLError` wrapped in several exceptions,
+        # with differences between py2/3; greping the message is the easiest way
+        if 'CERTIFICATE_VERIFY_FAILED' in str(e):
+            raise CLIError(
+                "Certificate verification failed. Please check that your API endpoint "
+                "is correct. If you are connecting to a private or third-party D-Wave "
+                "system that uses self-signed certificate(s), please see "
+                "https://support.dwavesys.com/hc/en-us/community/posts/360018930954.", 5)
+        raise CLIError("Unexpected SSL error while fetching solvers: {!r}".format(e), 5)
     except Exception as e:
         raise CLIError("Unexpected error while fetching solvers: {!r}".format(e), 5)
 
