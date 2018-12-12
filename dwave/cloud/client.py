@@ -759,6 +759,8 @@ class Client(object):
         query = dict(refresh_=refresh)
         if 'name' in filters:
             query['name'] = filters['name']
+        if 'name__eq' in filters:
+            query['name'] = filters['name__eq']
 
         solvers = self._fetch_solvers(**query).values()
         solvers = [s for s in solvers if all(p(s) for p in predicates)]
