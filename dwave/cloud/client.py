@@ -44,6 +44,7 @@ from __future__ import division, absolute_import
 import re
 import sys
 import time
+import json
 import logging
 import threading
 import requests
@@ -55,6 +56,7 @@ from functools import partial
 
 from dateutil.parser import parse as parse_datetime
 from six.moves import queue, range
+import six
 
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
@@ -221,7 +223,7 @@ class Client(object):
             token (str, default=None):
                 API authorization token.
 
-            solver (str, default=None):
+            solver (str: name, or dict: features, default=None):
                 Default :term:`solver` to use in :meth:`~dwave.cloud.client.Client.get_solver`.
                 If undefined, :meth:`~dwave.cloud.client.Client.get_solver` will return the
                 first solver available.
@@ -312,6 +314,23 @@ class Client(object):
             raise ValueError("Endpoint URL and/or token not defined")
 
         _LOGGER.debug("Creating a client for endpoint: %r", endpoint)
+
+        if solver is None:
+            solver = {}
+
+        elif isinstance(solver, six.string_types):
+            # support features dict encoded as JSON in our config INI file
+            # TODO: switch to richer config format (JSON or YAML)
+            try:
+                solver = json.loads(solver)
+            except Exception:
+                # unparseable json, assume string name for solver
+                # we'll deprecate this eventually, but for now just convert it to
+                # features dict (equality constraint on full solver name)
+                solver = dict(name__eq=solver)
+
+        elif not isinstance(solver, collections.Mapping):
+            raise ValueError("Expecting a string name or features dictionary for 'solver'")
 
         self.endpoint = endpoint
         self.token = token
@@ -801,7 +820,7 @@ class Client(object):
 
         # in absence of other features, config/env solver name is used
         if not features and self.default_solver:
-            features['name'] = self.default_solver
+            features = self.default_solver
 
         # get the first solver that satisfies all features
         try:

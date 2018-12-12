@@ -180,7 +180,7 @@ class ClientFactory(unittest.TestCase):
                 with dwave.cloud.Client.from_config(legacy_config_fallback=True) as client:
                     self.assertEqual(client.endpoint, 'endpoint')
                     self.assertEqual(client.token, 'token')
-                    self.assertEqual(client.default_solver, 'solver')
+                    self.assertEqual(client.default_solver, {"name__eq": "solver"})
                     self.assertEqual(client.session.proxies['http'], 'proxy')
 
                 # test fallback is avoided (legacy config skipped)
