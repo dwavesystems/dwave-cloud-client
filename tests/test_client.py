@@ -87,8 +87,8 @@ class SolverLoading(unittest.TestCase):
     def test_load_all_solvers(self):
         """List and retrieve all the solvers."""
         with Client(**config) as client:
-            for name in client.get_solvers():
-                self.assertEqual(client.get_solver(name).id, name)
+            for solver in client.get_solvers():
+                self.assertEqual(client.get_solver(name=solver.id).id, solver.id)
 
     def test_load_bad_solvers(self):
         """Try to load a nonexistent solver."""

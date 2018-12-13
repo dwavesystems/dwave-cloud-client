@@ -291,19 +291,17 @@ class cached(object):
     def __call__(self, fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
-            refresh_ = kwargs.get('refresh_', False)
-            if 'refresh_' in kwargs:
-                del kwargs['refresh_']
+            refresh_ = kwargs.pop('refresh_', False)
             now = epochnow()
 
             key = self.argshash(args, kwargs)
             data = self.cache.get(key, {})
 
             if not refresh_ and data.get('expires', 0) > now:
-                return data.get('val')
-
-            val = fn(*args, **kwargs)
-            self.cache[key] = dict(expires=now+self.maxage, val=val)
+                val = data.get('val')
+            else:
+                val = fn(*args, **kwargs)
+                self.cache[key] = dict(expires=now+self.maxage, val=val)
 
             return val
 

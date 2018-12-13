@@ -229,7 +229,7 @@ def _ping(config_file, profile, request_timeout, polling_timeout, output):
         # if not otherwise defined (ValueError), or unavailable (KeyError),
         # just use the first solver
         if solvers:
-            _, solver = next(iter(solvers.items()))
+            _, solver = next(iter(solvers))
         else:
             raise CLIError("No solvers available.", 6)
     except RequestTimeout:
@@ -314,7 +314,7 @@ def solvers(config_file, profile, solver_id, list_solvers):
     """
 
     with Client.from_config(config_file=config_file, profile=profile) as client:
-        solvers = client.get_solvers().values()
+        solvers = client.get_solvers()
 
         if solver_id:
             solvers = filter(lambda s: s.id == solver_id, solvers)
