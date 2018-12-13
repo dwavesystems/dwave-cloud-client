@@ -53,6 +53,7 @@ import collections
 import operator
 from itertools import chain
 from functools import partial
+from collections import OrderedDict
 
 from dateutil.parser import parse as parse_datetime
 from six.moves import queue, range
@@ -501,7 +502,7 @@ class Client(object):
         _LOGGER.debug("Received solver data for %d solver(s).", len(data))
         _LOGGER.trace("Solver data received for solver name=%r: %r", name, data)
 
-        solvers = {}
+        solvers = OrderedDict()
         for solver_desc in data:
             try:
                 solver = Solver(self, solver_desc)
@@ -528,8 +529,8 @@ class Client(object):
 
         To submit a sampling problem to the D-Wave API, select a solver from the returned list,
         and execute a ``sampling_*`` method on it. Alternatively, use the :meth:`.get_solver` method
-        if you know the solver ID (name), have it defined in your configuration file, or are just
-        interested in fetching any/first solver.
+        if you know the solver ID (name) or solver features you require, have it defined in your
+        configuration file, or are just interested in fetching any/first solver.
 
         Args:
             refresh (bool, default=False):
