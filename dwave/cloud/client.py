@@ -85,8 +85,8 @@ class Client(object):
         token (str):
             Authentication token for the D-Wave API.
 
-        solver (str):
-            Default solver.
+        solver (dict/str):
+            Default solver features (or simply solver name).
 
         proxy (str):
             Proxy URL to be used for accessing the D-Wave API.
@@ -223,10 +223,17 @@ class Client(object):
             token (str, default=None):
                 API authorization token.
 
-            solver (str: name, or dict: features, default=None):
-                Default :term:`solver` to use in :meth:`~dwave.cloud.client.Client.get_solver`.
-                If undefined, :meth:`~dwave.cloud.client.Client.get_solver` will return the
-                first solver available.
+            solver (dict/str, default=None):
+                Default :term:`solver` features to use in :meth:`~dwave.cloud.client.Client.get_solver`.
+
+                Defined via dictionary of solver feature constraints
+                (see :meth:`~dwave.cloud.client.Client.solvers`). For backward
+                compatibility, string solver name is also accepted, and it's
+                transformed to ``{"name": <solver name>}``.
+
+                If undefined, :meth:`~dwave.cloud.client.Client.get_solver` will use
+                solver definition from environment variables, configuration file, or
+                fallback to the first available online solver.
 
             proxy (str, default=None):
                 URL for proxy to use in connections to D-Wave API. Can include
@@ -320,7 +327,8 @@ class Client(object):
 
         elif isinstance(solver, six.string_types):
             # support features dict encoded as JSON in our config INI file
-            # TODO: switch to richer config format (JSON or YAML)
+            # TODO: push this decoding to the config module, once we switch to a
+            #       richer config format (JSON or YAML)
             try:
                 solver = json.loads(solver)
             except Exception:
