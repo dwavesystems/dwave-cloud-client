@@ -420,4 +420,4 @@ class MockLegacyConfiguration(unittest.TestCase):
                     return response
 
                 with mock.patch("requests.adapters.HTTPAdapter.send", mock_send):
-                    client.solvers()
+                    client.get_solvers()
