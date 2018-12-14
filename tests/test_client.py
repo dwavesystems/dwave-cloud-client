@@ -436,6 +436,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
 
     def test_solvers_deprecation(self):
         with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
             self.client.solvers()
             self.assertEqual(len(w), 1)
             self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
