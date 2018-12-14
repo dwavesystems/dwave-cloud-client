@@ -228,13 +228,13 @@ class Client(object):
                 Default :term:`solver` features to use in :meth:`~dwave.cloud.client.Client.get_solver`.
 
                 Defined via dictionary of solver feature constraints
-                (see :meth:`~dwave.cloud.client.Client.get_solvers`). For backward
-                compatibility, string solver name is also accepted, and it's
-                transformed to ``{"name": <solver name>}``.
+                (see :meth:`~dwave.cloud.client.Client.get_solvers`).
+                For backward compatibility, a solver name, as a string,
+                is also accepted and converted to ``{"name": <solver name>}``.
 
-                If undefined, :meth:`~dwave.cloud.client.Client.get_solver` will use
-                solver definition from environment variables, configuration file, or
-                fallback to the first available online solver.
+                If undefined, :meth:`~dwave.cloud.client.Client.get_solver` uses a
+                solver definition from environment variables, a configuration file, or
+                falls back to the first available online solver.
 
             proxy (str, default=None):
                 URL for proxy to use in connections to D-Wave API. Can include
@@ -343,10 +343,11 @@ class Client(object):
                 # unparseable json, assume string name for solver
                 # we'll deprecate this eventually, but for now just convert it to
                 # features dict (equality constraint on full solver name)
+                _LOGGER.debug("Invalid solver JSON, assuming string name: %r", solver)
                 solver_def = dict(name__eq=solver)
 
         else:
-            raise ValueError("Expecting a string name or features dictionary for 'solver'")
+            raise ValueError("Expecting a features dictionary or a string name for 'solver'")
 
         self.endpoint = endpoint
         self.token = token
