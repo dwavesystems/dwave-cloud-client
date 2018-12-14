@@ -54,7 +54,6 @@ import operator
 import collections
 from itertools import chain
 from functools import partial
-from collections import OrderedDict
 
 from dateutil.parser import parse as parse_datetime
 from six.moves import queue, range
@@ -503,12 +502,12 @@ class Client(object):
         _LOGGER.debug("Received solver data for %d solver(s).", len(data))
         _LOGGER.trace("Solver data received for solver name=%r: %r", name, data)
 
-        solvers = OrderedDict()
+        solvers = []
         for solver_desc in data:
             try:
                 solver = Solver(self, solver_desc)
                 if self.is_solver_handled(solver):
-                    solvers[solver.id] = solver
+                    solvers.append(solver)
                     _LOGGER.debug("Adding solver %r", solver)
                 else:
                     _LOGGER.debug("Skipping solver %r (not handled by this client)", solver)
@@ -735,7 +734,7 @@ class Client(object):
         if 'name__eq' in filters:
             query['name'] = filters['name__eq']
 
-        solvers = self._fetch_solvers(**query).values()
+        solvers = self._fetch_solvers(**query)
         solvers = [s for s in solvers if all(p(s) for p in predicates)]
         solvers.sort(key=operator.attrgetter('id'))
         return solvers

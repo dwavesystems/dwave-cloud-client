@@ -158,7 +158,7 @@ class MockSolverLoading(unittest.TestCase):
             cache = client._fetch_solvers._cache
             for args in cache:
                 if clear_val:
-                    cache[args]['val'] = {}
+                    cache[args]['val'] = []
                 if clear_expires:
                     cache[args]['expires'] = 0
 
