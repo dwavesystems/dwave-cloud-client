@@ -20,6 +20,7 @@ test_mock_solver_loading.py duplicates some of these tests against a mock server
 
 from __future__ import absolute_import
 
+import json
 import unittest
 import warnings
 import requests.exceptions
@@ -120,7 +121,7 @@ class SolverLoading(unittest.TestCase):
 
 
 class ClientFactory(unittest.TestCase):
-    """Test client factory."""
+    """Test Client.from_config() factory."""
 
     def test_default(self):
         conf = {k: k for k in 'endpoint token'.split()}
@@ -187,6 +188,49 @@ class ClientFactory(unittest.TestCase):
                 # test fallback is avoided (legacy config skipped)
                 self.assertRaises(
                     ValueError, dwave.cloud.Client.from_config, legacy_config_fallback=False)
+
+    def test_solver_features_from_config(self):
+        solver_def = {"qpu": True}
+        conf = {k: k for k in 'endpoint token'.split()}
+        conf.update(solver=json.dumps(solver_def))
+
+        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+            with dwave.cloud.Client.from_config() as client:
+                self.assertEqual(client.default_solver, solver_def)
+
+    def test_solver_name_from_config(self):
+        solver_def = {"name__eq": "solver"}
+        conf = {k: k for k in 'endpoint token solver'.split()}
+
+        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+            with dwave.cloud.Client.from_config() as client:
+                self.assertEqual(client.default_solver, solver_def)
+
+    def test_solver_features_kwargs_override_config(self):
+        new_solver_def = {"software": True}
+        conf = {k: k for k in 'endpoint token solver'.split()}
+
+        def load_config(**kwargs):
+            res = conf.copy()
+            res.update(kwargs)
+            return res
+
+        with mock.patch("dwave.cloud.client.load_config", load_config):
+            with dwave.cloud.Client.from_config(solver=new_solver_def) as client:
+                self.assertEqual(client.default_solver, new_solver_def)
+
+    def test_solver_name_overrides_config_features(self):
+        conf = {k: k for k in 'endpoint token solver'.split()}
+        conf.update(solver=json.dumps({"software": True}))
+
+        def load_config(**kwargs):
+            res = conf.copy()
+            res.update(kwargs)
+            return res
+
+        with mock.patch("dwave.cloud.client.load_config", load_config):
+            with dwave.cloud.Client.from_config(solver='solver') as client:
+                self.assertEqual(client.default_solver, {"name__eq": "solver"})
 
 
 class FeatureBasedSolverSelection(unittest.TestCase):

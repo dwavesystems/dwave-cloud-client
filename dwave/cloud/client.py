@@ -321,29 +321,36 @@ class Client(object):
         if not endpoint or not token:
             raise ValueError("Endpoint URL and/or token not defined")
 
-        _LOGGER.debug("Creating a client for endpoint: %r", endpoint)
+        _LOGGER.debug(
+            "Creating a client for (endpoint=%r, token=%r, solver=%r, proxy=%r, "
+            "permissive_ssl=%r, request_timeout=%r, polling_timeout=%r, **kwargs=%r)",
+            endpoint, token, solver, proxy, permissive_ssl, request_timeout, polling_timeout, kwargs
+        )
 
         if solver is None:
-            solver = {}
+            solver_def = {}
+
+        elif isinstance(solver, collections.Mapping):
+            solver_def = solver
 
         elif isinstance(solver, six.string_types):
             # support features dict encoded as JSON in our config INI file
             # TODO: push this decoding to the config module, once we switch to a
             #       richer config format (JSON or YAML)
             try:
-                solver = json.loads(solver)
+                solver_def = json.loads(solver)
             except Exception:
                 # unparseable json, assume string name for solver
                 # we'll deprecate this eventually, but for now just convert it to
                 # features dict (equality constraint on full solver name)
-                solver = dict(name__eq=solver)
+                solver_def = dict(name__eq=solver)
 
-        elif not isinstance(solver, collections.Mapping):
+        else:
             raise ValueError("Expecting a string name or features dictionary for 'solver'")
 
         self.endpoint = endpoint
         self.token = token
-        self.default_solver = solver
+        self.default_solver = solver_def
         self.request_timeout = parse_float(request_timeout)
         self.polling_timeout = parse_float(polling_timeout)
 
