@@ -5,3 +5,4 @@ mock
 requests_mock
 coverage
 coveralls
+plucky

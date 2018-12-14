@@ -23,7 +23,9 @@ from __future__ import absolute_import
 import json
 import unittest
 import warnings
+
 import requests.exceptions
+from plucky import merge
 
 from dwave.cloud.config import load_config
 from dwave.cloud.client import Client
@@ -211,9 +213,7 @@ class ClientFactory(unittest.TestCase):
         conf = {k: k for k in 'endpoint token solver'.split()}
 
         def load_config(**kwargs):
-            res = conf.copy()
-            res.update(kwargs)
-            return res
+            return merge(kwargs, conf, op=lambda a, b: a or b)
 
         with mock.patch("dwave.cloud.client.load_config", load_config):
             with dwave.cloud.Client.from_config(solver=new_solver_def) as client:
@@ -224,9 +224,7 @@ class ClientFactory(unittest.TestCase):
         conf.update(solver=json.dumps({"software": True}))
 
         def load_config(**kwargs):
-            res = conf.copy()
-            res.update(kwargs)
-            return res
+            return merge(kwargs, conf, op=lambda a, b: a or b)
 
         with mock.patch("dwave.cloud.client.load_config", load_config):
             with dwave.cloud.Client.from_config(solver='solver') as client:
