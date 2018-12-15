@@ -191,12 +191,11 @@ class TestCli(unittest.TestCase):
 
             # proper arguments passed to Client.from_config?
             m.from_config.assert_called_with(
-                config_file=config_file, profile=profile,
+                config_file=config_file, profile=profile, solver=None,
                 request_timeout=0.5, polling_timeout=30)
 
             # get solver called?
             c = m.from_config(config_file=config_file, profile=profile)
-            c.get_solvers.assert_called_with()
             c.get_solver.assert_called_with()
 
             # sampling method called on solver?

@@ -179,14 +179,14 @@ def create(config_file, profile):
     return 0
 
 
-def _ping(config_file, profile, request_timeout, polling_timeout, output):
+def _ping(config_file, profile, solver_def, request_timeout, polling_timeout, output):
     """Helper method for the ping command that uses `output()` for info output
     and raises `CLIError()` on handled errors.
 
     This function is invariant to output format and/or error signaling mechanism.
     """
 
-    config = dict(config_file=config_file, profile=profile)
+    config = dict(config_file=config_file, profile=profile, solver=solver_def)
     if request_timeout is not None:
         config.update(request_timeout=request_timeout)
     if polling_timeout is not None:
@@ -203,9 +203,11 @@ def _ping(config_file, profile, request_timeout, polling_timeout, output):
 
     t0 = timer()
     try:
-        solvers = client.get_solvers()
+        solver = client.get_solver()
     except SolverAuthenticationError:
         raise CLIError("Authentication error. Check credentials in your configuration file.", 2)
+    except SolverNotFoundError:
+        raise CLIError("Solver not available.", 6)
     except (InvalidAPIResponseError, UnsupportedSolverError):
         raise CLIError("Invalid or unexpected API response.", 3)
     except RequestTimeout:
@@ -219,21 +221,9 @@ def _ping(config_file, profile, request_timeout, polling_timeout, output):
                 "is correct. If you are connecting to a private or third-party D-Wave "
                 "system that uses self-signed certificate(s), please see "
                 "https://support.dwavesys.com/hc/en-us/community/posts/360018930954.", 5)
-        raise CLIError("Unexpected SSL error while fetching solvers: {!r}".format(e), 5)
+        raise CLIError("Unexpected SSL error while fetching solver: {!r}".format(e), 5)
     except Exception as e:
-        raise CLIError("Unexpected error while fetching solvers: {!r}".format(e), 5)
-
-    try:
-        solver = client.get_solver()
-    except (ValueError, KeyError):
-        # if not otherwise defined (ValueError), or unavailable (KeyError),
-        # just use the first solver
-        if solvers:
-            _, solver = next(iter(solvers))
-        else:
-            raise CLIError("No solvers available.", 6)
-    except RequestTimeout:
-        raise CLIError("API connection timed out.", 7)
+        raise CLIError("Unexpected error while fetching solver: {!r}".format(e), 5)
 
     t1 = timer()
     output("Using solver: {solver_id}", solver_id=solver.id)
@@ -256,9 +246,12 @@ def _ping(config_file, profile, request_timeout, polling_timeout, output):
     output(" * Solver definition fetch: {wallclock_solver_definition:.3f} ms", wallclock_solver_definition=(t1-t0)*1000.0)
     output(" * Problem submit and results fetch: {wallclock_sampling:.3f} ms", wallclock_sampling=(t2-t1)*1000.0)
     output(" * Total: {wallclock_total:.3f} ms", wallclock_total=(t2-t0)*1000.0)
-    output("\nQPU timing:")
-    for component, duration in timing.items():
-        output(" * %(name)s = {%(name)s} us" % {"name": component}, **{component: duration})
+    if timing.items():
+        output("\nQPU timing:")
+        for component, duration in timing.items():
+            output(" * %(name)s = {%(name)s} us" % {"name": component}, **{component: duration})
+    else:
+        output("\nQPU timing data not available.")
 
 
 @cli.command()
@@ -266,13 +259,14 @@ def _ping(config_file, profile, request_timeout, polling_timeout, output):
               type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
 @click.option('--profile', '-p', default=None,
               help='Connection profile (section) name')
+@click.option('--solver', '-s', 'solver_def', default=None, help='Feature-based solver definition')
 @click.option('--request-timeout', default=None, type=float,
               help='Connection and read timeouts (in seconds) for all API requests')
 @click.option('--polling-timeout', default=None, type=float,
               help='Problem polling timeout in seconds (time-to-solution timeout)')
 @click.option('--json', 'json_output', default=False, is_flag=True,
               help='JSON output')
-def ping(config_file, profile, json_output, request_timeout, polling_timeout):
+def ping(config_file, profile, solver_def, json_output, request_timeout, polling_timeout):
     """Ping the QPU by submitting a single-qubit problem."""
 
     now = utcnow()
@@ -288,7 +282,7 @@ def ping(config_file, profile, json_output, request_timeout, polling_timeout):
             click.echo(json.dumps(info))
 
     try:
-        _ping(config_file, profile, request_timeout, polling_timeout, output)
+        _ping(config_file, profile, solver_def, request_timeout, polling_timeout, output)
     except CLIError as error:
         output("Error: {error} (code: {code})", error=str(error), code=error.code)
         sys.exit(error.code)
@@ -303,7 +297,7 @@ def ping(config_file, profile, json_output, request_timeout, polling_timeout):
 @click.option('--config-file', '-c', default=None,
               type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
 @click.option('--profile', '-p', default=None, help='Connection profile name')
-@click.option('--solver', '-s', 'solver_def', default=None, help='Solver features filter')
+@click.option('--solver', '-s', 'solver_def', default=None, help='Feature-based solver filter')
 @click.option('--list', '-l', 'list_solvers', default=False, is_flag=True,
               help='List available solvers, one per line')
 def solvers(config_file, profile, solver_def, list_solvers):
@@ -346,7 +340,7 @@ def solvers(config_file, profile, solver_def, list_solvers):
 @click.option('--profile', '-p', default=None,
               help='Connection profile (section) name')
 @click.option('--solver', '-s', 'solver_def', default=None,
-              help='Solver name to use')
+              help='Feature-based solver filter')
 @click.option('--biases', '-h', default=None,
               help='List/dict of biases for Ising model problem formulation')
 @click.option('--couplings', '-j', default=None,
