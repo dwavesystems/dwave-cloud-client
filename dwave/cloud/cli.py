@@ -31,7 +31,7 @@ from dwave.cloud.utils import (
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError,
-    ConfigFileReadError, ConfigFileParseError,
+    ConfigFileReadError, ConfigFileParseError, SolverNotFoundError, SolverOfflineError,
     RequestTimeout, PollingTimeout)
 from dwave.cloud.config import (
     load_profile_from_files, load_config_from_files, get_default_config,
@@ -345,7 +345,7 @@ def solvers(config_file, profile, solver_id, list_solvers):
               type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
 @click.option('--profile', '-p', default=None,
               help='Connection profile (section) name')
-@click.option('--solver', '-s', 'solver_name', default=None,
+@click.option('--solver', '-s', 'solver_def', default=None,
               help='Solver name to use')
 @click.option('--biases', '-h', default=None,
               help='List/dict of biases for Ising model problem formulation')
@@ -357,7 +357,7 @@ def solvers(config_file, profile, solver_id, list_solvers):
               help='Number of reads/samples')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Increase output verbosity')
-def sample(config_file, profile, solver_name, biases, couplings, random_problem,
+def sample(config_file, profile, solver_def, biases, couplings, random_problem,
            num_reads, verbose):
     """Submit Ising-formulated problem and return samples."""
 
@@ -367,7 +367,8 @@ def sample(config_file, profile, solver_name, biases, couplings, random_problem,
         click.echo(s if verbose else strtrunc(s, maxlen))
 
     try:
-        client = Client.from_config(config_file=config_file, profile=profile)
+        client = Client.from_config(
+            config_file=config_file, profile=profile, solver=solver_def)
     except Exception as e:
         click.echo("Invalid configuration: {}".format(e))
         return 1
@@ -378,25 +379,16 @@ def sample(config_file, profile, solver_name, biases, couplings, random_problem,
     echo("Using endpoint: {}".format(client.endpoint))
 
     try:
-        solvers = client.get_solvers()
+        solver = client.get_solver()
     except SolverAuthenticationError:
         click.echo("Authentication error. Check credentials in your configuration file.")
         return 1
     except (InvalidAPIResponseError, UnsupportedSolverError):
         click.echo("Invalid or unexpected API response.")
         return 2
-
-    if solver_name and solver_name in solvers:
-        solver = solvers[solver_name]
-    else:
-        try:
-            solver = client.get_solver()
-        except (ValueError, KeyError):
-            if solvers:
-                _, solver = next(iter(solvers.items()))
-            else:
-                click.echo("No solvers available.")
-                return 1
+    except SolverNotFoundError:
+        click.echo("Solver with the specified features does not exist.")
+        return 3
 
     echo("Using solver: {}".format(solver.id))
 
@@ -420,7 +412,7 @@ def sample(config_file, profile, solver_name, biases, couplings, random_problem,
         result = solver.sample_ising(linear, quadratic, num_reads=num_reads).result()
     except Exception as e:
         click.echo(e)
-        return 2
+        return 4
 
     if verbose:
         click.echo("Result: {!r}".format(result))

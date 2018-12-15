@@ -247,6 +247,7 @@ class TestCli(unittest.TestCase):
     def test_sample(self):
         config_file = 'dwave.conf'
         profile = 'profile'
+        solver = '{"qpu": true}'
         biases = '[0]'
         couplings = '{(0, 4): 1}'
         num_reads = '10'
@@ -259,16 +260,16 @@ class TestCli(unittest.TestCase):
                 result = runner.invoke(cli, ['sample',
                                             '--config-file', config_file,
                                             '--profile', profile,
+                                            '--solver', solver,
                                             '-h', biases,
                                             '-j', couplings,
                                             '-n', num_reads])
 
             # proper arguments passed to Client.from_config?
-            m.from_config.assert_called_with(config_file=config_file, profile=profile)
+            m.from_config.assert_called_with(config_file=config_file, profile=profile, solver=solver)
 
             # get solver called?
-            c = m.from_config(config_file=config_file, profile=profile)
-            c.get_solvers.assert_called_with()
+            c = m.from_config(config_file=config_file, profile=profile, solver=solver)
             c.get_solver.assert_called_with()
 
             # sampling method called on solver?
