@@ -752,7 +752,7 @@ class Client(object):
         warnings.warn("'solvers' is deprecated in favor of 'get_solvers'.", DeprecationWarning)
         return self.get_solvers(refresh=refresh, **filters)
 
-    def get_solver(self, name=None, refresh=False, **features):
+    def get_solver(self, name=None, refresh=False, **filters):
         """Load the configuration for a single solver.
 
         Makes a blocking web call to `{endpoint}/solvers/remote/{solver_name}/`, where `{endpoint}`
@@ -765,11 +765,9 @@ class Client(object):
                 If default solver is not configured, ``None`` returns the first available
                 solver in ``Client``'s class (QPU/software/base).
 
-            **features (keyword arguments, optional):
-                Dictionary of features this solver has to have. For a list of
-                feature names and values, see: :meth:`~dwave.cloud.client.Client.solvers`.
-                To require a (full or partial) name match, use the ``features`` parameter
-                to specify a value for its ``name`` key.
+            **filters (keyword arguments, optional):
+                Dictionary of filters over features this solver has to have. For a list of
+                feature names and values, see: :meth:`~dwave.cloud.client.Client.get_solvers`.
 
             refresh (bool):
                 Return solver from cache (if cached with ``get_solvers()``),
@@ -798,20 +796,20 @@ class Client(object):
             >>> client.close() # doctest: +SKIP
 
         """
-        _LOGGER.debug("Requested a solver that best matches features=%r", features)
+        _LOGGER.debug("Requested a solver that best matches feature filters=%r", filters)
 
         # backward compatibility: name as the first feature
         if name is not None:
-            features.setdefault('name', name)
+            filters.setdefault('name', name)
 
-        # in absence of other features, config/env solver features/name are used
-        if not features and self.default_solver:
-            features = self.default_solver
+        # in absence of other filters, config/env solver filters/name are used
+        if not filters and self.default_solver:
+            filters = self.default_solver
 
-        # get the first solver that satisfies all features
+        # get the first solver that satisfies all filters
         try:
-            _LOGGER.debug("Fetching solvers according to features=%r", features)
-            return self.get_solvers(refresh=refresh, **features)[0]
+            _LOGGER.debug("Fetching solvers according to filters=%r", filters)
+            return self.get_solvers(refresh=refresh, **filters)[0]
         except IndexError:
             raise SolverNotFoundError("Solver with the requested features not available")
 
