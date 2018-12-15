@@ -606,9 +606,9 @@ def get_default_config():
         # If undefined, the first section below will be used as the default profile.
         #profile = prod
 
-        # Solver name used for sampling. If defining the solver in config,
-        # make sure that solver is provided on the endpoint used.
-        solver = DW_2000Q_3
+        # Feature-based definition of solver to be used for sampling. If defining
+        # the solver in here, make sure that solver is provided on the endpoint used.
+        #solver = {"qpu": true, "online": true, "num_qubits__gte": 2000}
 
         # Proxy URL (including authentication credentials) that shall be used
         # for all requests to D-Wave API endpoint URL.
