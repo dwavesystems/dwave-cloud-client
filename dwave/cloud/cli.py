@@ -303,24 +303,24 @@ def ping(config_file, profile, json_output, request_timeout, polling_timeout):
 @click.option('--config-file', '-c', default=None,
               type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
 @click.option('--profile', '-p', default=None, help='Connection profile name')
-@click.option('--id', 'solver_id', default=None, help='Solver ID/name')
-@click.option('--list', 'list_solvers', default=False, is_flag=True,
+@click.option('--solver', '-s', 'solver_def', default=None, help='Solver features filter')
+@click.option('--list', '-l', 'list_solvers', default=False, is_flag=True,
               help='List available solvers, one per line')
-def solvers(config_file, profile, solver_id, list_solvers):
+def solvers(config_file, profile, solver_def, list_solvers):
     """Get solver details.
 
     Unless solver name/id specified, fetch and display details for
     all solvers available on configured endpoint.
     """
 
-    with Client.from_config(config_file=config_file, profile=profile) as client:
-        solvers = client.get_solvers()
+    with Client.from_config(
+            config_file=config_file, profile=profile, solver=solver_def) as client:
 
-        if solver_id:
-            solvers = filter(lambda s: s.id == solver_id, solvers)
-            if not solvers:
-                click.echo("Solver {} not found.".format(solver_id))
-                return 1
+        try:
+            solvers = client.get_solvers(**client.default_solver)
+        except SolverNotFoundError:
+            click.echo("Solver(s) {} not found.".format(solver_def))
+            return 1
 
         if list_solvers:
             for solver in solvers:
