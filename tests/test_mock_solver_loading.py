@@ -153,6 +153,15 @@ class MockSolverLoading(unittest.TestCase):
 
     def test_load_all_solvers(self):
         """Load the list of solver names."""
+
+        def spoof_cache(client, clear_val=False, clear_expires=False):
+            cache = client._fetch_solvers._cache
+            for args in cache:
+                if clear_val:
+                    cache[args]['val'] = []
+                if clear_expires:
+                    cache[args]['expires'] = 0
+
         with requests_mock.mock() as m:
             setup_server(m)
 
@@ -163,14 +172,15 @@ class MockSolverLoading(unittest.TestCase):
                 self.assertEqual(len(solvers), 2)
 
                 # test default refresh
-                solvers.clear()
-                self.assertEqual(len(client.get_solvers()), 0)
+                spoof_cache(client, clear_expires=True)
+                self.assertEqual(len(client.get_solvers()), 2)      # should refresh
 
                 # test no refresh
-                self.assertEqual(len(client.get_solvers(refresh=False)), 0)
+                spoof_cache(client, clear_val=True)
+                self.assertEqual(len(client.get_solvers(refresh=False)), 0)     # should not refresh
 
                 # test refresh
-                self.assertEqual(len(client.get_solvers(refresh=True)), 2)
+                self.assertEqual(len(client.get_solvers(refresh=True)), 2)      # should refresh
 
     def test_load_missing_solver(self):
         """Try to load a solver that does not exist."""
@@ -410,4 +420,4 @@ class MockLegacyConfiguration(unittest.TestCase):
                     return response
 
                 with mock.patch("requests.adapters.HTTPAdapter.send", mock_send):
-                    client.solvers()
+                    client.get_solvers()

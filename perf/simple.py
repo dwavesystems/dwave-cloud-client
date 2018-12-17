@@ -30,7 +30,7 @@ logger.addHandler(handler)
 
 with Client.from_config(profile='prod') as client:
     solvers = client.get_solvers()
-    logger.info("Solvers available: %r", solvers.keys())
+    logger.info("Solvers available: %r", solvers)
 
     solver = client.get_solver()
     comp = solver.sample_qubo({})

@@ -44,17 +44,20 @@ from __future__ import division, absolute_import
 import re
 import sys
 import time
+import json
 import logging
 import threading
-import requests
 import posixpath
-import collections
+import requests
+import warnings
 import operator
+import collections
 from itertools import chain
 from functools import partial
 
 from dateutil.parser import parse as parse_datetime
 from six.moves import queue, range
+import six
 
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
@@ -83,8 +86,8 @@ class Client(object):
         token (str):
             Authentication token for the D-Wave API.
 
-        solver (str):
-            Default solver.
+        solver (dict/str):
+            Default solver features (or simply solver name).
 
         proxy (str):
             Proxy URL to be used for accessing the D-Wave API.
@@ -221,10 +224,17 @@ class Client(object):
             token (str, default=None):
                 API authorization token.
 
-            solver (str, default=None):
-                Default :term:`solver` to use in :meth:`~dwave.cloud.client.Client.get_solver`.
-                If undefined, :meth:`~dwave.cloud.client.Client.get_solver` will return the
-                first solver available.
+            solver (dict/str, default=None):
+                Default :term:`solver` features to use in :meth:`~dwave.cloud.client.Client.get_solver`.
+
+                Defined via dictionary of solver feature constraints
+                (see :meth:`~dwave.cloud.client.Client.get_solvers`).
+                For backward compatibility, a solver name, as a string,
+                is also accepted and converted to ``{"name": <solver name>}``.
+
+                If undefined, :meth:`~dwave.cloud.client.Client.get_solver` uses a
+                solver definition from environment variables, a configuration file, or
+                falls back to the first available online solver.
 
             proxy (str, default=None):
                 URL for proxy to use in connections to D-Wave API. Can include
@@ -311,11 +321,37 @@ class Client(object):
         if not endpoint or not token:
             raise ValueError("Endpoint URL and/or token not defined")
 
-        _LOGGER.debug("Creating a client for endpoint: %r", endpoint)
+        _LOGGER.debug(
+            "Creating a client for (endpoint=%r, token=%r, solver=%r, proxy=%r, "
+            "permissive_ssl=%r, request_timeout=%r, polling_timeout=%r, **kwargs=%r)",
+            endpoint, token, solver, proxy, permissive_ssl, request_timeout, polling_timeout, kwargs
+        )
+
+        if solver is None:
+            solver_def = {}
+
+        elif isinstance(solver, collections.Mapping):
+            solver_def = solver
+
+        elif isinstance(solver, six.string_types):
+            # support features dict encoded as JSON in our config INI file
+            # TODO: push this decoding to the config module, once we switch to a
+            #       richer config format (JSON or YAML)
+            try:
+                solver_def = json.loads(solver)
+            except Exception:
+                # unparseable json, assume string name for solver
+                # we'll deprecate this eventually, but for now just convert it to
+                # features dict (equality constraint on full solver name)
+                _LOGGER.debug("Invalid solver JSON, assuming string name: %r", solver)
+                solver_def = dict(name__eq=solver)
+
+        else:
+            raise ValueError("Expecting a features dictionary or a string name for 'solver'")
 
         self.endpoint = endpoint
         self.token = token
-        self.default_solver = solver
+        self.default_solver = solver_def
         self.request_timeout = parse_float(request_timeout)
         self.polling_timeout = parse_float(polling_timeout)
 
@@ -474,12 +510,12 @@ class Client(object):
         _LOGGER.debug("Received solver data for %d solver(s).", len(data))
         _LOGGER.trace("Solver data received for solver name=%r: %r", name, data)
 
-        solvers = {}
+        solvers = []
         for solver_desc in data:
             try:
                 solver = Solver(self, solver_desc)
                 if self.is_solver_handled(solver):
-                    solvers[solver.id] = solver
+                    solvers.append(solver)
                     _LOGGER.debug("Adding solver %r", solver)
                 else:
                     _LOGGER.debug("Skipping solver %r (not handled by this client)", solver)
@@ -491,45 +527,8 @@ class Client(object):
 
         return solvers
 
-    def get_solvers(self, refresh=False):
-        """List all solvers this client can provide, and load solvers' data.
-
-        Makes a blocking web call to `{endpoint}/solvers/remote/``, where `{endpoint}`
-        is a URL configured for the client, caches the result,
-        and populates a list of available :term:`solver`s described through :class:`.Solver`
-        instances.
-
-        To submit a sampling problem to the D-Wave API, select a solver from the returned list,
-        and execute a ``sampling_*`` method on it. Alternatively, use the :meth:`.get_solver` method
-        if you know the solver ID (name), have it defined in your configuration file, or are just
-        interested in fetching any/first solver.
-
-        Args:
-            refresh (bool, default=False):
-                By default, ``get_solvers`` caches the list of solvers it
-                receives from the API. Set to True to force a cache refresh.
-
-        Returns:
-            dict[id, solver]: Mapping of solver name/id to :class:`.Solver`
-
-        Examples:
-            This example lists all solvers available to a client instantiated from
-            a local system's auto-detected default configuration file, which configures
-            a connection to a D-Wave resource that provides two solvers.
-
-            >>> from dwave.cloud import Client
-            >>> client = Client.from_config()
-            >>> client.get_solvers()   # doctest: +SKIP
-            {u'2000Q_ONLINE_SOLVER1': <dwave.cloud.solver.Solver at 0x7e84fd0>,
-             u'2000Q_ONLINE_SOLVER2': <dwave.cloud.solver.Solver at 0x7e84828>}
-            >>> # code that uses client
-            >>> client.close() # doctest: +SKIP
-        """
-
-        return self._fetch_solvers(refresh_=refresh)
-
-    def solvers(self, refresh=False, **filters):
-        """Returns a filtered list of solvers handled by this client.
+    def get_solvers(self, refresh=False, **filters):
+        """Return a filtered list of solvers handled by this client.
 
         Solver filters are defined, similarly to Django QuerySet filters, with
         keyword arguments of form `<name>__<operator>=<value>`. Each
@@ -618,12 +617,12 @@ class Client(object):
             Client subclasses (e.g. :class:`dwave.cloud.qpu.Client` or
             :class:`dwave.cloud.sw.Client`) already filter solvers by resource
             type, so for ``qpu`` and ``software`` filters to have effect, you
-            need to call :meth:`.solvers` on the base :class:`~dwave.cloud.client.Client`
+            need to call :meth:`.get_solvers` on the base :class:`~dwave.cloud.client.Client`
             class.
 
         Examples::
 
-            client.solvers(
+            client.get_solvers(
                 num_qubits__gt=2000,                # we need more than 2000 q
                 num_qubits__lt=4000,                # .. but less than 4000 q
                 num_qubits__within=(2000, 4000),    # = alternative to the above
@@ -640,7 +639,7 @@ class Client(object):
                                                     # two couplings required: (0,128) and (0,4)
                 qubits__issuperset={0, 4, 215},     # qubits 0, 4 and 215 have to exist
                 supported_problem_types__issubset={'ising', 'qubo'},
-                                                    # require both Ising and QUBO support
+                                                    # require Ising, QUBO or both to be supported
                 name='DW_2000Q_3',                  # full solver name/id match
                 name__regex='.*2000.*',             # partial/regex-based solver name match
                 chip_id__regex='DW_.*'              # chip id prefix must be DW_
@@ -740,13 +739,20 @@ class Client(object):
         query = dict(refresh_=refresh)
         if 'name' in filters:
             query['name'] = filters['name']
+        if 'name__eq' in filters:
+            query['name'] = filters['name__eq']
 
-        solvers = self._fetch_solvers(**query).values()
+        solvers = self._fetch_solvers(**query)
         solvers = [s for s in solvers if all(p(s) for p in predicates)]
         solvers.sort(key=operator.attrgetter('id'))
         return solvers
 
-    def get_solver(self, name=None, refresh=False, **features):
+    def solvers(self, refresh=False, **filters):
+        """Deprecated in favor of :meth:`.get_solvers`."""
+        warnings.warn("'solvers' is deprecated in favor of 'get_solvers'.", DeprecationWarning)
+        return self.get_solvers(refresh=refresh, **filters)
+
+    def get_solver(self, name=None, refresh=False, **filters):
         """Load the configuration for a single solver.
 
         Makes a blocking web call to `{endpoint}/solvers/remote/{solver_name}/`, where `{endpoint}`
@@ -759,11 +765,9 @@ class Client(object):
                 If default solver is not configured, ``None`` returns the first available
                 solver in ``Client``'s class (QPU/software/base).
 
-            **features (keyword arguments, optional):
-                Dictionary of features this solver has to have. For a list of
-                feature names and values, see: :meth:`~dwave.cloud.client.Client.solvers`.
-                To require a (full or partial) name match, use the ``features`` parameter
-                to specify a value for its ``name`` key.
+            **filters (keyword arguments, optional):
+                Dictionary of filters over features this solver has to have. For a list of
+                feature names and values, see: :meth:`~dwave.cloud.client.Client.get_solvers`.
 
             refresh (bool):
                 Return solver from cache (if cached with ``get_solvers()``),
@@ -781,34 +785,33 @@ class Client(object):
             >>> from dwave.cloud import Client
             >>> client = Client.from_config()
             >>> client.get_solvers()   # doctest: +SKIP
-            {u'2000Q_ONLINE_SOLVER1': <dwave.cloud.solver.Solver at 0x7e84fd0>,
-             u'2000Q_ONLINE_SOLVER2': <dwave.cloud.solver.Solver at 0x7e84828>}
+            [Solver(id='2000Q_ONLINE_SOLVER1'), Solver(id='2000Q_ONLINE_SOLVER2')]
             >>> solver1 = client.get_solver()    # doctest: +SKIP
-            >>> solver2 = client.get_solver('2000Q_ONLINE_SOLVER2')    # doctest: +SKIP
+            >>> solver2 = client.get_solver(name='2000Q_ONLINE_SOLVER2')    # doctest: +SKIP
             >>> solver1.id  # doctest: +SKIP
-            u'2000Q_ONLINE_SOLVER1'
+            '2000Q_ONLINE_SOLVER1'
             >>> solver2.id   # doctest: +SKIP
-            u'2000Q_ONLINE_SOLVER2'
+            '2000Q_ONLINE_SOLVER2'
             >>> # code that uses client
             >>> client.close() # doctest: +SKIP
 
         """
-        _LOGGER.debug("Requested a solver that best matches features=%r", features)
+        _LOGGER.debug("Requested a solver that best matches feature filters=%r", filters)
 
         # backward compatibility: name as the first feature
         if name is not None:
-            features.setdefault('name', name)
+            filters.setdefault('name', name)
 
-        # in absence of other features, config/env solver name is used
-        if not features and self.default_solver:
-            features['name'] = self.default_solver
+        # in absence of other filters, config/env solver filters/name are used
+        if not filters and self.default_solver:
+            filters = self.default_solver
 
-        # get the first solver that satisfies all features
+        # get the first solver that satisfies all filters
         try:
-            _LOGGER.debug("Fetching solvers according to features=%r", features)
-            return self.solvers(refresh=refresh, **features)[0]
+            _LOGGER.debug("Fetching solvers according to filters=%r", filters)
+            return self.get_solvers(refresh=refresh, **filters)[0]
         except IndexError:
-            raise SolverNotFoundError("No solvers with the required features available")
+            raise SolverNotFoundError("Solver with the requested features not available")
 
     def _submit(self, body, future):
         """Enqueue a problem for submission to the server.

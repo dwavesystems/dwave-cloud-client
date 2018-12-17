@@ -20,7 +20,7 @@ install_requires = ['requests[socks]>=2.18', 'six>=1.10', 'homebase>=1.0',
 
 # Package extras requirements
 extras_require = {
-    'test': ['requests_mock', 'mock', 'numpy', 'coverage'],
+    'test': ['requests_mock', 'mock', 'numpy', 'coverage', 'plucky'],
 
     # python2 backports
     ':python_version == "2.7"': ['futures', 'configparser']

@@ -75,8 +75,14 @@ Examples:
         solver = EXAMPLE_2000Q_SYSTEM
         token = DEF-987654321987654321987654321
 
+        [feature]
+        solver = {"num_qubits__gte": 2000, "max_anneal_schedule_points__gte": 4}
+
     The example code below creates a client object that connects to a D-Wave QPU,
     using :class:`dwave.cloud.qpu.Client` and ``EXAMPLE_2000Q_SYSTEM`` as a default solver.
+    The ``feature`` profile specifies a solver selected based on available features,
+    namely we're requesting the first solver that has at least 2000 qubits and the
+    anneal schedule can be described with at least 4 points.
 
     >>> from dwave.cloud import Client
     >>> client = Client.from_config(config_file='~/jane/my_path_to_config/my_cloud_conf.conf')  # doctest: +SKIP
@@ -600,9 +606,9 @@ def get_default_config():
         # If undefined, the first section below will be used as the default profile.
         #profile = prod
 
-        # Solver name used for sampling. If defining the solver in config,
-        # make sure that solver is provided on the endpoint used.
-        solver = DW_2000Q_3
+        # Feature-based definition of solver to be used for sampling. If defining
+        # the solver in here, make sure that solver is provided on the endpoint used.
+        #solver = {"qpu": true, "online": true, "num_qubits__gte": 2000}
 
         # Proxy URL (including authentication credentials) that shall be used
         # for all requests to D-Wave API endpoint URL.
@@ -682,9 +688,17 @@ def load_config(config_file=None, profile=None, client=None,
             API authorization token.
 
         solver (str, default=None):
-            Default solver to use in :meth:`~dwave.cloud.client.Client.get_solver`.
-            If undefined, all calls to :meth:`~dwave.cloud.client.Client.get_solver`
-            must explicitly specify the solver name/id.
+            Default :term:`solver` features to use in
+            :meth:`~dwave.cloud.client.Client.get_solver`, encoded as JSON.
+
+            Defined via dictionary of solver feature constraints
+            (see :meth:`~dwave.cloud.client.Client.solvers`). For backward
+            compatibility, string solver name is also accepted, and it's
+            transformed to ``{"name": <solver name>}``.
+
+            If undefined, :meth:`~dwave.cloud.client.Client.get_solver` will use
+            solver definition from environment variables, configuration file, or
+            fallback to the first available online solver.
 
         proxy (str, default=None):
             URL for proxy to use in connections to D-Wave API. Can include
