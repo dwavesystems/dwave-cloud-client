@@ -34,7 +34,7 @@ try:
                          profile=test_config_profile)
 
     # ensure config is complete
-    for var in 'endpoint token solver'.split():
+    for var in ['token']:
         if not config[var]:
             raise ValueError("Config incomplete, missing: {!r}".format(var))
 
