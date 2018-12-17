@@ -101,9 +101,9 @@ class SolverLoading(unittest.TestCase):
                 client.get_solver("not-a-solver")
 
     def test_load_any_solver(self):
-        """Load a single solver without calling get_solvers (which caches data)."""
+        """Load a single solver without calling get_solvers."""
         with Client(**config) as client:
-            self.assertEqual(client.get_solver(config['solver']).id, config['solver'])
+            self.assertTrue(client.get_solver(software=True).is_software)
 
     def test_get_solver_no_defaults(self):
         from dwave.cloud import qpu, sw
