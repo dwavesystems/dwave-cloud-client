@@ -26,7 +26,7 @@ It's recommended you set up your D-Wave Cloud Client configuration through the
 
 As described in the :std:doc:`Using a D-Wave System <oceandocs:overview/dwavesys>` section
 of Ocean Documentation, for your code to access remote D-Wave compute resources, you must
-configure communication through SAPI; for example, your code needs the SAPI URL and your API
+configure communication through SAPI; for example, your code needs your API
 token for authentication. D-Wave Cloud Client provides multiple options for configuring
 the required information:
 
@@ -89,12 +89,10 @@ through auto-detection as the default configuration, contains the following
 profiles::
 
           [defaults]
-          endpoint = https://url.of.some.dwavesystem.com/sapi
-          client = qpu
-
-          [dw2000]
-          solver = DW_2000Q_1
           token = ABC-123456789123456789123456789
+
+          [firstAvailableQPU]
+          solver = {"qpu": true}
 
           [software]
           client = sw
@@ -102,10 +100,14 @@ profiles::
           token = DEF-987654321987654321987654321
           proxy = http://user:pass@myproxy.com:8080/
 
-You can instantiate clients for a D-Wave 2000Q QPU and a CPU with::
+          [backupDwave2000Q]
+          endpoint = https://url.of.my.backup.dwavesystem.com/sapi
+          solver = {"num_qubits__gt": 2000}
+
+You can instantiate clients for a D-Wave system and a CPU with::
 
       >>> from dwave.cloud import Client
-      >>> client_qpu = Client.from_config(profile='dw2000')   # doctest: +SKIP
+      >>> client_qpu = Client.from_config()   # doctest: +SKIP
       >>> client_cpu = Client.from_config(profile='software')   # doctest: +SKIP
 
 .. _environmentVariables:
@@ -167,7 +169,7 @@ A typical workflow may include the following steps:
    a solver.
 
    >>> with Client.from_config() as client:   # doctest: +SKIP
-   ...     solver = client.get_solver('2000Q_ONLINE_SOLVER')
+   ...     solver = client.get_solver(qpu=True)
 
    Alternatively, the following example snippet creates a client for software resources
    that it later explicitly closes.
