@@ -159,7 +159,7 @@ class Client(object):
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None,
                     endpoint=None, token=None, solver=None, proxy=None,
-                    legacy_config_fallback=True, **kwargs):
+                    legacy_config_fallback=False, **kwargs):
         """Client factory method to instantiate a client instance from configuration.
 
         Configuration values can be specified in multiple ways, ranked in the following
@@ -244,8 +244,8 @@ class Client(object):
                 username/password, port, scheme, etc. If undefined, client
                 uses the system-level proxy, if defined, or connects directly to the API.
 
-            legacy_config_fallback (bool, default=True):
-                If True (the default) and loading from a standard D-Wave Cloud Client configuration
+            legacy_config_fallback (bool, default=False):
+                If True and loading from a standard D-Wave Cloud Client configuration
                 file (``dwave.conf``) fails, tries loading a legacy configuration file (``~/.dwrc``).
 
         Other Parameters:
@@ -289,11 +289,15 @@ class Client(object):
         _LOGGER.debug("Config loaded: %r", config)
 
         # fallback to legacy `.dwrc` if key variables missing
-        if legacy_config_fallback and not config.get('token'):
-            config = legacy_load_config(
-                profile=profile, client=client,
-                endpoint=endpoint, token=token, solver=solver, proxy=proxy)
-            _LOGGER.debug("Legacy config loaded: %r", config)
+        if legacy_config_fallback:
+            warnings.warn("'legacy_config_fallback' is deprecated, please convert "
+                          "your legacy .dwrc file to the new config format.", DeprecationWarning)
+
+            if not config.get('token'):
+                config = legacy_load_config(
+                    profile=profile, client=client,
+                    endpoint=endpoint, token=token, solver=solver, proxy=proxy)
+                _LOGGER.debug("Legacy config loaded: %r", config)
 
         # manual override of other (client-custom) arguments
         config.update(kwargs)

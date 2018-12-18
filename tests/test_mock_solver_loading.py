@@ -371,7 +371,7 @@ class MockLegacyConfiguration(unittest.TestCase):
         """With environment variables and a config file, the config file should be ignored."""
         with mock.patch("dwave.cloud.config.open", iterable_mock_open(legacy_config_body), create=True):
             with mock.patch.dict(os.environ, {'DW_INTERNAL__HTTPLINK': 'env-url', 'DW_INTERNAL__TOKEN': 'env-token'}):
-                with Client.from_config(False) as client:
+                with Client.from_config(config_file=False, legacy_config_fallback=True) as client:
                     client.session.get = GetEvent.handle
                     try:
                         client.get_solver('arg-solver')
