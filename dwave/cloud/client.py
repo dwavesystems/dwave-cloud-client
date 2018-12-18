@@ -106,10 +106,10 @@ class Client(object):
     Examples:
         This example directly initializes a :class:`~dwave.cloud.client.Client`.
         Direct initialization uses class constructor arguments, the minimum being
-        values for `endpoint` and `token`.
+        a value for `token`.
 
         >>> from dwave.cloud import Client
-        >>> client = Client(endpoint='https://cloud.dwavesys.com/sapi', token='secret')
+        >>> client = Client(token='secret')
         >>> # code that uses client
         >>> client.close()
 

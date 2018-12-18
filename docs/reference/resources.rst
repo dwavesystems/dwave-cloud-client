@@ -15,12 +15,12 @@ creates a client based on an auto-detected configuration file and instantiates
 a solver.
 
 >>> with Client.from_config() as client:   # doctest: +SKIP
-...     solver = client.get_solver('2000Q_ONLINE_SOLVER')
+...     solver = client.get_solver(num_qubits__gt=2000)
 
 Alternatively, the following example snippet creates a client for software resources
 that it later explicitly closes.
 
->>> client = Client.from_config(client='sw')   # doctest: +SKIP
+>>> client = Client.from_config(software=True)   # doctest: +SKIP
 >>> # code that uses client
 >>> client.close()    # doctest: +SKIP
 
