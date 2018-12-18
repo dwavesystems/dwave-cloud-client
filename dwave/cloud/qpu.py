@@ -42,7 +42,8 @@ class Client(BaseClient):
 
     This class is instantiated by default, or explicitly when `client=qpu`, with the
     typical base client instantiation :code:`with Client.from_config() as client:` of
-    a client.
+    a client. (You should not instantiate this class with `client=sw` or use it with 
+    solver feature constraint `software=True`.)
 
     Examples:
         This example explicitly instantiates a :class:`dwave.cloud.qpu.client` based
