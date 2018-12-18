@@ -593,13 +593,14 @@ def get_default_config():
     config.read_string(u"""
         [defaults]
         # This section provides default values for some variables.
-        # Any of these can be overridden in a profile definition below.
+        # Any of these can be overridden in a specific profile definition below,
+        # with an environment variable, and in code.
 
         # D-Wave solver API endpoint URL defaults to a production endpoint
-        endpoint = https://cloud.dwavesys.com/sapi
+        #endpoint = https://cloud.dwavesys.com/sapi
 
         # Default client is for the QPU resource (QPU sampler)
-        # Possible values: qpu, sw
+        # Possible values: `qpu`, `sw`, `base` (equal to unspecified)
         client = qpu
 
         # Profile name to use if otherwise unspecified.
@@ -607,7 +608,8 @@ def get_default_config():
         #profile = prod
 
         # Feature-based definition of solver to be used for sampling. If defining
-        # the solver in here, make sure that solver is provided on the endpoint used.
+        # the solver in here, make sure that solver is provided on the endpoint used
+        # and with the client used (`qpu` or `sw`; `base` can handle any).
         #solver = {"qpu": true, "online": true, "num_qubits__gte": 2000}
 
         # Proxy URL (including authentication credentials) that shall be used

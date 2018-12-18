@@ -109,7 +109,7 @@ class Client(object):
         values for `endpoint` and `token`.
 
         >>> from dwave.cloud import Client
-        >>> client = Client(endpoint='https://cloud.dwavesys.com/sapi', token='secret')
+        >>> client = Client(token='secret')
         >>> # code that uses client
         >>> client.close()
 
@@ -125,6 +125,9 @@ class Client(object):
 
     # Identify as something like `dwave-cloud-client/0.4` in all requests
     USER_AGENT = '{}/{}'.format(__packagename__, __version__)
+
+    # Default API endpoint
+    DEFAULT_API_ENDPOINT = 'https://cloud.dwavesys.com/sapi'
 
     # Cases when multiple status flags qualify
     ANY_STATUS_ONGOING = [STATUS_IN_PROGRESS, STATUS_PENDING]
@@ -286,8 +289,7 @@ class Client(object):
         _LOGGER.debug("Config loaded: %r", config)
 
         # fallback to legacy `.dwrc` if key variables missing
-        if legacy_config_fallback and (
-                not config.get('token') or not config.get('endpoint')):
+        if legacy_config_fallback and not config.get('token'):
             config = legacy_load_config(
                 profile=profile, client=client,
                 endpoint=endpoint, token=token, solver=solver, proxy=proxy)
@@ -318,8 +320,11 @@ class Client(object):
         are performed by asynchronously workers. For 2, 3, and 5 the workers
         gather tasks in batches.
         """
-        if not endpoint or not token:
-            raise ValueError("Endpoint URL and/or token not defined")
+        if not endpoint:
+            endpoint = self.DEFAULT_API_ENDPOINT
+
+        if not token:
+            raise ValueError("API token not defined")
 
         _LOGGER.debug(
             "Creating a client for (endpoint=%r, token=%r, solver=%r, proxy=%r, "
