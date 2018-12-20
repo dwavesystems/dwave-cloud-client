@@ -251,7 +251,10 @@ def user_agent(name, version):
         bitness = platform.architecture()[0]
         if name == 'PyPy':
             version = '.'.join(map(str, sys.pypy_version_info[:3]))
-        return name, "{}-{}".format(version, bitness)
+        full_version = [version]
+        if bitness:
+            full_version.append(bitness)
+        return name, "-".join(full_version)
 
     tags = [
         (name, version),
