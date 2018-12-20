@@ -96,6 +96,15 @@ class Client(object):
         permissive_ssl (bool, default=False):
             Disables SSL verification.
 
+        request_timeout (float, default=60):
+            Connect and read timeout (in seconds) for all requests to the D-Wave API.
+
+        polling_timeout (float, default=None):
+            Problem status polling timeout (in seconds), after which polling is aborted.
+
+        connection_close (bool, default=False):
+            Force HTTP(S) connection close after each request.
+
     Other Parameters:
         Unrecognized keys (str):
             All unrecognized keys are passed through to the appropriate client class constructor
@@ -308,7 +317,8 @@ class Client(object):
         return _clients[_client](**config)
 
     def __init__(self, endpoint=None, token=None, solver=None, proxy=None,
-                 permissive_ssl=False, request_timeout=60, polling_timeout=None, **kwargs):
+                 permissive_ssl=False, request_timeout=60, polling_timeout=None,
+                 connection_close=False, **kwargs):
         """To setup the connection a pipeline of queues/workers is constructed.
 
         There are five interactions with the server the connection manages:
@@ -371,6 +381,11 @@ class Client(object):
         self.session.proxies = {'http': proxy, 'https': proxy}
         if permissive_ssl:
             self.session.verify = False
+        if connection_close:
+            self.session.headers.update({'Connection': 'close'})
+
+        # Debug-log headers
+        _LOGGER.debug("session.headers=%r", self.session.headers)
 
         # Build the problem submission queue, start its workers
         self._submission_queue = queue.Queue()
