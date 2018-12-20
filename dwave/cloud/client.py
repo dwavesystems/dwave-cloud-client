@@ -96,6 +96,15 @@ class Client(object):
         permissive_ssl (bool, default=False):
             Disables SSL verification.
 
+        request_timeout (float, default=60):
+            Connect and read timeout (in seconds) for all requests to the D-Wave API.
+
+        polling_timeout (float, default=None):
+            Problem status polling timeout (in seconds), after which polling is aborted.
+
+        connection_close (bool, default=False):
+            Force HTTP(S) connection close after each request.
+
     Other Parameters:
         Unrecognized keys (str):
             All unrecognized keys are passed through to the appropriate client class constructor
