@@ -56,6 +56,7 @@ from itertools import chain
 from functools import partial
 
 from dateutil.parser import parse as parse_datetime
+from plucky import pluck
 from six.moves import queue, range
 import six
 
@@ -557,8 +558,34 @@ class Client(object):
                 Force refresh of cached list of solvers/properties.
 
             order_by (callable/str, default='id'):
-                Solver sorting key function (or :class:`Solver` attribute name).
-                By default, solvers are sorted by ID/name.
+                Solver sorting key function (or :class:`Solver` attribute/item
+                dot-separated path). By default, solvers are sorted by ID/name
+                (identical to 'properties.chip_id').
+
+                Signature of the `key` `callable` is::
+
+                    key :: (Solver s, Ord k) => s -> k
+
+                Basic structure of the `key` string path is::
+
+                    (attr|item) ( "." (attr|item) )*
+
+                For example, to use solver property named ``avg_load``, available
+                in ``Solver.properties`` dict, you can either specify a callable `key`:
+
+                    key=lambda solver: solver.properties['avg_load']
+
+                or, you can use shorter string path based key:
+
+                    key='properties.avg_load'
+
+                Solver inferred properties, available as :class:`Solver` properties
+                can also be used (e.g. ``num_active_qubits``, ``is_online``, etc).
+
+                Note: the sort used for ordering solvers by `key` is **stable**,
+                meaning that if multiple solvers have the same value for the
+                key, their order is not changed, and effectively they are in order
+                are received from the API.
 
             filters:
                 See `Filtering forms` and `Operators` below.
@@ -744,7 +771,7 @@ class Client(object):
 
         # param validation
         if isinstance(order_by, six.string_types):
-            sort_key = operator.attrgetter(order_by)
+            sort_key = lambda solver: pluck(solver, order_by, None)
         elif callable(order_by):
             sort_key = order_by
         else:
