@@ -67,19 +67,19 @@ Examples:
     explicitly specified configuration file, "~/jane/my_path_to_config/my_cloud_conf.conf"::
 
         [defaults]
-        endpoint = https://url.of.some.dwavesystem.com/sapi
-        client = qpu
         token = ABC-123456789123456789123456789
 
-        [dw2000]
-        solver = EXAMPLE_2000Q_SYSTEM
-        token = DEF-987654321987654321987654321
+        [firstQPU]
+        solver = {"qpu": true}
 
         [feature]
+        endpoint = https://url.of.some.dwavesystem.com/sapi
+        token = DEF-987654321987654321987654321
         solver = {"num_qubits__gte": 2000, "max_anneal_schedule_points__gte": 4}
 
     The example code below creates a client object that connects to a D-Wave QPU,
-    using :class:`dwave.cloud.qpu.Client` and ``EXAMPLE_2000Q_SYSTEM`` as a default solver.
+    using :class:`dwave.cloud.qpu.Client` and the first available online D-Wave system
+    at the default API endpoint URL (https://cloud.dwavesys.com/sapi).
     The ``feature`` profile specifies a solver selected based on available features,
     namely we're requesting the first solver that has at least 2000 qubits and the
     anneal schedule can be described with at least 4 points.
@@ -103,12 +103,10 @@ Examples:
     configuration file::
 
         [defaults]
-        endpoint = https://url.of.some.dwavesystem.com/sapi
-        client = qpu
-
-        [dw2000A]
-        solver = EXAMPLE_2000Q_SYSTEM_A
         token = ABC-123456789123456789123456789
+
+        [primary-qpu]
+        solver = {"qpu": true}
 
         [sw_solver]
         client = sw
@@ -116,8 +114,9 @@ Examples:
         endpoint = https://url.of.some.software.resource.com/my_if
         token = DEF-987654321987654321987654321
 
-        [dw2000B]
-        solver = EXAMPLE_2000Q_SYSTEM_B
+        [backup-qpu]
+        solver = {"qpu": true, "num_qubits__gte": 2000}
+        endpoint = https://url.of.some.dwavesystem.com/sapi
         proxy = http://user:pass@myproxy.com:8080/
         token = XYZ-0101010100112341234123412341234
 
@@ -125,8 +124,8 @@ Examples:
     same URL but each with its own solver ID and token) and one software solver.
 
     >>> from dwave.cloud import Client
-    >>> client_qpu1 = Client.from_config(profile='dw2000A')    # doctest: +SKIP
-    >>> client_qpu1 = Client.from_config(profile='dw2000B')    # doctest: +SKIP
+    >>> client_qpu1 = Client.from_config(profile='primary-qpu')    # doctest: +SKIP
+    >>> client_qpu1 = Client.from_config(profile='backup-qpu')    # doctest: +SKIP
     >>> client_sw1 = Client.from_config(profile='sw_solver')   # doctest: +SKIP
     >>> client_qpu1.default_solver   # doctest: +SKIP
     u'EXAMPLE_2000Q_SYSTEM_A'
@@ -144,17 +143,16 @@ Examples:
     from the user-local ``/usr/local/share/dwave/dwave.conf`` file::
 
         [defaults]
-        endpoint = https://int.se.dwavesystems.com/sapi
+        solver = {"qpu": true}
 
         [dw2000]
-        client = qpu
+        endpoint = https://int.se.dwavesystems.com/sapi
         token = ABC-123456789123456789123456789
 
     A solver is supplemented from the file in the current working directory, which also
     overrides the token value. ``./dwave.conf`` is the file in the current directory::
 
         [dw2000]
-        solver = EXAMPLE_2000Q_SYSTEM_A
         token = DEF-987654321987654321987654321
 
     >>> from dwave.cloud import Client
@@ -174,15 +172,14 @@ Examples:
 
         [defaults]
         endpoint = https://url.of.some.dwavesystem.com/sapi
-        client = qpu
+        solver = {"qpu": true}
 
         [dw2000A]
-        client = sw
+        solver = {"software": true, "name": "EXAMPLE_2000Q"}
         token = ABC-123456789123456789123456789
-        solver = EXAMPLE_2000Q
 
         [dw2000B]
-        client = qpu
+        solver = {"qpu": true}
         token = DEF-987654321987654321987654321
 
     This configuration file contains two profiles in addition to the defaults section.
@@ -626,9 +623,12 @@ def load_config(config_file=None, profile=None, client=None,
     Configuration values can be specified in multiple ways, ranked in the following
     order (with 1 the highest ranked):
 
-    1. Values specified as keyword arguments in :func:`load_config()`
-    2. Values specified as environment variables
-    3. Values specified in the configuration file
+    1. Values specified as keyword arguments in :func:`load_config()`. These values replace
+       values read from a configuration file, and therefore must be **strings**, including float
+       values for timeouts, boolean flags (tested for "truthiness"), and solver feature
+       constraints (a dictionary encoded as JSON).
+    2. Values specified as environment variables.
+    3. Values specified in the configuration file.
 
     Configuration-file format is described in :mod:`dwave.cloud.config`.
 
@@ -679,7 +679,7 @@ def load_config(config_file=None, profile=None, client=None,
                section is promoted and selected.
 
         client (str, default=None):
-            Client type used for accessing the API. Supported values are `qpu
+            Client type used for accessing the API. Supported values are `qpu`
             for :class:`dwave.cloud.qpu.Client` and `sw` for
             :class:`dwave.cloud.sw.Client`.
 
@@ -690,17 +690,15 @@ def load_config(config_file=None, profile=None, client=None,
             API authorization token.
 
         solver (str, default=None):
-            Default :term:`solver` features to use in
-            :meth:`~dwave.cloud.client.Client.get_solver`, encoded as JSON.
+            :term:`solver` features, as a JSON-encoded dictionary of feature constraints,
+            the client should use. See :meth:`~dwave.cloud.client.Client.get_solvers` for
+            semantics of supported feature constraints.
 
-            Defined via dictionary of solver feature constraints
-            (see :meth:`~dwave.cloud.client.Client.solvers`). For backward
-            compatibility, string solver name is also accepted, and it's
-            transformed to ``{"name": <solver name>}``.
+            If undefined, the client uses a solver definition from environment variables,
+            a configuration file, or falls back to the first available online solver.
 
-            If undefined, :meth:`~dwave.cloud.client.Client.get_solver` will use
-            solver definition from environment variables, configuration file, or
-            fallback to the first available online solver.
+            For backward compatibility, solver name in string format is accepted and
+            converted to ``{"name": <solver name>}``.
 
         proxy (str, default=None):
             URL for proxy to use in connections to D-Wave API. Can include
@@ -726,21 +724,21 @@ def load_config(config_file=None, profile=None, client=None,
             Config file parse failed.
 
     Examples
+        This example loads the configuration from an auto-detected configuration file
+        in the home directory of a Windows system user.
+
+        >>> import dwave.cloud as dc
+        >>> dc.config.load_config()
+        {'client': u'qpu',
+         'endpoint': u'https://url.of.some.dwavesystem.com/sapi',
+         'proxy': None,
+         'solver': u'EXAMPLE_2000Q_SYSTEM_A',
+         'token': u'DEF-987654321987654321987654321'}
+        >>> See which configuration file was loaded
+        >>> dc.config.get_configfile_paths()
+        [u'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf']
+
         Additional examples are given in :mod:`dwave.cloud.config`.
-
-       This example loads the configuration from an auto-detected configuration file
-       in the home directory of a Windows system user.
-
-       >>> import dwave.cloud as dc
-       >>> dc.config.load_config()
-       {'client': u'qpu',
-        'endpoint': u'https://url.of.some.dwavesystem.com/sapi',
-        'proxy': None,
-        'solver': u'EXAMPLE_2000Q_SYSTEM_A',
-        'token': u'DEF-987654321987654321987654321'}
-       >>> See which configuration file was loaded
-       >>> dc.config.get_configfile_paths()
-       [u'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf']
 
     """
 

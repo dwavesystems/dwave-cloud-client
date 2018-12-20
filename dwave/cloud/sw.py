@@ -34,7 +34,8 @@ class Client(BaseClient):
 
     This class is instantiated by default, or explicitly when `client=sw`, with the
     typical base client instantiation :code:`with Client.from_config() as client:` of
-    a client.
+    a client. (You should not instantiate this class with `client=qpu` or use it with
+    solver feature constraint `qpu=True`.)
 
     Examples:
         This example indirectly instantiates a :class:`dwave.cloud.sw.client` based
@@ -47,7 +48,7 @@ class Client(BaseClient):
             from dwave.cloud import Client
 
             # Use context manager to ensure resources (thread pools used by Client) are released
-            with Client.from_config(client='sw') as client:
+            with Client.from_config(solver={"software": True}) as client:
 
                 solver = client.get_solver()
 

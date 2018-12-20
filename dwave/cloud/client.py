@@ -116,7 +116,7 @@ class Client(object):
     Examples:
         This example directly initializes a :class:`~dwave.cloud.client.Client`.
         Direct initialization uses class constructor arguments, the minimum being
-        values for `endpoint` and `token`.
+        a value for `token`.
 
         >>> from dwave.cloud import Client
         >>> client = Client(token='secret')
@@ -552,85 +552,78 @@ class Client(object):
     def get_solvers(self, refresh=False, **filters):
         """Return a filtered list of solvers handled by this client.
 
-        Solver filters are defined, similarly to Django QuerySet filters, with
-        keyword arguments of form `<name>__<operator>=<value>`. Each
-        ``<operator>`` is a predicate (boolean) function that acts on two
-        arguments: value of feature ``<name>`` and the required ``<value>``.
-
         Args:
             refresh (bool, default=False):
-                Force refresh cached list of solvers/properties
-            **filters:
-                See `Filtering forms` and `Operators` below
+                Force refresh of cached list of solvers/properties.
+            filters:
+                See `Filtering forms` and `Operators` below.
 
-        Feature ``<name>`` can be:
-            1) an inferred solver property, available as (similarly named)
-               :class:`Solver`'s property (`name`, `qpu`, `software`, `online`,
-               `num_qubits`, num_active_qubits`)
-            2) a solver parameter, available in :obj:`Solver.parameters`, or
-            3) a solver property, available in :obj:`Solver.properties`.
+        Solver filters are defined, similarly to Django QuerySet filters, with
+        keyword arguments of form `<name>__<operator>=<value>`. Each `<operator>`
+        is a predicate (boolean) function that acts on two arguments: value of feature
+        `<name>` and the required `<value>`.
 
-        Filtering forms:
-            <inferred_feature> (bool),
-            <inferred_feature>__eq (bool),
-            <inferred_feature>__<operator> (object <value>):
-                Ensures the value of solver's property bound to `inferred_feature`,
-                after applying `operator` equals the `value`. The default
-                operator is `eq`.
+        Feature `<name>` can be:
 
-            <parameter> (bool),
-            <parameter>__available (bool),
-            <parameter>__<operator> (object <value>):
-                Ensures solver supports `parameter`. General operator form can
-                be used, but that usually doesn't make sense for parameters,
-                since values are human-readable descriptions. The default
-                operator is `available`.
+        1) an inferred solver property, available as a (similarly named)
+           :class:`Solver`'s property (`name`, `qpu`, `software`, `online`,
+           `num_qubits`, num_active_qubits`)
+        2) a solver parameter, available in :obj:`Solver.parameters`
+        3) a solver property, available in :obj:`Solver.properties`
 
-            <property> (bool),
-            <property>__eq (bool),
-            <property>__<operator> (object <value>):
-                Ensures the value of solver's `property`, after applying
-                `operator` equals the righthand side `value`. The default
-                operator is `eq`.
+        Filtering forms are:
 
-            Note: if a non-existing parameter/property name/key given, the
-            default operator is `eq`.
+        * <inferred_feature> (bool)
+        * <inferred_feature>__eq (bool)
+        * <inferred_feature>__<operator> (object <value>)
 
-        Operators:
-            available, eq, lt, lte, gt, gte, regex,
-            covers, within,
-            in, contains,
-            issubset, issuperset
+          This form ensures the value of solver's property is bound to `inferred_feature`,
+          after applying `operator` equals the `value`. The default operator is `eq`.
 
-        Inferred features:
-            name (str):
-                Solver name/id.
-            qpu (bool):
-                Is solver QPU based?
-            software (bool):
-                Is solver software based?
-            online (bool, default=True):
-                Is solver online?
-            num_qubits (int):
-                Number of qubits available.
-            num_active_qubits (int):
-                Number of active qubits. Less then or equal to `num_qubits`.
+        * <parameter> (bool)
+        * <parameter>__available (bool)
+        * <parameter>__<operator> (object <value>)
 
-        Common solver parameters:
-            flux_biases:
-                Should solver accept flux biases?
-            anneal_schedule:
-                Should solver accept anneal schedule?
+          This form ensures that the solver supports `parameter`. General operator form can
+          be used but usually does not make sense for parameters, since values are human-readable
+          descriptions. The default operator is `available`.
 
-        Common solver properties:
-            vfyc (bool):
-                Should solver work on "virtual full-yield chip"?
-            max_anneal_schedule_points (int):
-                Piecewise linear annealing schedule points.
-            h_range ([int,int]), j_range ([int,int]):
-                Biases/couplings values range.
-            num_reads_range ([int,int]):
-                Range of allowed values for `num_reads` parameter.
+        * <property> (bool)
+        * <property>__eq (bool)
+        * <property>__<operator> (object <value>)
+
+          This form ensures the value of the solver's `property`, after applying `operator`
+          equals the righthand side `value`. The default operator is `eq`.
+
+        Note: if a non-existing parameter/property name/key given, the default operator is `eq`.
+
+        Operators are:
+
+        * available, eq, lt, lte, gt, gte, regex
+        * covers, within
+        * in, contains
+        * issubset, issuperset
+
+        Inferred features are:
+
+        * `name` (str): Solver name/id.
+        * `qpu` (bool): Is solver QPU based?
+        * `software` (bool): Is solver software based?
+        * `online` (bool, default=True): Is solver online?
+        * `num_qubits` (int): Number of qubits available.
+        * `num_active_qubits` (int): Number of active qubits. Less then or equal to `num_qubits`.
+
+        Common solver parameters are:
+
+        * `flux_biases`: Should solver accept flux biases?
+        * `anneal_schedule`: Should solver accept anneal schedule?
+
+        Common solver properties are:
+
+        * `vfyc` (bool): Should solver work on "virtual full-yield chip"?
+        * `max_anneal_schedule_points` (int): Piecewise linear annealing schedule points.
+        * `h_range` ([int,int]), j_range ([int,int]): Biases/couplings values range.
+        * `num_reads_range` ([int,int]): Range of allowed values for `num_reads` parameter.
 
         Returns:
             list[Solver]: List of all solvers that satisfy the conditions.
@@ -638,33 +631,32 @@ class Client(object):
         Note:
             Client subclasses (e.g. :class:`dwave.cloud.qpu.Client` or
             :class:`dwave.cloud.sw.Client`) already filter solvers by resource
-            type, so for ``qpu`` and ``software`` filters to have effect, you
-            need to call :meth:`.get_solvers` on the base :class:`~dwave.cloud.client.Client`
-            class.
+            type, so for `qpu` and `software` filters to have effect, call :meth:`.get_solvers`
+            on base class :class:`~dwave.cloud.client.Client`.
 
         Examples::
 
             client.get_solvers(
-                num_qubits__gt=2000,                # we need more than 2000 q
-                num_qubits__lt=4000,                # .. but less than 4000 q
-                num_qubits__within=(2000, 4000),    # = alternative to the above
-                num_active_qubits=1089,             # we are very particular about active qubit count
-                vfyc=True,                          # we require fully yielded Chimera
-                vfyc__in=[False, None],             # inverse of the above
+                num_qubits__gt=2000,                # we need more than 2000 qubits
+                num_qubits__lt=4000,                # ... but fewer than 4000 qubits
+                num_qubits__within=(2000, 4000),    # an alternative to the previous two lines
+                num_active_qubits=1089,             # we want a particular number of active qubits
+                vfyc=True,                          # we require a fully yielded Chimera
+                vfyc__in=[False, None],             # inverse of the previous filter
                 vfyc__available=False,              # we want solvers that do not advertize the vfyc property
                 anneal_schedule=True,               # we need support for custom anneal schedule
                 max_anneal_schedule_points__gte=4,  # we need at least 4 points for our anneal schedule
-                num_reads_range__covers=1000,       # solver must support returning 1000 reads
+                num_reads_range__covers=1000,       # our solver must support returning 1000 reads
                 extended_j_range__covers=(-2, 2),   # we need extended J range to contain (-2,2)
-                couplings__contains=[0, 128],       # coupling (edge between) (0,128) has to exist
+                couplings__contains=[0, 128],       # coupling (edge between) qubits (0,128) must exist
                 couplings__issuperset=[[0,128], [0,4]],
                                                     # two couplings required: (0,128) and (0,4)
-                qubits__issuperset={0, 4, 215},     # qubits 0, 4 and 215 have to exist
+                qubits__issuperset={0, 4, 215},     # qubits 0, 4 and 215 must exist
                 supported_problem_types__issubset={'ising', 'qubo'},
                                                     # require Ising, QUBO or both to be supported
-                name='DW_2000Q_3',                  # full solver name/id match
+                name='DW_2000Q_3',                  # full solver name/ID match
                 name__regex='.*2000.*',             # partial/regex-based solver name match
-                chip_id__regex='DW_.*'              # chip id prefix must be DW_
+                chip_id__regex='DW_.*'              # chip ID prefix must be DW_
             )
         """
 
