@@ -557,10 +557,11 @@ class Client(object):
             refresh (bool, default=False):
                 Force refresh of cached list of solvers/properties.
 
-            order_by (callable/str, default='id'):
+            order_by (callable/str/None, default='id'):
                 Solver sorting key function (or :class:`Solver` attribute/item
                 dot-separated path). By default, solvers are sorted by ID/name
-                (identical to 'properties.chip_id').
+                (identical to 'properties.chip_id'). To explicitly not sort the
+                solvers (and use the API-returned order), set ``order_by=None``.
 
                 Signature of the `key` `callable` is::
 
@@ -575,7 +576,7 @@ class Client(object):
 
                     key=lambda solver: solver.properties['avg_load']
 
-                or, you can use shorter string path based key:
+                or, you can use a short string path based key:
 
                     key='properties.avg_load'
 
@@ -586,6 +587,8 @@ class Client(object):
                 meaning that if multiple solvers have the same value for the
                 key, their order is not changed, and effectively they are in order
                 are received from the API.
+
+                Note: solvers with ``None`` for key appear last in the list of solvers.
 
             filters:
                 See `Filtering forms` and `Operators` below.
@@ -774,6 +777,8 @@ class Client(object):
             sort_key = lambda solver: pluck(solver, order_by, None)
         elif callable(order_by):
             sort_key = order_by
+        elif not order_by:
+            sort_key = None
         else:
             raise ValueError("expected string or callable for 'order_by'")
 
@@ -801,12 +806,14 @@ class Client(object):
         solvers = [s for s in solvers if all(p(s) for p in predicates)]
 
         # sort: undefined (None) key values go last
-        solvers_with_keys = [(sort_key(solver), solver) for solver in solvers]
-        solvers_with_invalid_keys = [(key, solver) for key, solver in solvers_with_keys if key is None]
-        solvers_with_valid_keys = [(key, solver) for key, solver in solvers_with_keys if key is not None]
-        solvers_with_valid_keys.sort(key=operator.itemgetter(0))
+        if sort_key is not None:
+            solvers_with_keys = [(sort_key(solver), solver) for solver in solvers]
+            solvers_with_invalid_keys = [(key, solver) for key, solver in solvers_with_keys if key is None]
+            solvers_with_valid_keys = [(key, solver) for key, solver in solvers_with_keys if key is not None]
+            solvers_with_valid_keys.sort(key=operator.itemgetter(0))
+            solvers = [solver for key, solver in chain(solvers_with_valid_keys, solvers_with_invalid_keys)]
 
-        return [solver for key, solver in chain(solvers_with_valid_keys, solvers_with_invalid_keys)]
+        return solvers
 
     def solvers(self, refresh=False, **filters):
         """Deprecated in favor of :meth:`.get_solvers`."""
