@@ -14,12 +14,14 @@
 
 from __future__ import division, absolute_import
 
+import sys
+import time
+import random
+import platform
+import itertools
 from datetime import datetime
 from dateutil.tz import UTC
 from functools import wraps
-import itertools
-import random
-import time
 
 import six
 import click
@@ -238,6 +240,29 @@ class TimeoutingHTTPAdapter(requests.adapters.HTTPAdapter):
         # can't use setdefault because caller always sets timeout kwarg
         kwargs['timeout'] = self.timeout
         return super(TimeoutingHTTPAdapter, self).send(*args, **kwargs)
+
+
+def user_agent(name, version):
+    """Return User-Agent ~ "name/version language/version interpreter/version os/version"."""
+
+    def _interpreter():
+        name = platform.python_implementation()
+        version = platform.python_version()
+        bitness = platform.architecture()[0]
+        if name == 'PyPy':
+            version = '.'.join(map(str, sys.pypy_version_info[:3]))
+        return name, "{}-{}".format(version, bitness)
+
+    tags = [
+        (name, version),
+        ("python", platform.python_version()),
+        _interpreter(),
+        ("machine", platform.machine()),
+        ("system", platform.system()),
+        ("platform", platform.platform()),
+    ]
+
+    return ' '.join("{}/{}".format(name, version) for name, version in tags)
 
 
 class CLIError(Exception):
