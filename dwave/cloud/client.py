@@ -569,7 +569,7 @@ class Client(object):
 
                 Basic structure of the `key` string path is::
 
-                    (attr|item) ( "." (attr|item) )*
+                    "-"? (attr|item) ( "." (attr|item) )*
 
                 For example, to use solver property named ``avg_load``, available
                 in ``Solver.properties`` dict, you can either specify a callable `key`:
@@ -582,6 +582,9 @@ class Client(object):
 
                 Solver inferred properties, available as :class:`Solver` properties
                 can also be used (e.g. ``num_active_qubits``, ``is_online``, etc).
+
+                Ascending sort order is implied, unless the key string path does
+                not start with ``-``, in which case descending sort is used.
 
                 Note: the sort used for ordering solvers by `key` is **stable**,
                 meaning that if multiple solvers have the same value for the
@@ -773,12 +776,19 @@ class Client(object):
                 return op(None, val)
 
         # param validation
-        if isinstance(order_by, six.string_types):
-            sort_key = lambda solver: pluck(solver, order_by, None)
+        sort_reverse = False
+        if not order_by:
+            sort_key = None
+        elif isinstance(order_by, six.string_types):
+            if order_by[0] == '-':
+                sort_reverse = True
+                order_by = order_by[1:]
+            if not order_by:
+                sort_key = None
+            else:
+                sort_key = lambda solver: pluck(solver, order_by, None)
         elif callable(order_by):
             sort_key = order_by
-        elif not order_by:
-            sort_key = None
         else:
             raise ValueError("expected string or callable for 'order_by'")
 
@@ -810,8 +820,12 @@ class Client(object):
             solvers_with_keys = [(sort_key(solver), solver) for solver in solvers]
             solvers_with_invalid_keys = [(key, solver) for key, solver in solvers_with_keys if key is None]
             solvers_with_valid_keys = [(key, solver) for key, solver in solvers_with_keys if key is not None]
-            solvers_with_valid_keys.sort(key=operator.itemgetter(0))
+            solvers_with_valid_keys.sort(key=operator.itemgetter(0), reverse=sort_reverse)
             solvers = [solver for key, solver in chain(solvers_with_valid_keys, solvers_with_invalid_keys)]
+        else:
+            # no sorting required, but we might want to just reverse the list
+            if sort_reverse:
+                solvers.reverse()
 
         return solvers
 
