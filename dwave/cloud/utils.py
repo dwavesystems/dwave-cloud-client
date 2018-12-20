@@ -260,9 +260,9 @@ def user_agent(name, version):
         (name, version),
         ("python", platform.python_version()),
         _interpreter(),
-        ("machine", platform.machine()),
-        ("system", platform.system()),
-        ("platform", platform.platform()),
+        ("machine", platform.machine() or 'unknown'),
+        ("system", platform.system() or 'unknown'),
+        ("platform", platform.platform() or 'unknown'),
     ]
 
     return ' '.join("{}/{}".format(name, version) for name, version in tags)
