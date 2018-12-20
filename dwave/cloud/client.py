@@ -549,12 +549,17 @@ class Client(object):
 
         return solvers
 
-    def get_solvers(self, refresh=False, **filters):
+    def get_solvers(self, refresh=False, order_by='id', **filters):
         """Return a filtered list of solvers handled by this client.
 
         Args:
             refresh (bool, default=False):
                 Force refresh of cached list of solvers/properties.
+
+            order_by (callable/str, default='id'):
+                Solver sorting key function (or :class:`Solver` attribute name).
+                By default, solvers are sorted by ID/name.
+
             filters:
                 See `Filtering forms` and `Operators` below.
 
@@ -737,6 +742,14 @@ class Client(object):
                 op = ops[opname or 'eq']
                 return op(None, val)
 
+        # param validation
+        if isinstance(order_by, six.string_types):
+            sort_key = operator.attrgetter(order_by)
+        elif callable(order_by):
+            sort_key = order_by
+        else:
+            raise ValueError("expected string or callable for 'order_by'")
+
         # default filters:
         filters.setdefault('online', True)
 
@@ -756,10 +769,17 @@ class Client(object):
         if 'name__eq' in filters:
             query['name'] = filters['name__eq']
 
+        # filter
         solvers = self._fetch_solvers(**query)
         solvers = [s for s in solvers if all(p(s) for p in predicates)]
-        solvers.sort(key=operator.attrgetter('id'))
-        return solvers
+
+        # sort: undefined (None) key values go last
+        solvers_with_keys = [(sort_key(solver), solver) for solver in solvers]
+        solvers_with_invalid_keys = [(key, solver) for key, solver in solvers_with_keys if key is None]
+        solvers_with_valid_keys = [(key, solver) for key, solver in solvers_with_keys if key is not None]
+        solvers_with_valid_keys.sort(key=operator.itemgetter(0))
+
+        return [solver for key, solver in chain(solvers_with_valid_keys, solvers_with_invalid_keys)]
 
     def solvers(self, refresh=False, **filters):
         """Deprecated in favor of :meth:`.get_solvers`."""
@@ -782,6 +802,10 @@ class Client(object):
             **filters (keyword arguments, optional):
                 Dictionary of filters over features this solver has to have. For a list of
                 feature names and values, see: :meth:`~dwave.cloud.client.Client.get_solvers`.
+
+            order_by (callable/str, default='id'):
+                Solver sorting key function (or :class:`Solver` attribute name).
+                By default, solvers are sorted by ID/name.
 
             refresh (bool):
                 Return solver from cache (if cached with ``get_solvers()``),
