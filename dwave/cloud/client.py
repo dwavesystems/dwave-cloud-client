@@ -64,7 +64,8 @@ from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config, parse_float
 from dwave.cloud.solver import Solver
 from dwave.cloud.utils import (
-    datetime_to_timestamp, utcnow, TimeoutingHTTPAdapter, epochnow, cached)
+    datetime_to_timestamp, utcnow, TimeoutingHTTPAdapter, user_agent,
+    epochnow, cached)
 
 __all__ = ['Client']
 
@@ -122,9 +123,6 @@ class Client(object):
     STATUS_COMPLETE = 'COMPLETED'
     STATUS_FAILED = 'FAILED'
     STATUS_CANCELLED = 'CANCELLED'
-
-    # Identify as something like `dwave-cloud-client/0.4` in all requests
-    USER_AGENT = '{}/{}'.format(__packagename__, __version__)
 
     # Default API endpoint
     DEFAULT_API_ENDPOINT = 'https://cloud.dwavesys.com/sapi'
@@ -369,7 +367,7 @@ class Client(object):
         self.session.mount('http://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
         self.session.mount('https://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
         self.session.headers.update({'X-Auth-Token': self.token,
-                                     'User-Agent': self.USER_AGENT})
+                                     'User-Agent': user_agent(__packagename__, __version__)})
         self.session.proxies = {'http': proxy, 'https': proxy}
         if permissive_ssl:
             self.session.verify = False
