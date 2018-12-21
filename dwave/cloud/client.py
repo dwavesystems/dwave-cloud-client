@@ -550,18 +550,18 @@ class Client(object):
 
         return solvers
 
-    def get_solvers(self, refresh=False, order_by='id', **filters):
+    def get_solvers(self, refresh=False, order_by='properties.avg_load', **filters):
         """Return a filtered list of solvers handled by this client.
 
         Args:
             refresh (bool, default=False):
                 Force refresh of cached list of solvers/properties.
 
-            order_by (callable/str/None, default='id'):
+            order_by (callable/str/None, default='properties.avg_load'):
                 Solver sorting key function (or :class:`Solver` attribute/item
-                dot-separated path). By default, solvers are sorted by ID/name
-                (identical to 'properties.chip_id'). To explicitly not sort the
-                solvers (and use the API-returned order), set ``order_by=None``.
+                dot-separated path). By default, solvers are sorted by average
+                load. To explicitly not sort the solvers (and use the API-returned
+                order), set ``order_by=None``.
 
                 Signature of the `key` `callable` is::
 
@@ -588,10 +588,13 @@ class Client(object):
 
                 Note: the sort used for ordering solvers by `key` is **stable**,
                 meaning that if multiple solvers have the same value for the
-                key, their order is not changed, and effectively they are in order
-                are received from the API.
+                key, their relative order is preserved, and effectively they are
+                in the same order as returned by the API.
 
-                Note: solvers with ``None`` for key appear last in the list of solvers.
+                Note: solvers with ``None`` for key appear last in the list of
+                solvers. When providing a key callable, ensure all values returned
+                are of the same type (particularly in Python 3). For solvers with
+                undefined key value, return ``None``.
 
             filters:
                 See `Filtering forms` and `Operators` below.

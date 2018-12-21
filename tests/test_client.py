@@ -277,7 +277,8 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "num_qubits": 7,
                 "num_reads_range": [0, 1000],
                 "parameters": {"num_reads": "Number of samples to return."},
-                "vfyc": False
+                "vfyc": False,
+                "avg_load": 0.7
             },
             "id": "c4-sw_solver3",
             "description": "A test of software solver"
@@ -442,7 +443,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
 
     def test_order_by_edgecases(self):
-        # default: sort by name
+        # default: sort by avg_load
         self.assertEqual(self.client.get_solvers(), [self.solver3, self.solver1, self.solver2])
 
         # explicit no sort
@@ -451,7 +452,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertEqual(self.client.get_solvers(order_by=False), self.solvers)
 
         # reverse without sorting
-        self.assertEqual(self.client.get_solvers(order_by='-'), [self.solver3, self.solver2, self.solver1])
+        self.assertEqual(self.client.get_solvers(order_by='-'), list(reversed(self.solvers)))
 
         # invalid type of `order_by`
         with self.assertRaises(TypeError):
