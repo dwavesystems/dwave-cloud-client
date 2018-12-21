@@ -56,6 +56,7 @@ from itertools import chain
 from functools import partial
 
 from dateutil.parser import parse as parse_datetime
+from plucky import pluck
 from six.moves import queue, range
 import six
 
@@ -549,12 +550,52 @@ class Client(object):
 
         return solvers
 
-    def get_solvers(self, refresh=False, **filters):
+    def get_solvers(self, refresh=False, order_by='properties.avg_load', **filters):
         """Return a filtered list of solvers handled by this client.
 
         Args:
             refresh (bool, default=False):
                 Force refresh of cached list of solvers/properties.
+
+            order_by (callable/str/None, default='properties.avg_load'):
+                Solver sorting key function (or :class:`Solver` attribute/item
+                dot-separated path). By default, solvers are sorted by average
+                load. To explicitly not sort the solvers (and use the API-returned
+                order), set ``order_by=None``.
+
+                Signature of the `key` `callable` is::
+
+                    key :: (Solver s, Ord k) => s -> k
+
+                Basic structure of the `key` string path is::
+
+                    "-"? (attr|item) ( "." (attr|item) )*
+
+                For example, to use solver property named ``avg_load``, available
+                in ``Solver.properties`` dict, you can either specify a callable `key`:
+
+                    key=lambda solver: solver.properties['avg_load']
+
+                or, you can use a short string path based key:
+
+                    key='properties.avg_load'
+
+                Solver inferred properties, available as :class:`Solver` properties
+                can also be used (e.g. ``num_active_qubits``, ``is_online``, etc).
+
+                Ascending sort order is implied, unless the key string path does
+                not start with ``-``, in which case descending sort is used.
+
+                Note: the sort used for ordering solvers by `key` is **stable**,
+                meaning that if multiple solvers have the same value for the
+                key, their relative order is preserved, and effectively they are
+                in the same order as returned by the API.
+
+                Note: solvers with ``None`` for key appear last in the list of
+                solvers. When providing a key callable, ensure all values returned
+                are of the same type (particularly in Python 3). For solvers with
+                undefined key value, return ``None``.
+
             filters:
                 See `Filtering forms` and `Operators` below.
 
@@ -737,6 +778,23 @@ class Client(object):
                 op = ops[opname or 'eq']
                 return op(None, val)
 
+        # param validation
+        sort_reverse = False
+        if not order_by:
+            sort_key = None
+        elif isinstance(order_by, six.string_types):
+            if order_by[0] == '-':
+                sort_reverse = True
+                order_by = order_by[1:]
+            if not order_by:
+                sort_key = None
+            else:
+                sort_key = lambda solver: pluck(solver, order_by, None)
+        elif callable(order_by):
+            sort_key = order_by
+        else:
+            raise TypeError("expected string or callable for 'order_by'")
+
         # default filters:
         filters.setdefault('online', True)
 
@@ -756,9 +814,23 @@ class Client(object):
         if 'name__eq' in filters:
             query['name'] = filters['name__eq']
 
+        # filter
         solvers = self._fetch_solvers(**query)
         solvers = [s for s in solvers if all(p(s) for p in predicates)]
-        solvers.sort(key=operator.attrgetter('id'))
+
+        # sort: undefined (None) key values go last
+        if sort_key is not None:
+            solvers_with_keys = [(sort_key(solver), solver) for solver in solvers]
+            solvers_with_invalid_keys = [(key, solver) for key, solver in solvers_with_keys if key is None]
+            solvers_with_valid_keys = [(key, solver) for key, solver in solvers_with_keys if key is not None]
+            solvers_with_valid_keys.sort(key=operator.itemgetter(0))
+            solvers = [solver for key, solver in chain(solvers_with_valid_keys, solvers_with_invalid_keys)]
+
+        # reverse if necessary (as a separate step from sorting, so it works for invalid keys
+        # and plain list reverse without sorting)
+        if sort_reverse:
+            solvers.reverse()
+
         return solvers
 
     def solvers(self, refresh=False, **filters):
@@ -782,6 +854,10 @@ class Client(object):
             **filters (keyword arguments, optional):
                 Dictionary of filters over features this solver has to have. For a list of
                 feature names and values, see: :meth:`~dwave.cloud.client.Client.get_solvers`.
+
+            order_by (callable/str, default='id'):
+                Solver sorting key function (or :class:`Solver` attribute name).
+                By default, solvers are sorted by ID/name.
 
             refresh (bool):
                 Return solver from cache (if cached with ``get_solvers()``),

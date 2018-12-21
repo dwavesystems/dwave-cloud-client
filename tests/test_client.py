@@ -277,7 +277,8 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "num_qubits": 7,
                 "num_reads_range": [0, 1000],
                 "parameters": {"num_reads": "Number of samples to return."},
-                "vfyc": False
+                "vfyc": False,
+                "avg_load": 0.7
             },
             "id": "c4-sw_solver3",
             "description": "A test of software solver"
@@ -440,6 +441,60 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             self.client.solvers()
             self.assertEqual(len(w), 1)
             self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
+
+    def test_order_by_edgecases(self):
+        # default: sort by avg_load
+        self.assertEqual(self.client.get_solvers(), [self.solver3, self.solver1, self.solver2])
+
+        # explicit no sort
+        self.assertEqual(self.client.get_solvers(order_by=None), self.solvers)
+        self.assertEqual(self.client.get_solvers(order_by=''), self.solvers)
+        self.assertEqual(self.client.get_solvers(order_by=False), self.solvers)
+
+        # reverse without sorting
+        self.assertEqual(self.client.get_solvers(order_by='-'), list(reversed(self.solvers)))
+
+        # invalid type of `order_by`
+        with self.assertRaises(TypeError):
+            self.client.get_solvers(order_by=1)
+        with self.assertRaises(TypeError):
+            self.client.get_solvers(order_by=list)
+
+    def test_order_by_string(self):
+        # sort by Solver inferred properties
+        self.assertEqual(self.client.get_solvers(order_by='id'), [self.solver3, self.solver1, self.solver2])
+        self.assertEqual(self.client.get_solvers(order_by='is_qpu'), [self.solver3, self.solver1, self.solver2])
+        self.assertEqual(self.client.get_solvers(order_by='num_qubits'), self.solvers)
+        self.assertEqual(self.client.get_solvers(order_by='num_active_qubits'), [self.solver3, self.solver1, self.solver2])
+
+        # sort by solver property
+        self.assertEqual(self.client.get_solvers(order_by='properties.num_qubits'), self.solvers)
+
+        # sort (and reverse sort) by upper bound of a range property
+        self.assertEqual(self.client.get_solvers(order_by='properties.num_reads_range[1]'), self.solvers)
+        self.assertEqual(self.client.get_solvers(order_by='-properties.num_reads_range[1]'), [self.solver3, self.solver2, self.solver1])
+
+        # check solvers with None values for key end up last
+        self.assertEqual(self.client.get_solvers(order_by='properties.vfyc'), [self.solver3, self.solver2, self.solver1])
+        self.assertEqual(self.client.get_solvers(order_by='-properties.vfyc'), [self.solver1, self.solver2, self.solver3])
+
+        # check invalid keys don't fail, and effectively don't sort the list
+        self.assertEqual(self.client.get_solvers(order_by='non_existing_key'), self.solvers)
+        self.assertEqual(self.client.get_solvers(order_by='-non_existing_key'), list(reversed(self.solvers)))
+
+    def test_order_by_callable(self):
+        # sort by Solver inferred properties
+        self.assertEqual(self.client.get_solvers(order_by=lambda solver: solver.id), [self.solver3, self.solver1, self.solver2])
+        self.assertEqual(self.client.get_solvers(order_by=lambda solver: solver.num_qubits), self.solvers)
+
+        # sort by solver property
+        self.assertEqual(self.client.get_solvers(order_by=lambda solver: solver.properties['num_qubits']), self.solvers)
+
+        # sort None`s last (here: False, True, None)
+        self.assertEqual(self.client.get_solvers(order_by=lambda solver: solver.properties.get('vfyc')), [self.solver3, self.solver2, self.solver1])
+
+        # test no sort
+        self.assertEqual(self.client.get_solvers(order_by=lambda solver: None), self.solvers)
 
 
 if __name__ == '__main__':
