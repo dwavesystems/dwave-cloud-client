@@ -278,7 +278,11 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "num_reads_range": [0, 1000],
                 "parameters": {"num_reads": "Number of samples to return."},
                 "vfyc": False,
-                "avg_load": 0.7
+                # the following are only present in this solver
+                "avg_load": 0.7,
+                "some_set": [1, 2],
+                "some_range": [1, 2],
+                "some_string": "x"
             },
             "id": "c4-sw_solver3",
             "description": "A test of software solver"
@@ -364,6 +368,16 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.get_solvers(num_qubits__lte=7), self.solvers)
         self.assertSolvers(self.client.get_solvers(num_qubits__lt=7), [self.solver1, self.solver2])
 
+        # skip solver if LHS value not defined (None)
+        self.assertSolvers(self.client.get_solvers(avg_load__gt=0), [self.solver3])
+        self.assertSolvers(self.client.get_solvers(avg_load__gte=0), [self.solver3])
+        self.assertSolvers(self.client.get_solvers(avg_load__lt=1), [self.solver3])
+        self.assertSolvers(self.client.get_solvers(avg_load__lte=1), [self.solver3])
+        self.assertSolvers(self.client.get_solvers(avg_load=0.7), [self.solver3])
+        self.assertSolvers(self.client.get_solvers(avg_load__eq=0.7), [self.solver3])
+        self.assertSolvers(self.client.get_solvers(avg_load=None), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.get_solvers(avg_load__eq=None), [self.solver1, self.solver2])
+
     def test_range_ops(self):
         # value within range
         self.assertSolvers(self.client.get_solvers(num_qubits__within=[3, 7]), self.solvers)
@@ -376,6 +390,9 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.get_solvers(num_reads_range__within=(0, 500)), [self.solver1, self.solver2])
         self.assertSolvers(self.client.get_solvers(num_reads_range__within=(1, 500)), [])
 
+        # invalid LHS
+        self.assertSolvers(self.client.get_solvers(some_range__within=[0, 2]), [self.solver3])
+
         # range covering a value (value included in range)
         self.assertSolvers(self.client.get_solvers(num_reads_range__covers=0), self.solvers)
         self.assertSolvers(self.client.get_solvers(num_reads_range__covers=150), [self.solver2, self.solver3])
@@ -386,6 +403,9 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         # range covering a range
         self.assertSolvers(self.client.get_solvers(num_reads_range__covers=(10, 90)), self.solvers)
         self.assertSolvers(self.client.get_solvers(num_reads_range__covers=(110, 200)), [self.solver2, self.solver3])
+
+        # invalid LHS
+        self.assertSolvers(self.client.get_solvers(some_range__covers=1.5), [self.solver3])
 
     def test_membership_ops(self):
         # property contains
@@ -398,6 +418,11 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.get_solvers(num_qubits__in=[3, 5]), [self.solver1, self.solver2])
         self.assertSolvers(self.client.get_solvers(num_qubits__in=[7]), [self.solver3])
         self.assertSolvers(self.client.get_solvers(num_qubits__in=[]), [])
+
+        # invalid LHS
+        self.assertSolvers(self.client.get_solvers(some_set__contains=1), [self.solver3])
+        self.assertSolvers(self.client.get_solvers(avg_load__in=[None]), [self.solver1, self.solver2])
+        self.assertSolvers(self.client.get_solvers(avg_load__in=[None, 0.7]), self.solvers)
 
     def test_set_ops(self):
         # property issubset
@@ -418,11 +443,18 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.get_solvers(couplers__issuperset={(0, 1), (0, 2), (2, 3)}), [self.solver2])
         self.assertSolvers(self.client.get_solvers(couplers__issuperset={(0, 1), (0, 2), (2, 3), (0, 5)}), [])
 
+        # invalid LHS
+        self.assertSolvers(self.client.get_solvers(some_set__issubset={0, 1, 2}), [self.solver3])
+        self.assertSolvers(self.client.get_solvers(some_set__issuperset={1}), [self.solver3])
+
     def test_regex(self):
         self.assertSolvers(self.client.get_solvers(num_reads__regex='.*number.*'), [])
         self.assertSolvers(self.client.get_solvers(num_reads__regex='.*Number.*'), self.solvers)
         self.assertSolvers(self.client.get_solvers(num_reads__regex='Number.*'), self.solvers)
         self.assertSolvers(self.client.get_solvers(num_reads__regex='Number'), [])
+
+        # invalid LHS
+        self.assertSolvers(self.client.get_solvers(some_string__regex='x'), [self.solver3])
 
     def test_range_boolean_combo(self):
         self.assertSolvers(self.client.get_solvers(num_qubits=3, vfyc=True), [])

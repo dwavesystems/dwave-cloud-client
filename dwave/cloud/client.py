@@ -53,7 +53,7 @@ import warnings
 import operator
 import collections
 from itertools import chain
-from functools import partial
+from functools import partial, wraps
 
 from dateutil.parser import parse as parse_datetime
 from plucky import pluck
@@ -734,24 +734,32 @@ class Client(object):
                 return set(tuple(x) for x in iterable)
             return set(iterable)
 
+        def with_valid_lhs(op):
+            @wraps(op)
+            def _wrapper(prop, val):
+                if prop is None:
+                    return False
+                return op(prop, val)
+            return _wrapper
+
         # available filtering operators
         ops = {
-            'lt': operator.lt,
-            'lte': operator.le,
-            'gt': operator.gt,
-            'gte': operator.ge,
+            'lt': with_valid_lhs(operator.lt),
+            'lte': with_valid_lhs(operator.le),
+            'gt': with_valid_lhs(operator.gt),
+            'gte': with_valid_lhs(operator.ge),
             'eq': operator.eq,
             'available': lambda prop, val: prop is not None if val else prop is None,
-            'regex': lambda prop, val: re.match("^{}$".format(val), prop),
+            'regex': with_valid_lhs(lambda prop, val: re.match("^{}$".format(val), prop)),
             # range operations
-            'covers': covers_op,
-            'within': within_op,
+            'covers': with_valid_lhs(covers_op),
+            'within': with_valid_lhs(within_op),
             # membership tests
             'in': lambda prop, val: prop in val,
-            'contains': lambda prop, val: val in prop,
+            'contains': with_valid_lhs(lambda prop, val: val in prop),
             # set tests
-            'issubset': lambda prop, val: _set(prop).issubset(_set(val)),
-            'issuperset': lambda prop, val: _set(prop).issuperset(_set(val)),
+            'issubset': with_valid_lhs(lambda prop, val: _set(prop).issubset(_set(val))),
+            'issuperset': with_valid_lhs(lambda prop, val: _set(prop).issuperset(_set(val))),
         }
 
         # features available as `Solver` attribute/properties
