@@ -790,7 +790,7 @@ class Client(object):
         elif callable(order_by):
             sort_key = order_by
         else:
-            raise ValueError("expected string or callable for 'order_by'")
+            raise TypeError("expected string or callable for 'order_by'")
 
         # default filters:
         filters.setdefault('online', True)
@@ -820,12 +820,13 @@ class Client(object):
             solvers_with_keys = [(sort_key(solver), solver) for solver in solvers]
             solvers_with_invalid_keys = [(key, solver) for key, solver in solvers_with_keys if key is None]
             solvers_with_valid_keys = [(key, solver) for key, solver in solvers_with_keys if key is not None]
-            solvers_with_valid_keys.sort(key=operator.itemgetter(0), reverse=sort_reverse)
+            solvers_with_valid_keys.sort(key=operator.itemgetter(0))
             solvers = [solver for key, solver in chain(solvers_with_valid_keys, solvers_with_invalid_keys)]
-        else:
-            # no sorting required, but we might want to just reverse the list
-            if sort_reverse:
-                solvers.reverse()
+
+        # reverse if necessary (as a separate step from sorting, so it works for invalid keys
+        # and plain list reverse without sorting)
+        if sort_reverse:
+            solvers.reverse()
 
         return solvers
 
