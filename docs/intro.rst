@@ -91,7 +91,7 @@ profiles::
           [defaults]
           token = ABC-123456789123456789123456789
 
-          [firstAvailableQPU]
+          [first-available-qpu]
           solver = {"qpu": true}
 
           [software]
@@ -100,7 +100,7 @@ profiles::
           token = DEF-987654321987654321987654321
           proxy = http://user:pass@myproxy.com:8080/
 
-          [backupDwave2000Q]
+          [backup-dwave2000q]
           endpoint = https://url.of.my.backup.dwavesystem.com/sapi
           solver = {"num_qubits__gt": 2000}
 

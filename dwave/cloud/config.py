@@ -69,7 +69,7 @@ Examples:
         [defaults]
         token = ABC-123456789123456789123456789
 
-        [firstQPU]
+        [first-qpu]
         solver = {"qpu": true}
 
         [feature]
@@ -108,7 +108,7 @@ Examples:
         [primary-qpu]
         solver = {"qpu": true}
 
-        [sw_solver]
+        [sw-solver]
         client = sw
         solver = c4-sw_sample
         endpoint = https://url.of.some.software.resource.com/my_if
@@ -126,7 +126,7 @@ Examples:
     >>> from dwave.cloud import Client
     >>> client_qpu1 = Client.from_config(profile='primary-qpu')    # doctest: +SKIP
     >>> client_qpu1 = Client.from_config(profile='backup-qpu')    # doctest: +SKIP
-    >>> client_sw1 = Client.from_config(profile='sw_solver')   # doctest: +SKIP
+    >>> client_sw1 = Client.from_config(profile='sw-solver')   # doctest: +SKIP
     >>> client_qpu1.default_solver   # doctest: +SKIP
     u'EXAMPLE_2000Q_SYSTEM_A'
     >>> client_qpu2.endpoint   # doctest: +SKIP
@@ -174,11 +174,11 @@ Examples:
         endpoint = https://url.of.some.dwavesystem.com/sapi
         solver = {"qpu": true}
 
-        [dw2000A]
+        [dw2000a]
         solver = {"software": true, "name": "EXAMPLE_2000Q"}
         token = ABC-123456789123456789123456789
 
-        [dw2000B]
+        [dw2000b]
         solver = {"qpu": true}
         token = DEF-987654321987654321987654321
 
@@ -197,7 +197,7 @@ Examples:
      'proxy': None,
      'solver': 'EXAMPLE_2000Q_SYSTEM',
      'token': u'ABC-123456789123456789123456789'}
-    >>> dc.config.load_config("./dwave_c.conf", profile='dw2000B', solver='Solver3')   # doctest: +SKIP
+    >>> dc.config.load_config("./dwave_c.conf", profile='dw2000b', solver='Solver3')   # doctest: +SKIP
     {'client': u'qpu',
      'endpoint': u'https://url.of.some.dwavesystem.com/sapi',
      'proxy': None,
@@ -405,10 +405,10 @@ def load_config_from_files(filenames=None):
     Examples:
         This example loads configurations from two files. One contains a default
         section with key/values that are overwritten by any profile section that
-        contains that key/value; for example, profile dw2000B in file dwave_b.conf
-        overwrites the default URL and client type, which profile dw2000A inherits
-        from the defaults section, while profile dw2000A overwrites the API token that
-        profile dw2000B inherits.
+        contains that key/value; for example, profile dw2000b in file dwave_b.conf
+        overwrites the default URL and client type, which profile dw2000a inherits
+        from the defaults section, while profile dw2000a overwrites the API token that
+        profile dw2000b inherits.
 
         The files, which are located in the current working directory, are
         (1) dwave_a.conf::
@@ -418,13 +418,13 @@ def load_config_from_files(filenames=None):
             client = qpu
             token = ABC-123456789123456789123456789
 
-            [dw2000A]
+            [dw2000a]
             solver = EXAMPLE_2000Q_SYSTEM
             token = DEF-987654321987654321987654321
 
         and (2) dwave_b.conf::
 
-            [dw2000B]
+            [dw2000b]
             endpoint = https://url.of.some.other.dwavesystem.com/sapi
             client = sw
             solver = EXAMPLE_2000Q_SYSTEM
@@ -443,11 +443,11 @@ def load_config_from_files(filenames=None):
             client = qpu
             token = ABC-123456789123456789123456789
 
-            [dw2000A]
+            [dw2000a]
             solver = EXAMPLE_2000Q_SYSTEM
             token = DEF-987654321987654321987654321
 
-            [dw2000B]
+            [dw2000b]
             endpoint = https://url.of.some.other.dwavesystem.com/sapi
             client = sw
             solver = EXAMPLE_2000Q_SYSTEM
@@ -513,7 +513,7 @@ def load_profile_from_files(filenames=None, profile=None):
 
     Examples:
         This example loads a profile based on configurations from two files. It
-        finds the first profile, dw2000A, in the first file, dwave_a.conf, and adds to
+        finds the first profile, dw2000a, in the first file, dwave_a.conf, and adds to
         the values of the defaults section, overwriting the existing client value,
         while ignoring the profile in the second file, dwave_b.conf.
 
@@ -525,14 +525,14 @@ def load_profile_from_files(filenames=None, profile=None):
             client = qpu
             token = ABC-123456789123456789123456789
 
-            [dw2000A]
+            [dw2000a]
             client = sw
             solver = EXAMPLE_2000Q_SYSTEM_A
             token = DEF-987654321987654321987654321
 
         and (2) dwave_b.conf::
 
-            [dw2000B]
+            [dw2000b]
             endpoint = https://url.of.some.other.dwavesystem.com/sapi
             client = qpu
             solver = EXAMPLE_2000Q_SYSTEM_B
@@ -547,7 +547,7 @@ def load_profile_from_files(filenames=None, profile=None):
          'solver': u'EXAMPLE_2000Q_SYSTEM_A',
          'token': u'DEF-987654321987654321987654321'}
         >>> dc.config.load_profile_from_files(["./dwave_a.conf", "./dwave_b.conf"],
-        ...                                   profile='dw2000B')   # doctest: +SKIP
+        ...                                   profile='dw2000b')   # doctest: +SKIP
         {'client': u'qpu',
         'endpoint': u'https://url.of.some.other.dwavesystem.com/sapi',
         'solver': u'EXAMPLE_2000Q_SYSTEM_B',
