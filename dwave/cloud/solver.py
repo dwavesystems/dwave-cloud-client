@@ -313,16 +313,20 @@ class Solver(object):
             # good to check.
             initial_state = params['initial_state']
             if isinstance(initial_state, Mapping):
-                if type_ == 'ising' and any(v == 0 for v in initial_state.values()):
-                    # initial_state is in qubo format, coerce to Ising
-                    initial_state = [2*initial_state.get(v, 2)-1 for v in range(self.properties['num_qubits'])]
-                elif type_ == 'qubo' and any(v == -1 for v in initial_state.values()):
-                    # initial_state is in ising format, coerce to QUBO
-                    initial_state = [(initial_state.get(v, 5)+1)//2 for v in range(self.properties['num_qubits'])]
-                else:
-                    initial_state = [initial_state.get(v, 3) for v in range(self.properties['num_qubits'])]
 
-                params['initial_state'] = initial_state
+                initial_state_list = [3]*self.properties['num_qubits']
+
+                low = -1 if type_ == 'ising' else 0
+
+                for v, val in initial_state.items():
+                    if val == 3:
+                        continue
+                    if val <= 0:
+                        initial_state_list[v] = low
+                    else:
+                        initial_state_list[v] = 1
+
+                params['initial_state'] = initial_state_list
             # else: support old format
 
     def check_problem(self, linear, quadratic):
