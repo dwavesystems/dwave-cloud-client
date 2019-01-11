@@ -279,13 +279,13 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "parameters": {"num_reads": "Number of samples to return."},
                 "vfyc": False,
                 # the following are only present in this solver
-                "avg_load": 0.7,
                 "some_set": [1, 2],
                 "some_range": [1, 2],
                 "some_string": "x"
             },
             "id": "c4-sw_solver3",
-            "description": "A test of software solver"
+            "description": "A test of software solver",
+            "avg_load": 0.7
         })
         self.solvers = [self.solver1, self.solver2, self.solver3]
 

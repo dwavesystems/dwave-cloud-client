@@ -185,6 +185,11 @@ class Solver(object):
         "Solver supports/accepts ``anneal_schedule``."
         return 'anneal_schedule' in self.parameters
 
+    @property
+    def avg_load(self):
+        "Solver's average load, at the time of description fetch."
+        return self.data.get('avg_load')
+
     def sample_ising(self, linear, quadratic, **params):
         """Sample from the specified Ising model.
 

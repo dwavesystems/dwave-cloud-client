@@ -550,14 +550,14 @@ class Client(object):
 
         return solvers
 
-    def get_solvers(self, refresh=False, order_by='properties.avg_load', **filters):
+    def get_solvers(self, refresh=False, order_by='avg_load', **filters):
         """Return a filtered list of solvers handled by this client.
 
         Args:
             refresh (bool, default=False):
                 Force refresh of cached list of solvers/properties.
 
-            order_by (callable/str/None, default='properties.avg_load'):
+            order_by (callable/str/None, default='avg_load'):
                 Solver sorting key function (or :class:`Solver` attribute/item
                 dot-separated path). By default, solvers are sorted by average
                 load. To explicitly not sort the solvers (and use the API-returned
@@ -571,17 +571,19 @@ class Client(object):
 
                     "-"? (attr|item) ( "." (attr|item) )*
 
-                For example, to use solver property named ``avg_load``, available
-                in ``Solver.properties`` dict, you can either specify a callable `key`:
+                For example, to use solver property named ``max_anneal_schedule_points``,
+                available in ``Solver.properties`` dict, you can either specify a
+                callable `key`:
 
-                    key=lambda solver: solver.properties['avg_load']
+                    key=lambda solver: solver.properties['max_anneal_schedule_points']
 
                 or, you can use a short string path based key:
 
-                    key='properties.avg_load'
+                    key='properties.max_anneal_schedule_points'
 
                 Solver inferred properties, available as :class:`Solver` properties
-                can also be used (e.g. ``num_active_qubits``, ``is_online``, etc).
+                can also be used (e.g. ``num_active_qubits``, ``is_online``,
+                ``avg_load``, etc).
 
                 Ascending sort order is implied, unless the key string path does
                 not start with ``-``, in which case descending sort is used.
@@ -601,14 +603,14 @@ class Client(object):
 
         Solver filters are defined, similarly to Django QuerySet filters, with
         keyword arguments of form `<name>__<operator>=<value>`. Each `<operator>`
-        is a predicate (boolean) function that acts on two arguments: value of feature
-        `<name>` and the required `<value>`.
+        is a predicate (boolean) function that acts on two arguments: value of
+        feature `<name>` and the required `<value>`.
 
         Feature `<name>` can be:
 
         1) an inferred solver property, available as a (similarly named)
            :class:`Solver`'s property (`name`, `qpu`, `software`, `online`,
-           `num_qubits`, num_active_qubits`)
+           `num_qubits`, num_active_qubits`, `avg_load`)
         2) a solver parameter, available in :obj:`Solver.parameters`
         3) a solver property, available in :obj:`Solver.properties`
 
@@ -618,7 +620,7 @@ class Client(object):
         * <inferred_feature>__eq (bool)
         * <inferred_feature>__<operator> (object <value>)
 
-          This form ensures the value of solver's property is bound to `inferred_feature`,
+          This form ensures the value of solver's property bound to `inferred_feature`,
           after applying `operator` equals the `value`. The default operator is `eq`.
 
         * <parameter> (bool)
@@ -653,6 +655,7 @@ class Client(object):
         * `online` (bool, default=True): Is solver online?
         * `num_qubits` (int): Number of qubits available.
         * `num_active_qubits` (int): Number of active qubits. Less then or equal to `num_qubits`.
+        * `avg_load` (float): Solver's average load (similar to Unix load average).
 
         Common solver parameters are:
 
@@ -769,7 +772,8 @@ class Client(object):
             'online': 'is_online',
             'name': 'id',
             'num_qubits': 'num_qubits',
-            'num_active_qubits': 'num_active_qubits'
+            'num_active_qubits': 'num_active_qubits',
+            'avg_load': 'avg_load'
         }
 
         def predicate(solver, name, opname, val):
