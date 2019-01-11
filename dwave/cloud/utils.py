@@ -19,6 +19,13 @@ import time
 import random
 import platform
 import itertools
+
+try:
+    import collections.abc as abc
+except ImportError:
+    # 2.7
+    import collections as abc
+
 from datetime import datetime
 from dateutil.tz import UTC
 from functools import wraps
@@ -107,7 +114,7 @@ def uniform_iterator(sequence):
     """Uniform (key, value) iteration on a `dict`,
     or (idx, value) on a `list`."""
 
-    if isinstance(sequence, dict):
+    if isinstance(sequence, abc.Mapping):
         return six.iteritems(sequence)
     else:
         return enumerate(sequence)
@@ -117,7 +124,7 @@ def uniform_get(sequence, index, default=None):
     """Uniform `dict`/`list` item getter, where `index` is interpreted as a key
     for maps and as numeric index for lists."""
 
-    if isinstance(sequence, dict):
+    if isinstance(sequence, abc.Mapping):
         return sequence.get(index, default)
     else:
         return sequence[index] if index < len(sequence) else default
