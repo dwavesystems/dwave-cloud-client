@@ -345,7 +345,7 @@ class Client(object):
             endpoint, token, solver, proxy, permissive_ssl, request_timeout, polling_timeout, kwargs
         )
 
-        if solver is None:
+        if not solver:
             solver_def = {}
 
         elif isinstance(solver, collections.Mapping):

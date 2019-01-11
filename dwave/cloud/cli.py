@@ -304,7 +304,7 @@ def solvers(config_file, profile, solver_def, list_solvers):
     """Get solver details.
 
     Unless solver name/id specified, fetch and display details for
-    all solvers available on configured endpoint.
+    all online solvers available on the configured endpoint.
     """
 
     with Client.from_config(
