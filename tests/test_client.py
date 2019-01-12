@@ -103,7 +103,7 @@ class SolverLoading(unittest.TestCase):
     def test_load_any_solver(self):
         """Load a single solver without calling get_solvers."""
         with Client(**config) as client:
-            self.assertTrue(client.get_solver(software=True).is_software)
+            self.assertTrue(client.get_solver(software=True).software)
 
     def test_get_solver_no_defaults(self):
         from dwave.cloud import qpu, sw
@@ -279,13 +279,13 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "parameters": {"num_reads": "Number of samples to return."},
                 "vfyc": False,
                 # the following are only present in this solver
-                "avg_load": 0.7,
                 "some_set": [1, 2],
                 "some_range": [1, 2],
                 "some_string": "x"
             },
             "id": "c4-sw_solver3",
-            "description": "A test of software solver"
+            "description": "A test of software solver",
+            "avg_load": 0.7
         })
         self.solvers = [self.solver1, self.solver2, self.solver3]
 
@@ -495,7 +495,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
     def test_order_by_string(self):
         # sort by Solver inferred properties
         self.assertEqual(self.client.get_solvers(order_by='id'), [self.solver3, self.solver1, self.solver2])
-        self.assertEqual(self.client.get_solvers(order_by='is_qpu'), [self.solver3, self.solver1, self.solver2])
+        self.assertEqual(self.client.get_solvers(order_by='qpu'), [self.solver3, self.solver1, self.solver2])
         self.assertEqual(self.client.get_solvers(order_by='num_qubits'), self.solvers)
         self.assertEqual(self.client.get_solvers(order_by='num_active_qubits'), [self.solver3, self.solver1, self.solver2])
 

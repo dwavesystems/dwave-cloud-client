@@ -222,10 +222,10 @@ class MockSolverLoading(unittest.TestCase):
         self.assertFalse(SoftwareClient.is_solver_handled(None))
 
     def test_solver_feature_properties(self):
-        self.assertTrue(solver_object('dw2000').is_qpu)
-        self.assertFalse(solver_object('dw2000').is_software)
-        self.assertFalse(solver_object('c4-sw_x').is_qpu)
-        self.assertTrue(solver_object('c4-sw_x').is_software)
+        self.assertTrue(solver_object('dw2000').qpu)
+        self.assertFalse(solver_object('dw2000').software)
+        self.assertFalse(solver_object('c4-sw_x').qpu)
+        self.assertTrue(solver_object('c4-sw_x').software)
 
         self.assertFalse(solver_object('dw2000').is_vfyc)
         self.assertEqual(solver_object('dw2000').num_qubits, 3)
@@ -255,13 +255,13 @@ class MockSolverLoading(unittest.TestCase):
         data['properties']['parameters']['anneal_schedule'] = '...'
         self.assertTrue(Solver(None, data).has_anneal_schedule)
 
-        # test `.is_online` property
-        self.assertTrue(solver_object('dw2000').is_online)
+        # test `.online` property
+        self.assertTrue(solver_object('dw2000').online)
         data = json.loads(solver_data('test'))
         data['status'] = 'offline'
-        self.assertFalse(Solver(None, data).is_online)
+        self.assertFalse(Solver(None, data).online)
         del data['status']
-        self.assertTrue(Solver(None, data).is_online)
+        self.assertTrue(Solver(None, data).online)
 
 
 class GetEvent(Exception):
