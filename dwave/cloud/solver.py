@@ -31,6 +31,7 @@ from __future__ import division, absolute_import
 
 import json
 import logging
+import warnings
 
 from collections import Mapping
 
@@ -140,28 +141,30 @@ class Solver(object):
         # Create a set of default parameters for the queries
         self._params = {}
 
+        # Derived solver properties (not present in solver data properties dict)
+        self.derived_properties = {
+            'qpu', 'software', 'online', 'num_active_qubits', 'avg_load', 'name'
+        }
+
     def __repr__(self):
         return "Solver(id={!r})".format(self.id)
 
+    # Derived properties
+
     @property
-    def is_qpu(self):
+    def qpu(self):
         "Is this a QPU-based solver?"
         # TODO: add a field for this in SAPI response; for now base decision on id/name
         return not self.id.startswith('c4-sw_')
 
     @property
-    def is_software(self):
+    def software(self):
         "Is this a software-based solver?"
         # TODO: add a field for this in SAPI response; for now base decision on id/name
         return self.id.startswith('c4-sw_')
 
     @property
-    def is_vfyc(self):
-        "Is this a virtual full-yield chip?"
-        return self.properties.get('vfyc') == True
-
-    @property
-    def is_online(self):
+    def online(self):
         "Is this solver online (or offline)?"
         return self.data.get('status', 'online').lower() == 'online'
 
@@ -171,9 +174,35 @@ class Solver(object):
         return len(self.nodes)
 
     @property
-    def num_qubits(self):
-        "Nominal number of qubits on chip (includes active AND inactive)."
-        return self.properties.get('num_qubits')
+    def avg_load(self):
+        "Solver's average load, at the time of description fetch."
+        return self.data.get('avg_load')
+
+    @property
+    def name(self):
+        return self.id
+
+    # Convenience properties (based on self.properties)
+
+    @property
+    def is_qpu(self):
+        warnings.warn("'is_qpu' property is deprecated in favor of 'qpu'.", DeprecationWarning)
+        return self.qpu
+
+    @property
+    def is_software(self):
+        warnings.warn("'is_software' property is deprecated in favor of 'software'.", DeprecationWarning)
+        return self.software
+
+    @property
+    def is_online(self):
+        warnings.warn("'is_online' property is deprecated in favor of 'online'.", DeprecationWarning)
+        return self.online
+
+    @property
+    def is_vfyc(self):
+        "Is this a virtual full-yield chip?"
+        return self.properties.get('vfyc') == True
 
     @property
     def has_flux_biases(self):
@@ -186,9 +215,11 @@ class Solver(object):
         return 'anneal_schedule' in self.parameters
 
     @property
-    def avg_load(self):
-        "Solver's average load, at the time of description fetch."
-        return self.data.get('avg_load')
+    def num_qubits(self):
+        "Nominal number of qubits on chip (includes active AND inactive)."
+        return self.properties.get('num_qubits')
+
+    # Sampling methods
 
     def sample_ising(self, linear, quadratic, **params):
         """Sample from the specified Ising model.

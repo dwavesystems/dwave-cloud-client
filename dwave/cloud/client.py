@@ -581,8 +581,8 @@ class Client(object):
 
                     key='properties.max_anneal_schedule_points'
 
-                Solver inferred properties, available as :class:`Solver` properties
-                can also be used (e.g. ``num_active_qubits``, ``is_online``,
+                Solver derived properties, available as :class:`Solver` properties
+                can also be used (e.g. ``num_active_qubits``, ``online``,
                 ``avg_load``, etc).
 
                 Ascending sort order is implied, unless the key string path does
@@ -608,7 +608,7 @@ class Client(object):
 
         Feature `<name>` can be:
 
-        1) an inferred solver property, available as a (similarly named)
+        1) a derived solver property, available as a (identically named)
            :class:`Solver`'s property (`name`, `qpu`, `software`, `online`,
            `num_qubits`, num_active_qubits`, `avg_load`)
         2) a solver parameter, available in :obj:`Solver.parameters`
@@ -616,11 +616,11 @@ class Client(object):
 
         Filtering forms are:
 
-        * <inferred_feature> (bool)
-        * <inferred_feature>__eq (bool)
-        * <inferred_feature>__<operator> (object <value>)
+        * <derived_property> (bool)
+        * <derived_property>__eq (bool)
+        * <derived_property>__<operator> (object <value>)
 
-          This form ensures the value of solver's property bound to `inferred_feature`,
+          This form ensures the value of solver's property bound to `derived_property`,
           after applying `operator` equals the `value`. The default operator is `eq`.
 
         * <parameter> (bool)
@@ -647,13 +647,12 @@ class Client(object):
         * in, contains
         * issubset, issuperset
 
-        Inferred features are:
+        Derived properies are:
 
         * `name` (str): Solver name/id.
         * `qpu` (bool): Is solver QPU based?
         * `software` (bool): Is solver software based?
         * `online` (bool, default=True): Is solver online?
-        * `num_qubits` (int): Number of qubits available.
         * `num_active_qubits` (int): Number of active qubits. Less then or equal to `num_qubits`.
         * `avg_load` (float): Solver's average load (similar to Unix load average).
 
@@ -664,6 +663,7 @@ class Client(object):
 
         Common solver properties are:
 
+        * `num_qubits` (int): Number of qubits available.
         * `vfyc` (bool): Should solver work on "virtual full-yield chip"?
         * `max_anneal_schedule_points` (int): Piecewise linear annealing schedule points.
         * `h_range` ([int,int]), j_range ([int,int]): Biases/couplings values range.
@@ -765,21 +765,10 @@ class Client(object):
             'issuperset': with_valid_lhs(lambda prop, val: _set(prop).issuperset(_set(val))),
         }
 
-        # features available as `Solver` attribute/properties
-        derived_features = {
-            'qpu': 'is_qpu',
-            'software': 'is_software',
-            'online': 'is_online',
-            'name': 'id',
-            'num_qubits': 'num_qubits',
-            'num_active_qubits': 'num_active_qubits',
-            'avg_load': 'avg_load'
-        }
-
         def predicate(solver, name, opname, val):
-            if name in derived_features:
+            if name in solver.derived_properties:
                 op = ops[opname or 'eq']
-                return op(getattr(solver, derived_features[name]), val)
+                return op(getattr(solver, name), val)
             elif name in solver.parameters:
                 op = ops[opname or 'available']
                 return op(solver.parameters[name], val)
