@@ -82,4 +82,4 @@ class Client(BaseClient):
                     return solver and solver.id.startswith('My_SW_Solver')
 
         """
-        return solver and solver.is_software
+        return solver and solver.software

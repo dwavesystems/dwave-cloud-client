@@ -90,4 +90,4 @@ class Client(BaseClient):
                     return solver and solver.id.startswith('2000Q')
 
         """
-        return solver and solver.is_qpu
+        return solver and solver.qpu
