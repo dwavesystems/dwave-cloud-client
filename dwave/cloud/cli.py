@@ -325,12 +325,15 @@ def solvers(config_file, profile, solver_def, list_solvers):
         for solver in solvers:
             click.echo("Solver: {}".format(solver.id))
             click.echo("  Parameters:")
-            for param, desc in sorted(solver.parameters.items()):
-                click.echo("    {}: {}".format(param, strtrunc(desc) if desc else '?'))
+            for name, val in sorted(solver.parameters.items()):
+                click.echo("    {}: {}".format(name, strtrunc(val) if val else '?'))
             solver.properties.pop('parameters', None)
             click.echo("  Properties:")
-            for k,v in sorted(solver.properties.items()):
-                click.echo("    {}: {}".format(k, strtrunc(v)))
+            for name, val in sorted(solver.properties.items()):
+                click.echo("    {}: {}".format(name, strtrunc(val)))
+            click.echo("  Derived properties:")
+            for name in sorted(solver.derived_properties):
+                click.echo("    {}: {}".format(name, strtrunc(getattr(solver, name))))
             click.echo()
 
 
