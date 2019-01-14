@@ -608,32 +608,29 @@ class Client(object):
 
         Feature `<name>` can be:
 
-        1) a derived solver property, available as a (identically named)
+        1) a derived solver property, available as an identically named
            :class:`Solver`'s property (`name`, `qpu`, `software`, `online`,
-           `num_qubits`, num_active_qubits`, `avg_load`)
+           `num_active_qubits`, `avg_load`)
         2) a solver parameter, available in :obj:`Solver.parameters`
         3) a solver property, available in :obj:`Solver.properties`
 
         Filtering forms are:
 
-        * <derived_property> (bool)
-        * <derived_property>__eq (bool)
         * <derived_property>__<operator> (object <value>)
+        * <derived_property> (bool)
 
           This form ensures the value of solver's property bound to `derived_property`,
           after applying `operator` equals the `value`. The default operator is `eq`.
 
-        * <parameter> (bool)
-        * <parameter>__available (bool)
         * <parameter>__<operator> (object <value>)
+        * <parameter> (bool)
 
           This form ensures that the solver supports `parameter`. General operator form can
           be used but usually does not make sense for parameters, since values are human-readable
           descriptions. The default operator is `available`.
 
-        * <property> (bool)
-        * <property>__eq (bool)
         * <property>__<operator> (object <value>)
+        * <property> (bool)
 
           This form ensures the value of the solver's `property`, after applying `operator`
           equals the righthand side `value`. The default operator is `eq`.
@@ -642,10 +639,22 @@ class Client(object):
 
         Operators are:
 
-        * available, eq, lt, lte, gt, gte, regex
-        * covers, within
-        * in, contains
-        * issubset, issuperset
+        * `available` (<name>: str, <value>: bool): Test availability of <name> feature.
+        * `eq`, `lt`, `lte`, `gt`, `gte` (<name>: str, <value>: any):
+            Standard relational operators that compare feature <name> value with <value>.
+        * `regex` (<name>: str, <value>: str): Test regular expression matching feature value.
+        * `covers` (<name>: str, <value>: single value or range expressed as 2-tuple/list):
+            Test feature <name> value (which should be a *range*) covers a given value or a subrange.
+        * `within` (<name>: str, <value>: range expressed as 2-tuple/list):
+            Test feature <name> value (which can be a *single value* or a *range*) is within a given range.
+        * `in` (<name>: str, <value>: container type):
+            Test feature <name> value is *in* <value> container.
+        * `contains` (<name>: str, <value>: any):
+            Test feature <name> value (container type) *contains* <value>.
+        * `issubset` (<name>: str, <value>: container type):
+            Test feature <name> value (container type) is a subset of <value>.
+        * `issuperset` (<name>: str, <value>: container type):
+            Test feature <name> value (container type) is a superset of <value>.
 
         Derived properies are:
 
@@ -691,7 +700,7 @@ class Client(object):
                 anneal_schedule=True,               # we need support for custom anneal schedule
                 max_anneal_schedule_points__gte=4,  # we need at least 4 points for our anneal schedule
                 num_reads_range__covers=1000,       # our solver must support returning 1000 reads
-                extended_j_range__covers=(-2, 2),   # we need extended J range to contain (-2,2)
+                extended_j_range__covers=[-2, 2],   # we need extended J range to contain subrange [-2,2]
                 couplings__contains=[0, 128],       # coupling (edge between) qubits (0,128) must exist
                 couplings__issuperset=[[0,128], [0,4]],
                                                     # two couplings required: (0,128) and (0,4)
