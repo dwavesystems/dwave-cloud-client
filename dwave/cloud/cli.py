@@ -41,14 +41,19 @@ from dwave.cloud.config import (
 
 def enable_logging(ctx, param, value):
     if value and not ctx.resilient_parsing:
-        logging.getLogger('dwave.cloud').setLevel(logging.DEBUG)
+        if param.name == 'debug':
+            logging.getLogger('dwave.cloud').setLevel(logging.DEBUG)
+        elif param.name == 'trace':
+            logging.getLogger('dwave.cloud').setLevel(logging.TRACE)
 
 
 @click.group()
 @click.version_option(prog_name=__title__, version=__version__)
 @click.option('--debug', is_flag=True, callback=enable_logging,
               help='Enable debug logging.')
-def cli(debug=False):
+@click.option('--trace', is_flag=True, callback=enable_logging,
+              help='Enable trace-level debug logging.')
+def cli(debug=False, trace=False):
     """D-Wave Cloud Client interactive configuration tool."""
 
 
