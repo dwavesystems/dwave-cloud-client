@@ -573,11 +573,11 @@ class Client(object):
 
                 For example, to use solver property named ``max_anneal_schedule_points``,
                 available in ``Solver.properties`` dict, you can either specify a
-                callable `key`:
+                callable `key`::
 
                     key=lambda solver: solver.properties['max_anneal_schedule_points']
 
-                or, you can use a short string path based key:
+                or, you can use a short string path based key::
 
                     key='properties.max_anneal_schedule_points'
 
@@ -598,7 +598,7 @@ class Client(object):
                 are of the same type (particularly in Python 3). For solvers with
                 undefined key value, return ``None``.
 
-            filters:
+            **filters:
                 See `Filtering forms` and `Operators` below.
 
         Solver filters are defined, similarly to Django QuerySet filters, with
@@ -622,12 +622,28 @@ class Client(object):
           This form ensures the value of solver's property bound to `derived_property`,
           after applying `operator` equals the `value`. The default operator is `eq`.
 
+          For example::
+
+            >>> client.get_solvers(avg_load__gt=0.5)
+
+          but also::
+
+            >>> client.get_solvers(online=True)
+            >>> # identical to:
+            >>> client.get_solvers(online__eq=True)
+
         * <parameter>__<operator> (object <value>)
         * <parameter> (bool)
 
           This form ensures that the solver supports `parameter`. General operator form can
           be used but usually does not make sense for parameters, since values are human-readable
           descriptions. The default operator is `available`.
+
+          Example::
+
+            >>> client.get_solvers(flux_biases=True)
+            >>> # identical to:
+            >>> client.get_solvers(flux_biases__available=True)
 
         * <property>__<operator> (object <value>)
         * <property> (bool)
@@ -639,10 +655,12 @@ class Client(object):
 
         Operators are:
 
-        * `available` (<name>: str, <value>: bool): Test availability of <name> feature.
+        * `available` (<name>: str, <value>: bool):
+            Test availability of <name> feature.
         * `eq`, `lt`, `lte`, `gt`, `gte` (<name>: str, <value>: any):
             Standard relational operators that compare feature <name> value with <value>.
-        * `regex` (<name>: str, <value>: str): Test regular expression matching feature value.
+        * `regex` (<name>: str, <value>: str):
+            Test regular expression matching feature value.
         * `covers` (<name>: str, <value>: single value or range expressed as 2-tuple/list):
             Test feature <name> value (which should be a *range*) covers a given value or a subrange.
         * `within` (<name>: str, <value>: range expressed as 2-tuple/list):
