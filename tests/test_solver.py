@@ -73,6 +73,19 @@ class PropertyLoading(unittest.TestCase):
             solver = client.get_solver()
             self.assertTrue(len(solver.edges) > 0)
 
+    def test_max_num_reads(self):
+        with Client(**config) as client:
+            solver = client.get_solver()
+
+            if solver.qpu:
+                dnr = solver.max_num_reads()
+                # double the anneal_time
+                anneal_time = 2*solver.properties['default_annealing_time']
+                self.assertEqual(dnr // 2, self.max_num_reads(annealing_time=anneal_time))
+            else:
+                self.assertEqual(solver.max_num_reads(),
+                                 solver.properties['num_reads_range'][1])
+
 
 class _QueryTest(unittest.TestCase):
     def _submit_and_check(self, solver, linear, quad, **param):
