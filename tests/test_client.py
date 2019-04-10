@@ -246,6 +246,10 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "parameters": {
                     "num_reads": "Number of samples to return.",
                     "postprocess": "either 'sampling' or 'optimization'"
+                },
+                "topology": {
+                    "type": "chimera",
+                    "shape": [16, 16, 4]
                 }
             },
             "id": "solver1",
@@ -264,6 +268,10 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                     "flux_biases": "Supported ...",
                     "anneal_schedule": "Supported ..."
                 },
+                "topology": {
+                    "type": "pegasus",
+                    "shape": [6, 6, 12]
+                },
                 "vfyc": True
             },
             "id": "solver2",
@@ -278,6 +286,10 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "num_reads_range": [0, 1000],
                 "parameters": {"num_reads": "Number of samples to return."},
                 "vfyc": False,
+                "topology": {
+                    "type": "chimera",
+                    "shape": [4, 4, 4]
+                },
                 # the following are only present in this solver
                 "some_set": [1, 2],
                 "some_range": [1, 2],
@@ -462,6 +474,17 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.get_solvers(num_qubits__lte=4, vfyc=True), [])
         self.assertSolvers(self.client.get_solvers(num_qubits__within=(3, 6), flux_biases=True), [self.solver2])
         self.assertSolvers(self.client.get_solvers(num_qubits=5, flux_biases=True), [self.solver2])
+
+    def test_nested_properties_leaf_lookup(self):
+        self.assertSolvers(self.client.get_solvers(topology__type="chimera"), [self.solver1, self.solver3])
+        self.assertSolvers(self.client.get_solvers(topology__type="pegasus"), [self.solver2])
+        self.assertSolvers(self.client.get_solvers(topology__type__eq="pegasus"), [self.solver2])
+        self.assertSolvers(self.client.get_solvers(topology__shape=[6,6,12]), [self.solver2])
+        self.assertSolvers(self.client.get_solvers(topology__type="chimera", topology__shape__contains=16), [self.solver1])
+
+    def test_nested_properties_intermediate_key_lookup(self):
+        self.assertSolvers(self.client.get_solvers(topology__contains="shape"), self.solvers)
+        self.assertSolvers(self.client.get_solvers(topology={"type": "pegasus", "shape": [6, 6, 12]}), self.solver2)
 
     def test_anneal_schedule(self):
         self.assertSolvers(self.client.get_solvers(anneal_schedule__available=True), [self.solver2])
