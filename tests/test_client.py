@@ -250,7 +250,8 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "topology": {
                     "type": "chimera",
                     "shape": [16, 16, 4]
-                }
+                },
+                "tags": ["lower_noise"]
             },
             "id": "solver1",
             "description": "A test solver 1",
@@ -293,7 +294,8 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 # the following are only present in this solver
                 "some_set": [1, 2],
                 "some_range": [1, 2],
-                "some_string": "x"
+                "some_string": "x",
+                "tags": ["tag"]
             },
             "id": "c4-sw_solver3",
             "description": "A test of software solver",
@@ -338,6 +340,10 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.get_solvers(num_qubits=5), [self.solver2])
         self.assertSolvers(self.client.get_solvers(num_active_qubits=2), [self.solver3])
         self.assertSolvers(self.client.get_solvers(num_active_qubits__in=[2, 3]), [self.solver1, self.solver3])
+
+    def test_lower_noise_derived_property(self):
+        self.assertSolvers(self.client.get_solvers(lower_noise=True), [self.solver1])
+        self.assertSolvers(self.client.get_solvers(lower_noise=False), [self.solver2, self.solver3])
 
     def test_parameter_availability_check(self):
         self.assertSolvers(self.client.get_solvers(postprocess__available=True), [self.solver1])
