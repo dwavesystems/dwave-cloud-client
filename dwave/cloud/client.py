@@ -602,9 +602,10 @@ class Client(object):
                 See `Filtering forms` and `Operators` below.
 
         Solver filters are defined, similarly to Django QuerySet filters, with
-        keyword arguments of form `<name>__<operator>=<value>`. Each `<operator>`
-        is a predicate (boolean) function that acts on two arguments: value of
-        feature `<name>` and the required `<value>`.
+        keyword arguments of form `<key1>__...__<keyN>[__<operator>]=<value>`.
+        Each `<operator>` is a predicate (boolean) function that acts on two
+        arguments: value of feature `<name>` (described with keys path
+        `<key1.key2...keyN>`) and the required `<value>`.
 
         Feature `<name>` can be:
 
@@ -613,6 +614,7 @@ class Client(object):
            `num_active_qubits`, `avg_load`)
         2) a solver parameter, available in :obj:`Solver.parameters`
         3) a solver property, available in :obj:`Solver.properties`
+        4) a path describing a property in nested dictionaries
 
         Filtering forms are:
 
@@ -727,7 +729,8 @@ class Client(object):
                                                     # require Ising, QUBO or both to be supported
                 name='DW_2000Q_3',                  # full solver name/ID match
                 name__regex='.*2000.*',             # partial/regex-based solver name match
-                chip_id__regex='DW_.*'              # chip ID prefix must be DW_
+                chip_id__regex='DW_.*',             # chip ID prefix must be DW_
+                topology__type__eq="chimera"        # topology.type must be chimera
             )
         """
 
@@ -792,18 +795,38 @@ class Client(object):
             'issuperset': with_valid_lhs(lambda prop, val: _set(prop).issuperset(_set(val))),
         }
 
-        def predicate(solver, name, opname, val):
-            if name in solver.derived_properties:
-                op = ops[opname or 'eq']
-                return op(getattr(solver, name), val)
-            elif name in solver.parameters:
-                op = ops[opname or 'available']
-                return op(solver.parameters[name], val)
-            elif name in solver.properties:
-                op = ops[opname or 'eq']
-                return op(solver.properties[name], val)
+        def predicate(solver, query, val):
+            # needs to handle kwargs like these:
+            #  key=val
+            #  key__op=val
+            #  key__key=val
+            #  key__key__op=val
+            # LHS is split on __ in `query`
+            assert len(query) >= 1
+
+            potential_path, potential_op_name = query[:-1], query[-1]
+
+            if potential_op_name in ops:
+                # op is explicit, and potential path is correct
+                op_name = potential_op_name
             else:
-                op = ops[opname or 'eq']
+                # op is implied and depends on property type, path is the whole query
+                op_name = None
+                potential_path = query
+
+            path = '.'.join(potential_path)
+
+            if path in solver.derived_properties:
+                op = ops[op_name or 'eq']
+                return op(getattr(solver, path), val)
+            elif pluck(solver.parameters, path, None) is not None:
+                op = ops[op_name or 'available']
+                return op(pluck(solver.parameters, path), val)
+            elif pluck(solver.properties, path, None) is not None:
+                op = ops[op_name or 'eq']
+                return op(pluck(solver.properties, path), val)
+            else:
+                op = ops[op_name or 'eq']
                 return op(None, val)
 
         # param validation
@@ -828,8 +851,8 @@ class Client(object):
 
         predicates = []
         for lhs, val in filters.items():
-            propname, opname = (lhs.rsplit('__', 1) + [None])[:2]
-            predicates.append(partial(predicate, name=propname, opname=opname, val=val))
+            query = lhs.split('__')
+            predicates.append(partial(predicate, query=query, val=val))
 
         _LOGGER.debug("Filtering solvers with predicates=%r", predicates)
 
