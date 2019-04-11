@@ -484,7 +484,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
 
     def test_nested_properties_intermediate_key_lookup(self):
         self.assertSolvers(self.client.get_solvers(topology__contains="shape"), self.solvers)
-        self.assertSolvers(self.client.get_solvers(topology={"type": "pegasus", "shape": [6, 6, 12]}), self.solver2)
+        self.assertSolvers(self.client.get_solvers(topology={"type": "pegasus", "shape": [6, 6, 12]}), [self.solver2])
 
     def test_anneal_schedule(self):
         self.assertSolvers(self.client.get_solvers(anneal_schedule__available=True), [self.solver2])
