@@ -143,7 +143,8 @@ class Solver(object):
 
         # Derived solver properties (not present in solver data properties dict)
         self.derived_properties = {
-            'qpu', 'software', 'online', 'num_active_qubits', 'avg_load', 'name'
+            'qpu', 'software', 'online', 'num_active_qubits', 'avg_load', 'name',
+            'lower_noise'
         }
 
     def __repr__(self):
@@ -218,6 +219,10 @@ class Solver(object):
     def num_qubits(self):
         "Nominal number of qubits on chip (includes active AND inactive)."
         return self.properties.get('num_qubits')
+
+    @property
+    def lower_noise(self):
+        return "lower_noise" in self.properties.get("tags", [])
 
     def max_num_reads(self, **params):
         """Returns the maximum number of reads for the given solver parameters.
