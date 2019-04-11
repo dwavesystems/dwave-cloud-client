@@ -29,12 +29,6 @@ matrix:
 
         - os: linux
           sudo: required
-          python: "3.4"
-          env: TOXENV=py34
-          deploy:
-
-        - os: linux
-          sudo: required
           python: "2.7"
           env: TOXENV=py27
           deploy:
