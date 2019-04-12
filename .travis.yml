@@ -1,3 +1,4 @@
+dist: xenial
 
 language: python
 
@@ -8,33 +9,40 @@ matrix:
           python: "nightly"
           env: TOXENV=pynightly
           deploy:
+
+        - os: linux
+          sudo: required
+          python: "3.7"
+          env: TOXENV=py37
+
         - os: linux
           sudo: required
           python: "3.6"
           env: TOXENV=py36
+          deploy:
+
         - os: linux
           sudo: required
           python: "3.5"
           env: TOXENV=py35
           deploy:
-        - os: linux
-          sudo: required
-          python: "3.4"
-          env: TOXENV=py34
-          deploy:
+
         - os: linux
           sudo: required
           python: "2.7"
           env: TOXENV=py27
           deploy:
+
         - os: osx
+          osx_image: xcode10.2    # Python 3.7.2 running on macOS 10.14.3
           language: generic
-          env: TOXENV=py36
+          env: TOXENV=py37
           before_install:
             - pip3 install virtualenv
             - virtualenv env -p python3
             - source env/bin/activate
           deploy:
+
         - os: osx
           language: generic
           env: TOXENV=py27
