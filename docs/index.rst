@@ -23,22 +23,23 @@ Documentation
   installation
   license
   bibliography
+  Source <https://github.com/dwavesystems/dwave-cloud-client>
 
 .. toctree::
-  :caption: D-Wave's Ocean Software
+  :caption: Ocean Software
   :maxdepth: 1
 
-  ocean
-  contributing
-  glossary
+  Ocean Home <https://ocean.dwavesys.com/>
+  Ocean Documentation <https://docs.ocean.dwavesys.com>
+  Ocean Glossary <https://docs.ocean.dwavesys.com/en/latest/glossary.html>
 
 .. toctree::
   :caption: D-Wave
   :maxdepth: 1
 
-  dwave
-  leap
-  sysdocs
+  D-Wave <https://www.dwavesys.com>
+  Leap <https://cloud.dwavesys.com/leap/>
+  D-Wave System Documentation <https://docs.dwavesys.com/docs/latest/index.html>
 
 Indices and tables
 ------------------
