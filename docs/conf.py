@@ -67,6 +67,11 @@ pygments_style = 'sphinx'
 import sphinx_rtd_theme
 html_theme = 'sphinx_rtd_theme'
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+html_static_path = ['_static']
+
+def setup(app):
+    app.add_stylesheet('cookie_notice.css')
+    app.add_javascript('cookie_notice.js')
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
