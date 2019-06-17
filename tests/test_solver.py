@@ -136,7 +136,7 @@ class Submission(_QueryTest):
             linear, quad = generate_random_ising_problem(solver)
             linear[max(solver.nodes) + 1] = 1
 
-            with self.assertRaises(ValueError):
+            with self.assertRaises(InvalidProblemError):
                 results = solver.sample_ising(linear, quad)
                 results.samples
 

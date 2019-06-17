@@ -63,3 +63,7 @@ class CanceledFutureError(Exception):
 
 class InvalidAPIResponseError(Exception):
     """Raised when an invalid/unexpected response from D-Wave Solver API is received."""
+
+
+class InvalidProblemError(ValueError):
+    """Solver cannot handle the given binary quadratic model."""
