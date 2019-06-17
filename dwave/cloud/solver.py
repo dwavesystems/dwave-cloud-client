@@ -358,7 +358,7 @@ class Solver(object):
         """
         # Check the problem
         if not self.check_problem(linear, quadratic):
-            raise ValueError("Problem graph incompatible with solver.")
+            raise InvalidProblemError("Problem graph incompatible with solver.")
 
         # Mix the new parameters with the default parameters
         combined_params = dict(self._params)
