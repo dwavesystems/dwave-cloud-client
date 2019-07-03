@@ -721,9 +721,9 @@ class Client(object):
                 max_anneal_schedule_points__gte=4,  # we need at least 4 points for our anneal schedule
                 num_reads_range__covers=1000,       # our solver must support returning 1000 reads
                 extended_j_range__covers=[-2, 2],   # we need extended J range to contain subrange [-2,2]
-                couplings__contains=[0, 128],       # coupling (edge between) qubits (0,128) must exist
-                couplings__issuperset=[[0,128], [0,4]],
-                                                    # two couplings required: (0,128) and (0,4)
+                couplers__contains=[0, 128],        # coupler (edge between) qubits (0,128) must exist
+                couplers__issuperset=[[0,128], [0,4]],
+                                                    # two couplers required: (0,128) and (0,4)
                 qubits__issuperset={0, 4, 215},     # qubits 0, 4 and 215 must exist
                 supported_problem_types__issubset={'ising', 'qubo'},
                                                     # require Ising, QUBO or both to be supported
