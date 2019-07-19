@@ -727,7 +727,7 @@ class Client(object):
                 qubits__issuperset={0, 4, 215},     # qubits 0, 4 and 215 must exist
                 supported_problem_types__issubset={'ising', 'qubo'},
                                                     # require Ising, QUBO or both to be supported
-                name='DW_2000Q_3',                  # full solver name/ID match
+                name='DW_2000Q_5',                  # full solver name/ID match
                 name__regex='.*2000.*',             # partial/regex-based solver name match
                 chip_id__regex='DW_.*',             # chip ID prefix must be DW_
                 topology__type__eq="chimera"        # topology.type must be chimera
