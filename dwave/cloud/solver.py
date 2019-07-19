@@ -42,7 +42,7 @@ from dwave.cloud.computation import Future
 
 __all__ = ['Solver']
 
-_LOGGER = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class Solver(object):
@@ -378,12 +378,12 @@ class Solver(object):
             'type': type_,
             'params': combined_params
         })
-        _LOGGER.trace("Encoded sample request: %s", body)
+        logger.trace("Encoded sample request: %s", body)
 
         future = Future(solver=self, id_=None, return_matrix=self.return_matrix,
                         submission_data=(type_, linear, quadratic, params))
 
-        _LOGGER.debug("Submitting new problem to: %s", self.id)
+        logger.debug("Submitting new problem to: %s", self.id)
         self.client._submit(body, future)
         return future
 
