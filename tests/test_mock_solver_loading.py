@@ -27,7 +27,7 @@ from dwave.cloud.client import Client, Solver
 from dwave.cloud.qpu import Client as QPUClient
 from dwave.cloud.sw import Client as SoftwareClient
 from dwave.cloud.exceptions import (
-    InvalidAPIResponseError, ConfigFileReadError, ConfigFileParseError,
+    SolverPropertyMissingError, ConfigFileReadError, ConfigFileParseError,
     SolverError, SolverNotFoundError)
 from dwave.cloud.config import legacy_load_config, load_config
 from dwave.cloud.testing import mock, iterable_mock_open
@@ -195,7 +195,7 @@ class MockSolverLoading(unittest.TestCase):
         with requests_mock.mock() as m:
             m.get(solver1_url, text=solver_data(solver_name, True))
             with Client(url, token) as client:
-                with self.assertRaises(InvalidAPIResponseError):
+                with self.assertRaises(SolverNotFoundError):
                     client.get_solver(solver_name)
 
     def test_load_solver_broken_response(self):

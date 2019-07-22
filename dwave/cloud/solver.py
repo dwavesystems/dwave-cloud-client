@@ -40,7 +40,7 @@ from dwave.cloud.coders import encode_bqm_as_qp
 from dwave.cloud.utils import uniform_iterator, uniform_get
 from dwave.cloud.computation import Future
 
-__all__ = ['Solver']
+__all__ = ['Solver', 'BaseSolver', 'StructuredSolver', 'UnstructuredSolver']
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class BaseSolver(object):
 
     # Classes of problems the remote solver has to support (at least one of these)
     # in order for `Solver` to be able to abstract, or use, that solver
-    _HANDLED_PROBLEM_TYPES = {"ising", "qubo", "bqm"}
+    _handled_problem_types = {"ising", "qubo", "bqm"}
 
     def __init__(self, client, data):
         # client handles async api requests (via local thread pool)
@@ -92,24 +92,24 @@ class BaseSolver(object):
         try:
             self.properties = data['properties']
         except KeyError:
-            raise InvalidAPIResponseError("Missing solver property: 'properties'")
+            raise SolverPropertyMissingError("Missing solver property: 'properties'")
+
+        # The set of extra parameters this solver will accept in sample_ising or sample_qubo: dict
+        self.parameters = self.properties.get('parameters', {})
 
         # Ensure this remote solver supports at least one of the problem types we know how to handle
         try:
             self.supported_problem_types = set(self.properties['supported_problem_types'])
         except KeyError:
-            raise InvalidAPIResponseError(
+            raise SolverPropertyMissingError(
                 "Missing solver property: 'properties.supported_problem_types'")
 
-        if self.supported_problem_types.isdisjoint(self._HANDLED_PROBLEM_TYPES):
+        if self.supported_problem_types.isdisjoint(self._handled_problem_types):
             raise UnsupportedSolverError(
                 "Remote solver {!r} supports {} problems, but this solver handles only {}".format(
                     self.id,
                     list(self.supported_problem_types),
-                    list(self._HANDLED_PROBLEM_TYPES)))
-
-        # The set of extra parameters this solver will accept in sample_ising or sample_qubo: dict
-        self.parameters = self.properties.get('parameters', {})
+                    list(self._handled_problem_types)))
 
         # When True the solution data will be returned as numpy matrices: False
         # TODO: deprecate
@@ -183,11 +183,11 @@ class BaseSolver(object):
         return self.online
 
 
-class Solver(BaseSolver):
-    """
-    Class for D-Wave solvers.
+class UnstructuredSolver(BaseSolver):
+    """Class for D-Wave unstructured solvers.
 
-    This class provides :term:`Ising` and :term:`QUBO` sampling methods and encapsulates
+    This class provides :term:`Ising`, :term:`QUBO` and
+    :term:`BinaryQuadraticModel` sampling methods and encapsulates
     the solver description returned from the D-Wave cloud API.
 
     Args:
@@ -197,31 +197,38 @@ class Solver(BaseSolver):
         data (`dict`):
             Data from the server describing this solver.
 
-    Examples:
-        This example creates a client using the local system's default D-Wave Cloud
-        Client configuration file and checks the identity of its default solver.
+    """
 
-        >>> from dwave.cloud import Client
-        >>> client = Client.from_config()
-        >>> solver = client.get_solver()
-        >>> solver.data['id']    # doctest: +SKIP
-        'EXAMPLE_2000Q_SYSTEM'
+
+class StructuredSolver(BaseSolver):
+    """Class for D-Wave structured solvers.
+
+    This class provides :term:`Ising`, :term:`QUBO` and
+    :term:`BinaryQuadraticModel` sampling methods and encapsulates
+    the solver description returned from the D-Wave cloud API.
+
+    Args:
+        client (:class:`Client`):
+            Client that manages access to this solver.
+
+        data (`dict`):
+            Data from the server describing this solver.
 
     """
 
     def __init__(self, *args, **kwargs):
-        super(Solver, self).__init__(*args, **kwargs)
+        super(StructuredSolver, self).__init__(*args, **kwargs)
 
         # The exact sequence of nodes/edges is used in encoding problems and must be preserved
         try:
             self._encoding_qubits = self.properties['qubits']
         except KeyError:
-            raise InvalidAPIResponseError("Missing solver property: 'properties.qubits'")
+            raise SolverPropertyMissingError("Missing solver property: 'properties.qubits'")
 
         try:
             self._encoding_couplers = [tuple(edge) for edge in self.properties['couplers']]
         except KeyError:
-            raise InvalidAPIResponseError("Missing solver property: 'properties.couplers'")
+            raise SolverPropertyMissingError("Missing solver property: 'properties.couplers'")
 
         # The nodes in this solver's graph: set(int)
         self.nodes = self.variables = set(self._encoding_qubits)
@@ -495,3 +502,12 @@ class Solver(BaseSolver):
             if value != 0 and tuple(key) not in self.edges:
                 return False
         return True
+
+
+# for backwards compatibility:
+Solver = StructuredSolver
+
+
+# list of all available solvers, ordered according to loading attempt priority
+# (more specific first)
+available_solvers = [StructuredSolver, UnstructuredSolver]

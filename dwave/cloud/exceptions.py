@@ -43,6 +43,9 @@ class SolverAuthenticationError(SolverError):
 class UnsupportedSolverError(SolverError):
     """The solver we received from the API is not supported by the client."""
 
+class SolverPropertyMissingError(UnsupportedSolverError):
+    """The solver we received from the API does not have required properties."""
+
 
 class Timeout(Exception):
     """General timeout error."""
