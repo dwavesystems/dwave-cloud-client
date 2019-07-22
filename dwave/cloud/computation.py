@@ -55,23 +55,33 @@ __all__ = ['Future']
 class Future(object):
     """Class for interacting with jobs submitted to SAPI.
 
-    :class:`~dwave.cloud.solver.Solver` uses :class:`Future` to construct objects for pending SAPI calls that can wait for
-    requests to complete and parse returned messages.
+    :class:`~dwave.cloud.solver.Solver` uses :class:`Future` to construct
+    objects for pending SAPI calls that can wait for requests to complete and
+    parse returned messages.
 
-    Objects are blocked for the duration of any data accessed on the remote resource.
+    Objects are blocked for the duration of any data accessed on the remote
+    resource.
 
-    .. warning:: :class:`Future` objects are not intended to be directly created. Problem submittal is initiated by :class:`~dwave.cloud.solver.Solver` and executed by the client.
+    .. warning:: :class:`Future` objects are not intended to be directly
+    created. Problem submittal is initiated by :class:`~dwave.cloud.solver.Solver`
+    and executed by the client.
 
     Args:
-        solver: Solver responsible for this :class:`Future` object.
-        id_: Identification for a query submitted by a solver to SAPI.
-            May be None following submission until an identification number is set.
-        return_matrix: Return values for this :class:`Future` object are NumPy matrices.
+        solver:
+            Solver responsible for this :class:`Future` object.
+
+        id_:
+            Identification for a query submitted by a solver to SAPI. May be
+            None following submission until an identification number is set.
+
+        return_matrix:
+            Return values for this :class:`Future` object are NumPy matrices.
 
     Examples:
-        This example creates a solver using the local system's default D-Wave Cloud Client
-        configuration file, submits a simple QUBO problem to a remote D-Wave resource for
-        100 samples, and checks a couple of times whether the sampling is completed.
+        This example creates a solver using the local system's default D-Wave
+        Cloud Client configuration file, submits a simple QUBO problem to a
+        remote D-Wave resource for 100 samples, and checks a couple of times
+        whether the sampling is completed.
 
         >>> from dwave.cloud import Client
         >>> client = Client.from_config()
@@ -214,26 +224,36 @@ class Future(object):
         Blocking call that uses an event object to emulate multi-wait for Python.
 
         Args:
-            futures (list of Futures): List of :class:`Future` objects to await.
-            min_done (int, optional, default=None): Minimum required completions to end
-                the waiting. The wait is terminated when this number of results are ready.
-                If None, waits for all the :class:`Future` objects to complete.
-            timeout (float, optional, default=None): Maximum number of seconds to await completion.
-                If None, waits indefinitely.
+            futures (list of Futures):
+                List of :class:`Future` objects to await.
+
+            min_done (int, optional, default=None):
+                Minimum required completions to end the waiting. The wait is
+                terminated when this number of results are ready. If None, waits
+                for all the :class:`Future` objects to complete.
+
+            timeout (float, optional, default=None):
+                Maximum number of seconds to await completion. If None, waits
+                indefinitely.
 
         Returns:
-            Two-tuple of :class:`Future` objects: completed and not completed submitted tasks. Similar to `concurrent.futures.wait()` method's returned two-tuple of `done` and `not_done` sets.
+            Two-tuple of :class:`Future` objects: completed and not completed
+            submitted tasks. Similar to `concurrent.futures.wait()` method's
+            returned two-tuple of `done` and `not_done` sets.
 
         See Also:
-            :func:`as_completed` for a blocking iterable of resolved futures similar to `concurrent.futures.as_completed()` method.
+            :func:`as_completed` for a blocking iterable of resolved futures
+            similar to `concurrent.futures.as_completed()` method.
 
         Examples:
-            This example creates a solver using the local system's default D-Wave Cloud Client
-            configuration file, submits a simple QUBO problem to a remote D-Wave resource 3 times
-            for differing numers of samples, and waits for sampling to complete on any
-            two of the submissions. The wait ends with the completion of two submissions while
-            the third is still in progress. (A more typical approach would use something
-            like :code:`first = next(Future.as_completed(computation))` instead.)
+            This example creates a solver using the local system's default
+            D-Wave Cloud Client configuration file, submits a simple QUBO
+            problem to a remote D-Wave resource 3 times for differing numers of
+            samples, and waits for sampling to complete on any two of the
+            submissions. The wait ends with the completion of two submissions
+            while the third is still in progress. (A more typical approach would
+            use something like
+            :code:`first = next(Future.as_completed(computation))` instead.)
 
             >>> import dwave.cloud as dc
             >>> client = dc.Client.from_config()
@@ -303,29 +323,34 @@ class Future(object):
     def as_completed(fs, timeout=None):
         """Yield Futures objects as they complete.
 
-        Returns an iterator over the specified list of :class:`Future` objects that
-        yields those objects as they complete. Completion occurs
-        when the submitted job is finished or cancelled.
+        Returns an iterator over the specified list of :class:`Future` objects
+        that yields those objects as they complete. Completion occurs when the
+        submitted job is finished or cancelled.
 
-        Emulates the behavior of the `concurrent.futures.as_completed()` function.
+        Emulates the behavior of the `concurrent.futures.as_completed()`
+        function.
 
         Args:
-            fs (list): List of :class:`Future` objects to iterate over.
-            timeout (float, optional, default=None): Maximum number of seconds to await completion.
-                If None, awaits indefinitely.
+            fs (list):
+                List of :class:`Future` objects to iterate over.
+
+            timeout (float, optional, default=None):
+                Maximum number of seconds to await completion. If None, awaits
+                indefinitely.
 
         Returns:
             Generator (:class:`Future` objects):
                 Listed :class:`Future` objects as they complete.
 
         Raises:
-            `concurrent.futures.TimeoutError` is raised if per-future timeout is exceeded.
+            `concurrent.futures.TimeoutError` is raised if per-future timeout is
+            exceeded.
 
         Examples:
-            This example creates a solver using the local system's default D-Wave Cloud Client
-            configuration file, submits a simple QUBO problem to a remote D-Wave resource 3 times
-            for differing numers of samples, and yields timing information for each job
-            as it completes.
+            This example creates a solver using the local system's default D-Wave
+            Cloud Client configuration file, submits a simple QUBO problem to a
+            remote D-Wave resource 3 times for differing numers of samples, and
+            yields timing information for each job as it completes.
 
             >>> import dwave.cloud as dc
             >>> client = dc.Client.from_config()
@@ -359,16 +384,18 @@ class Future(object):
         Blocking call that waits for a :class:`Future` object to complete.
 
         Args:
-            timeout (float, optional, default=None): Maximum number of seconds to await completion.
-                If None, waits indefinitely.
+            timeout (float, optional, default=None):
+                Maximum number of seconds to await completion. If None, waits
+                indefinitely.
 
         Returns:
             Boolean: True if solver received a response.
 
         Examples:
-            This example creates a solver using the local system's default D-Wave Cloud Client
-            configuration file, submits a simple QUBO problem to a remote D-Wave resource for
-            100 samples, and tries waiting for 10 seconds for sampling to complete.
+            This example creates a solver using the local system's default
+            D-Wave Cloud Client configuration file, submits a simple QUBO
+            problem to a remote D-Wave resource for 100 samples, and tries
+            waiting for 10 seconds for sampling to complete.
 
             >>> from dwave.cloud import Client
             >>> client = Client.from_config()
@@ -391,16 +418,17 @@ class Future(object):
     def done(self):
         """Check whether the solver received a response for a submitted problem.
 
-        Non-blocking call that checks whether the solver has received a response from
-        the remote resource.
+        Non-blocking call that checks whether the solver has received a response
+        from the remote resource.
 
         Returns:
             Boolean: True if solver received a response.
 
         Examples:
-            This example creates a solver using the local system's default D-Wave Cloud Client
-            configuration file, submits a simple QUBO problem to a remote D-Wave resource for
-            100 samples, and checks a couple of times whether sampling is completed.
+            This example creates a solver using the local system's default
+            D-Wave Cloud Client  configuration file, submits a simple QUBO
+            problem to a remote D-Wave resource for 100 samples, and checks a
+            couple of times whether sampling is completed.
 
             >>> from dwave.cloud import Client
             >>> client = Client.from_config()
@@ -419,12 +447,14 @@ class Future(object):
     def cancel(self):
         """Try to cancel the problem corresponding to this result.
 
-        Non-blocking call to the remote resource in a best-effort attempt to prevent execution of a problem.
+        Non-blocking call to the remote resource in a best-effort attempt to
+        prevent execution of a problem.
 
         Examples:
-            This example creates a solver using the local system's default D-Wave Cloud Client
-            configuration file, submits a simple QUBO problem to a remote D-Wave resource for
-            100 samples, and tries (and in this case succeeds) to cancel it.
+            This example creates a solver using the local system's default
+            D-Wave Cloud Client configuration file, submits a simple QUBO
+            problem to a remote D-Wave resource for 100 samples, and tries
+            (and in this case succeeds) to cancel it.
 
             >>> from dwave.cloud import Client
             >>> client = Client.from_config()
@@ -461,16 +491,18 @@ class Future(object):
     def result(self):
         """Results for a submitted job.
 
-        Retrives result data in a :class:`Future` object that the solver submitted to a remote resource.
-        First calls to access this data are blocking.
+        Retrives result data in a :class:`Future` object that the solver
+        submitted to a remote resource. First calls to access this data are
+        blocking.
 
         Returns:
             dict: Results of the submitted job. Should be considered read-only.
 
         Examples:
-            This example creates a solver using the local system's default D-Wave Cloud Client
-            configuration file, submits a simple QUBO problem (representing a Boolean NOT gate
-            by a penalty function) to a remote D-Wave resource for 5 samples, and prints part
+            This example creates a solver using the local system's default
+            D-Wave Cloud Client configuration file, submits a simple QUBO
+            problem (representing a Boolean NOT gate by a penalty function)
+            to a remote D-Wave resource for 5 samples, and prints part
             of the returned result (the relevant samples).
 
             >>> from dwave.cloud import Client
@@ -497,17 +529,18 @@ class Future(object):
     def energies(self):
         """Energy buffer for the submitted job.
 
-        First calls to access data of a :class:`Future` object are blocking; subsequent access
-        to this property is non-blocking.
+        First calls to access data of a :class:`Future` object are blocking;
+        subsequent access to this property is non-blocking.
 
         Returns:
             list or NumPy matrix of doubles: Energies for each set of samples.
 
         Examples:
-            This example creates a solver using the local system's default D-Wave Cloud Client
-            configuration file, submits a random Ising problem (+1 or -1 values of linear and
-            quadratic biases on all nodes and edges, respectively, of the solver's garph) to
-            a remote D-Wave resource for 10 samples, and prints the returned energies.
+            This example creates a solver using the local system's default
+            D-Wave Cloud Client configuration file, submits a random Ising
+            problem (+1 or -1 values of linear and quadratic biases on all nodes
+            and edges, respectively, of the solver's garph) to a remote D-Wave
+            resource for 10 samples, and prints the returned energies.
 
             >>> import random
             >>> from dwave.cloud import Client
@@ -527,17 +560,18 @@ class Future(object):
     def samples(self):
         """State buffer for the submitted job.
 
-        First calls to access data of a :class:`Future` object are blocking; subsequent access
-        to this property is non-blocking.
+        First calls to access data of a :class:`Future` object are blocking;
+        subsequent access to this property is non-blocking.
 
         Returns:
             list of lists or NumPy matrix: Samples on the nodes of solver's graph.
 
         Examples:
-            This example creates a solver using the local system's default D-Wave Cloud Client
-            configuration file, submits a simple QUBO problem (representing a Boolean NOT gate
-            by a penalty function) to a remote D-Wave resource for 5 samples, and prints part
-            of the returned result (the relevant samples).
+            This example creates a solver using the local system's default
+            D-Wave Cloud Client configuration file, submits a simple QUBO
+            problem (representing a Boolean NOT gate by a penalty function) to a
+            remote D-Wave resource for 5 samples, and prints part of the
+            returned result (the relevant samples).
 
             >>> from dwave.cloud import Client
             >>> with Client.from_config() as client:  # doctest: +SKIP
@@ -561,19 +595,20 @@ class Future(object):
     def occurrences(self):
         """Occurrences buffer for the submitted job.
 
-        First calls to access data of a :class:`Future` object are blocking; subsequent access
-        to this property is non-blocking.
+        First calls to access data of a :class:`Future` object are blocking;
+        subsequent access to this property is non-blocking.
 
         Returns:
-            list or NumPy matrix of doubles: Occurrences. When returned results are
-            ordered in a histogram, `occurrences` indicates the number of times a particular
-            solution recurred.
+            list or NumPy matrix of doubles: Occurrences. When returned results
+            are ordered in a histogram, `occurrences` indicates the number of
+            times a particular solution recurred.
 
         Examples:
-            This example creates a solver using the local system's default D-Wave Cloud Client
-            configuration file, submits a simple Ising problem with several ground states to a
-            remote D-Wave resource for 20 samples, and prints the returned results, which
-            are ordered as a histogram. The problem's ground states tend to recur frequently,
+            This example creates a solver using the local system's default
+            D-Wave Cloud Client configuration file, submits a simple Ising
+            problem with several ground states to a remote D-Wave resource for
+            20 samples, and prints the returned results, which are ordered as a
+            histogram. The problem's ground states tend to recur frequently,
             and so those solutions have `occurrences` greater than 1.
 
             >>> from dwave.cloud import Client
@@ -582,7 +617,9 @@ class Future(object):
             ...     quad = {(16, 20): -1, (17, 20): 1, (16, 21): 1, (17, 21): 1}
             ...     computation = solver.sample_ising({}, quad, num_reads=500, answer_mode='histogram')
             ...     for i in range(len(computation.occurrences)):
-            ...         print(computation.samples[i][16],computation.samples[i][17], computation.samples[i][20], computation.samples[i][21], ' --> ', computation.energies[i], computation.occurrences[i])
+            ...         print(computation.samples[i][16], computation.samples[i][17],
+            ...               computation.samples[i][20], computation.samples[i][21],
+                              ' --> ', computation.energies[i], computation.occurrences[i])
             ...
             (-1, 1, -1, -1, ' --> ', -2.0, 41)
             (-1, -1, -1, 1, ' --> ', -2.0, 53)
@@ -607,20 +644,23 @@ class Future(object):
         """Timing information about a solver operation.
 
         Mapping from string keys to numeric values representing timing details
-        for a submitted job as returned from the remote resource. Keys are dependant on
-        the particular solver.
+        for a submitted job as returned from the remote resource. Keys are
+        dependant on the particular solver.
 
-        First calls to access data of a :class:`Future` object are blocking; subsequent access
-        to this property is non-blocking.
+        First calls to access data of a :class:`Future` object are blocking;
+        subsequent access to this property is non-blocking.
 
         Returns:
-            dict: Mapping from string keys to numeric values representing timing information.
+            dict:
+                Mapping from string keys to numeric values representing timing
+                information.
 
         Examples:
-            This example creates a client using the local system's default D-Wave Cloud Client
-            configuration file, which is configured to access a D-Wave 2000Q QPU, submits a
-            simple :term:`Ising` problem (opposite linear biases on two coupled qubits) for
-            5 samples, and prints timing information for the job.
+            This example creates a client using the local system's default
+            D-Wave Cloud Client configuration file, which is configured to
+            access a D-Wave 2000Q QPU, submits a simple :term:`Ising` problem
+            (opposite linear biases on two coupled qubits) for 5 samples, and
+            prints timing information for the job.
 
             >>> from dwave.cloud import Client
             >>> with Client.from_config() as client:
