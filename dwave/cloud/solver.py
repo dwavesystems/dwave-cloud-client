@@ -45,11 +45,11 @@ __all__ = ['Solver']
 logger = logging.getLogger(__name__)
 
 
-class Solver(object):
-    """
-    Class for D-Wave solvers.
+class BaseSolver(object):
+    """Base class for a general D-Wave solver.
 
-    This class provides :term:`Ising` and :term:`QUBO` sampling methods and encapsulates
+    This class provides :term:`Ising`, :term:`QUBO` and
+    :term:`BinaryQuadraticModel` sampling methods and encapsulates
     the solver description returned from the D-Wave cloud API.
 
     Args:
@@ -64,22 +64,22 @@ class Solver(object):
         Client configuration file and checks the identity of its default solver.
 
         >>> from dwave.cloud import Client
-        >>> client = Client.from_config()
-        >>> solver = client.get_solver()
-        >>> solver.data['id']    # doctest: +SKIP
-        u'EXAMPLE_2000Q_SYSTEM'
-
+        >>> with Client.from_config() as client:
+        ...     solver = client.get_solver()
+        ...     solver.id       # doctest: +SKIP
+        'EXAMPLE_2000Q_SYSTEM'
     """
 
     # Classes of problems the remote solver has to support (at least one of these)
     # in order for `Solver` to be able to abstract, or use, that solver
-    _HANDLED_PROBLEM_TYPES = {"ising", "qubo"}
+    _HANDLED_PROBLEM_TYPES = {"ising", "qubo", "bqm"}
 
     def __init__(self, client, data):
         # client handles async api requests (via local thread pool)
         self.client = client
 
-        # data for each solver includes at least: id, description, and properties
+        # data for each solver includes at least: id, description, properties,
+        # status and avg_load
         self.data = data
 
         # Each solver has an ID field
@@ -103,19 +103,114 @@ class Solver(object):
 
         if self.supported_problem_types.isdisjoint(self._HANDLED_PROBLEM_TYPES):
             raise UnsupportedSolverError(
-                "Remote solver {!r} supports {} problems, but Solver() handles only {}".format(
+                "Remote solver {!r} supports {} problems, but this solver handles only {}".format(
                     self.id,
                     list(self.supported_problem_types),
                     list(self._HANDLED_PROBLEM_TYPES)))
 
         # The set of extra parameters this solver will accept in sample_ising or sample_qubo: dict
-        try:
-            self.parameters = self.properties['parameters']
-        except KeyError:
-            raise InvalidAPIResponseError("Missing solver property: 'parameters'")
+        self.parameters = self.properties.get('parameters', {})
 
         # When True the solution data will be returned as numpy matrices: False
+        # TODO: deprecate
         self.return_matrix = False
+
+        # Derived solver properties (not present in solver data properties dict)
+        self.derived_properties = {
+            'qpu', 'software', 'online', 'avg_load', 'name'
+        }
+
+    def __repr__(self):
+        return "{}(id={!r})".format(type(self).__name__, self.id)
+
+    def _retrieve_problem(self, id_):
+        """Resume polling for a problem previously submitted.
+
+        Args:
+            id_: Identification of the query.
+
+        Returns:
+            :obj: `Future`
+        """
+        future = Future(self, id_, self.return_matrix, None)
+        self.client._poll(future)
+        return future
+
+    def check_problem(self, *args, **kwargs):
+        return True
+
+    # Derived properties
+
+    @property
+    def name(self):
+        return self.id
+
+    @property
+    def online(self):
+        "Is this solver online (or offline)?"
+        return self.data.get('status', 'online').lower() == 'online'
+
+    @property
+    def avg_load(self):
+        "Solver's average load, at the time of description fetch."
+        return self.data.get('avg_load')
+
+    @property
+    def qpu(self):
+        "Is this a QPU-based solver?"
+        # TODO: add a field for this in SAPI response; for now base decision on id/name
+        return not self.id.startswith('c4-sw_')
+
+    @property
+    def software(self):
+        "Is this a software-based solver?"
+        # TODO: add a field for this in SAPI response; for now base decision on id/name
+        return self.id.startswith('c4-sw_')
+
+    @property
+    def is_qpu(self):
+        warnings.warn("'is_qpu' property is deprecated in favor of 'qpu'.", DeprecationWarning)
+        return self.qpu
+
+    @property
+    def is_software(self):
+        warnings.warn("'is_software' property is deprecated in favor of 'software'.", DeprecationWarning)
+        return self.software
+
+    @property
+    def is_online(self):
+        warnings.warn("'is_online' property is deprecated in favor of 'online'.", DeprecationWarning)
+        return self.online
+
+
+class Solver(BaseSolver):
+    """
+    Class for D-Wave solvers.
+
+    This class provides :term:`Ising` and :term:`QUBO` sampling methods and encapsulates
+    the solver description returned from the D-Wave cloud API.
+
+    Args:
+        client (:class:`Client`):
+            Client that manages access to this solver.
+
+        data (`dict`):
+            Data from the server describing this solver.
+
+    Examples:
+        This example creates a client using the local system's default D-Wave Cloud
+        Client configuration file and checks the identity of its default solver.
+
+        >>> from dwave.cloud import Client
+        >>> client = Client.from_config()
+        >>> solver = client.get_solver()
+        >>> solver.data['id']    # doctest: +SKIP
+        'EXAMPLE_2000Q_SYSTEM'
+
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(Solver, self).__init__(*args, **kwargs)
 
         # The exact sequence of nodes/edges is used in encoding problems and must be preserved
         try:
@@ -141,64 +236,15 @@ class Solver(object):
         # Create a set of default parameters for the queries
         self._params = {}
 
-        # Derived solver properties (not present in solver data properties dict)
-        self.derived_properties = {
-            'qpu', 'software', 'online', 'num_active_qubits', 'avg_load', 'name',
-            'lower_noise'
-        }
-
-    def __repr__(self):
-        return "Solver(id={!r})".format(self.id)
+        # Add derived properties specific for this solver
+        self.derived_properties.update({'lower_noise', 'num_active_qubits'})
 
     # Derived properties
-
-    @property
-    def qpu(self):
-        "Is this a QPU-based solver?"
-        # TODO: add a field for this in SAPI response; for now base decision on id/name
-        return not self.id.startswith('c4-sw_')
-
-    @property
-    def software(self):
-        "Is this a software-based solver?"
-        # TODO: add a field for this in SAPI response; for now base decision on id/name
-        return self.id.startswith('c4-sw_')
-
-    @property
-    def online(self):
-        "Is this solver online (or offline)?"
-        return self.data.get('status', 'online').lower() == 'online'
 
     @property
     def num_active_qubits(self):
         "The number of active (encoding) qubits."
         return len(self.nodes)
-
-    @property
-    def avg_load(self):
-        "Solver's average load, at the time of description fetch."
-        return self.data.get('avg_load')
-
-    @property
-    def name(self):
-        return self.id
-
-    # Convenience properties (based on self.properties)
-
-    @property
-    def is_qpu(self):
-        warnings.warn("'is_qpu' property is deprecated in favor of 'qpu'.", DeprecationWarning)
-        return self.qpu
-
-    @property
-    def is_software(self):
-        warnings.warn("'is_software' property is deprecated in favor of 'software'.", DeprecationWarning)
-        return self.software
-
-    @property
-    def is_online(self):
-        warnings.warn("'is_online' property is deprecated in favor of 'online'.", DeprecationWarning)
-        return self.online
 
     @property
     def is_vfyc(self):
@@ -449,16 +495,3 @@ class Solver(object):
             if value != 0 and tuple(key) not in self.edges:
                 return False
         return True
-
-    def _retrieve_problem(self, id_):
-        """Resume polling for a problem previously submitted.
-
-        Args:
-            id_: Identification of the query.
-
-        Returns:
-            :obj: `Future`
-        """
-        future = Future(self, id_, self.return_matrix, None)
-        self.client._poll(future)
-        return future

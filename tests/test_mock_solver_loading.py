@@ -58,7 +58,7 @@ def solver_data(id_, incomplete=False):
     }
 
     if incomplete:
-        del obj['properties']['parameters']
+        del obj['properties']['supported_problem_types']
 
     return json.dumps(obj)
 
