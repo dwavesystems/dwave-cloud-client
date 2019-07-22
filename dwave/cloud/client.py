@@ -63,7 +63,7 @@ import six
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config, parse_float
-from dwave.cloud.solver import Solver
+from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.utils import (
     datetime_to_timestamp, utcnow, TimeoutingHTTPAdapter, user_agent,
     epochnow, cached)
@@ -535,16 +535,18 @@ class Client(object):
 
         solvers = []
         for solver_desc in data:
-            try:
-                solver = Solver(self, solver_desc)
-                if self.is_solver_handled(solver):
-                    solvers.append(solver)
-                    logger.debug("Adding solver %r", solver)
-                else:
-                    logger.debug("Skipping solver %r (not handled by this client)", solver)
+            for solver_class in available_solvers:
+                try:
+                    solver = solver_class(self, solver_desc)
+                    if self.is_solver_handled(solver):
+                        solvers.append(solver)
+                        logger.debug("Adding solver %r", solver)
+                        break
+                    else:
+                        logger.debug("Skipping solver %r (not handled by this client)", solver)
 
-            except UnsupportedSolverError as e:
-                logger.debug("Skipping solver due to %r", e)
+                except UnsupportedSolverError as e:
+                    logger.debug("Skipping solver due to %r", e)
 
             # propagate all other/decoding errors, like InvalidAPIResponseError, etc.
 

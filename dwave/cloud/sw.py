@@ -22,7 +22,7 @@ classical software resources generating samples.
 from __future__ import absolute_import
 
 from dwave.cloud.client import Client as BaseClient
-from dwave.cloud.solver import Solver
+from dwave.cloud.solver import UnstructuredSolver as Solver
 from dwave.cloud.computation import Future
 
 __all__ = ['Client']
