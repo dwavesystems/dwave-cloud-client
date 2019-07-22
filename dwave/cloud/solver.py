@@ -132,7 +132,7 @@ class BaseSolver(object):
         Returns:
             :obj: `Future`
         """
-        future = Future(self, id_, self.return_matrix, None)
+        future = Future(self, id_, self.return_matrix)
         self.client._poll(future)
         return future
 
@@ -433,8 +433,7 @@ class StructuredSolver(BaseSolver):
         })
         logger.trace("Encoded sample request: %s", body)
 
-        future = Future(solver=self, id_=None, return_matrix=self.return_matrix,
-                        submission_data=(type_, linear, quadratic, params))
+        future = Future(solver=self, id_=None, return_matrix=self.return_matrix)
 
         logger.debug("Submitting new problem to: %s", self.id)
         self.client._submit(body, future)

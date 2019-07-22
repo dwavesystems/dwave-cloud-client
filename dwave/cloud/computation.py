@@ -98,11 +98,8 @@ class Future(object):
         >>> client.close()
     """
 
-    def __init__(self, solver, id_, return_matrix, submission_data):
+    def __init__(self, solver, id_, return_matrix):
         self.solver = solver
-
-        # Store the query data in case the problem needs to be resubmitted
-        self._submission_data = submission_data
 
         # Has the client tried to cancel this job
         self._cancel_requested = False
