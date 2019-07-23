@@ -29,7 +29,8 @@ import numpy
 
 from dwave.cloud.utils import evaluate_ising, generate_random_ising_problem
 from dwave.cloud.client import Client
-from dwave.cloud.exceptions import CanceledFutureError, SolverFailureError
+from dwave.cloud.exceptions import (
+    CanceledFutureError, SolverFailureError, InvalidProblemError)
 import dwave.cloud.computation
 
 from tests import config
