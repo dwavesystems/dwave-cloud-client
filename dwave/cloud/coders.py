@@ -17,6 +17,8 @@ from __future__ import division, absolute_import
 import struct
 import base64
 
+import dimod
+
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_tail, active_qubits)
 
@@ -238,3 +240,25 @@ def decode_qp_numpy(msg, return_matrix=True):
         result['solutions'] = result['solutions'].tolist()
 
     return result
+
+
+def encode_problem_as_bq(problem):
+    """Encode the binary quadratic problem for submission the `bq` data format.
+
+    Args:
+        problem (:class:`~dimod.BinaryQuadraticModel`):
+            Binary quadratic model.
+
+    Returns:
+        encoded submission dictionary
+    """
+
+    serialized_bqm = problem.to_serializable(use_bytes=False)
+    return {
+        'format': 'bq',
+        'data': serialized_bqm,
+    }
+
+
+def decode_bq(msg):
+    pass

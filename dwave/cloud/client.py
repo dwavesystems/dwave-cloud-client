@@ -978,6 +978,7 @@ class Client(object):
 
                 # `None` task is used to signal thread termination
                 item = self._submission_queue.get()
+
                 if item is None:
                     break
 

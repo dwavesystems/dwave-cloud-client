@@ -32,11 +32,12 @@ from __future__ import division, absolute_import
 import json
 import logging
 import warnings
-
 from collections import Mapping
 
+import dimod
+
 from dwave.cloud.exceptions import *
-from dwave.cloud.coders import encode_problem_as_qp
+from dwave.cloud.coders import encode_problem_as_qp, encode_problem_as_bq
 from dwave.cloud.utils import uniform_iterator, uniform_get
 from dwave.cloud.computation import Future
 
@@ -201,6 +202,30 @@ class UnstructuredSolver(BaseSolver):
     """
 
     _handled_encoding_formats = {"bqm"}
+
+    def sample_ising(self, linear, quadratic, **params):
+        bqm = dimod.BinaryQuadraticModel.from_ising(linear, quadratic)
+        return self.sample_bqm(bqm, **params)
+
+    def sample_qubo(self, qubo, **params):
+        bqm = dimod.BinaryQuadraticModel.from_qubo(qubo)
+        return self.sample_bqm(bqm, **params)
+
+    def sample_bqm(self, bqm, **params):
+        body = json.dumps({
+            'solver': self.id,
+            'data': encode_problem_as_bq(bqm),
+            'type': 'bqm',
+            'params': params
+        })
+        logger.trace("Encoded sample request: %s", body)
+
+        future = Future(solver=self, id_=None, return_matrix=False)
+
+        logger.debug("Submitting new problem to: %s", self.id)
+        self.client._submit(body, future)
+
+        return future
 
 
 class StructuredSolver(BaseSolver):
