@@ -35,18 +35,10 @@ import six
 import functools
 from concurrent.futures import TimeoutError
 
+import numpy as np
 from dateutil.parser import parse
 
-from dwave.cloud.coders import decode_qp, decode_qp_numpy
 from dwave.cloud.utils import utcnow, datetime_to_timestamp
-
-# Use numpy if available for fast decoding
-try:
-    import numpy as np
-    _numpy = True
-except ImportError:
-    # If numpy isn't available we can do the encoding slower in native python
-    _numpy = False
 
 __all__ = ['Future']
 
@@ -67,14 +59,14 @@ class Future(object):
     and executed by the client.
 
     Args:
-        solver:
+        solver (:class:`~dwave.cloud.solver.Solver`):
             Solver responsible for this :class:`Future` object.
 
-        id_:
+        id_ (str, optional, default=None):
             Identification for a query submitted by a solver to SAPI. May be
             None following submission until an identification number is set.
 
-        return_matrix:
+        return_matrix (bool, optional, default=False):
             Return values for this :class:`Future` object are NumPy matrices.
 
     Examples:
@@ -98,7 +90,7 @@ class Future(object):
         >>> client.close()
     """
 
-    def __init__(self, solver, id_, return_matrix):
+    def __init__(self, solver, id_, return_matrix=False):
         self.solver = solver
 
         # Has the client tried to cancel this job
@@ -107,8 +99,6 @@ class Future(object):
         self._single_cancel_lock = threading.Lock()  # Make sure we only call cancel once
 
         # Should the results be decoded as python lists or numpy matrices
-        if return_matrix and not _numpy:
-            raise ValueError("Matrix result requested without numpy.")
         self.return_matrix = return_matrix
 
         #: The id the server will use to identify this problem, None until the id is actually known
@@ -705,26 +695,11 @@ class Future(object):
         return self._result
 
     def _decode(self):
-        """Choose the right decoding method based on format and environment."""
-
-        if self._message['type'] not in ['qubo', 'ising']:
-            raise ValueError('Unknown problem format used.')
-
-        # If format is set, it must be qp
-        if self._message.get('answer', {}).get('format') != 'qp':
-            raise ValueError('Data format returned by server not understood.')
-
-        # prefer numpy decoding, but fallback to python
-        # TODO: we should really be explicit about numpy usage
+        """Decode answer data from the response."""
         start = time.time()
-        if _numpy:
-            self._result = decode_qp_numpy(self._message,
-                                           return_matrix=self.return_matrix)
-        else:
-            self._result = decode_qp(self._message)
-        self.parse_time = time.time() - start
-
+        self._result = self.solver.decode_response(self._message)
         self._alias_result()
+        self.parse_time = time.time() - start
         return self._result
 
     def _alias_result(self):

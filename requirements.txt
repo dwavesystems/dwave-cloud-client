@@ -7,3 +7,4 @@ futures; python_version=="2.7"
 configparser; python_version=="2.7"
 plucky>=0.4.3
 dimod>=0.8.14
+numpy>=1.15.4

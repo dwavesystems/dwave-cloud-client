@@ -37,7 +37,9 @@ from collections import Mapping
 import dimod
 
 from dwave.cloud.exceptions import *
-from dwave.cloud.coders import encode_problem_as_qp, encode_problem_as_bq
+from dwave.cloud.coders import (
+    encode_problem_as_qp, encode_problem_as_bq,
+    decode_qp_numpy, decode_bq)
 from dwave.cloud.utils import uniform_iterator, uniform_get
 from dwave.cloud.computation import Future
 
@@ -141,6 +143,21 @@ class BaseSolver(object):
     def check_problem(self, *args, **kwargs):
         return True
 
+    def decode_response(self, msg):
+        if msg['type'] not in self._handled_problem_types:
+            raise ValueError('Unknown problem type received.')
+
+        fmt = msg.get('answer', {}).get('format')
+        if fmt not in self._handled_encoding_formats:
+            raise ValueError('Unhandled answer encoding format received.')
+
+        if fmt == 'qp':
+            return decode_qp_numpy(msg, return_matrix=self.return_matrix)
+        elif fmt == 'bq':
+            return decode_bq(msg)
+        else:
+            raise ValueError("Don't know how to decode %r answer format" % fmt)
+
     # Derived properties
 
     @property
@@ -201,7 +218,7 @@ class UnstructuredSolver(BaseSolver):
 
     """
 
-    _handled_encoding_formats = {"bqm"}
+    _handled_encoding_formats = {"bq"}
 
     def sample_ising(self, linear, quadratic, **params):
         bqm = dimod.BinaryQuadraticModel.from_ising(linear, quadratic)
@@ -212,6 +229,7 @@ class UnstructuredSolver(BaseSolver):
         return self.sample_bqm(bqm, **params)
 
     def sample_bqm(self, bqm, **params):
+        # encode the request
         body = json.dumps({
             'solver': self.id,
             'data': encode_problem_as_bq(bqm),
@@ -220,7 +238,7 @@ class UnstructuredSolver(BaseSolver):
         })
         logger.trace("Encoded sample request: %s", body)
 
-        future = Future(solver=self, id_=None, return_matrix=False)
+        future = Future(solver=self, id_=None, return_matrix=self.return_matrix)
 
         logger.debug("Submitting new problem to: %s", self.id)
         self.client._submit(body, future)
