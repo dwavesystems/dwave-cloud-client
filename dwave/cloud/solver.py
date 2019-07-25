@@ -36,7 +36,7 @@ import warnings
 from collections import Mapping
 
 from dwave.cloud.exceptions import *
-from dwave.cloud.coders import encode_bqm_as_qp
+from dwave.cloud.coders import encode_problem_as_qp
 from dwave.cloud.utils import uniform_iterator, uniform_get
 from dwave.cloud.computation import Future
 
@@ -73,6 +73,7 @@ class BaseSolver(object):
     # Classes of problems the remote solver has to support (at least one of these)
     # in order for `Solver` to be able to abstract, or use, that solver
     _handled_problem_types = {"ising", "qubo", "bqm"}
+    _handled_encoding_formats = {}
 
     def __init__(self, client, data):
         # client handles async api requests (via local thread pool)
@@ -199,6 +200,8 @@ class UnstructuredSolver(BaseSolver):
 
     """
 
+    _handled_encoding_formats = {"bqm"}
+
 
 class StructuredSolver(BaseSolver):
     """Class for D-Wave structured solvers.
@@ -215,6 +218,8 @@ class StructuredSolver(BaseSolver):
             Data from the server describing this solver.
 
     """
+
+    _handled_encoding_formats = {"qp"}
 
     def __init__(self, *args, **kwargs):
         super(StructuredSolver, self).__init__(*args, **kwargs)
@@ -427,7 +432,7 @@ class StructuredSolver(BaseSolver):
 
         body = json.dumps({
             'solver': self.id,
-            'data': encode_bqm_as_qp(self, linear, quadratic),
+            'data': encode_problem_as_qp(self, linear, quadratic),
             'type': type_,
             'params': combined_params
         })

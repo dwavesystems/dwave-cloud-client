@@ -19,7 +19,7 @@ import struct
 import unittest
 import itertools
 
-from dwave.cloud.coders import encode_bqm_as_qp
+from dwave.cloud.coders import encode_problem_as_qp
 from dwave.cloud.qpu import Solver
 
 
@@ -50,7 +50,7 @@ class TestCoders(unittest.TestCase):
         solver = get_solver()
         linear = {index: 1 for index in solver.nodes}
         quadratic = {key: -1 for key in solver.undirected_edges}
-        request = encode_bqm_as_qp(solver, linear, quadratic)
+        request = encode_problem_as_qp(solver, linear, quadratic)
         self.assertEqual(request['format'], 'qp')
         self.assertEqual(request['lin'],  self.encode_doubles([1, 1, 1, 1]))
         self.assertEqual(request['quad'], self.encode_doubles([-1, -1, -1, -1]))
@@ -61,7 +61,7 @@ class TestCoders(unittest.TestCase):
         solver = get_solver()
         linear = {index: 1 for index in sorted(list(solver.nodes))[:2]}
         quadratic = {key: -1 for key in sorted(list(solver.undirected_edges))[:1]}
-        request = encode_bqm_as_qp(solver, linear, quadratic)
+        request = encode_problem_as_qp(solver, linear, quadratic)
         self.assertEqual(request['format'], 'qp')
         # [1, 1, NaN, NaN]
         self.assertEqual(request['lin'],  self.encode_doubles([1, 1, self.nan, self.nan]))
@@ -74,7 +74,7 @@ class TestCoders(unittest.TestCase):
         solver = get_solver()
         linear = {}
         quadratic = {(0, 1): -1}
-        request = encode_bqm_as_qp(solver, linear, quadratic)
+        request = encode_problem_as_qp(solver, linear, quadratic)
         self.assertEqual(request['format'], 'qp')
         # [0, 0, NaN, NaN]
         self.assertEqual(request['lin'],  self.encode_doubles([0, 0, self.nan, self.nan]))
@@ -87,7 +87,7 @@ class TestCoders(unittest.TestCase):
         solver = get_solver()
         linear = {}
         quadratic = {(0,3): -1}
-        request = encode_bqm_as_qp(solver, linear, quadratic)
+        request = encode_problem_as_qp(solver, linear, quadratic)
         self.assertEqual(request['format'], 'qp')
         # [0, NaN, NaN, 0]
         self.assertEqual(request['lin'],  self.encode_doubles([0, self.nan, self.nan, 0]))
@@ -100,7 +100,7 @@ class TestCoders(unittest.TestCase):
         solver = get_solver()
         linear = {0: 0, 3: 0}
         quadratic = {}
-        request = encode_bqm_as_qp(solver, linear, quadratic)
+        request = encode_problem_as_qp(solver, linear, quadratic)
         self.assertEqual(request['format'], 'qp')
         # [0, NaN, NaN, 0]
         self.assertEqual(request['lin'],  self.encode_doubles([0, self.nan, self.nan, 0]))
