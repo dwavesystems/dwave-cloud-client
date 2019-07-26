@@ -3,8 +3,12 @@ requests[socks]>=2.18
 homebase>=1.0.0
 python-dateutil>=2.7
 click>=6
+plucky>=0.4.3
+
+# backports
 futures; python_version=="2.7"
 configparser; python_version=="2.7"
-plucky>=0.4.3
+
+# optional bqm support
 dimod>=0.8.14
 numpy>=1.15.4

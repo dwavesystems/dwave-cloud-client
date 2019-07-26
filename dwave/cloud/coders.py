@@ -17,8 +17,6 @@ from __future__ import division, absolute_import
 import struct
 import base64
 
-import dimod
-
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_tail, active_qubits)
 
@@ -261,4 +259,9 @@ def encode_problem_as_bq(problem):
 
 
 def decode_bq(msg):
-    pass
+    """Decode answers for problem submitted in the `bq` data format."""
+    try:
+        import dimod
+    except ImportError:
+        raise RuntimeError("Can't decode BQMs without dimod. "
+                           "Re-install the library with 'bqm' support.")

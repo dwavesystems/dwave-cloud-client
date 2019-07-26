@@ -16,12 +16,14 @@ except SyntaxError:
 
 # Package requirements, minimal pinning
 install_requires = ['requests[socks]>=2.18', 'six>=1.10', 'homebase>=1.0',
-                    'click>=6.7', 'python-dateutil>=2.7', 'plucky>=0.4.3',
-                    'dimod>=0.8.14', 'numpy>=1.15.4']
+                    'click>=6.7', 'python-dateutil>=2.7', 'plucky>=0.4.3']
 
 # Package extras requirements
 extras_require = {
     'test': ['requests_mock', 'mock', 'numpy', 'coverage'],
+
+    # bqm support
+    'bqm': ['dimod>=0.8.14', 'numpy>=1.15.4'],
 
     # python2 backports
     ':python_version == "2.7"': ['futures', 'configparser']

@@ -34,14 +34,19 @@ import logging
 import warnings
 from collections import Mapping
 
-import dimod
-
 from dwave.cloud.exceptions import *
 from dwave.cloud.coders import (
     encode_problem_as_qp, encode_problem_as_bq,
-    decode_qp_numpy, decode_bq)
+    decode_qp_numpy, decode_qp, decode_bq)
 from dwave.cloud.utils import uniform_iterator, uniform_get
 from dwave.cloud.computation import Future
+
+# Use numpy if available for fast encoding/decoding
+try:
+    import numpy as np
+    _numpy = True
+except ImportError:
+    _numpy = False
 
 __all__ = ['Solver', 'BaseSolver', 'StructuredSolver', 'UnstructuredSolver']
 
@@ -75,7 +80,7 @@ class BaseSolver(object):
 
     # Classes of problems the remote solver has to support (at least one of these)
     # in order for `Solver` to be able to abstract, or use, that solver
-    _handled_problem_types = {"ising", "qubo", "bqm"}
+    _handled_problem_types = {}
     _handled_encoding_formats = {}
 
     def __init__(self, client, data):
@@ -143,6 +148,12 @@ class BaseSolver(object):
     def check_problem(self, *args, **kwargs):
         return True
 
+    def _decode_qp(self, msg):
+        if _numpy:
+            return decode_qp_numpy(msg, return_matrix=self.return_matrix)
+        else:
+            return decode_qp(msg)
+
     def decode_response(self, msg):
         if msg['type'] not in self._handled_problem_types:
             raise ValueError('Unknown problem type received.')
@@ -152,7 +163,7 @@ class BaseSolver(object):
             raise ValueError('Unhandled answer encoding format received.')
 
         if fmt == 'qp':
-            return decode_qp_numpy(msg, return_matrix=self.return_matrix)
+            return self._decode_qp(msg)
         elif fmt == 'bq':
             return decode_bq(msg)
         else:
@@ -218,13 +229,26 @@ class UnstructuredSolver(BaseSolver):
 
     """
 
+    _handled_problem_types = {"bqm"}
     _handled_encoding_formats = {"bq"}
 
     def sample_ising(self, linear, quadratic, **params):
+        try:
+            import dimod
+        except ImportError:
+            raise RuntimeError("Can't use solver of type 'bqm' without dimod. "
+                               "Re-install the library with 'bqm' support.")
+
         bqm = dimod.BinaryQuadraticModel.from_ising(linear, quadratic)
         return self.sample_bqm(bqm, **params)
 
     def sample_qubo(self, qubo, **params):
+        try:
+            import dimod
+        except ImportError:
+            raise RuntimeError("Can't use solver of type 'bqm' without dimod. "
+                               "Re-install the library with 'bqm' support.")
+
         bqm = dimod.BinaryQuadraticModel.from_qubo(qubo)
         return self.sample_bqm(bqm, **params)
 
@@ -262,6 +286,7 @@ class StructuredSolver(BaseSolver):
 
     """
 
+    _handled_problem_types = {"ising", "qubo"}
     _handled_encoding_formats = {"qp"}
 
     def __init__(self, *args, **kwargs):

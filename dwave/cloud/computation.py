@@ -35,10 +35,16 @@ import six
 import functools
 from concurrent.futures import TimeoutError
 
-import numpy as np
 from dateutil.parser import parse
 
 from dwave.cloud.utils import utcnow, datetime_to_timestamp
+
+# Use numpy if available for fast decoding
+try:
+    import numpy as np
+    _numpy = True
+except ImportError:
+    _numpy = False
 
 __all__ = ['Future']
 
@@ -99,6 +105,8 @@ class Future(object):
         self._single_cancel_lock = threading.Lock()  # Make sure we only call cancel once
 
         # Should the results be decoded as python lists or numpy matrices
+        if return_matrix and not _numpy:
+            raise ValueError("Matrix result requested without numpy.")
         self.return_matrix = return_matrix
 
         #: The id the server will use to identify this problem, None until the id is actually known
@@ -619,6 +627,7 @@ class Future(object):
 
         """
         self._load_result()
+        # `occurrences` data is not present if `answer_mode` was set to "raw"
         if 'occurrences' in self._result:
             return self._result['occurrences']
         elif self.return_matrix:
