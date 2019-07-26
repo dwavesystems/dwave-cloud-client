@@ -1185,11 +1185,11 @@ class Client(object):
             if future.eta_min and self._is_clock_diff_acceptable(future):
                 at = datetime_to_timestamp(future.eta_min)
                 logger.debug("Response ETA indicated and local clock reliable. "
-                             "Scheduling first polling at +%.2f sec", at - epochnow())
+                             "Scheduling first polling at %+.2f sec", at - epochnow())
             else:
                 at = time.time() + future._poll_backoff
                 logger.debug("Response ETA not indicated, or local clock unreliable. "
-                             "Scheduling first polling at +%.2f sec", at - epochnow())
+                             "Scheduling first polling at %+.2f sec", at - epochnow())
 
         else:
             # update exponential poll back-off, clipped to a range
