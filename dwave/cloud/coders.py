@@ -240,7 +240,7 @@ def decode_qp_numpy(msg, return_matrix=True):
     return result
 
 
-def encode_problem_as_bq(problem):
+def encode_problem_as_bq(problem, compress=False):
     """Encode the binary quadratic problem for submission the `bq` data format.
 
     Args:
@@ -251,10 +251,21 @@ def encode_problem_as_bq(problem):
         encoded submission dictionary
     """
 
+    import zlib
+    import json
+
     serialized_bqm = problem.to_serializable(use_bytes=False)
+
+    if compress:
+        # note: compression scheme will change, and preferably move to transport layer
+        compressed_bqm = zlib.compress(bytes(json.dumps(serialized_bqm), "ascii"))
+        data = str(base64.b64encode(compressed_bqm), "ascii")
+    else:
+        data = serialized_bqm
+
     return {
         'format': 'bq',
-        'data': serialized_bqm,
+        'data': data,
     }
 
 
