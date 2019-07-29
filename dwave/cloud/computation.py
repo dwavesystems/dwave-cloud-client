@@ -553,7 +553,14 @@ class Future(object):
             [-3976.0, -3974.0, -3972.0, -3970.0, -3968.0, -3968.0, -3966.0,
              -3964.0, -3964.0, -3960.0]
         """
-        return self.result()['energies']
+
+        # return energies from sampleset, if already constructed
+        result = self.result()
+        if 'sampleset' in result:
+            return result['sampleset'].record.energy
+
+        # fallback to energies from response
+        return result['energies']
 
     @property
     def samples(self):
@@ -588,7 +595,13 @@ class Future(object):
             (1, 0)
             (0, 1)
         """
-        return self.result()['samples']
+        # return samples from sampleset, if already constructed
+        result = self.result()
+        if 'sampleset' in result:
+            return result['sampleset'].record.sample
+
+        # fallback to samples from response
+        return result['samples']
 
     @property
     def variables(self):
@@ -646,14 +659,20 @@ class Future(object):
             (-1, -1, 1, 1, ' --> ', -2.0, 28)
 
         """
-        self._load_result()
-        # `occurrences` data is not present if `answer_mode` was set to "raw"
-        if 'occurrences' in self._result:
-            return self._result['occurrences']
+
+        # return num_occurrences from sampleset, if already constructed
+        result = self.result()
+        if 'sampleset' in result:
+            return result['sampleset'].record.num_occurrences
+
+        # fallback to num_occurrences from response
+        # (but `occurrences` data is not present if `answer_mode` was set to "raw")
+        if 'num_occurrences' in result:
+            return result['num_occurrences']
         elif self.return_matrix:
-            return np.ones((len(self._result['samples']),))
+            return np.ones((len(result['samples']),))
         else:
-            return [1] * len(self._result['samples'])
+            return [1] * len(result['samples'])
 
     @property
     def sampleset(self):
