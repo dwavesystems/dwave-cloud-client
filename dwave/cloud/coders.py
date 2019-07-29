@@ -173,7 +173,7 @@ def decode_qp_numpy(msg, return_matrix=True):
     """Decode SAPI response, results in a `qp` format, explicitly using numpy.
     If numpy is not installed, the method will fail.
 
-    To use numpy for decoding, but return the results a lists (instead of
+    To use numpy for decoding, but return the results as lists (instead of
     numpy matrices), set `return_matrix=False`.
     """
     import numpy as np
@@ -276,3 +276,9 @@ def decode_bq(msg):
     except ImportError:
         raise RuntimeError("Can't decode BQMs without dimod. "
                            "Re-install the library with 'bqm' support.")
+
+    result = msg['answer']
+    sampleset = dimod.SampleSet.from_serializable(result)
+    result['sampleset'] = sampleset
+
+    return result
