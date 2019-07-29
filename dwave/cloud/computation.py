@@ -656,6 +656,41 @@ class Future(object):
             return [1] * len(self._result['samples'])
 
     @property
+    def sampleset(self):
+        """Return :class:`~dimod.SampleSet` representation of the results."""
+
+        result = self._load_result()
+        if 'sampleset' in result:
+            return result['sampleset']
+
+        # construct sampleset from available data
+        try:
+            import dimod
+        except ImportError:
+            raise RuntimeError("Can't construct SampleSet without dimod. "
+                               "Re-install the library with 'bqm' support.")
+
+        # filter inactive variables from samples
+        samples = [[sample[v] for v in self.variables] for sample in self.samples]
+
+        # infer vartype from problem type
+        # note: KeyError on unknown problem types. BQMs should be handled above.
+        vartype_from_problem_type = {'ising': 'SPIN', 'qubo': 'BINARY'}
+        vartype = vartype_from_problem_type[self.problem_type]
+
+        # include timing in info
+        info = dict(timing=self.timing)
+
+        sampleset = dimod.SampleSet.from_samples(
+            (samples, self.variables), vartype=vartype,
+            energy=self.energies, num_occurrences=self.occurrences,
+            info=info, sort_labels=True)
+
+        self._result['sampleset'] = sampleset
+
+        return sampleset
+
+    @property
     def timing(self):
         """Timing information about a solver operation.
 
