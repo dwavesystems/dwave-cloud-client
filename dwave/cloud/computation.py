@@ -154,6 +154,9 @@ class Future(object):
         # current poll back-off interval, in seconds
         self._poll_backoff = None
 
+        # cached set of active variables in the answer
+        self._active_variables = None
+
     def __lt__(self, other):
         return id(self) < id(other)
 
@@ -589,12 +592,14 @@ class Future(object):
 
     @property
     def variables(self):
-        """Return the list of active variables."""
+        """Return the set of active variables."""
 
         result = self.result()
 
         if 'active_variables' in result:
-            return result['active_variables']
+            if self._active_variables is None:
+                self._active_variables = set(result['active_variables'])
+            return self._active_variables
 
         if 'sampleset' in result:
             return result['sampleset'].variables
