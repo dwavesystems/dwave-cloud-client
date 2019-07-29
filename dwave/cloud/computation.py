@@ -38,6 +38,7 @@ from concurrent.futures import TimeoutError
 from dateutil.parser import parse
 
 from dwave.cloud.utils import utcnow, datetime_to_timestamp
+from dwave.cloud.exceptions import InvalidAPIResponseError
 
 # Use numpy if available for fast decoding
 try:
@@ -585,6 +586,20 @@ class Future(object):
             (0, 1)
         """
         return self.result()['samples']
+
+    @property
+    def variables(self):
+        """Return the list of active variables."""
+
+        result = self.result()
+
+        if 'active_variables' in result:
+            return result['active_variables']
+
+        if 'sampleset' in result:
+            return result['sampleset'].variables
+
+        raise InvalidAPIResponseError("Active variables not present in the response")
 
     @property
     def occurrences(self):
