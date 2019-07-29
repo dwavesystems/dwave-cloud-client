@@ -154,9 +154,6 @@ class Future(object):
         # current poll back-off interval, in seconds
         self._poll_backoff = None
 
-        # cached set of active variables in the answer
-        self._active_variables = None
-
     def __lt__(self, other):
         return id(self) < id(other)
 
@@ -605,14 +602,12 @@ class Future(object):
 
     @property
     def variables(self):
-        """Return the set of active variables."""
+        """Return the list of active variables."""
 
         result = self.result()
 
         if 'active_variables' in result:
-            if self._active_variables is None:
-                self._active_variables = set(result['active_variables'])
-            return self._active_variables
+            return result['active_variables']
 
         if 'sampleset' in result:
             return result['sampleset'].variables
@@ -690,7 +685,8 @@ class Future(object):
                                "Re-install the library with 'bqm' support.")
 
         # filter inactive variables from samples
-        samples = [[sample[v] for v in self.variables] for sample in self.samples]
+        variables = set(self.variables)
+        samples = [[sample[v] for v in variables] for sample in self.samples]
 
         # infer vartype from problem type
         # note: KeyError on unknown problem types. BQMs should be handled above.
@@ -701,7 +697,7 @@ class Future(object):
         info = dict(timing=self.timing)
 
         sampleset = dimod.SampleSet.from_samples(
-            (samples, self.variables), vartype=vartype,
+            (samples, variables), vartype=vartype,
             energy=self.energies, num_occurrences=self.occurrences,
             info=info, sort_labels=True)
 
