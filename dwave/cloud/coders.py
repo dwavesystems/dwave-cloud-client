@@ -122,6 +122,11 @@ def decode_qp(msg):
         solutions.append(solution)
 
     result['solutions'] = solutions
+
+    # include problem type
+    if 'type' in msg:
+        result['problem_type'] = msg['type']
+
     return result
 
 
@@ -237,6 +242,10 @@ def decode_qp_numpy(msg, return_matrix=True):
         result['active_variables'] = result['active_variables'].tolist()
         result['solutions'] = result['solutions'].tolist()
 
+    # include problem type
+    if 'type' in msg:
+        result['problem_type'] = msg['type']
+
     return result
 
 
@@ -280,5 +289,8 @@ def decode_bq(msg):
     result = msg['answer']
     sampleset = dimod.SampleSet.from_serializable(result)
     result['sampleset'] = sampleset
+
+    # include problem type
+    result['problem_type'] = 'bqm'
 
     return result

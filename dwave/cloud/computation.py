@@ -686,6 +686,13 @@ class Future(object):
         """
         return self.result()['timing']
 
+    @property
+    def problem_type(self):
+        """Submitted problem type for this computation, as returned by the
+        solver API. Typical values are 'ising' and 'qubo'.
+        """
+        return self.result()['problem_type']
+
     def __getitem__(self, key):
         """Provide a simple results item getter. Blocks if future is unresolved.
 
