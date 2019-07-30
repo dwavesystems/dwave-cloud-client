@@ -19,6 +19,7 @@ Solvers are responsible for:
 
     - Encoding submitted problems
     - Checking submitted parameters
+    - Decoding answers
     - Adding problems to a client's submission queue
 
 You can list all solvers available to a :class:`~dwave.cloud.client.Client` with its
@@ -56,9 +57,9 @@ logger = logging.getLogger(__name__)
 class BaseSolver(object):
     """Base class for a general D-Wave solver.
 
-    This class provides :term:`Ising`, :term:`QUBO` and
-    :term:`BinaryQuadraticModel` sampling methods and encapsulates
-    the solver description returned from the D-Wave cloud API.
+    This class provides :term:`Ising`, :term:`QUBO` and :term:`BQM` sampling
+    methods and encapsulates the solver description returned from the D-Wave
+    cloud API.
 
     Args:
         client (:class:`Client`):
@@ -216,12 +217,12 @@ class BaseSolver(object):
 class UnstructuredSolver(BaseSolver):
     """Class for D-Wave unstructured solvers.
 
-    This class provides :term:`Ising`, :term:`QUBO` and
-    :term:`BinaryQuadraticModel` sampling methods and encapsulates
-    the solver description returned from the D-Wave cloud API.
+    This class provides :term:`Ising`, :term:`QUBO` and :term:`BQM` sampling
+    methods and encapsulates the solver description returned from the D-Wave
+    cloud API.
 
     Args:
-        client (:class:`Client`):
+        client (:class:`~dwave.cloud.client.Client`):
             Client that manages access to this solver.
 
         data (`dict`):
@@ -273,12 +274,12 @@ class UnstructuredSolver(BaseSolver):
 class StructuredSolver(BaseSolver):
     """Class for D-Wave structured solvers.
 
-    This class provides :term:`Ising`, :term:`QUBO` and
-    :term:`BinaryQuadraticModel` sampling methods and encapsulates
-    the solver description returned from the D-Wave cloud API.
+    This class provides :term:`Ising`, :term:`QUBO` and :term:`BQM` sampling
+    methods and encapsulates the solver description returned from the D-Wave
+    cloud API.
 
     Args:
-        client (:class:`Client`):
+        client (:class:`~dwave.cloud.client.Client`):
             Client that manages access to this solver.
 
         data (`dict`):

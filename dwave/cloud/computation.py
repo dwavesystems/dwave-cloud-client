@@ -498,13 +498,13 @@ class Future(object):
         Note:
             Helper properties on :class:`Future` object are preferred to reading
             raw results, as they abstract away the differences in response
-            between some solvers like. Available methods are: :meth:`.samples`,
-            :meth:`.energies`, :meth:`.occurrences`, :meth:`.variables`,
-            :meth:`.timing`, :meth:`.problem_type`, :meth:`.sampleset` (only if
+            between some solvers like. Available methods are: :meth:`samples`,
+            :meth:`energies`, :meth:`occurrences`, :meth:`variables`,
+            :meth:`timing`, :meth:`problem_type`, :meth:`sampleset` (only if
             dimod package is installed).
 
         Warning:
-            The dictionary returned by :meth:`.result` depends on the solver
+            The dictionary returned by :meth:`result` depends on the solver
             used. Starting with version 0.7.0 we will not try to standardize
             them anymore, on client side. For QPU solvers, please replace
             `'samples'` with `'solutions'` and `'occurrences'` with
@@ -620,7 +620,7 @@ class Future(object):
 
     @property
     def variables(self):
-        """Return the list of active variables."""
+        """List of active variables in response/answer."""
 
         result = self.result()
 
