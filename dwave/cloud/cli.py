@@ -411,7 +411,8 @@ def sample(config_file, profile, solver_def, biases, couplings, random_problem,
     echo("Number of samples: {}".format(num_reads))
 
     try:
-        result = solver.sample_ising(linear, quadratic, num_reads=num_reads).result()
+        result = solver.sample_ising(linear, quadratic, num_reads=num_reads)
+        result.result()
     except Exception as e:
         click.echo(e)
         return 4
@@ -419,6 +420,6 @@ def sample(config_file, profile, solver_def, biases, couplings, random_problem,
     if verbose:
         click.echo("Result: {!r}".format(result))
 
-    echo("Samples: {!r}".format(result['samples']))
-    echo("Occurrences: {!r}".format(result['occurrences']))
-    echo("Energies: {!r}".format(result['energies']))
+    echo("Samples: {!r}".format(result.samples))
+    echo("Occurrences: {!r}".format(result.occurrences))
+    echo("Energies: {!r}".format(result.energies))
