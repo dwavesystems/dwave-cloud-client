@@ -739,7 +739,7 @@ class Future(object):
             >>> # Snipped above response for brevity
 
         """
-        return self.result()['timing']
+        return self.result().get('timing', {})
 
     @property
     def problem_type(self):
