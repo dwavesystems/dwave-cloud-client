@@ -472,6 +472,31 @@ class StructuredSolver(BaseSolver):
         quadratic = {(i1, i2): v for (i1, i2), v in uniform_iterator(qubo) if i1 != i2}
         return self._sample('qubo', linear, quadratic, params)
 
+    def sample_bqm(self, bqm, **params):
+        """Sample from the specified :term:`BQM`.
+
+        Args:
+            bqm (:class:`~dimod.BinaryQuadraticModel`):
+                A binary quadratic model.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
+
+        Returns:
+            :obj:`Future`
+
+        Note:
+            To use this method, dimod package has to be installed.
+        """
+        try:
+            import dimod
+        except ImportError:
+            raise RuntimeError("Can't sample from 'bqm' without dimod. "
+                               "Re-install the library with 'bqm' support.")
+
+        ising = bqm.spin
+        return self.sample_ising(ising.linear, ising.quadratic, **params)
+
     def _sample(self, type_, linear, quadratic, params):
         """Internal method for both sample_ising and sample_qubo.
 
