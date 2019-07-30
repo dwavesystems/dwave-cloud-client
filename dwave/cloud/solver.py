@@ -170,6 +170,16 @@ class BaseSolver(object):
         else:
             raise ValueError("Don't know how to decode %r answer format" % fmt)
 
+    # Sampling methods
+    def sample_ising(self, linear, quadratic, **params):
+        raise NotImplementedError
+
+    def sample_qubo(self, qubo, **params):
+        raise NotImplementedError
+
+    def sample_bqm(self, bqm, **params):
+        raise NotImplementedError
+
     # Derived properties
 
     @property
@@ -234,6 +244,21 @@ class UnstructuredSolver(BaseSolver):
     _handled_encoding_formats = {"bq"}
 
     def sample_ising(self, linear, quadratic, **params):
+        """Sample from the specified :term:`BQM`.
+
+        Args:
+            bqm (:class:`~dimod.BinaryQuadraticModel`):
+                A binary quadratic model.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
+
+        Returns:
+            :class:`Future`
+
+        Note:
+            To use this method, dimod package has to be installed.
+        """
         try:
             import dimod
         except ImportError:
@@ -244,6 +269,22 @@ class UnstructuredSolver(BaseSolver):
         return self.sample_bqm(bqm, **params)
 
     def sample_qubo(self, qubo, **params):
+        """Sample from the specified :term:`QUBO`.
+
+        Args:
+            qubo (dict[(int, int), float]):
+                Coefficients of a quadratic unconstrained binary optimization
+                (QUBO) model.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
+
+        Returns:
+            :class:`Future`
+
+        Note:
+            To use this method, dimod package has to be installed.
+        """
         try:
             import dimod
         except ImportError:
@@ -254,6 +295,21 @@ class UnstructuredSolver(BaseSolver):
         return self.sample_bqm(bqm, **params)
 
     def sample_bqm(self, bqm, **params):
+        """Sample from the specified :term:`BQM`.
+
+        Args:
+            bqm (:class:`~dimod.BinaryQuadraticModel`):
+                A binary quadratic model.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
+
+        Returns:
+            :class:`Future`
+
+        Note:
+            To use this method, dimod package has to be installed.
+        """
         # encode the request
         body = json.dumps({
             'solver': self.id,
@@ -396,15 +452,22 @@ class StructuredSolver(BaseSolver):
     # Sampling methods
 
     def sample_ising(self, linear, quadratic, **params):
-        """Sample from the specified Ising model.
+        """Sample from the specified :term:`Ising` model.
 
         Args:
-            linear (list/dict): Linear terms of the model (h).
-            quadratic (dict of (int, int):float): Quadratic terms of the model (J).
-            **params: Parameters for the sampling method, specified per solver.
+            linear (list/dict):
+                Linear terms of the model (h).
+
+            quadratic (dict[(int, int), float]):
+                Quadratic terms of the model (J), stored in a dict. With keys
+                that are 2-tuples of variables and values are quadratic biases
+                associated with the pair of variables (the interaction).
+
+            **params:
+                Parameters for the sampling method, solver-specific.
 
         Returns:
-            :obj:`Future`
+            :class:`Future`
 
         Examples:
             This example creates a client using the local system's default D-Wave Cloud Client
@@ -416,7 +479,7 @@ class StructuredSolver(BaseSolver):
             >>> with Client.from_config() as client:
             ...     solver = client.get_solver()
             ...     u, v = next(iter(solver.edges))
-            ...     computation = solver.sample_ising({u: -1, v: 1},{}, num_reads=5)   # doctest: +SKIP
+            ...     computation = solver.sample_ising({u: -1, v: 1}, {}, num_reads=5)   # doctest: +SKIP
             ...     for i in range(5):
             ...         print(computation.samples[i][u], computation.samples[i][v])
             ...
@@ -433,15 +496,18 @@ class StructuredSolver(BaseSolver):
         return self._sample('ising', linear, quadratic, params)
 
     def sample_qubo(self, qubo, **params):
-        """Sample from the specified QUBO.
+        """Sample from the specified :term:`QUBO`.
 
         Args:
-            qubo (dict of (int, int):float): Coefficients of a quadratic unconstrained binary
-                optimization (QUBO) model.
-            **params: Parameters for the sampling method, specified per solver.
+            qubo (dict[(int, int), float]):
+                Coefficients of a quadratic unconstrained binary optimization
+                (QUBO) model.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
 
         Returns:
-            :obj:`Future`
+            :class:`Future`
 
         Examples:
             This example creates a client using the local system's default D-Wave Cloud Client
@@ -483,7 +549,7 @@ class StructuredSolver(BaseSolver):
                 Parameters for the sampling method, solver-specific.
 
         Returns:
-            :obj:`Future`
+            :class:`Future`
 
         Note:
             To use this method, dimod package has to be installed.
@@ -498,15 +564,20 @@ class StructuredSolver(BaseSolver):
         return self.sample_ising(ising.linear, ising.quadratic, **params)
 
     def _sample(self, type_, linear, quadratic, params):
-        """Internal method for both sample_ising and sample_qubo.
+        """Internal method for `sample_ising` and `sample_qubo`.
 
         Args:
-            linear (list/dict): Linear terms of the model.
-            quadratic (dict of (int, int):float): Quadratic terms of the model.
-            **params: Parameters for the sampling method, specified per solver.
+            linear (list/dict):
+                Linear terms of the model.
+
+            quadratic (dict[(int, int), float]):
+                Quadratic terms of the model.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
 
         Returns:
-            :obj: `Future`
+            :class:`Future`
         """
         # Check the problem
         if not self.check_problem(linear, quadratic):
@@ -567,8 +638,11 @@ class StructuredSolver(BaseSolver):
         """Test if an Ising model matches the graph provided by the solver.
 
         Args:
-            linear (list/dict): Linear terms of the model (h).
-            quadratic (dict of (int, int):float): Quadratic terms of the model (J).
+            linear (list/dict):
+                Linear terms of the model (h).
+
+            quadratic (dict[(int, int), float]):
+                Quadratic terms of the model (J).
 
         Returns:
             boolean
