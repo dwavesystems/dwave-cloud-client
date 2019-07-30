@@ -111,9 +111,9 @@ class Submission(_QueryTest):
             solver = client.get_solver()
             computation = solver.sample_ising({}, {})
             result = computation.result()
-            self.assertIn('samples', result)
+            self.assertIn('solutions', result)
             self.assertIn('energies', result)
-            self.assertIn('occurrences', result)
+            self.assertIn('num_occurrences', result)
             self.assertIn('timing', result)
 
     def test_future_structure(self):

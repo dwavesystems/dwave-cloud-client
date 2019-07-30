@@ -61,9 +61,10 @@ class Future(object):
     Objects are blocked for the duration of any data accessed on the remote
     resource.
 
-    .. warning:: :class:`Future` objects are not intended to be directly
-    created. Problem submittal is initiated by :class:`~dwave.cloud.solver.Solver`
-    and executed by the client.
+    Warning:
+        :class:`Future` objects are not intended to be directly
+        created. Problem submittal is initiated by one of the solvers in
+        :mod:`~dwave.cloud.solver` module and executed by one of the clients.
 
     Args:
         solver (:class:`~dwave.cloud.solver.Solver`):
@@ -402,11 +403,11 @@ class Future(object):
             >>> computation.wait(timeout=10)    # doctest: +SKIP
             False
             >>> computation.remote_status
-            u'IN_PROGRESS'
-            >>> computation.wait(timeout=10)  # doctest: +SKIP
+            'IN_PROGRESS'
+            >>> computation.wait(timeout=10)    # doctest: +SKIP
             True
-            >>> computation.remote_status   # doctest: +SKIP
-            u'COMPLETED'
+            >>> computation.remote_status       # doctest: +SKIP
+            'COMPLETED'
             >>> client.close()
         """
         return self._results_ready_event.wait(timeout)
@@ -487,12 +488,28 @@ class Future(object):
     def result(self):
         """Results for a submitted job.
 
-        Retrives result data in a :class:`Future` object that the solver
+        Retrives raw result data in a :class:`Future` object that the solver
         submitted to a remote resource. First calls to access this data are
         blocking.
 
         Returns:
             dict: Results of the submitted job. Should be considered read-only.
+
+        Note:
+            Helper properties on :class:`Future` object are preferred to reading
+            raw results, as they abstract away the differences in response
+            between some solvers like. Available methods are: :meth:`.samples`,
+            :meth:`.energies`, :meth:`.occurrences`, :meth:`.variables`,
+            :meth:`.timing`, :meth:`.problem_type`, :meth:`.sampleset` (only if
+            dimod package is installed).
+
+        Warning:
+            The dictionary returned by :meth:`.result` depends on the solver
+            used. Starting with version 0.7.0 we will not try to standardize
+            them anymore, on client side. For QPU solvers, please replace
+            `'samples'` with `'solutions'` and `'occurrences'` with
+            `'num_occurrences'`. Better yet, use :meth:`Future.samples` and
+            :meth:`Future.occurrences` instead.
 
         Examples:
             This example creates a solver using the local system's default
@@ -508,7 +525,8 @@ class Future(object):
             ...     Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
             ...     computation = solver.sample_qubo(Q, num_reads=5)
             ...     for i in range(5):
-            ...         print(computation.result()['samples'][i][u], computation.result()['samples'][i][v])
+            ...         result = computation.result()
+            ...         print(result['solutions'][i][u], result['solutions'][i][v])
             ...
             ...
             (0, 1)
@@ -598,7 +616,7 @@ class Future(object):
             return result['sampleset'].record.sample
 
         # fallback to samples from response
-        return result['samples']
+        return result['solutions']
 
     @property
     def variables(self):
@@ -665,9 +683,9 @@ class Future(object):
         if 'num_occurrences' in result:
             return result['num_occurrences']
         elif self.return_matrix:
-            return np.ones((len(result['samples']),))
+            return np.ones((len(result['solutions']),))
         else:
-            return [1] * len(result['samples'])
+            return [1] * len(result['solutions'])
 
     @property
     def sampleset(self):
@@ -776,7 +794,10 @@ class Future(object):
             # If someone else took care of this while we were waiting
             if self._result is not None:
                 return self._result
+
+            # Prepare results from the response
             self._decode()
+            self._alias_result()
 
         return self._result
 
@@ -784,13 +805,14 @@ class Future(object):
         """Decode answer data from the response."""
         start = time.time()
         self._result = self.solver.decode_response(self._message)
-        self._alias_result()
         self.parse_time = time.time() - start
         return self._result
 
     def _alias_result(self):
         """Create aliases for some of the keys in the results dict. Eventually,
         those will be renamed on the server side.
+
+        Deprecated since version 0.6.0. Will be removed in 0.7.0.
         """
         if not self._result:
             return
