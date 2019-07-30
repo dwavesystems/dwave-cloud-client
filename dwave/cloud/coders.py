@@ -279,16 +279,20 @@ def encode_problem_as_bq(problem, compress=False):
 
 
 def decode_bq(msg):
-    """Decode answers for problem submitted in the `bq` data format."""
+    """Decode answer for problem submitted in the `bq` data format."""
     try:
         import dimod
     except ImportError:
         raise RuntimeError("Can't decode BQMs without dimod. "
                            "Re-install the library with 'bqm' support.")
 
-    result = msg['answer']
-    sampleset = dimod.SampleSet.from_serializable(result)
-    result['sampleset'] = sampleset
+    answer = msg['answer']
+    assert answer['format'] == 'bq'
+
+    result = {}
+
+    # sampleset is encoded in data field
+    result['sampleset'] = dimod.SampleSet.from_serializable(answer['data'])
 
     # include problem type
     result['problem_type'] = 'bqm'

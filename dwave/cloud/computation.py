@@ -155,6 +155,8 @@ class Future(object):
         # current poll back-off interval, in seconds
         self._poll_backoff = None
 
+    # make Future ordered
+
     def __lt__(self, other):
         return id(self) < id(other)
 
@@ -360,10 +362,10 @@ class Future(object):
             >>> for tasks in dc.computation.Future.as_completed(computation, timeout=10)
             ...     print(tasks.timing)   # doctest: +SKIP
             ...
-            {u'total_real_time': 17318, ... u'qpu_readout_time_per_sample': 123}
-            {u'total_real_time': 10816, ... u'qpu_readout_time_per_sample': 123}
-            {u'total_real_time': 26285, ... u'qpu_readout_time_per_sample': 123}
-            >>> # Snipped above response for brevity
+            {'total_real_time': 17318, ... 'qpu_readout_time_per_sample': 123}
+            {'total_real_time': 10816, ... 'qpu_readout_time_per_sample': 123}
+            {'total_real_time': 26285, ... 'qpu_readout_time_per_sample': 123}
+            ...
             >>> client.close()
 
         """
@@ -753,8 +755,7 @@ class Future(object):
             ...     computation = solver.sample_ising({u: -1, v: 1},{}, num_reads=5)   # doctest: +SKIP
             ...     print(computation.timing)
             ...
-            {u'total_real_time': 10961, u'anneal_time_per_run': 20,
-            >>> # Snipped above response for brevity
+            {'total_real_time': 10961, 'anneal_time_per_run': 20, ...}
 
         """
         return self.result().get('timing', {})
