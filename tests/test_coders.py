@@ -14,16 +14,19 @@
 
 from __future__ import absolute_import, print_function
 
+import copy
 import base64
 import struct
 import unittest
 import itertools
 
 import dimod
+import numpy as np
 from plucky import pluck
 
 from dwave.cloud.coders import (
-    encode_problem_as_qp, encode_problem_as_bq, decode_bq)
+    encode_problem_as_qp, decode_qp, decode_qp_numpy,
+    encode_problem_as_bq, decode_bq)
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
 
 
@@ -55,6 +58,28 @@ def get_unstructured_solver():
 
 class TestQPCoders(unittest.TestCase):
     nan = float('nan')
+
+    # response to a 5-qubit problem from a 5 qubit machine
+    res_msg = {
+        "id": "test",
+        "solver": "test",
+        "status": "COMPLETED",
+        "type": "ising",
+        "answer": {
+            "format": "qp",
+            "num_variables": 5,
+            "energies": "AAAAAAAALsA=",
+            "num_occurrences": "ZAAAAA==",
+            "active_variables": "AAAAAAEAAAACAAAAAwAAAAQAAAA=",
+            "solutions": "AAAAAA==",
+            "timing": {}
+        }
+    }
+    res_num_variables = 5
+    res_active_variables = (0, 1, 2, 3, 4)
+    res_solutions = [[-1, -1, -1, -1, -1]]
+    res_energies = (-15.0,)
+    res_num_occurrences = (100,)
 
     def encode_doubles(self, values):
         return base64.b64encode(struct.pack('<' + ('d' * len(values)), *values)).decode('utf-8')
@@ -121,6 +146,37 @@ class TestQPCoders(unittest.TestCase):
         self.assertEqual(request['lin'],  self.encode_doubles([0, self.nan, self.nan, 0]))
         # [0]
         self.assertEqual(request['quad'], self.encode_doubles([0]))
+
+    def test_qp_response_decoding(self):
+        res = decode_qp(copy.deepcopy(self.res_msg))
+
+        self.assertEqual(res.get('format'), 'qp')
+        self.assertEqual(res.get('num_variables'), self.res_num_variables)
+        self.assertEqual(res.get('active_variables'), self.res_active_variables)
+        self.assertEqual(res.get('solutions'), self.res_solutions)
+        self.assertEqual(res.get('energies'), self.res_energies)
+        self.assertEqual(res.get('num_occurrences'), self.res_num_occurrences)
+
+    def test_qp_response_numpy_decoding(self):
+        res = decode_qp_numpy(copy.deepcopy(self.res_msg), return_matrix=False)
+
+        self.assertEqual(res.get('format'), 'qp')
+        self.assertEqual(res.get('num_variables'), self.res_num_variables)
+        self.assertEqual(res.get('active_variables'), list(self.res_active_variables))
+        self.assertEqual(res.get('solutions'), list(self.res_solutions))
+        self.assertEqual(res.get('energies'), list(self.res_energies))
+        self.assertEqual(res.get('num_occurrences'), list(self.res_num_occurrences))
+
+    def test_qp_response_numpy_decoding_numpy_array(self):
+        res = decode_qp_numpy(copy.deepcopy(self.res_msg), return_matrix=True)
+
+        self.assertEqual(res.get('format'), 'qp')
+        self.assertEqual(res.get('num_variables'), self.res_num_variables)
+        np.testing.assert_array_equal(res.get('active_variables'), np.array(self.res_active_variables))
+        np.testing.assert_array_equal(res.get('solutions'), np.array(self.res_solutions))
+        np.testing.assert_array_equal(res.get('energies'), np.array(self.res_energies))
+        np.testing.assert_array_equal(res.get('num_occurrences'), np.array(self.res_num_occurrences))
+
 
 class TestBQCoders(unittest.TestCase):
 
