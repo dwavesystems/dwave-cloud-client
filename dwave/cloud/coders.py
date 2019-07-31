@@ -250,7 +250,8 @@ def decode_qp_numpy(msg, return_matrix=True):
 
 
 def encode_problem_as_bq(problem, compress=False):
-    """Encode the binary quadratic problem for submission the `bq` data format.
+    """Encode the binary quadratic problem for submission in the `bq` data
+    format.
 
     Args:
         problem (:class:`~dimod.BinaryQuadraticModel`):
