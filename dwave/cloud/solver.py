@@ -261,7 +261,7 @@ class UnstructuredSolver(BaseSolver):
         """
         try:
             import dimod
-        except ImportError:
+        except ImportError: # pragma: no cover
             raise RuntimeError("Can't use solver of type 'bqm' without dimod. "
                                "Re-install the library with 'bqm' support.")
 
@@ -287,7 +287,7 @@ class UnstructuredSolver(BaseSolver):
         """
         try:
             import dimod
-        except ImportError:
+        except ImportError: # pragma: no cover
             raise RuntimeError("Can't use solver of type 'bqm' without dimod. "
                                "Re-install the library with 'bqm' support.")
 
@@ -556,7 +556,7 @@ class StructuredSolver(BaseSolver):
         """
         try:
             import dimod
-        except ImportError:
+        except ImportError: # pragma: no cover
             raise RuntimeError("Can't sample from 'bqm' without dimod. "
                                "Re-install the library with 'bqm' support.")
 

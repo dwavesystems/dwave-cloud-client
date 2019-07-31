@@ -282,7 +282,7 @@ def decode_bq(msg):
     """Decode answer for problem submitted in the `bq` data format."""
     try:
         import dimod
-    except ImportError:
+    except ImportError:     # pragma: no cover
         raise RuntimeError("Can't decode BQMs without dimod. "
                            "Re-install the library with 'bqm' support.")
 
