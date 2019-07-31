@@ -23,7 +23,7 @@ extras_require = {
     'test': ['requests_mock', 'mock', 'numpy', 'coverage'],
 
     # bqm support
-    'bqm': ['dimod>=0.8.14', 'numpy>=1.15.4'],
+    'bqm': ['dimod>=0.8.15', 'numpy>=1.15.4'],
 
     # python2 backports
     ':python_version == "2.7"': ['futures', 'configparser']

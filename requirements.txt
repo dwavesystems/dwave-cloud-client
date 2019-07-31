@@ -10,5 +10,5 @@ futures; python_version=="2.7"
 configparser; python_version=="2.7"
 
 # optional bqm support
-dimod>=0.8.14
+dimod>=0.8.15
 numpy>=1.15.4
