@@ -27,7 +27,7 @@ from dwave.cloud.client import Client, Solver
 from dwave.cloud.qpu import Client as QPUClient
 from dwave.cloud.sw import Client as SoftwareClient
 from dwave.cloud.exceptions import (
-    InvalidAPIResponseError, ConfigFileReadError, ConfigFileParseError,
+    SolverPropertyMissingError, ConfigFileReadError, ConfigFileParseError,
     SolverError, SolverNotFoundError)
 from dwave.cloud.config import legacy_load_config, load_config
 from dwave.cloud.testing import mock, iterable_mock_open
@@ -42,7 +42,7 @@ bad_url = 'https://not-a-subdomain.dwavesys.com'
 bad_token = '------------------------'
 
 
-def solver_data(id_, incomplete=False):
+def structured_solver_data(id_, incomplete=False):
     """Return string describing a single solver."""
     obj = {
         "properties": {
@@ -58,12 +58,12 @@ def solver_data(id_, incomplete=False):
     }
 
     if incomplete:
-        del obj['properties']['parameters']
+        del obj['properties']['supported_problem_types']
 
     return json.dumps(obj)
 
 def solver_object(id_, incomplete=False):
-    return Solver(client=None, data=json.loads(solver_data(id_, incomplete)))
+    return Solver(client=None, data=json.loads(structured_solver_data(id_, incomplete)))
 
 
 # Define the endpoints
@@ -75,8 +75,8 @@ solver2_url = '{}/solvers/remote/{}/'.format(url, second_solver_name)
 def setup_server(m):
     """Add endpoints to the server."""
     # Content strings
-    first_solver_response = solver_data(solver_name)
-    second_solver_response = solver_data(second_solver_name)
+    first_solver_response = structured_solver_data(solver_name)
+    second_solver_response = structured_solver_data(second_solver_name)
     two_solver_response = '[' + first_solver_response + ',' + second_solver_response + ']'
 
     # Setup the server
@@ -193,15 +193,15 @@ class MockSolverLoading(unittest.TestCase):
     def test_load_solver_missing_data(self):
         """Try to load a solver that has incomplete data."""
         with requests_mock.mock() as m:
-            m.get(solver1_url, text=solver_data(solver_name, True))
+            m.get(solver1_url, text=structured_solver_data(solver_name, True))
             with Client(url, token) as client:
-                with self.assertRaises(InvalidAPIResponseError):
+                with self.assertRaises(SolverNotFoundError):
                     client.get_solver(solver_name)
 
     def test_load_solver_broken_response(self):
         """Try to load a solver for which the server has returned a truncated response."""
         with requests_mock.mock() as m:
-            body = solver_data(solver_name)
+            body = structured_solver_data(solver_name)
             m.get(solver1_url, text=body[0:len(body)//2])
             with Client(url, token) as client:
                 with self.assertRaises(ValueError):
@@ -232,14 +232,14 @@ class MockSolverLoading(unittest.TestCase):
         self.assertFalse(solver_object('dw2000').has_flux_biases)
 
         # test .num_qubits vs .num_actual_qubits
-        data = json.loads(solver_data('test'))
+        data = json.loads(structured_solver_data('test'))
         data['properties']['num_qubits'] = 7
         solver = Solver(None, data)
         self.assertEqual(solver.num_qubits, 7)
         self.assertEqual(solver.num_active_qubits, 3)
 
         # test .is_vfyc
-        data = json.loads(solver_data('test'))
+        data = json.loads(structured_solver_data('test'))
         data['properties']['vfyc'] = 'error'
         self.assertFalse(Solver(None, data).is_vfyc)
         data['properties']['vfyc'] = True
@@ -257,7 +257,7 @@ class MockSolverLoading(unittest.TestCase):
 
         # test `.online` property
         self.assertTrue(solver_object('dw2000').online)
-        data = json.loads(solver_data('test'))
+        data = json.loads(structured_solver_data('test'))
         data['status'] = 'offline'
         self.assertFalse(Solver(None, data).online)
         del data['status']

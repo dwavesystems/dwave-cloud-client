@@ -29,7 +29,8 @@ import numpy
 
 from dwave.cloud.utils import evaluate_ising, generate_random_ising_problem
 from dwave.cloud.client import Client
-from dwave.cloud.exceptions import CanceledFutureError, SolverFailureError
+from dwave.cloud.exceptions import (
+    CanceledFutureError, SolverFailureError, InvalidProblemError)
 import dwave.cloud.computation
 
 from tests import config
@@ -110,9 +111,9 @@ class Submission(_QueryTest):
             solver = client.get_solver()
             computation = solver.sample_ising({}, {})
             result = computation.result()
-            self.assertIn('samples', result)
+            self.assertIn('solutions', result)
             self.assertIn('energies', result)
-            self.assertIn('occurrences', result)
+            self.assertIn('num_occurrences', result)
             self.assertIn('timing', result)
 
     def test_future_structure(self):

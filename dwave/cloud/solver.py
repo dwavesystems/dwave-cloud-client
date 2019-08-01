@@ -19,6 +19,7 @@ Solvers are responsible for:
 
     - Encoding submitted problems
     - Checking submitted parameters
+    - Decoding answers
     - Adding problems to a client's submission queue
 
 You can list all solvers available to a :class:`~dwave.cloud.client.Client` with its
@@ -32,25 +33,33 @@ from __future__ import division, absolute_import
 import json
 import logging
 import warnings
-
 from collections import Mapping
 
 from dwave.cloud.exceptions import *
-from dwave.cloud.coders import encode_bqm_as_qp
+from dwave.cloud.coders import (
+    encode_problem_as_qp, encode_problem_as_bq,
+    decode_qp_numpy, decode_qp, decode_bq)
 from dwave.cloud.utils import uniform_iterator, uniform_get
 from dwave.cloud.computation import Future
 
-__all__ = ['Solver']
+# Use numpy if available for fast encoding/decoding
+try:
+    import numpy as np
+    _numpy = True
+except ImportError:
+    _numpy = False
 
-_LOGGER = logging.getLogger(__name__)
+__all__ = ['Solver', 'BaseSolver', 'StructuredSolver', 'UnstructuredSolver']
+
+logger = logging.getLogger(__name__)
 
 
-class Solver(object):
-    """
-    Class for D-Wave solvers.
+class BaseSolver(object):
+    """Base class for a general D-Wave solver.
 
-    This class provides :term:`Ising` and :term:`QUBO` sampling methods and encapsulates
-    the solver description returned from the D-Wave cloud API.
+    This class provides :term:`Ising`, :term:`QUBO` and :term:`BQM` sampling
+    methods and encapsulates the solver description returned from the D-Wave
+    cloud API.
 
     Args:
         client (:class:`Client`):
@@ -64,22 +73,23 @@ class Solver(object):
         Client configuration file and checks the identity of its default solver.
 
         >>> from dwave.cloud import Client
-        >>> client = Client.from_config()
-        >>> solver = client.get_solver()
-        >>> solver.data['id']    # doctest: +SKIP
-        u'EXAMPLE_2000Q_SYSTEM'
-
+        >>> with Client.from_config() as client:
+        ...     solver = client.get_solver()
+        ...     solver.id       # doctest: +SKIP
+        'EXAMPLE_2000Q_SYSTEM'
     """
 
     # Classes of problems the remote solver has to support (at least one of these)
     # in order for `Solver` to be able to abstract, or use, that solver
-    _HANDLED_PROBLEM_TYPES = {"ising", "qubo"}
+    _handled_problem_types = {}
+    _handled_encoding_formats = {}
 
     def __init__(self, client, data):
         # client handles async api requests (via local thread pool)
         self.client = client
 
-        # data for each solver includes at least: id, description, and properties
+        # data for each solver includes at least: id, description, properties,
+        # status and avg_load
         self.data = data
 
         # Each solver has an ID field
@@ -92,65 +102,99 @@ class Solver(object):
         try:
             self.properties = data['properties']
         except KeyError:
-            raise InvalidAPIResponseError("Missing solver property: 'properties'")
+            raise SolverPropertyMissingError("Missing solver property: 'properties'")
+
+        # The set of extra parameters this solver will accept in sample_ising or sample_qubo: dict
+        self.parameters = self.properties.get('parameters', {})
 
         # Ensure this remote solver supports at least one of the problem types we know how to handle
         try:
             self.supported_problem_types = set(self.properties['supported_problem_types'])
         except KeyError:
-            raise InvalidAPIResponseError(
+            raise SolverPropertyMissingError(
                 "Missing solver property: 'properties.supported_problem_types'")
 
-        if self.supported_problem_types.isdisjoint(self._HANDLED_PROBLEM_TYPES):
+        if self.supported_problem_types.isdisjoint(self._handled_problem_types):
             raise UnsupportedSolverError(
-                "Remote solver {!r} supports {} problems, but Solver() handles only {}".format(
+                "Remote solver {!r} supports {} problems, but this solver handles only {}".format(
                     self.id,
                     list(self.supported_problem_types),
-                    list(self._HANDLED_PROBLEM_TYPES)))
-
-        # The set of extra parameters this solver will accept in sample_ising or sample_qubo: dict
-        try:
-            self.parameters = self.properties['parameters']
-        except KeyError:
-            raise InvalidAPIResponseError("Missing solver property: 'parameters'")
+                    list(self._handled_problem_types)))
 
         # When True the solution data will be returned as numpy matrices: False
+        # TODO: deprecate
         self.return_matrix = False
-
-        # The exact sequence of nodes/edges is used in encoding problems and must be preserved
-        try:
-            self._encoding_qubits = self.properties['qubits']
-        except KeyError:
-            raise InvalidAPIResponseError("Missing solver property: 'properties.qubits'")
-
-        try:
-            self._encoding_couplers = [tuple(edge) for edge in self.properties['couplers']]
-        except KeyError:
-            raise InvalidAPIResponseError("Missing solver property: 'properties.couplers'")
-
-        # The nodes in this solver's graph: set(int)
-        self.nodes = self.variables = set(self._encoding_qubits)
-
-        # The edges in this solver's graph, every edge will be present as (a, b) and (b, a): set(tuple(int, int))
-        self.edges = self.couplers = set(tuple(edge) for edge in self._encoding_couplers) | \
-            set((edge[1], edge[0]) for edge in self._encoding_couplers)
-
-        # The edges in this solver's graph, each edge will only be represented once: set(tuple(int, int))
-        self.undirected_edges = {edge for edge in self.edges if edge[0] < edge[1]}
-
-        # Create a set of default parameters for the queries
-        self._params = {}
 
         # Derived solver properties (not present in solver data properties dict)
         self.derived_properties = {
-            'qpu', 'software', 'online', 'num_active_qubits', 'avg_load', 'name',
-            'lower_noise'
+            'qpu', 'software', 'online', 'avg_load', 'name'
         }
 
     def __repr__(self):
-        return "Solver(id={!r})".format(self.id)
+        return "{}(id={!r})".format(type(self).__name__, self.id)
+
+    def _retrieve_problem(self, id_):
+        """Resume polling for a problem previously submitted.
+
+        Args:
+            id_: Identification of the query.
+
+        Returns:
+            :obj: `Future`
+        """
+        future = Future(self, id_, self.return_matrix)
+        self.client._poll(future)
+        return future
+
+    def check_problem(self, *args, **kwargs):
+        return True
+
+    def _decode_qp(self, msg):
+        if _numpy:
+            return decode_qp_numpy(msg, return_matrix=self.return_matrix)
+        else:
+            return decode_qp(msg)
+
+    def decode_response(self, msg):
+        if msg['type'] not in self._handled_problem_types:
+            raise ValueError('Unknown problem type received.')
+
+        fmt = msg.get('answer', {}).get('format')
+        if fmt not in self._handled_encoding_formats:
+            raise ValueError('Unhandled answer encoding format received.')
+
+        if fmt == 'qp':
+            return self._decode_qp(msg)
+        elif fmt == 'bq':
+            return decode_bq(msg)
+        else:
+            raise ValueError("Don't know how to decode %r answer format" % fmt)
+
+    # Sampling methods
+    def sample_ising(self, linear, quadratic, **params):
+        raise NotImplementedError
+
+    def sample_qubo(self, qubo, **params):
+        raise NotImplementedError
+
+    def sample_bqm(self, bqm, **params):
+        raise NotImplementedError
 
     # Derived properties
+
+    @property
+    def name(self):
+        return self.id
+
+    @property
+    def online(self):
+        "Is this solver online (or offline)?"
+        return self.data.get('status', 'online').lower() == 'online'
+
+    @property
+    def avg_load(self):
+        "Solver's average load, at the time of description fetch."
+        return self.data.get('avg_load')
 
     @property
     def qpu(self):
@@ -163,27 +207,6 @@ class Solver(object):
         "Is this a software-based solver?"
         # TODO: add a field for this in SAPI response; for now base decision on id/name
         return self.id.startswith('c4-sw_')
-
-    @property
-    def online(self):
-        "Is this solver online (or offline)?"
-        return self.data.get('status', 'online').lower() == 'online'
-
-    @property
-    def num_active_qubits(self):
-        "The number of active (encoding) qubits."
-        return len(self.nodes)
-
-    @property
-    def avg_load(self):
-        "Solver's average load, at the time of description fetch."
-        return self.data.get('avg_load')
-
-    @property
-    def name(self):
-        return self.id
-
-    # Convenience properties (based on self.properties)
 
     @property
     def is_qpu(self):
@@ -199,6 +222,166 @@ class Solver(object):
     def is_online(self):
         warnings.warn("'is_online' property is deprecated in favor of 'online'.", DeprecationWarning)
         return self.online
+
+
+class UnstructuredSolver(BaseSolver):
+    """Class for D-Wave unstructured solvers.
+
+    This class provides :term:`Ising`, :term:`QUBO` and :term:`BQM` sampling
+    methods and encapsulates the solver description returned from the D-Wave
+    cloud API.
+
+    Args:
+        client (:class:`~dwave.cloud.client.Client`):
+            Client that manages access to this solver.
+
+        data (`dict`):
+            Data from the server describing this solver.
+
+    """
+
+    _handled_problem_types = {"bqm"}
+    _handled_encoding_formats = {"bq"}
+
+    def sample_ising(self, linear, quadratic, **params):
+        """Sample from the specified :term:`BQM`.
+
+        Args:
+            bqm (:class:`~dimod.BinaryQuadraticModel`):
+                A binary quadratic model.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
+
+        Returns:
+            :class:`Future`
+
+        Note:
+            To use this method, dimod package has to be installed.
+        """
+        try:
+            import dimod
+        except ImportError: # pragma: no cover
+            raise RuntimeError("Can't use solver of type 'bqm' without dimod. "
+                               "Re-install the library with 'bqm' support.")
+
+        bqm = dimod.BinaryQuadraticModel.from_ising(linear, quadratic)
+        return self.sample_bqm(bqm, **params)
+
+    def sample_qubo(self, qubo, **params):
+        """Sample from the specified :term:`QUBO`.
+
+        Args:
+            qubo (dict[(int, int), float]):
+                Coefficients of a quadratic unconstrained binary optimization
+                (QUBO) model.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
+
+        Returns:
+            :class:`Future`
+
+        Note:
+            To use this method, dimod package has to be installed.
+        """
+        try:
+            import dimod
+        except ImportError: # pragma: no cover
+            raise RuntimeError("Can't use solver of type 'bqm' without dimod. "
+                               "Re-install the library with 'bqm' support.")
+
+        bqm = dimod.BinaryQuadraticModel.from_qubo(qubo)
+        return self.sample_bqm(bqm, **params)
+
+    def sample_bqm(self, bqm, **params):
+        """Sample from the specified :term:`BQM`.
+
+        Args:
+            bqm (:class:`~dimod.BinaryQuadraticModel`):
+                A binary quadratic model.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
+
+        Returns:
+            :class:`Future`
+
+        Note:
+            To use this method, dimod package has to be installed.
+        """
+        # encode the request
+        body = json.dumps({
+            'solver': self.id,
+            'data': encode_problem_as_bq(bqm),
+            'type': 'bqm',
+            'params': params
+        })
+        logger.trace("Encoded sample request: %s", body)
+
+        future = Future(solver=self, id_=None, return_matrix=self.return_matrix)
+
+        logger.debug("Submitting new problem to: %s", self.id)
+        self.client._submit(body, future)
+
+        return future
+
+
+class StructuredSolver(BaseSolver):
+    """Class for D-Wave structured solvers.
+
+    This class provides :term:`Ising`, :term:`QUBO` and :term:`BQM` sampling
+    methods and encapsulates the solver description returned from the D-Wave
+    cloud API.
+
+    Args:
+        client (:class:`~dwave.cloud.client.Client`):
+            Client that manages access to this solver.
+
+        data (`dict`):
+            Data from the server describing this solver.
+
+    """
+
+    _handled_problem_types = {"ising", "qubo"}
+    _handled_encoding_formats = {"qp"}
+
+    def __init__(self, *args, **kwargs):
+        super(StructuredSolver, self).__init__(*args, **kwargs)
+
+        # The exact sequence of nodes/edges is used in encoding problems and must be preserved
+        try:
+            self._encoding_qubits = self.properties['qubits']
+        except KeyError:
+            raise SolverPropertyMissingError("Missing solver property: 'properties.qubits'")
+
+        try:
+            self._encoding_couplers = [tuple(edge) for edge in self.properties['couplers']]
+        except KeyError:
+            raise SolverPropertyMissingError("Missing solver property: 'properties.couplers'")
+
+        # The nodes in this solver's graph: set(int)
+        self.nodes = self.variables = set(self._encoding_qubits)
+
+        # The edges in this solver's graph, every edge will be present as (a, b) and (b, a): set(tuple(int, int))
+        self.edges = self.couplers = set(tuple(edge) for edge in self._encoding_couplers) | \
+            set((edge[1], edge[0]) for edge in self._encoding_couplers)
+
+        # The edges in this solver's graph, each edge will only be represented once: set(tuple(int, int))
+        self.undirected_edges = {edge for edge in self.edges if edge[0] < edge[1]}
+
+        # Create a set of default parameters for the queries
+        self._params = {}
+
+        # Add derived properties specific for this solver
+        self.derived_properties.update({'lower_noise', 'num_active_qubits'})
+
+    # Derived properties
+
+    @property
+    def num_active_qubits(self):
+        "The number of active (encoding) qubits."
+        return len(self.nodes)
 
     @property
     def is_vfyc(self):
@@ -269,15 +452,22 @@ class Solver(object):
     # Sampling methods
 
     def sample_ising(self, linear, quadratic, **params):
-        """Sample from the specified Ising model.
+        """Sample from the specified :term:`Ising` model.
 
         Args:
-            linear (list/dict): Linear terms of the model (h).
-            quadratic (dict of (int, int):float): Quadratic terms of the model (J).
-            **params: Parameters for the sampling method, specified per solver.
+            linear (list/dict):
+                Linear terms of the model (h).
+
+            quadratic (dict[(int, int), float]):
+                Quadratic terms of the model (J), stored in a dict. With keys
+                that are 2-tuples of variables and values are quadratic biases
+                associated with the pair of variables (the interaction).
+
+            **params:
+                Parameters for the sampling method, solver-specific.
 
         Returns:
-            :obj:`Future`
+            :class:`Future`
 
         Examples:
             This example creates a client using the local system's default D-Wave Cloud Client
@@ -289,7 +479,7 @@ class Solver(object):
             >>> with Client.from_config() as client:
             ...     solver = client.get_solver()
             ...     u, v = next(iter(solver.edges))
-            ...     computation = solver.sample_ising({u: -1, v: 1},{}, num_reads=5)   # doctest: +SKIP
+            ...     computation = solver.sample_ising({u: -1, v: 1}, {}, num_reads=5)   # doctest: +SKIP
             ...     for i in range(5):
             ...         print(computation.samples[i][u], computation.samples[i][v])
             ...
@@ -306,15 +496,18 @@ class Solver(object):
         return self._sample('ising', linear, quadratic, params)
 
     def sample_qubo(self, qubo, **params):
-        """Sample from the specified QUBO.
+        """Sample from the specified :term:`QUBO`.
 
         Args:
-            qubo (dict of (int, int):float): Coefficients of a quadratic unconstrained binary
-                optimization (QUBO) model.
-            **params: Parameters for the sampling method, specified per solver.
+            qubo (dict[(int, int), float]):
+                Coefficients of a quadratic unconstrained binary optimization
+                (QUBO) model.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
 
         Returns:
-            :obj:`Future`
+            :class:`Future`
 
         Examples:
             This example creates a client using the local system's default D-Wave Cloud Client
@@ -345,16 +538,46 @@ class Solver(object):
         quadratic = {(i1, i2): v for (i1, i2), v in uniform_iterator(qubo) if i1 != i2}
         return self._sample('qubo', linear, quadratic, params)
 
-    def _sample(self, type_, linear, quadratic, params):
-        """Internal method for both sample_ising and sample_qubo.
+    def sample_bqm(self, bqm, **params):
+        """Sample from the specified :term:`BQM`.
 
         Args:
-            linear (list/dict): Linear terms of the model.
-            quadratic (dict of (int, int):float): Quadratic terms of the model.
-            **params: Parameters for the sampling method, specified per solver.
+            bqm (:class:`~dimod.BinaryQuadraticModel`):
+                A binary quadratic model.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
 
         Returns:
-            :obj: `Future`
+            :class:`Future`
+
+        Note:
+            To use this method, dimod package has to be installed.
+        """
+        try:
+            import dimod
+        except ImportError: # pragma: no cover
+            raise RuntimeError("Can't sample from 'bqm' without dimod. "
+                               "Re-install the library with 'bqm' support.")
+
+        ising = bqm.spin
+        return self.sample_ising(ising.linear, ising.quadratic, **params)
+
+    def _sample(self, type_, linear, quadratic, params):
+        """Internal method for `sample_ising` and `sample_qubo`.
+
+        Args:
+            linear (list/dict):
+                Linear terms of the model.
+
+            quadratic (dict[(int, int), float]):
+                Quadratic terms of the model.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
+
+        Returns:
+            :class:`Future`
         """
         # Check the problem
         if not self.check_problem(linear, quadratic):
@@ -374,16 +597,15 @@ class Solver(object):
 
         body = json.dumps({
             'solver': self.id,
-            'data': encode_bqm_as_qp(self, linear, quadratic),
+            'data': encode_problem_as_qp(self, linear, quadratic),
             'type': type_,
             'params': combined_params
         })
-        _LOGGER.trace("Encoded sample request: %s", body)
+        logger.trace("Encoded sample request: %s", body)
 
-        future = Future(solver=self, id_=None, return_matrix=self.return_matrix,
-                        submission_data=(type_, linear, quadratic, params))
+        future = Future(solver=self, id_=None, return_matrix=self.return_matrix)
 
-        _LOGGER.debug("Submitting new problem to: %s", self.id)
+        logger.debug("Submitting new problem to: %s", self.id)
         self.client._submit(body, future)
         return future
 
@@ -416,8 +638,11 @@ class Solver(object):
         """Test if an Ising model matches the graph provided by the solver.
 
         Args:
-            linear (list/dict): Linear terms of the model (h).
-            quadratic (dict of (int, int):float): Quadratic terms of the model (J).
+            linear (list/dict):
+                Linear terms of the model (h).
+
+            quadratic (dict[(int, int), float]):
+                Quadratic terms of the model (J).
 
         Returns:
             boolean
@@ -450,15 +675,11 @@ class Solver(object):
                 return False
         return True
 
-    def _retrieve_problem(self, id_):
-        """Resume polling for a problem previously submitted.
 
-        Args:
-            id_: Identification of the query.
+# for backwards compatibility:
+Solver = StructuredSolver
 
-        Returns:
-            :obj: `Future`
-        """
-        future = Future(self, id_, self.return_matrix, None)
-        self.client._poll(future)
-        return future
+
+# list of all available solvers, ordered according to loading attempt priority
+# (more specific first)
+available_solvers = [StructuredSolver, UnstructuredSolver]

@@ -34,6 +34,9 @@ Properties
    :toctree: generated
 
    Future.samples
+   Future.variables
    Future.energies
    Future.occurrences
+   Future.sampleset
+   Future.problem_type
    Future.timing

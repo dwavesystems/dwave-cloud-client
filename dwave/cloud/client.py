@@ -63,14 +63,14 @@ import six
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config, parse_float
-from dwave.cloud.solver import Solver
+from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.utils import (
     datetime_to_timestamp, utcnow, TimeoutingHTTPAdapter, user_agent,
     epochnow, cached)
 
 __all__ = ['Client']
 
-_LOGGER = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class Client(object):
@@ -294,7 +294,7 @@ class Client(object):
         config = load_config(
             config_file=config_file, profile=profile, client=client,
             endpoint=endpoint, token=token, solver=solver, proxy=proxy)
-        _LOGGER.debug("Config loaded: %r", config)
+        logger.debug("Config loaded: %r", config)
 
         # fallback to legacy `.dwrc` if key variables missing
         if legacy_config_fallback:
@@ -305,7 +305,7 @@ class Client(object):
                 config = legacy_load_config(
                     profile=profile, client=client,
                     endpoint=endpoint, token=token, solver=solver, proxy=proxy)
-                _LOGGER.debug("Legacy config loaded: %r", config)
+                logger.debug("Legacy config loaded: %r", config)
 
         # manual override of other (client-custom) arguments
         config.update(kwargs)
@@ -314,7 +314,7 @@ class Client(object):
         _clients = {'qpu': qpu.Client, 'sw': sw.Client, 'base': cls}
         _client = config.pop('client', None) or 'base'
 
-        _LOGGER.debug("Final config used for %s.Client(): %r", _client, config)
+        logger.debug("Final config used for %s.Client(): %r", _client, config)
         return _clients[_client](**config)
 
     def __init__(self, endpoint=None, token=None, solver=None, proxy=None,
@@ -339,7 +339,7 @@ class Client(object):
         if not token:
             raise ValueError("API token not defined")
 
-        _LOGGER.debug(
+        logger.debug(
             "Creating a client for (endpoint=%r, token=%r, solver=%r, proxy=%r, "
             "permissive_ssl=%r, request_timeout=%r, polling_timeout=%r, **kwargs=%r)",
             endpoint, token, solver, proxy, permissive_ssl, request_timeout, polling_timeout, kwargs
@@ -361,7 +361,7 @@ class Client(object):
                 # unparseable json, assume string name for solver
                 # we'll deprecate this eventually, but for now just convert it to
                 # features dict (equality constraint on full solver name)
-                _LOGGER.debug("Invalid solver JSON, assuming string name: %r", solver)
+                logger.debug("Invalid solver JSON, assuming string name: %r", solver)
                 solver_def = dict(name__eq=solver)
 
         else:
@@ -386,7 +386,7 @@ class Client(object):
             self.session.headers.update({'Connection': 'close'})
 
         # Debug-log headers
-        _LOGGER.debug("session.headers=%r", self.session.headers)
+        logger.debug("session.headers=%r", self.session.headers)
 
         # Build the problem submission queue, start its workers
         self._submission_queue = queue.Queue()
@@ -446,13 +446,13 @@ class Client(object):
 
         """
         # Finish all the work that requires the connection
-        _LOGGER.debug("Joining submission queue")
+        logger.debug("Joining submission queue")
         self._submission_queue.join()
-        _LOGGER.debug("Joining cancel queue")
+        logger.debug("Joining cancel queue")
         self._cancel_queue.join()
-        _LOGGER.debug("Joining poll queue")
+        logger.debug("Joining poll queue")
         self._poll_queue.join()
-        _LOGGER.debug("Joining load queue")
+        logger.debug("Joining load queue")
         self._load_queue.join()
 
         # Send kill-task to all worker threads
@@ -507,10 +507,10 @@ class Client(object):
     @cached(maxage=_SOLVERS_CACHE_MAXAGE)
     def _fetch_solvers(self, name=None):
         if name is not None:
-            _LOGGER.debug("Fetching definition of a solver with name=%r", name)
+            logger.debug("Fetching definition of a solver with name=%r", name)
             url = posixpath.join(self.endpoint, 'solvers/remote/{}/'.format(name))
         else:
-            _LOGGER.debug("Fetching definitions of all available solvers")
+            logger.debug("Fetching definitions of all available solvers")
             url = posixpath.join(self.endpoint, 'solvers/remote/')
 
         try:
@@ -530,21 +530,23 @@ class Client(object):
         if name is not None:
             data = [data]
 
-        _LOGGER.debug("Received solver data for %d solver(s).", len(data))
-        _LOGGER.trace("Solver data received for solver name=%r: %r", name, data)
+        logger.debug("Received solver data for %d solver(s).", len(data))
+        logger.trace("Solver data received for solver name=%r: %r", name, data)
 
         solvers = []
         for solver_desc in data:
-            try:
-                solver = Solver(self, solver_desc)
-                if self.is_solver_handled(solver):
-                    solvers.append(solver)
-                    _LOGGER.debug("Adding solver %r", solver)
-                else:
-                    _LOGGER.debug("Skipping solver %r (not handled by this client)", solver)
+            for solver_class in available_solvers:
+                try:
+                    solver = solver_class(self, solver_desc)
+                    if self.is_solver_handled(solver):
+                        solvers.append(solver)
+                        logger.debug("Adding solver %r", solver)
+                        break
+                    else:
+                        logger.debug("Skipping solver %r (not handled by this client)", solver)
 
-            except UnsupportedSolverError as e:
-                _LOGGER.debug("Skipping solver due to %r", e)
+                except UnsupportedSolverError as e:
+                    logger.debug("Skipping solver due to %r", e)
 
             # propagate all other/decoding errors, like InvalidAPIResponseError, etc.
 
@@ -727,7 +729,7 @@ class Client(object):
                 qubits__issuperset={0, 4, 215},     # qubits 0, 4 and 215 must exist
                 supported_problem_types__issubset={'ising', 'qubo'},
                                                     # require Ising, QUBO or both to be supported
-                name='DW_2000Q_3',                  # full solver name/ID match
+                name='DW_2000Q_5',                  # full solver name/ID match
                 name__regex='.*2000.*',             # partial/regex-based solver name match
                 chip_id__regex='DW_.*',             # chip ID prefix must be DW_
                 topology__type__eq="chimera"        # topology.type must be chimera
@@ -854,7 +856,7 @@ class Client(object):
             query = lhs.split('__')
             predicates.append(partial(predicate, query=query, val=val))
 
-        _LOGGER.debug("Filtering solvers with predicates=%r", predicates)
+        logger.debug("Filtering solvers with predicates=%r", predicates)
 
         # optimization for case when exact solver name/id is known:
         # we can fetch only that solver
@@ -937,7 +939,7 @@ class Client(object):
             >>> client.close() # doctest: +SKIP
 
         """
-        _LOGGER.debug("Requested a solver that best matches feature filters=%r", filters)
+        logger.debug("Requested a solver that best matches feature filters=%r", filters)
 
         # backward compatibility: name as the first feature
         if name is not None:
@@ -949,7 +951,7 @@ class Client(object):
 
         # get the first solver that satisfies all filters
         try:
-            _LOGGER.debug("Fetching solvers according to filters=%r", filters)
+            logger.debug("Fetching solvers according to filters=%r", filters)
             return self.get_solvers(refresh=refresh, **filters)[0]
         except IndexError:
             raise SolverNotFoundError("Solver with the requested features not available")
@@ -976,6 +978,7 @@ class Client(object):
 
                 # `None` task is used to signal thread termination
                 item = self._submission_queue.get()
+
                 if item is None:
                     break
 
@@ -987,7 +990,7 @@ class Client(object):
                         break
 
                 # Submit the problems
-                _LOGGER.debug("Submitting %d problems", len(ready_problems))
+                logger.debug("Submitting %d problems", len(ready_problems))
                 body = '[' + ','.join(mess.body for mess in ready_problems) + ']'
                 try:
                     try:
@@ -1001,9 +1004,9 @@ class Client(object):
                     response.raise_for_status()
 
                     message = response.json()
-                    _LOGGER.debug("Finished submitting %d problems", len(ready_problems))
+                    logger.debug("Finished submitting %d problems", len(ready_problems))
                 except BaseException as exception:
-                    _LOGGER.debug("Submit failed for %d problems", len(ready_problems))
+                    logger.debug("Submit failed for %d problems", len(ready_problems))
                     if not isinstance(exception, SolverAuthenticationError):
                         exception = IOError(exception)
 
@@ -1022,7 +1025,7 @@ class Client(object):
                 time.sleep(0)
 
         except BaseException as err:
-            _LOGGER.exception(err)
+            logger.exception(err)
 
     def _handle_problem_status(self, message, future):
         """Handle the results of a problem submission or results request.
@@ -1037,8 +1040,8 @@ class Client(object):
             This method is always run inside of a daemon thread.
         """
         try:
-            _LOGGER.trace("Handling response: %r", message)
-            _LOGGER.debug("Handling response for %s with status %s", message.get('id'), message.get('status'))
+            logger.trace("Handling response: %r", message)
+            logger.debug("Handling response for %s with status %s", message.get('id'), message.get('status'))
 
             # Handle errors in batch mode
             if 'error_code' in message and 'error_msg' in message:
@@ -1159,15 +1162,15 @@ class Client(object):
                 time.sleep(0)
 
         except Exception as err:
-            _LOGGER.exception(err)
+            logger.exception(err)
 
     def _is_clock_diff_acceptable(self, future):
         if not future or future.clock_diff is None:
             return False
 
-        _LOGGER.debug("Detected (server,client) clock offset: approx. %.2f sec. "
-                      "Acceptable offset is: %.2f sec",
-                      future.clock_diff, self._CLOCK_DIFF_MAX)
+        logger.debug("Detected (server,client) clock offset: approx. %.2f sec. "
+                     "Acceptable offset is: %.2f sec",
+                     future.clock_diff, self._CLOCK_DIFF_MAX)
 
         return future.clock_diff <= self._CLOCK_DIFF_MAX
 
@@ -1181,12 +1184,12 @@ class Client(object):
             # if we have ETA of results, schedule the first poll for then
             if future.eta_min and self._is_clock_diff_acceptable(future):
                 at = datetime_to_timestamp(future.eta_min)
-                _LOGGER.debug("Response ETA indicated and local clock reliable. "
-                              "Scheduling first polling at +%.2f sec", at - epochnow())
+                logger.debug("Response ETA indicated and local clock reliable. "
+                             "Scheduling first polling at %+.2f sec", at - epochnow())
             else:
                 at = time.time() + future._poll_backoff
-                _LOGGER.debug("Response ETA not indicated, or local clock unreliable. "
-                              "Scheduling first polling at +%.2f sec", at - epochnow())
+                logger.debug("Response ETA not indicated, or local clock unreliable. "
+                             "Scheduling first polling at %+.2f sec", at - epochnow())
 
         else:
             # update exponential poll back-off, clipped to a range
@@ -1199,14 +1202,14 @@ class Client(object):
 
         now = utcnow()
         future_age = (now - future.time_created).total_seconds()
-        _LOGGER.debug("Polling scheduled at %.2f with %.2f sec new back-off for: %s (future's age: %.2f sec)",
-                      at, future._poll_backoff, future.id, future_age)
+        logger.debug("Polling scheduled at %.2f with %.2f sec new back-off for: %s (future's age: %.2f sec)",
+                     at, future._poll_backoff, future.id, future_age)
 
         # don't enqueue for next poll if polling_timeout is exceeded by then
         future_age_on_next_poll = future_age + (at - datetime_to_timestamp(now))
         if self.polling_timeout is not None and future_age_on_next_poll > self.polling_timeout:
-            _LOGGER.debug("Polling timeout exceeded before next poll: %.2f sec > %.2f sec, aborting polling!",
-                          future_age_on_next_poll, self.polling_timeout)
+            logger.debug("Polling timeout exceeded before next poll: %.2f sec > %.2f sec, aborting polling!",
+                         future_age_on_next_poll, self.polling_timeout)
             raise PollingTimeout
 
         self._poll_queue.put((at, future))
@@ -1266,7 +1269,7 @@ class Client(object):
 
                 # build a query string with ids of all futures in this frame
                 ids = [future.id for future in frame_futures.values()]
-                _LOGGER.debug("Polling for status of futures: %s", ids)
+                logger.debug("Polling for status of futures: %s", ids)
                 query_string = 'problems/?id=' + ','.join(ids)
 
                 # if futures were cancelled while `add`ing, skip empty frame
@@ -1276,13 +1279,13 @@ class Client(object):
                 # wait until `frame_earliest` before polling
                 delay = frame_earliest - time.time()
                 if delay > 0:
-                    _LOGGER.debug("Pausing polling %.2f sec for futures: %s", delay, ids)
+                    logger.debug("Pausing polling %.2f sec for futures: %s", delay, ids)
                     time.sleep(delay)
                 else:
-                    _LOGGER.trace("Skipping non-positive delay of %.2f sec", delay)
+                    logger.trace("Skipping non-positive delay of %.2f sec", delay)
 
                 try:
-                    _LOGGER.trace("Executing poll API request")
+                    logger.trace("Executing poll API request")
 
                     try:
                         response = self.session.get(posixpath.join(self.endpoint, query_string))
@@ -1310,7 +1313,7 @@ class Client(object):
                 time.sleep(0)
 
         except Exception as err:
-            _LOGGER.exception(err)
+            logger.exception(err)
 
     def _load(self, future):
         """Enqueue a problem to download results from the server.
@@ -1337,7 +1340,7 @@ class Client(object):
                 # `None` task signifies thread termination
                 if future is None:
                     break
-                _LOGGER.debug("Loading results of: %s", future.id)
+                logger.debug("Loading results of: %s", future.id)
 
                 # Submit the query
                 query_string = 'problems/{}/'.format(future.id)
@@ -1367,4 +1370,4 @@ class Client(object):
                 time.sleep(0)
 
         except Exception as err:
-            _LOGGER.error('Load result error: ' + str(err))
+            logger.error('Load result error: ' + str(err))

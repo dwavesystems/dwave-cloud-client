@@ -251,7 +251,7 @@ def _ping(config_file, profile, solver_def, request_timeout, polling_timeout, ou
     output(" * Solver definition fetch: {wallclock_solver_definition:.3f} ms", wallclock_solver_definition=(t1-t0)*1000.0)
     output(" * Problem submit and results fetch: {wallclock_sampling:.3f} ms", wallclock_sampling=(t2-t1)*1000.0)
     output(" * Total: {wallclock_total:.3f} ms", wallclock_total=(t2-t0)*1000.0)
-    if timing.items():
+    if timing:
         output("\nQPU timing:")
         for component, duration in timing.items():
             output(" * %(name)s = {%(name)s} us" % {"name": component}, **{component: duration})
@@ -411,7 +411,8 @@ def sample(config_file, profile, solver_def, biases, couplings, random_problem,
     echo("Number of samples: {}".format(num_reads))
 
     try:
-        result = solver.sample_ising(linear, quadratic, num_reads=num_reads).result()
+        result = solver.sample_ising(linear, quadratic, num_reads=num_reads)
+        result.result()
     except Exception as e:
         click.echo(e)
         return 4
@@ -419,6 +420,6 @@ def sample(config_file, profile, solver_def, biases, couplings, random_problem,
     if verbose:
         click.echo("Result: {!r}".format(result))
 
-    echo("Samples: {!r}".format(result['samples']))
-    echo("Occurrences: {!r}".format(result['occurrences']))
-    echo("Energies: {!r}".format(result['energies']))
+    echo("Samples: {!r}".format(result.samples))
+    echo("Occurrences: {!r}".format(result.occurrences))
+    echo("Energies: {!r}".format(result.energies))

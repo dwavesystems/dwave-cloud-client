@@ -20,10 +20,10 @@ import base64
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_tail, active_qubits)
 
-__all__ = ['encode_bqm_as_qp', 'decode_qp', 'decode_qp_numpy']
+__all__ = ['encode_problem_as_qp', 'decode_qp', 'decode_qp_numpy']
 
 
-def encode_bqm_as_qp(solver, linear, quadratic):
+def encode_problem_as_qp(solver, linear, quadratic):
     """Encode the binary quadratic problem for submission to a given solver,
     using the `qp` format for data.
 
@@ -122,6 +122,11 @@ def decode_qp(msg):
         solutions.append(solution)
 
     result['solutions'] = solutions
+
+    # include problem type
+    if 'type' in msg:
+        result['problem_type'] = msg['type']
+
     return result
 
 
@@ -173,7 +178,7 @@ def decode_qp_numpy(msg, return_matrix=True):
     """Decode SAPI response, results in a `qp` format, explicitly using numpy.
     If numpy is not installed, the method will fail.
 
-    To use numpy for decoding, but return the results a lists (instead of
+    To use numpy for decoding, but return the results as lists (instead of
     numpy matrices), set `return_matrix=False`.
     """
     import numpy as np
@@ -236,5 +241,61 @@ def decode_qp_numpy(msg, return_matrix=True):
             result['num_occurrences'] = result['num_occurrences'].tolist()
         result['active_variables'] = result['active_variables'].tolist()
         result['solutions'] = result['solutions'].tolist()
+
+    # include problem type
+    if 'type' in msg:
+        result['problem_type'] = msg['type']
+
+    return result
+
+
+def encode_problem_as_bq(problem, compress=False):
+    """Encode the binary quadratic problem for submission in the `bq` data
+    format.
+
+    Args:
+        problem (:class:`~dimod.BinaryQuadraticModel`):
+            Binary quadratic model.
+
+    Returns:
+        encoded submission dictionary
+    """
+
+    import zlib
+    import json
+
+    serialized_bqm = problem.to_serializable(use_bytes=False)
+
+    if compress:
+        # note: compression scheme will change, and preferably move to transport layer
+        compressed_bqm = zlib.compress(bytes(json.dumps(serialized_bqm), "ascii"))
+        data = str(base64.b64encode(compressed_bqm), "ascii")
+    else:
+        data = serialized_bqm
+
+    return {
+        'format': 'bq',
+        'data': data,
+    }
+
+
+def decode_bq(msg):
+    """Decode answer for problem submitted in the `bq` data format."""
+    try:
+        import dimod
+    except ImportError:     # pragma: no cover
+        raise RuntimeError("Can't decode BQMs without dimod. "
+                           "Re-install the library with 'bqm' support.")
+
+    answer = msg['answer']
+    assert answer['format'] == 'bq'
+
+    result = {}
+
+    # sampleset is encoded in data field
+    result['sampleset'] = dimod.SampleSet.from_serializable(answer['data'])
+
+    # include problem type
+    result['problem_type'] = 'bqm'
 
     return result
