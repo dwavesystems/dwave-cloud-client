@@ -1180,25 +1180,14 @@ class Client(object):
         if future._poll_backoff is None:
             # on first poll, start with minimal back-off
             future._poll_backoff = self._POLL_BACKOFF_MIN
-
-            # if we have ETA of results, schedule the first poll for then
-            if future.eta_min and self._is_clock_diff_acceptable(future):
-                at = datetime_to_timestamp(future.eta_min)
-                logger.debug("Response ETA indicated and local clock reliable. "
-                             "Scheduling first polling at %+.2f sec", at - epochnow())
-            else:
-                at = time.time() + future._poll_backoff
-                logger.debug("Response ETA not indicated, or local clock unreliable. "
-                             "Scheduling first polling at %+.2f sec", at - epochnow())
-
         else:
-            # update exponential poll back-off, clipped to a range
+            # on subsequent polls, do exponential back-off, clipped to a range
             future._poll_backoff = \
                 max(self._POLL_BACKOFF_MIN,
                     min(future._poll_backoff * 2, self._POLL_BACKOFF_MAX))
 
-            # for poll priority we use timestamp of next scheduled poll
-            at = time.time() + future._poll_backoff
+        # for poll priority we use timestamp of next scheduled poll
+        at = time.time() + future._poll_backoff
 
         now = utcnow()
         future_age = (now - future.time_created).total_seconds()
