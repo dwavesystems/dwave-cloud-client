@@ -397,8 +397,8 @@ class MockSubmission(_QueryTest):
 
     @mock.patch.object(Client, "_POLL_THREAD_COUNT", 1)
     @mock.patch.object(Client, "_SUBMISSION_THREAD_COUNT", 1)
-    def test_eta_min_is_respected_on_first_poll(self):
-        "eta_min/earliest_estimated_completion should be respected if present in response"
+    def test_eta_min_is_ignored_on_first_poll(self):
+        "eta_min/earliest_estimated_completion should not be used anymore"
 
         with Client('endpoint', 'token') as client:
             now = datetime_in_future(0)
@@ -414,10 +414,11 @@ class MockSubmission(_QueryTest):
 
             solver = Solver(client, solver_data('abc123'))
 
-            def assert_min_eta(s):
-                s and self.assertTrue(abs(s - 10) < 1)
+            def assert_no_delay(s):
+                s and self.assertTrue(
+                    abs(s - client._POLL_BACKOFF_MIN) < client._POLL_BACKOFF_MIN / 10.0)
 
-            with mock.patch('time.sleep', assert_min_eta):
+            with mock.patch('time.sleep', assert_no_delay):
                 future = solver.sample_qubo({})
                 future.result()
 
