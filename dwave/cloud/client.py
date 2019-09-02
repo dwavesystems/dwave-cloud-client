@@ -1030,18 +1030,22 @@ class Client(object):
     def _handle_problem_status(self, message, future):
         """Handle the results of a problem submission or results request.
 
-        This method checks the status of the problem and puts it in the correct queue.
+        This method checks the status of the problem and puts it in the correct
+        queue.
 
         Args:
-            message (dict): Update message from the SAPI server wrt. this problem.
-            future `Future`: future corresponding to the problem
+            message (dict):
+                Update message from the SAPI server wrt. this problem.
+            future (:class:`dwave.cloud.computation.Future`:
+                future corresponding to the problem
 
         Note:
             This method is always run inside of a daemon thread.
         """
         try:
             logger.trace("Handling response: %r", message)
-            logger.debug("Handling response for %s with status %s", message.get('id'), message.get('status'))
+            logger.debug("Handling response for %s with status %s",
+                         message.get('id'), message.get('status'))
 
             # Handle errors in batch mode
             if 'error_code' in message and 'error_msg' in message:
@@ -1273,6 +1277,7 @@ class Client(object):
                 else:
                     logger.trace("Skipping non-positive delay of %.2f sec", delay)
 
+                # execute and handle the polling request
                 try:
                     logger.trace("Executing poll API request")
 
@@ -1283,11 +1288,27 @@ class Client(object):
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()
-                    response.raise_for_status()
 
-                    statuses = response.json()
-                    for status in statuses:
-                        self._handle_problem_status(status, frame_futures[status['id']])
+                    # assume 5xx errors are transient, and don't abort polling
+                    if 500 <= response.status_code < 600:
+                        logger.warning(
+                            "Received an internal server error response on "
+                            "problem status polling request (%s). Assuming "
+                            "error is transient, and resuming polling.",
+                            response.status_code)
+                        # add all futures in this frame back to the polling queue
+                        # XXX: logic split between `_handle_problem_status` and here
+                        for future in frame_futures.values():
+                            self._poll(future)
+
+                    else:
+                        # otherwise, fail
+                        response.raise_for_status()
+
+                        # or handle a successful request
+                        statuses = response.json()
+                        for status in statuses:
+                            self._handle_problem_status(status, frame_futures[status['id']])
 
                 except BaseException as exception:
                     if not isinstance(exception, SolverAuthenticationError):
