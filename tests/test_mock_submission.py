@@ -21,11 +21,13 @@ import json
 import unittest
 import itertools
 import threading
+import collections
 
 from datetime import datetime, timedelta
 from dateutil.tz import UTC
 from dateutil.parser import parse as parse_datetime
 from requests.structures import CaseInsensitiveDict
+from requests.exceptions import HTTPError
 
 from dwave.cloud.utils import evaluate_ising, generate_random_ising_problem
 from dwave.cloud.client import Client, Solver
@@ -149,17 +151,24 @@ def continue_reply(id_, solver_name, now=None, eta_min=None, eta_max=None):
     return json.dumps(resp)
 
 
-def choose_reply(path, replies, date=None):
+def choose_reply(path, replies, statuses=None, date=None):
     """Choose the right response based on the path and make a mock response."""
+
+    if statuses is None:
+        statuses = collections.defaultdict(lambda: iter([200]))
 
     if date is None:
         date = datetime_in_future(0)
 
     if path in replies:
         response = mock.Mock(['json', 'raise_for_status', 'headers'])
-        response.status_code = 200
+        response.status_code = next(statuses[path])
         response.json.side_effect = lambda: json.loads(replies[path])
         response.headers = CaseInsensitiveDict({'Date': date.isoformat()})
+        def raise_for_status():
+            if not 200 <= response.status_code < 300:
+                raise HTTPError(response.status_code)
+        response.raise_for_status = raise_for_status
         return response
     else:
         raise NotImplementedError(path)
@@ -474,6 +483,47 @@ class MockSubmission(_QueryTest):
             with mock.patch('time.sleep', assert_no_delay):
                 future = solver.sample_qubo({})
                 future.result()
+
+    # Reduce the number of poll and submission threads so that the system can be tested
+    @mock.patch.object(Client, "_POLL_THREAD_COUNT", 1)
+    @mock.patch.object(Client, "_SUBMISSION_THREAD_COUNT", 1)
+    def test_polling_recovery_after_5xx(self):
+        "Polling shouldn't be aborted on 5xx responses."
+
+        with Client('endpoint', 'token') as client:
+            client.session = mock.Mock()
+            # on submit, return status pending
+            client.session.post = lambda path, _: choose_reply(path, {
+                'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123')
+            })
+            # on first and second status poll, fail with 503 and 504
+            # on third status poll, return completed
+            statuses = iter([503, 504])
+            def continue_then_complete(path, state={'count': 0}):
+                state['count'] += 1
+                if state['count'] < 3:
+                    return choose_reply(path, replies={
+                        'endpoint/problems/?id=123': '[%s]' % continue_reply('123', 'abc123'),
+                        'endpoint/problems/123/': continue_reply('123', 'abc123')
+                    }, statuses={
+                        'endpoint/problems/?id=123': statuses,
+                        'endpoint/problems/123/': statuses
+                    })
+                else:
+                    return choose_reply(path, {
+                        'endpoint/problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
+                        'endpoint/problems/123/': complete_reply('123', 'abc123')
+                    })
+
+            client.session.get = continue_then_complete
+
+            solver = Solver(client, solver_data('abc123'))
+
+            future = solver.sample_qubo({})
+            future.result()
+
+            # after third poll, back-off interval should be 4 x initial back-off
+            self.assertEqual(future._poll_backoff, Client._POLL_BACKOFF_MIN * 2**2)
 
 
 class DeleteEvent(Exception):
