@@ -242,11 +242,9 @@ def _ping(config_file, profile, solver_def, request_timeout, polling_timeout, ou
         raise CLIError("Polling timeout exceeded.", 9)
     except Exception as e:
         raise CLIError("Sampling error: {!r}".format(e), 10)
-    finally:
-        output("Submitted problem ID: {problem_id}", problem_id=future.id)
+    output("Submitted problem ID: {problem_id}", problem_id=future.id)
 
     t2 = timer()
-
     output("\nWall clock time:")
     output(" * Solver definition fetch: {wallclock_solver_definition:.3f} ms", wallclock_solver_definition=(t1-t0)*1000.0)
     output(" * Problem submit and results fetch: {wallclock_sampling:.3f} ms", wallclock_sampling=(t2-t1)*1000.0)
