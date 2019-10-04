@@ -147,6 +147,8 @@ class Client(object):
 
     # Number of worker threads for each problem processing task
     _SUBMISSION_THREAD_COUNT = 5
+    _UPLOAD_PROBLEM_THREAD_COUNT = 1
+    _UPLOAD_PART_THREAD_COUNT = 5
     _CANCEL_THREAD_COUNT = 1
     _POLL_THREAD_COUNT = 2
     _LOAD_THREAD_COUNT = 5
@@ -163,6 +165,9 @@ class Client(object):
 
     # Downloaded solver definition cache maxage [sec]
     _SOLVERS_CACHE_MAXAGE = 300
+
+    # Multipart upload parameters
+    _MULTIPART_PART_SIZE_BYTES = 5
 
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None,
@@ -424,6 +429,24 @@ class Client(object):
             worker.start()
             self._load_workers.append(worker)
 
+        # Build the problem (multipart) upload queue, start its workers
+        self._upload_problem_queue = queue.Queue()
+        self._upload_problem_workers = []
+        for _ in range(self._UPLOAD_PROBLEM_THREAD_COUNT):
+            worker = threading.Thread(target=self._do_upload_problem)
+            worker.daemon = True
+            worker.start()
+            self._upload_problem_workers.append(worker)
+
+        # Build the problem (part) upload queue, start its workers
+        self._upload_part_queue = queue.Queue()
+        self._upload_part_workers = []
+        for _ in range(self._UPLOAD_PART_THREAD_COUNT):
+            worker = threading.Thread(target=self._do_upload_part)
+            worker.daemon = True
+            worker.start()
+            self._upload_part_workers.append(worker)
+
     def close(self):
         """Perform a clean shutdown.
 
@@ -454,6 +477,10 @@ class Client(object):
         self._poll_queue.join()
         logger.debug("Joining load queue")
         self._load_queue.join()
+        logger.debug("Joining problem upload queue")
+        self._upload_problem_queue.join()
+        logger.debug("Joining problem part upload queue")
+        self._upload_part_queue.join()
 
         # Send kill-task to all worker threads
         # Note: threads can't be 'killed' in Python, they have to die by
@@ -466,10 +493,15 @@ class Client(object):
             self._poll_queue.put((-1, None))
         for _ in self._load_workers:
             self._load_queue.put(None)
+        for _ in self._upload_problem_workers:
+            self._upload_problem_queue.put(None)
+        for _ in self._upload_part_workers:
+            self._upload_part_queue.put(None)
 
         # Wait for threads to die
         for worker in chain(self._submission_workers, self._cancel_workers,
-                            self._poll_workers, self._load_workers):
+                            self._poll_workers, self._load_workers,
+                            self._upload_problem_workers, self._upload_part_workers):
             worker.join()
 
         # Close the requests session
@@ -1381,3 +1413,43 @@ class Client(object):
 
         except Exception as err:
             logger.error('Load result error: ' + str(err))
+
+    _Problem = collections.namedtuple('_Problem', ['data', 'future'])
+    _ProblemPart = collections.namedtuple('_ProblemPart', ['data', 'no', 'future'])
+
+    def _upload(self, data, future):
+        self._upload_problem_queue.put(self._Problem(data, future))
+
+    def _do_upload_problem(self):
+        while True:
+            try:
+                # fetch problem definition to upload
+                problem = self._upload_problem_queue.get()
+
+                # `None` task signifies thread termination
+                if problem is None:
+                    return
+
+                # XXX: initiate multipart upload session -> problem_id
+
+                logger.debug("Multipart upload initiated (problem_id=%r)", problem_id)
+
+            except Exception as exc:
+                logger.exception('Problem upload error', exc)
+
+    def _do_upload_part(self):
+        while True:
+            try:
+                # fetch problem part definition to upload
+                part = self._upload_part_queue.get()
+
+                # `None` task signifies thread termination
+                if part is None:
+                    return
+
+                # XXX: upload `part`
+
+                logger.debug("Problem part upload initiated (part no %r)", part.no)
+
+            except Exception as exc:
+                logger.exception('Problem part upload error', exc)
