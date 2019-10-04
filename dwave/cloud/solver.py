@@ -39,7 +39,7 @@ from dwave.cloud.exceptions import *
 from dwave.cloud.coders import (
     encode_problem_as_qp, encode_problem_as_bq,
     decode_qp_numpy, decode_qp, decode_bq)
-from dwave.cloud.utils import uniform_iterator, uniform_get
+from dwave.cloud.utils import uniform_iterator, qubo_to_ising
 from dwave.cloud.computation import Future
 
 # Use numpy if available for fast encoding/decoding
@@ -534,8 +534,7 @@ class StructuredSolver(BaseSolver):
         """
         # In a QUBO the linear and quadratic terms in the objective are mixed into
         # a matrix. For the sake of encoding, we will separate them before calling `_sample`
-        linear = {i1: v for (i1, i2), v in uniform_iterator(qubo) if i1 == i2}
-        quadratic = {(i1, i2): v for (i1, i2), v in uniform_iterator(qubo) if i1 != i2}
+        linear, quadratic = qubo_to_ising(qubo)
         return self._sample('qubo', linear, quadratic, params)
 
     def sample_bqm(self, bqm, **params):

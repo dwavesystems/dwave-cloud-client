@@ -130,6 +130,25 @@ def uniform_get(sequence, index, default=None):
         return sequence[index] if index < len(sequence) else default
 
 
+def qubo_to_ising(qubo):
+    """Split QUBO coefficients into linear and quadratic terms (the Ising form).
+
+    Args:
+        qubo (dict[(int, int), float]):
+            Coefficients of a quadratic unconstrained binary optimization
+            (QUBO) model.
+
+    Returns:
+        (dict[int, float], dict[(int, int), float])
+
+    """
+
+    lin = {u: bias for (u, v), bias in six.iteritems(qubo) if u == v}
+    quad = {(u, v): bias for (u, v), bias in six.iteritems(qubo) if u != v}
+
+    return lin, quad
+
+
 def strip_head(sequence, values):
     """Strips elements of `values` from the beginning of `sequence`."""
     values = set(values)
