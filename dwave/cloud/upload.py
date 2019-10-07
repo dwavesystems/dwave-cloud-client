@@ -22,15 +22,48 @@ import math
 import logging
 import threading
 
+from abc import abstractmethod
+try:
+    import collections.abc as abc
+except ImportError:
+    import collections as abc
+
 import six
 
-__all__ = ['FileSlicer', 'ChunkedData']
+__all__ = ['FileView', 'ChunkedData']
 
 logger = logging.getLogger(__name__)
 
 
-class FileSlicer(object):
-    """Thread-safe random access to a file-like object."""
+class RandomAccessIOBaseView(abc.Sized):
+    """Abstract base class for random access file-like object views.
+
+    Concrete subclasses must provide __len__ and __getitem__.
+    """
+
+    __slots__ = ()
+
+    @abstractmethod
+    def __getitem__(self, key):
+        raise KeyError
+
+
+class FileView(RandomAccessIOBaseView):
+    """Provide thread-safe random access to a file-like object via item getter
+    interface.
+
+    Example:
+        Access overlapping segments of a file from multiple threads::
+
+            with open('/path/to/file', 'rb') as fp:
+                fv = FileView(fp):
+
+                # in thread 1:
+                seg = fv[0:10]
+
+                # in thread 2:
+                seg = fv[5:15]
+    """
 
     def __init__(self, fp):
         if not (isinstance(fp, io.IOBase) and fp.seekable() and fp.readable()):
@@ -48,6 +81,12 @@ class FileSlicer(object):
         return self._size
 
     def __getitem__(self, key):
+        """Fetch a slice of file's content.
+
+        Returns:
+            :class:`bytes`
+        """
+
         if not isinstance(key, slice):
             raise TypeError("slice key expected")
 
@@ -55,6 +94,7 @@ class FileSlicer(object):
         if stride != 1:
             raise NotImplementedError("stride of 1 required")
 
+        # slice is an atomic seek & read
         with self._lock:
             self.fp.seek(start)
             return self.fp.read(stop - start)
@@ -64,17 +104,14 @@ class ChunkedData(object):
     """Unifying and performant streaming file-like interface to (large problem)
     data chunks.
 
-    Handles streaming, in-file and in-memory input of problem data in Ising,
-    QUBO and BQM form. Provides by-ref slice operation.
+    Handles streaming, in-file and in-memory data. Provides chunk data access.
 
     Args:
-        data (bytes/str/file-like):
-            Encoded problem data, in-memory or in-file. This data is typically
-            obtained from one of the encoders in the :mod:`dwave.cloud.coders`
-            module (directly or indirectly)
+        data (bytes/str/binary-file-like):
+            Encoded problem data, in-memory or in-file.
 
         chunk_size (int):
-            Problem part size in bytes.
+            Chunk size in bytes.
 
     """
 
@@ -94,7 +131,7 @@ class ChunkedData(object):
                 raise ValueError("seekable file-like data object expected")
             if not data.readable():
                 raise ValueError("readable file-like data object expected")
-            self.view = FileSlicer(data)
+            self.view = FileView(data)
 
     @property
     def num_chunks(self):
