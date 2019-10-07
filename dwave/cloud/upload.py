@@ -96,9 +96,18 @@ class FileView(RandomAccessIOBaseView):
                 start = int(key)
             except:
                 raise TypeError("slice or integral key expected")
+
+            # negative indices wrap around
+            if start < 0:
+                start %= len(self)
+
             stop = start + 1
 
-        # slice is an atomic seek & read
+        # empty slices
+        if stop <= start:
+            return bytes()
+
+        # slice is an atomic "seek and read" operation
         with self._lock:
             self.fp.seek(start)
             return self.fp.read(stop - start)
