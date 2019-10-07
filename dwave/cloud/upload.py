@@ -87,12 +87,16 @@ class FileView(RandomAccessIOBaseView):
             :class:`bytes`
         """
 
-        if not isinstance(key, slice):
-            raise TypeError("slice key expected")
-
-        start, stop, stride = key.indices(len(self))
-        if stride != 1:
-            raise NotImplementedError("stride of 1 required")
+        if isinstance(key, slice):
+            start, stop, stride = key.indices(len(self))
+            if stride != 1:
+                raise NotImplementedError("stride of 1 required")
+        else:
+            try:
+                start = int(key)
+            except:
+                raise TypeError("slice or integral key expected")
+            stop = start + 1
 
         # slice is an atomic seek & read
         with self._lock:
