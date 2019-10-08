@@ -25,7 +25,7 @@ import threading
 from abc import abstractmethod
 try:
     import collections.abc as abc
-except ImportError:
+except ImportError:     # pragma: no cover
     import collections as abc
 
 import six
@@ -44,7 +44,7 @@ class RandomAccessIOBaseView(abc.Sized):
     __slots__ = ()
 
     @abstractmethod
-    def __getitem__(self, key):
+    def __getitem__(self, key):     # pragma: no cover
         raise KeyError
 
 

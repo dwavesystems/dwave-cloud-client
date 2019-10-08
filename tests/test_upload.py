@@ -62,6 +62,13 @@ class TestFileView(unittest.TestCase):
         # out of bounds integer indexing
         self.assertEqual(fv[n], data[n:n+1])
 
+        # non-integer key
+        with self.assertRaises(TypeError):
+            fv['a']
+
+        # empty slices
+        self.assertEqual(fv[1:0], b'')
+
         # slicing
         self.assertEqual(fv[:], data[:])
         self.assertEqual(fv[0:n//2], data[0:n//2])
@@ -180,6 +187,11 @@ class TestChunkedData(unittest.TestCase):
 
     def test_chunks_from_bytes(self):
         cd = ChunkedData(self.data, chunk_size=3)
+        chunks_expected = [b'012', b'345', b'678', b'9']
+        self.verify_chunking(cd, chunks_expected)
+
+    def test_chunks_from_str(self):
+        cd = ChunkedData(self.data.decode('ascii'), chunk_size=3)
         chunks_expected = [b'012', b'345', b'678', b'9']
         self.verify_chunking(cd, chunks_expected)
 
