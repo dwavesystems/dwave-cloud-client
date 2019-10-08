@@ -22,9 +22,15 @@ import itertools
 
 try:
     import collections.abc as abc
-except ImportError:
-    # 2.7
+except ImportError:     # pragma: no cover
+    # python 2
     import collections as abc
+
+try:
+    perf_counter = time.perf_counter
+except AttributeError:  # pragma: no cover
+    # python 2
+    perf_counter = time.time
 
 from datetime import datetime
 from dateutil.tz import UTC
@@ -43,7 +49,7 @@ except ImportError:  # pragma: no cover
 
 __all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
            'default_text_input', 'click_info_switch', 'datetime_to_timestamp',
-           'datetime_to_timestamp', 'utcnow', 'epochnow']
+           'datetime_to_timestamp', 'utcnow', 'epochnow', 'tictoc']
 
 
 def evaluate_ising(linear, quad, state):
@@ -364,3 +370,14 @@ class cached(object):
         wrapper._maxage = self.maxage
 
         return wrapper
+
+
+class tictoc(object):
+    """Timer as a context manager."""
+
+    def __enter__(self):
+        self.tick = perf_counter()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.dt = perf_counter() - self.tick
