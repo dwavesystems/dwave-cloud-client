@@ -60,10 +60,17 @@ class FileView(RandomAccessIOBaseView):
         strict (bool, default=True):
             Require file-like object to be a :class:`io.IOBase` subclass.
 
+    Note:
+        :class:`FileView` behavior is invariant to data encoding of the
+        file-like object. For example, if the file is opened in binary mode
+        (or file is :class:`io.BytesIO` instance), :class:`bytes` are returned
+        as slices. If the file is opened in text mode (or it's
+        :class:`io.StringIO`), slicing returns :class:`str` instances.
+
     Example:
         Access overlapping segments of a file from multiple threads::
 
-            with open('/path/to/file', 'rb') as fp:
+            with open('/path/to/file', 'rb') as fp:   # binary mode, read access
                 fv = FileView(fp):
 
                 # in thread 1:
@@ -100,7 +107,7 @@ class FileView(RandomAccessIOBaseView):
         """Fetch a slice of file's content.
 
         Returns:
-            :class:`bytes`
+            :class:`bytes`/:class:`str`
         """
 
         if isinstance(key, slice):
@@ -133,7 +140,8 @@ class ChunkedData(object):
     """Unifying and performant streaming file-like interface to (large problem)
     data chunks.
 
-    Handles streaming, in-file and in-memory data. Provides chunk data access.
+    Handles streaming (not yet), in-file and in-memory data. Provides access to
+    chunk data.
 
     Args:
         data (bytes/str/binary-file-like):
@@ -169,9 +177,16 @@ class ChunkedData(object):
         total_size = len(self.view)
         return math.ceil(total_size / self.chunk_size)
 
+    def __len__(self):
+        return self.num_chunks
+
     def chunk(self, idx):
         """Return :class:`io.BytesIO`-wrapped zero-indexed chunk data."""
 
         start = idx * self.chunk_size
         stop = start + self.chunk_size
         return io.BytesIO(self.view[start:stop])
+
+    def __iter__(self):
+        for idx in range(len(self)):
+            yield self.chunk(idx)
