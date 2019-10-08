@@ -103,15 +103,22 @@ class TestFileView(unittest.TestCase):
         os.write(fd, data)
         os.close(fd)
 
-        # test FileView from file on disk
-        with open(path, 'rb') as fp:
+        # test FileView from file on disk (read access)
+        with io.open(path, 'rb') as fp:
             fv = FileView(fp)
 
             self.assertEqual(len(fv), len(data))
             self.verify_getter(fv, data)
 
-        # file has to be open for reading
-        with open(path, 'wb') as fp:
+        # works also for read+write access
+        with io.open(path, 'r+b') as fp:
+            fv = FileView(fp)
+
+            self.assertEqual(len(fv), len(data))
+            self.verify_getter(fv, data)
+
+        # fail without read access
+        with io.open(path, 'wb') as fp:
             with self.assertRaises(ValueError):
                 fv = FileView(fp)
 
