@@ -164,14 +164,16 @@ class ChunkedData(object):
             data = data.encode('ascii')
 
         if isinstance(data, bytes):
-            self.view = io.BytesIO(data).getbuffer()
+            data = io.BytesIO(data)
 
-        elif isinstance(data, io.IOBase):
+        if isinstance(data, io.IOBase):
             if not data.seekable():
                 raise ValueError("seekable file-like data object expected")
             if not data.readable():
                 raise ValueError("readable file-like data object expected")
             self.view = FileView(data)
+        else:
+            raise TypeError("bytes/str/IOBase-subclass data required")
 
     @property
     def num_chunks(self):
