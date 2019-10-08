@@ -154,6 +154,7 @@ class ChunkedData(object):
 
     def __init__(self, data, chunk_size):
         self.data = data
+        self.view = None
         self.chunk_size = int(chunk_size)
 
         if self.chunk_size <= 0:
@@ -165,14 +166,24 @@ class ChunkedData(object):
 
         if isinstance(data, bytes):
             data = io.BytesIO(data)
+            # use non-locking memory view over bytes if available
+            try:
+                self.view = data.getbuffer()
+            except AttributeError:  # pragma: no cover
+                # python 2: fallback to FileView
+                pass
 
-        if isinstance(data, io.IOBase):
+        if self.view is None and isinstance(data, io.IOBase):
+            # use locking file view if possible
             if not data.seekable():
                 raise ValueError("seekable file-like data object expected")
             if not data.readable():
                 raise ValueError("readable file-like data object expected")
             self.view = FileView(data)
-        else:
+
+        # TODO: use stream view if possible
+
+        if self.view is None:
             raise TypeError("bytes/str/IOBase-subclass data required")
 
     @property
