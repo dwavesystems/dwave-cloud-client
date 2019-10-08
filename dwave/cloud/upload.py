@@ -65,8 +65,13 @@ class FileView(RandomAccessIOBaseView):
                 seg = fv[5:15]
     """
 
-    def __init__(self, fp):
-        if not (isinstance(fp, io.IOBase) and fp.seekable() and fp.readable()):
+    def __init__(self, fp, strict=True):
+        if strict:
+            valid = lambda f: isinstance(f, io.IOBase) and f.seekable() and f.readable()
+        else:
+            valid = lambda f: hasattr(f, 'seek') and hasattr(f, 'read')
+
+        if not valid(fp):
             raise ValueError("expected file-like, seekable, readable object")
 
         # store file size, assuming it won't change

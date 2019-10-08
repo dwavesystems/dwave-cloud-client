@@ -90,7 +90,7 @@ class TestFileView(unittest.TestCase):
         with tempfile.TemporaryFile() as fp:
             fp.write(data)
             fp.seek(0)
-            fv = FileView(fp)
+            fv = FileView(fp, strict=False)
 
             self.assertEqual(len(fv), len(data))
             self.verify_getter(fv, data)
