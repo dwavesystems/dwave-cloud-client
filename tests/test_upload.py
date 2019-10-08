@@ -140,8 +140,8 @@ class TestFileView(unittest.TestCase):
         sleep = 0.25
         def blocking_seek(start):
             time.sleep(sleep)
-            return io.BytesIO.seek(fv.fp, start)
-        fv.fp.seek = blocking_seek
+            return io.BytesIO.seek(fv._fp, start)
+        fv._fp.seek = blocking_seek
 
         # define the worker
         def worker(slice_):

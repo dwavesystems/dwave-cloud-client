@@ -77,7 +77,7 @@ class FileView(RandomAccessIOBaseView):
         # store file size, assuming it won't change
         fp.seek(0, os.SEEK_END)
         self._size = fp.tell()
-        self.fp = fp
+        self._fp = fp
 
         # multiple threads will be accessing the underlying file 
         self._lock = threading.RLock()
@@ -114,8 +114,8 @@ class FileView(RandomAccessIOBaseView):
 
         # slice is an atomic "seek and read" operation
         with self._lock:
-            self.fp.seek(start)
-            return self.fp.read(stop - start)
+            self._fp.seek(start)
+            return self._fp.read(stop - start)
 
 
 class ChunkedData(object):
