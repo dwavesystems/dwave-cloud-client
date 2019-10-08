@@ -52,6 +52,14 @@ class FileView(RandomAccessIOBaseView):
     """Provide thread-safe random access to a file-like object via item getter
     interface.
 
+    Args:
+        fp (:class:`io.IOBase`/file-like):
+            A file-like object that supports seek, read and tell operations.
+            Thread-safety of these operations is not assumed.
+
+        strict (bool, default=True):
+            Require file-like object to be a :class:`io.IOBase` subclass.
+
     Example:
         Access overlapping segments of a file from multiple threads::
 
@@ -63,13 +71,16 @@ class FileView(RandomAccessIOBaseView):
 
                 # in thread 2:
                 seg = fv[5:15]
+
     """
 
     def __init__(self, fp, strict=True):
         if strict:
-            valid = lambda f: isinstance(f, io.IOBase) and f.seekable() and f.readable()
+            valid = lambda f: (
+                isinstance(f, io.IOBase) and f.seekable() and f.readable())
         else:
-            valid = lambda f: hasattr(f, 'seek') and hasattr(f, 'read')
+            valid = lambda f: all([
+                hasattr(f, 'read'), hasattr(f, 'seek'), hasattr(f, 'tell')])
 
         if not valid(fp):
             raise ValueError("expected file-like, seekable, readable object")
