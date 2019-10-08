@@ -532,8 +532,6 @@ class StructuredSolver(BaseSolver):
             (1, 0)
 
         """
-        # In a QUBO the linear and quadratic terms in the objective are mixed into
-        # a matrix. For the sake of encoding, we will separate them before calling `_sample`
         linear, quadratic = qubo_to_ising(qubo)
         return self._sample('qubo', linear, quadratic, params)
 

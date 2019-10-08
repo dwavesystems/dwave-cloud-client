@@ -167,7 +167,7 @@ class Client(object):
     _SOLVERS_CACHE_MAXAGE = 300
 
     # Multipart upload parameters
-    _MULTIPART_PART_SIZE_BYTES = 5
+    _UPLOAD_PART_SIZE_BYTES = 5
 
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None,
@@ -1361,9 +1361,10 @@ class Client(object):
         """Enqueue a problem to download results from the server.
 
         Args:
-            future: Future` object corresponding to the query
+            future (:class:`~dwave.cloud.computation.Future`):
+                Future object corresponding to the remote computation.
 
-        This method is threadsafe.
+        This method is thread-safe.
         """
         self._load_queue.put(future)
 
@@ -1430,9 +1431,33 @@ class Client(object):
                 if problem is None:
                     return
 
-                # XXX: initiate multipart upload session -> problem_id
+                data = problem.data
+                size = len(data)
+
+                # initiate multipart upload
+                logger.debug("Initiating problem multipart upload (size=%r)", size)
+                path = "/bqm/multipart"
+                try:
+                    response = self.session.post(
+                        posixpath.join(self.endpoint, path),
+                        json=dict(size=size))
+                except requests.exceptions.Timeout:
+                    raise RequestTimeout
+
+                if response.status_code == 401:
+                    raise SolverAuthenticationError()
+                else:
+                    response.raise_for_status()
+
+                try:
+                    problem_id = response.json()['id']
+                except KeyError:
+                    raise InvalidAPIResponseError("problem ID missing")
 
                 logger.debug("Multipart upload initiated (problem_id=%r)", problem_id)
+
+                # queue parts upload
+
 
             except Exception as exc:
                 logger.exception('Problem upload error', exc)
