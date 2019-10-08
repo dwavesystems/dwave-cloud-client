@@ -14,9 +14,12 @@
 
 import io
 import os
+import time
 import unittest
 import tempfile
+from concurrent.futures import ThreadPoolExecutor, wait
 
+from dwave.cloud.utils import tictoc
 from dwave.cloud.upload import RandomAccessIOBaseView, FileView
 
 
@@ -114,3 +117,40 @@ class TestFileView(unittest.TestCase):
 
         # remove temp file
         os.unlink(path)
+
+    def test_critical_section_respected(self):
+        # setup a shared file view
+        data = self.data
+        fp = io.BytesIO(data)
+        fv = FileView(fp)
+
+        # file slices
+        slice_a = slice(0, 7)
+        slice_b = slice(3, 5)
+
+        # add a noticeable sleep inside the critical section (on `file.seek`),
+        # resulting in minimal runtime equal to (N runs * sleep in crit sect)
+        sleep = 0.25
+        def blocking_seek(start):
+            time.sleep(sleep)
+            return io.BytesIO.seek(fv.fp, start)
+        fv.fp.seek = blocking_seek
+
+        # define the worker
+        def worker(slice_):
+            return fv[slice_]
+
+        # run the worker a few times in parallel
+        executor = ThreadPoolExecutor(max_workers=3)
+        slices = [slice_a, slice_b, slice_a]
+        futures = [executor.submit(worker, s) for s in slices]
+        with tictoc() as timer:
+            wait(futures)
+
+        # verify results
+        results = [f.result() for f in futures]
+        expected = [data[s] for s in slices]
+        self.assertEqual(results, expected)
+
+        # verify runtime is consistent with a blocking critical section
+        self.assertGreaterEqual(timer.dt, len(results) * sleep)
