@@ -161,7 +161,7 @@ class ChunkedData(object):
 
         # convenience string handler
         if isinstance(data, six.string_types):
-            data = bytes(data, encoding='ascii')
+            data = data.encode('ascii')
 
         if isinstance(data, bytes):
             self.view = io.BytesIO(data).getbuffer()
