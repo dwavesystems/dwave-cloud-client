@@ -160,4 +160,4 @@ class TestFileView(unittest.TestCase):
         self.assertEqual(results, expected)
 
         # verify runtime is consistent with a blocking critical section
-        self.assertGreaterEqual(timer.dt, len(results) * sleep)
+        self.assertGreaterEqual(timer.dt, 0.9 * len(results) * sleep)
