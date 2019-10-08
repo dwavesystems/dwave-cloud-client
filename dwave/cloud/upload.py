@@ -154,7 +154,10 @@ class ChunkedData(object):
 
     def __init__(self, data, chunk_size):
         self.data = data
-        self.chunk_size = chunk_size
+        self.chunk_size = int(chunk_size)
+
+        if self.chunk_size <= 0:
+            raise ValueError("positive integer required for chunk size")
 
         # convenience string handler
         if isinstance(data, six.string_types):

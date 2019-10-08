@@ -20,7 +20,7 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor, wait
 
 from dwave.cloud.utils import tictoc
-from dwave.cloud.upload import RandomAccessIOBaseView, FileView
+from dwave.cloud.upload import RandomAccessIOBaseView, FileView, ChunkedData
 
 
 class TestFileViewABC(unittest.TestCase):
@@ -161,3 +161,42 @@ class TestFileView(unittest.TestCase):
 
         # verify runtime is consistent with a blocking critical section
         self.assertGreaterEqual(timer.dt, 0.9 * len(results) * sleep)
+
+
+class TestChunkedData(unittest.TestCase):
+    data = b'0123456789'
+
+    def verify_chunking(self, cd, chunks_expected):
+        self.assertEqual(len(cd), len(chunks_expected))
+        self.assertEqual(cd.num_chunks, len(chunks_expected))
+
+        chunks_iter = [c.getvalue() for c in cd]
+        chunks_explicit = []
+        for idx in range(len(cd)):
+            chunks_explicit.append(cd.chunk(idx).getvalue())
+
+        self.assertListEqual(chunks_iter, chunks_expected)
+        self.assertListEqual(chunks_explicit, chunks_iter)
+
+    def test_chunks_from_bytes(self):
+        cd = ChunkedData(self.data, chunk_size=3)
+        chunks_expected = [b'012', b'345', b'678', b'9']
+        self.verify_chunking(cd, chunks_expected)
+
+    def test_chunks_from_memory_file(self):
+        data = io.BytesIO(self.data)
+        cd = ChunkedData(data, chunk_size=3)
+        chunks_expected = [b'012', b'345', b'678', b'9']
+        self.verify_chunking(cd, chunks_expected)
+
+    def test_chunk_size_edges(self):
+        with self.assertRaises(ValueError):
+            cd = ChunkedData(self.data, chunk_size=0)
+
+        cd = ChunkedData(self.data, chunk_size=1)
+        chunks_expected = [self.data[i:i+1] for i in range(len(self.data))]
+        self.verify_chunking(cd, chunks_expected)
+
+        cd = ChunkedData(self.data, chunk_size=len(self.data))
+        chunks_expected = [self.data]
+        self.verify_chunking(cd, chunks_expected)
