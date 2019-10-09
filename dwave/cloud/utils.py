@@ -116,6 +116,10 @@ def generate_random_ising_problem(solver, h_range=None, j_range=None):
     return lin, quad
 
 
+def generate_const_ising_problem(solver, h=1, j=-1):
+    return generate_random_ising_problem(solver, h_range=[h, h], j_range=[j, j])
+
+
 def uniform_iterator(sequence):
     """Uniform (key, value) iteration on a `dict`,
     or (idx, value) on a `list`."""

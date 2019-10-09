@@ -29,10 +29,15 @@ from dateutil.parser import parse as parse_datetime
 from requests.structures import CaseInsensitiveDict
 from requests.exceptions import HTTPError
 
-from dwave.cloud.utils import evaluate_ising, generate_random_ising_problem
+from dwave.cloud.utils import evaluate_ising, generate_const_ising_problem
 from dwave.cloud.client import Client, Solver
 from dwave.cloud.exceptions import SolverFailureError, CanceledFutureError
 from dwave.cloud.testing import mock
+
+
+def test_problem(solver):
+    """The problem answered by mocked replies below."""
+    return generate_const_ising_problem(solver, h=1, j=-1)
 
 
 def solver_data(id_, incomplete=False):
@@ -42,7 +47,7 @@ def solver_data(id_, incomplete=False):
             "supported_problem_types": ["qubo", "ising"],
             "qubits": [0, 1, 2, 3, 4],
             "couplers": list(itertools.combinations(range(5), 2)),
-            "num_qubits": 3,
+            "num_qubits": 5,
             "parameters": {"num_reads": "Number of samples to return."}
         },
         "id": id_,
@@ -203,10 +208,8 @@ class MockSubmission(_QueryTest):
             with Client('endpoint', 'token') as client:
                 solver = Solver(client, solver_data('abc123'))
 
-                # Build a problem
-                linear = {index: 1 for index in solver.nodes}
-                quad = {key: -1 for key in solver.undirected_edges}
-                results = solver.sample_ising(linear, quad, num_reads=100)
+                linear, quadratic = test_problem(solver)
+                results = solver.sample_ising(linear, quadratic, num_reads=100)
 
                 with self.assertRaises(ValueError):
                     results.samples
@@ -230,12 +233,10 @@ class MockSubmission(_QueryTest):
             with Client('endpoint', 'token') as client:
                 solver = Solver(client, solver_data('abc123'))
 
-                # Build a problem
-                linear = {index: 1 for index in solver.nodes}
-                quad = {key: -1 for key in solver.undirected_edges}
-                results = solver.sample_ising(linear, quad, num_reads=100)
+                linear, quadratic = test_problem(solver)
+                results = solver.sample_ising(linear, quadratic, num_reads=100)
 
-                self._check(results, linear, quad, 100)
+                self._check(results, linear, quadratic, 100)
 
     def test_submit_error_reply(self):
         """Handle an error on problem submission."""
@@ -253,10 +254,8 @@ class MockSubmission(_QueryTest):
             with Client('endpoint', 'token') as client:
                 solver = Solver(client, solver_data('abc123'))
 
-                # Build a problem
-                linear = {index: 1 for index in solver.nodes}
-                quad = {key: -1 for key in solver.undirected_edges}
-                results = solver.sample_ising(linear, quad, num_reads=100)
+                linear, quadratic = test_problem(solver)
+                results = solver.sample_ising(linear, quadratic, num_reads=100)
 
                 with self.assertRaises(SolverFailureError):
                     results.samples
@@ -277,8 +276,8 @@ class MockSubmission(_QueryTest):
             with Client('endpoint', 'token') as client:
                 solver = Solver(client, solver_data('abc123'))
 
-                linear, quad = generate_random_ising_problem(solver)
-                results = solver.sample_ising(linear, quad)
+                linear, quadratic = test_problem(solver)
+                results = solver.sample_ising(linear, quadratic)
 
                 with self.assertRaises(SolverFailureError):
                     results.samples
@@ -298,10 +297,8 @@ class MockSubmission(_QueryTest):
             with Client('endpoint', 'token') as client:
                 solver = Solver(client, solver_data('abc123'))
 
-                # Build a problem
-                linear = {index: 1 for index in solver.nodes}
-                quad = {key: -1 for key in solver.undirected_edges}
-                results = solver.sample_ising(linear, quad, num_reads=100)
+                linear, quadratic = test_problem(solver)
+                results = solver.sample_ising(linear, quadratic, num_reads=100)
 
                 with self.assertRaises(CanceledFutureError):
                     results.samples
@@ -332,12 +329,10 @@ class MockSubmission(_QueryTest):
             with Client('endpoint', 'token') as client:
                 solver = Solver(client, solver_data('abc123'))
 
-                # Build a problem
-                linear = {index: 1 for index in solver.nodes}
-                quad = {key: -1 for key in solver.undirected_edges}
-                results = solver.sample_ising(linear, quad, num_reads=100)
+                linear, quadratic = test_problem(solver)
+                results = solver.sample_ising(linear, quadratic, num_reads=100)
 
-                self._check(results, linear, quad, 100)
+                self._check(results, linear, quadratic, 100)
 
                 # test future has eta_min and eta_max parsed correctly
                 self.assertEqual(results.eta_min, eta_min)
@@ -362,13 +357,11 @@ class MockSubmission(_QueryTest):
             with Client('endpoint', 'token') as client:
                 solver = Solver(client, solver_data('abc123'))
 
-                # Build a problem
-                linear = {index: 1 for index in solver.nodes}
-                quad = {key: -1 for key in solver.undirected_edges}
-                results = solver.sample_ising(linear, quad, num_reads=100)
+                linear, quadratic = test_problem(solver)
+                results = solver.sample_ising(linear, quadratic, num_reads=100)
 
                 with self.assertRaises(SolverFailureError):
-                    self._check(results, linear, quad, 100)
+                    self._check(results, linear, quadratic, 100)
 
     def test_submit_continue_then_ok_and_error_reply(self):
         """Handle polling for the status of multiple problems."""
@@ -422,15 +415,14 @@ class MockSubmission(_QueryTest):
             with Client('endpoint', 'token') as client:
                 solver = Solver(client, solver_data('abc123'))
 
-                linear = {index: 1 for index in solver.nodes}
-                quad = {key: -1 for key in solver.undirected_edges}
+                linear, quadratic = test_problem(solver)
 
-                results1 = solver.sample_ising(linear, quad, num_reads=100)
-                results2 = solver.sample_ising(linear, quad, num_reads=100)
+                results1 = solver.sample_ising(linear, quadratic, num_reads=100)
+                results2 = solver.sample_ising(linear, quadratic, num_reads=100)
 
                 with self.assertRaises(SolverFailureError):
-                    self._check(results1, linear, quad, 100)
-                self._check(results2, linear, quad, 100)
+                    self._check(results1, linear, quadratic, 100)
+                self._check(results2, linear, quadratic, 100)
 
     def test_exponential_backoff_polling(self):
         "After each poll, back-off should double"
@@ -696,11 +688,9 @@ class MockCancel(unittest.TestCase):
             with Client('endpoint', 'token') as client:
                 solver = Solver(client, solver_data('abc123'))
 
-                # Build a problem
-                linear = {index: 1 for index in solver.nodes}
-                quad = {key: -1 for key in solver.undirected_edges}
+                linear, quadratic = test_problem(solver)
 
-                future = solver.sample_ising(linear, quad)
+                future = solver.sample_ising(linear, quadratic)
                 future.cancel()
 
                 try:
