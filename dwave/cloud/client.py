@@ -1077,6 +1077,9 @@ class Client(object):
         except BaseException as err:
             logger.exception(err)
 
+        finally:
+            session.close()
+
     def _handle_problem_status(self, message, future):
         """Handle the results of a problem submission or results request.
 
@@ -1218,6 +1221,9 @@ class Client(object):
 
         except Exception as err:
             logger.exception(err)
+
+        finally:
+            session.close()
 
     def _is_clock_diff_acceptable(self, future):
         if not future or future.clock_diff is None:
@@ -1377,6 +1383,9 @@ class Client(object):
         except Exception as err:
             logger.exception(err)
 
+        finally:
+            session.close()
+
     def _load(self, future):
         """Enqueue a problem to download results from the server.
 
@@ -1436,6 +1445,9 @@ class Client(object):
         except Exception as err:
             logger.error('Load result error: ' + str(err))
 
+        finally:
+            session.close()
+
     _Problem = collections.namedtuple('_Problem', ['data', 'future'])
     _ProblemPart = collections.namedtuple('_ProblemPart', ['data', 'no', 'future'])
 
@@ -1483,6 +1495,8 @@ class Client(object):
 
             except Exception as exc:
                 logger.exception('Problem upload error', exc)
+
+        session.close()
 
     def _do_upload_part(self):
         while True:
