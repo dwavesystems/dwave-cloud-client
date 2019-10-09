@@ -201,7 +201,7 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'endpoint/problems/': ''})
+                'problems/': ''})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
@@ -222,10 +222,10 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'endpoint/problems/': '[%s]' % complete_no_answer_reply(
+                'problems/': '[%s]' % complete_no_answer_reply(
                     '123', 'abc123')})
             session.get = lambda a: choose_reply(a, {
-                'endpoint/problems/123/': complete_reply(
+                'problems/123/': complete_reply(
                     '123', 'abc123')})
             return session
 
@@ -246,7 +246,7 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'endpoint/problems/': '[%s]' % error_reply(
+                'problems/': '[%s]' % error_reply(
                     '123', 'abc123', 'An error message')})
             return session
 
@@ -268,7 +268,7 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'endpoint/problems/': '[%s]' % immediate_error_reply(
+                'problems/': '[%s]' % immediate_error_reply(
                     400, "Missing parameter 'num_reads' in problem JSON")})
             return session
 
@@ -290,7 +290,7 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'endpoint/problems/': '[%s]' % cancel_reply('123', 'abc123')})
+                'problems/': '[%s]' % cancel_reply('123', 'abc123')})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
@@ -314,13 +314,13 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'endpoint/problems/': '[%s]' % continue_reply(
+                'problems/': '[%s]' % continue_reply(
                     '123', 'abc123', eta_min=eta_min, eta_max=eta_max, now=now)
             }, date=now)
             session.get = lambda a: choose_reply(a, {
-                'endpoint/problems/?id=123': '[%s]' % complete_no_answer_reply(
+                'problems/?id=123': '[%s]' % complete_no_answer_reply(
                     '123', 'abc123'),
-                'endpoint/problems/123/': complete_reply(
+                'problems/123/': complete_reply(
                     '123', 'abc123')
             }, date=now)
             return session
@@ -346,10 +346,10 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'endpoint/problems/': '[%s]' % continue_reply(
+                'problems/': '[%s]' % continue_reply(
                     '123', 'abc123')})
             session.get = lambda a: choose_reply(a, {
-                'endpoint/problems/?id=123': '[%s]' % error_reply(
+                'problems/?id=123': '[%s]' % error_reply(
                     '123', 'abc123', "error message")})
             return session
 
@@ -376,31 +376,31 @@ class MockSubmission(_QueryTest):
                 state['count'] += 1
                 if state['count'] < 2:
                     return choose_reply(path, {
-                        'endpoint/problems/?id=1': '[{}]'.format(continue_reply('1', 'abc123')),
-                        'endpoint/problems/?id=2': '[{}]'.format(continue_reply('2', 'abc123')),
-                        'endpoint/problems/1/': continue_reply('1', 'abc123'),
-                        'endpoint/problems/2/': continue_reply('2', 'abc123'),
-                        'endpoint/problems/?id=1,2': '[{},{}]'.format(continue_reply('1', 'abc123'),
+                        'problems/?id=1': '[{}]'.format(continue_reply('1', 'abc123')),
+                        'problems/?id=2': '[{}]'.format(continue_reply('2', 'abc123')),
+                        'problems/1/': continue_reply('1', 'abc123'),
+                        'problems/2/': continue_reply('2', 'abc123'),
+                        'problems/?id=1,2': '[{},{}]'.format(continue_reply('1', 'abc123'),
                                                                       continue_reply('2', 'abc123')),
-                        'endpoint/problems/?id=2,1': '[{},{}]'.format(continue_reply('2', 'abc123'),
+                        'problems/?id=2,1': '[{},{}]'.format(continue_reply('2', 'abc123'),
                                                                       continue_reply('1', 'abc123'))
                     })
                 else:
                     return choose_reply(path, {
-                        'endpoint/problems/?id=1': '[{}]'.format(error_reply('1', 'abc123', 'error')),
-                        'endpoint/problems/?id=2': '[{}]'.format(complete_no_answer_reply('2', 'abc123')),
-                        'endpoint/problems/1/': error_reply('1', 'abc123', 'error'),
-                        'endpoint/problems/2/': complete_reply('2', 'abc123'),
-                        'endpoint/problems/?id=1,2': '[{},{}]'.format(error_reply('1', 'abc123', 'error'),
+                        'problems/?id=1': '[{}]'.format(error_reply('1', 'abc123', 'error')),
+                        'problems/?id=2': '[{}]'.format(complete_no_answer_reply('2', 'abc123')),
+                        'problems/1/': error_reply('1', 'abc123', 'error'),
+                        'problems/2/': complete_reply('2', 'abc123'),
+                        'problems/?id=1,2': '[{},{}]'.format(error_reply('1', 'abc123', 'error'),
                                                                       complete_no_answer_reply('2', 'abc123')),
-                        'endpoint/problems/?id=2,1': '[{},{}]'.format(complete_no_answer_reply('2', 'abc123'),
+                        'problems/?id=2,1': '[{},{}]'.format(complete_no_answer_reply('2', 'abc123'),
                                                                       error_reply('1', 'abc123', 'error'))
                     })
 
             def accept_problems_with_continue_reply(path, body, ids=iter('12')):
                 problems = json.loads(body)
                 return choose_reply(path, {
-                    'endpoint/problems/': json.dumps(
+                    'problems/': json.dumps(
                         [json.loads(continue_reply(next(ids), 'abc123')) for _ in problems])
                 })
 
@@ -433,7 +433,7 @@ class MockSubmission(_QueryTest):
 
             # on submit, return status pending
             session.post = lambda path, _: choose_reply(path, {
-                'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123')
+                'problems/': '[%s]' % continue_reply('123', 'abc123')
             })
 
             # on first and second status poll, return pending
@@ -442,13 +442,13 @@ class MockSubmission(_QueryTest):
                 state['count'] += 1
                 if state['count'] < 3:
                     return choose_reply(path, {
-                        'endpoint/problems/?id=123': '[%s]' % continue_reply('123', 'abc123'),
-                        'endpoint/problems/123/': continue_reply('123', 'abc123')
+                        'problems/?id=123': '[%s]' % continue_reply('123', 'abc123'),
+                        'problems/123/': continue_reply('123', 'abc123')
                     })
                 else:
                     return choose_reply(path, {
-                        'endpoint/problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
-                        'endpoint/problems/123/': complete_reply('123', 'abc123')
+                        'problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
+                        'problems/123/': complete_reply('123', 'abc123')
                     })
 
             session.get = continue_then_complete
@@ -477,13 +477,13 @@ class MockSubmission(_QueryTest):
             eta_min, eta_max = datetime_in_future(10), datetime_in_future(30)
             session = mock.Mock()
             session.post = lambda path, _: choose_reply(path, {
-                'endpoint/problems/': '[%s]' % continue_reply(
+                'problems/': '[%s]' % continue_reply(
                     '1', 'abc123', eta_min=eta_min, eta_max=eta_max, now=now)
             }, date=now)
             session.get = lambda path: choose_reply(path, {
-                'endpoint/problems/?id=1': '[%s]' % complete_no_answer_reply(
+                'problems/?id=1': '[%s]' % complete_no_answer_reply(
                     '1', 'abc123'),
-                'endpoint/problems/1/': complete_reply(
+                'problems/1/': complete_reply(
                     '1', 'abc123')
             }, date=now)
             return session
@@ -509,11 +509,11 @@ class MockSubmission(_QueryTest):
             now = datetime_in_future(0)
             session = mock.Mock()
             session.post = lambda path, _: choose_reply(path, {
-                'endpoint/problems/': '[%s]' % continue_reply('1', 'abc123')
+                'problems/': '[%s]' % continue_reply('1', 'abc123')
             }, date=now)
             session.get = lambda path: choose_reply(path, {
-                'endpoint/problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
-                'endpoint/problems/1/': complete_reply('1', 'abc123')
+                'problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
+                'problems/1/': complete_reply('1', 'abc123')
             }, date=now)
             return session
 
@@ -539,11 +539,11 @@ class MockSubmission(_QueryTest):
             badnow = datetime_in_future(100)
             session = mock.Mock()
             session.post = lambda path, _: choose_reply(path, {
-                'endpoint/problems/': '[%s]' % continue_reply('1', 'abc123')
+                'problems/': '[%s]' % continue_reply('1', 'abc123')
             }, date=badnow)
             session.get = lambda path: choose_reply(path, {
-                'endpoint/problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
-                'endpoint/problems/1/': complete_reply('1', 'abc123')
+                'problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
+                'problems/1/': complete_reply('1', 'abc123')
             }, date=badnow)
             return session
 
@@ -568,7 +568,7 @@ class MockSubmission(_QueryTest):
 
             # on submit, return status pending
             session.post = lambda path, _: choose_reply(path, {
-                'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123')
+                'problems/': '[%s]' % continue_reply('123', 'abc123')
             })
 
             # on first and second status poll, fail with 503 and 504
@@ -578,16 +578,16 @@ class MockSubmission(_QueryTest):
                 state['count'] += 1
                 if state['count'] < 3:
                     return choose_reply(path, replies={
-                        'endpoint/problems/?id=123': '[%s]' % continue_reply('123', 'abc123'),
-                        'endpoint/problems/123/': continue_reply('123', 'abc123')
+                        'problems/?id=123': '[%s]' % continue_reply('123', 'abc123'),
+                        'problems/123/': continue_reply('123', 'abc123')
                     }, statuses={
-                        'endpoint/problems/?id=123': statuses,
-                        'endpoint/problems/123/': statuses
+                        'problems/?id=123': statuses,
+                        'problems/123/': statuses
                     })
                 else:
                     return choose_reply(path, {
-                        'endpoint/problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
-                        'endpoint/problems/123/': complete_reply('123', 'abc123')
+                        'problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
+                        'problems/123/': complete_reply('123', 'abc123')
                     })
 
             session.get = continue_then_complete
@@ -638,7 +638,7 @@ class MockCancel(unittest.TestCase):
             session = mock.Mock()
             reply_body = '[%s]' % continue_reply(submission_id, 'solver')
             session.get = lambda a: choose_reply(a, {
-                'endpoint/problems/?id={}'.format(submission_id): reply_body})
+                'problems/?id={}'.format(submission_id): reply_body})
             session.delete = DeleteEvent.handle
             return session
 
@@ -653,10 +653,10 @@ class MockCancel(unittest.TestCase):
                     future.samples
                     self.fail()
                 except DeleteEvent as event:
-                    if event.url == 'endpoint/problems/':
+                    if event.url == 'problems/':
                         self.assertEqual(event.body, '["{}"]'.format(submission_id))
                     else:
-                        self.assertEqual(event.url, 'endpoint/problems/{}/'.format(submission_id))
+                        self.assertEqual(event.url, 'problems/{}/'.format(submission_id))
 
     def test_cancel_without_id(self):
         """Make sure the cancel method submits to the right endpoint.
@@ -673,11 +673,11 @@ class MockCancel(unittest.TestCase):
 
             session = mock.Mock()
             session.get = lambda a: choose_reply(a, {
-                'endpoint/problems/?id={}'.format(submission_id): reply_body})
+                'problems/?id={}'.format(submission_id): reply_body})
 
             def post(a, _):
                 release_reply.wait()
-                return choose_reply(a, {'endpoint/problems/': reply_body})
+                return choose_reply(a, {'problems/': reply_body})
 
             session.post = post
             session.delete = DeleteEvent.handle
@@ -698,7 +698,7 @@ class MockCancel(unittest.TestCase):
                     future.samples
                     self.fail()
                 except DeleteEvent as event:
-                    if event.url == 'endpoint/problems/':
+                    if event.url == 'problems/':
                         self.assertEqual(event.body, '["{}"]'.format(submission_id))
                     else:
-                        self.assertEqual(event.url, 'endpoint/problems/{}/'.format(submission_id))
+                        self.assertEqual(event.url, 'problems/{}/'.format(submission_id))

@@ -82,7 +82,7 @@ class TestUnstructuredSolver(unittest.TestCase):
                 # direct bqm sampling
                 ss = dimod.ExactSolver().sample(bqm)
                 session.post = lambda path, _: choose_reply(
-                    path, {'endpoint/problems/': complete_reply(ss)})
+                    path, {'problems/': complete_reply(ss)})
 
                 fut = solver.sample_bqm(bqm)
                 numpy.testing.assert_array_equal(fut.sampleset, ss)
@@ -94,7 +94,7 @@ class TestUnstructuredSolver(unittest.TestCase):
                 lin, quad, _ = bqm.to_ising()
                 ss = dimod.ExactSolver().sample_ising(lin, quad)
                 session.post = lambda path, _: choose_reply(
-                    path, {'endpoint/problems/': complete_reply(ss)})
+                    path, {'problems/': complete_reply(ss)})
 
                 fut = solver.sample_ising(lin, quad)
                 numpy.testing.assert_array_equal(fut.sampleset, ss)
@@ -106,7 +106,7 @@ class TestUnstructuredSolver(unittest.TestCase):
                 qubo, _ = bqm.to_qubo()
                 ss = dimod.ExactSolver().sample_qubo(qubo)
                 session.post = lambda path, _: choose_reply(
-                    path, {'endpoint/problems/': complete_reply(ss)})
+                    path, {'problems/': complete_reply(ss)})
 
                 fut = solver.sample_qubo(qubo)
                 numpy.testing.assert_array_equal(fut.sampleset, ss)
