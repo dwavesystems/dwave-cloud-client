@@ -47,7 +47,6 @@ import time
 import json
 import logging
 import threading
-import posixpath
 import requests
 import warnings
 import operator
@@ -65,8 +64,8 @@ from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config, parse_float
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.utils import (
-    datetime_to_timestamp, utcnow, TimeoutingHTTPAdapter, user_agent,
-    epochnow, cached)
+    TimeoutingHTTPAdapter, BaseUrlSession, user_agent,
+    datetime_to_timestamp, utcnow, epochnow, cached)
 
 __all__ = ['Client']
 
@@ -448,7 +447,7 @@ class Client(object):
         create and use an isolated session.
         """
 
-        session = requests.Session()
+        session = BaseUrlSession(base_url=self.endpoint)
         session.mount('http://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
         session.mount('https://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
         session.headers.update({'X-Auth-Token': self.token,
@@ -557,10 +556,10 @@ class Client(object):
     def _fetch_solvers(self, name=None):
         if name is not None:
             logger.debug("Fetching definition of a solver with name=%r", name)
-            url = posixpath.join(self.endpoint, 'solvers/remote/{}/'.format(name))
+            url = 'solvers/remote/{}/'.format(name)
         else:
             logger.debug("Fetching definitions of all available solvers")
-            url = posixpath.join(self.endpoint, 'solvers/remote/')
+            url = 'solvers/remote/'
 
         try:
             response = self.session.get(url)
@@ -1044,7 +1043,7 @@ class Client(object):
                 body = '[' + ','.join(mess.body for mess in ready_problems) + ']'
                 try:
                     try:
-                        response = session.post(posixpath.join(self.endpoint, 'problems/'), body)
+                        response = session.post('problems/', body)
                         localtime_of_response = epochnow()
                     except requests.exceptions.Timeout:
                         raise RequestTimeout
@@ -1204,7 +1203,7 @@ class Client(object):
                     body = [item[0] for item in item_list]
 
                     try:
-                        session.delete(posixpath.join(self.endpoint, 'problems/'), json=body)
+                        session.delete('problems/', json=body)
                     except requests.exceptions.Timeout:
                         raise RequestTimeout
 
@@ -1340,7 +1339,7 @@ class Client(object):
                     logger.trace("Executing poll API request")
 
                     try:
-                        response = session.get(posixpath.join(self.endpoint, query_string))
+                        response = session.get(query_string)
                     except requests.exceptions.Timeout:
                         raise RequestTimeout
 
@@ -1419,7 +1418,7 @@ class Client(object):
                 query_string = 'problems/{}/'.format(future.id)
                 try:
                     try:
-                        response = session.get(posixpath.join(self.endpoint, query_string))
+                        response = session.get(query_string)
                     except requests.exceptions.Timeout:
                         raise RequestTimeout
 
@@ -1472,9 +1471,7 @@ class Client(object):
                 logger.debug("Initiating problem multipart upload (size=%r)", size)
                 path = "/bqm/multipart"
                 try:
-                    response = session.post(
-                        posixpath.join(self.endpoint, path),
-                        json=dict(size=size))
+                    response = session.post(path, json=dict(size=size))
                 except requests.exceptions.Timeout:
                     raise RequestTimeout
 
