@@ -148,7 +148,7 @@ class Client(object):
     # Number of worker threads for each problem processing task
     _SUBMISSION_THREAD_COUNT = 5
     _UPLOAD_PROBLEM_THREAD_COUNT = 1
-    _UPLOAD_PART_THREAD_COUNT = 5
+    _UPLOAD_PART_THREAD_COUNT = 1
     _CANCEL_THREAD_COUNT = 1
     _POLL_THREAD_COUNT = 2
     _LOAD_THREAD_COUNT = 5
@@ -372,26 +372,20 @@ class Client(object):
         else:
             raise ValueError("Expecting a features dictionary or a string name for 'solver'")
 
+        # Store connection/session parameters
         self.endpoint = endpoint
-        self.token = token
         self.default_solver = solver_def
+
+        self.token = token
         self.request_timeout = parse_float(request_timeout)
         self.polling_timeout = parse_float(polling_timeout)
 
-        # Create a :mod:`requests` session. `requests` will manage our url parsing, https, etc.
-        self.session = requests.Session()
-        self.session.mount('http://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
-        self.session.mount('https://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
-        self.session.headers.update({'X-Auth-Token': self.token,
-                                     'User-Agent': user_agent(__packagename__, __version__)})
-        self.session.proxies = {'http': proxy, 'https': proxy}
-        if permissive_ssl:
-            self.session.verify = False
-        if connection_close:
-            self.session.headers.update({'Connection': 'close'})
+        self.proxy = proxy
+        self.permissive_ssl = permissive_ssl
+        self.connection_close = connection_close
 
-        # Debug-log headers
-        logger.debug("session.headers=%r", self.session.headers)
+        # Create session for main thread only
+        self.session = self.create_session()
 
         # Build the problem submission queue, start its workers
         self._submission_queue = queue.Queue()
@@ -446,6 +440,29 @@ class Client(object):
             worker.daemon = True
             worker.start()
             self._upload_part_workers.append(worker)
+
+    def create_session(self):
+        """Create a new requests session based on client's (self) params.
+
+        Note: since `requests.Session` is NOT thread-safe, every thread should
+        create and use an isolated session.
+        """
+
+        session = requests.Session()
+        session.mount('http://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
+        session.mount('https://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
+        session.headers.update({'X-Auth-Token': self.token,
+                                'User-Agent': user_agent(__packagename__, __version__)})
+        session.proxies = {'http': self.proxy, 'https': self.proxy}
+        if self.permissive_ssl:
+            session.verify = False
+        if self.connection_close:
+            session.headers.update({'Connection': 'close'})
+
+        # Debug-log headers
+        logger.debug("session.headers=%r", session.headers)
+
+        return session
 
     def close(self):
         """Perform a clean shutdown.
@@ -504,7 +521,7 @@ class Client(object):
                             self._upload_problem_workers, self._upload_part_workers):
             worker.join()
 
-        # Close the requests session
+        # Close the main thread's session
         self.session.close()
 
     def __enter__(self):
@@ -1002,6 +1019,7 @@ class Client(object):
         Note:
             This method is always run inside of a daemon thread.
         """
+        session = self.create_session()
         try:
             while True:
                 # Pull as many problems as we can, block on the first one,
@@ -1026,7 +1044,7 @@ class Client(object):
                 body = '[' + ','.join(mess.body for mess in ready_problems) + ']'
                 try:
                     try:
-                        response = self.session.post(posixpath.join(self.endpoint, 'problems/'), body)
+                        response = session.post(posixpath.join(self.endpoint, 'problems/'), body)
                         localtime_of_response = epochnow()
                     except requests.exceptions.Timeout:
                         raise RequestTimeout
@@ -1160,6 +1178,7 @@ class Client(object):
         Note:
             This method is always run inside of a daemon thread.
         """
+        session = self.create_session()
         try:
             while True:
                 # Pull as many problems as we can, block when none are available.
@@ -1182,7 +1201,7 @@ class Client(object):
                     body = [item[0] for item in item_list]
 
                     try:
-                        self.session.delete(posixpath.join(self.endpoint, 'problems/'), json=body)
+                        session.delete(posixpath.join(self.endpoint, 'problems/'), json=body)
                     except requests.exceptions.Timeout:
                         raise RequestTimeout
 
@@ -1245,6 +1264,7 @@ class Client(object):
         Note:
             This method is always run inside of a daemon thread.
         """
+        session = self.create_session()
         try:
             # grouped futures (all scheduled within _POLL_GROUP_TIMEFRAME)
             frame_futures = {}
@@ -1314,7 +1334,7 @@ class Client(object):
                     logger.trace("Executing poll API request")
 
                     try:
-                        response = self.session.get(posixpath.join(self.endpoint, query_string))
+                        response = session.get(posixpath.join(self.endpoint, query_string))
                     except requests.exceptions.Timeout:
                         raise RequestTimeout
 
@@ -1376,6 +1396,7 @@ class Client(object):
         Note:
             This method is always run inside of a daemon thread.
         """
+        session = self.create_session()
         try:
             while True:
                 # Select a problem
@@ -1389,7 +1410,7 @@ class Client(object):
                 query_string = 'problems/{}/'.format(future.id)
                 try:
                     try:
-                        response = self.session.get(posixpath.join(self.endpoint, query_string))
+                        response = session.get(posixpath.join(self.endpoint, query_string))
                     except requests.exceptions.Timeout:
                         raise RequestTimeout
 
@@ -1422,6 +1443,7 @@ class Client(object):
         self._upload_problem_queue.put(self._Problem(data, future))
 
     def _do_upload_problem(self):
+        session = self.create_session()
         while True:
             try:
                 # fetch problem definition to upload
@@ -1438,7 +1460,7 @@ class Client(object):
                 logger.debug("Initiating problem multipart upload (size=%r)", size)
                 path = "/bqm/multipart"
                 try:
-                    response = self.session.post(
+                    response = session.post(
                         posixpath.join(self.endpoint, path),
                         json=dict(size=size))
                 except requests.exceptions.Timeout:
