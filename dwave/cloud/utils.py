@@ -22,9 +22,11 @@ import itertools
 
 try:
     import collections.abc as abc
+    from urllib.parse import urljoin
 except ImportError:     # pragma: no cover
     # python 2
     import collections as abc
+    from urlparse import urljoin
 
 try:
     perf_counter = time.perf_counter
@@ -276,6 +278,32 @@ class TimeoutingHTTPAdapter(requests.adapters.HTTPAdapter):
         # can't use setdefault because caller always sets timeout kwarg
         kwargs['timeout'] = self.timeout
         return super(TimeoutingHTTPAdapter, self).send(*args, **kwargs)
+
+
+# Note: BaseUrlSession is taken from https://github.com/requests/toolbelt. This
+# simple extension didn't warrant a new dependency. If we later decide to use
+# additional features from `requests-toolbelt`, remove it from here.
+
+class BaseUrlSession(requests.Session):
+    """A Session with a URL that all requests will use as a base."""
+
+    base_url = None
+
+    def __init__(self, base_url=None):
+        if base_url:
+            self.base_url = base_url
+        super(BaseUrlSession, self).__init__()
+
+    def request(self, method, url, *args, **kwargs):
+        """Send the request after generating the complete URL."""
+        url = self.create_url(url)
+        return super(BaseUrlSession, self).request(
+            method, url, *args, **kwargs
+        )
+
+    def create_url(self, url):
+        """Create the URL based off this partial path."""
+        return urljoin(self.base_url, url)
 
 
 def user_agent(name, version):
