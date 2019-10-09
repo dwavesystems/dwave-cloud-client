@@ -190,132 +190,192 @@ class MockSubmission(_QueryTest):
 
     def test_submit_null_reply(self):
         """Get an error when the server's response is incomplete."""
-        with Client('endpoint', 'token') as client:
-            client.session = mock.Mock()
-            client.session.post = lambda a, _: choose_reply(a, {'endpoint/problems/': ''})
-            solver = Solver(client, solver_data('abc123'))
 
-            # Build a problem
-            linear = {index: 1 for index in solver.nodes}
-            quad = {key: -1 for key in solver.undirected_edges}
-            results = solver.sample_ising(linear, quad, num_reads=100)
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda a, _: choose_reply(a, {
+                'endpoint/problems/': ''})
+            return session
 
-            with self.assertRaises(ValueError):
-                results.samples
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+
+                # Build a problem
+                linear = {index: 1 for index in solver.nodes}
+                quad = {key: -1 for key in solver.undirected_edges}
+                results = solver.sample_ising(linear, quad, num_reads=100)
+
+                with self.assertRaises(ValueError):
+                    results.samples
 
     def test_submit_ok_reply(self):
         """Handle a normal query and response."""
-        with Client('endpoint', 'token') as client:
-            client.session = mock.Mock()
-            client.session.post = lambda a, _: choose_reply(a, {
-                'endpoint/problems/': '[%s]' % complete_no_answer_reply('123', 'abc123')})
-            client.session.get = lambda a: choose_reply(a, {'endpoint/problems/123/': complete_reply('123', 'abc123')})
-            solver = Solver(client, solver_data('abc123'))
 
-            # Build a problem
-            linear = {index: 1 for index in solver.nodes}
-            quad = {key: -1 for key in solver.undirected_edges}
-            results = solver.sample_ising(linear, quad, num_reads=100)
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda a, _: choose_reply(a, {
+                'endpoint/problems/': '[%s]' % complete_no_answer_reply(
+                    '123', 'abc123')})
+            session.get = lambda a: choose_reply(a, {
+                'endpoint/problems/123/': complete_reply(
+                    '123', 'abc123')})
+            return session
 
-            self._check(results, linear, quad, 100)
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+
+                # Build a problem
+                linear = {index: 1 for index in solver.nodes}
+                quad = {key: -1 for key in solver.undirected_edges}
+                results = solver.sample_ising(linear, quad, num_reads=100)
+
+                self._check(results, linear, quad, 100)
 
     def test_submit_error_reply(self):
         """Handle an error on problem submission."""
-        error_body = 'An error message'
-        with Client('endpoint', 'token') as client:
-            client.session = mock.Mock()
-            client.session.post = lambda a, _: choose_reply(a, {
-                'endpoint/problems/': '[%s]' % error_reply('123', 'abc123', error_body)})
-            solver = Solver(client, solver_data('abc123'))
 
-            # Build a problem
-            linear = {index: 1 for index in solver.nodes}
-            quad = {key: -1 for key in solver.undirected_edges}
-            results = solver.sample_ising(linear, quad, num_reads=100)
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda a, _: choose_reply(a, {
+                'endpoint/problems/': '[%s]' % error_reply(
+                    '123', 'abc123', 'An error message')})
+            return session
 
-            with self.assertRaises(SolverFailureError):
-                results.samples
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+
+                # Build a problem
+                linear = {index: 1 for index in solver.nodes}
+                quad = {key: -1 for key in solver.undirected_edges}
+                results = solver.sample_ising(linear, quad, num_reads=100)
+
+                with self.assertRaises(SolverFailureError):
+                    results.samples
 
     def test_submit_immediate_error_reply(self):
         """Handle an (obvious) error on problem submission."""
-        with Client('endpoint', 'token') as client:
-            client.session = mock.Mock()
-            client.session.post = lambda a, _: choose_reply(a, {
-                'endpoint/problems/': '[%s]' % immediate_error_reply(400, "Missing parameter 'num_reads' in problem JSON")})
-            solver = Solver(client, solver_data('abc123'))
 
-            linear, quad = generate_random_ising_problem(solver)
-            results = solver.sample_ising(linear, quad)
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda a, _: choose_reply(a, {
+                'endpoint/problems/': '[%s]' % immediate_error_reply(
+                    400, "Missing parameter 'num_reads' in problem JSON")})
+            return session
 
-            with self.assertRaises(SolverFailureError):
-                results.samples
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+
+                linear, quad = generate_random_ising_problem(solver)
+                results = solver.sample_ising(linear, quad)
+
+                with self.assertRaises(SolverFailureError):
+                    results.samples
 
     def test_submit_cancel_reply(self):
         """Handle a response for a canceled job."""
-        with Client('endpoint', 'token') as client:
-            client.session = mock.Mock()
-            client.session.post = lambda a, _: choose_reply(a, {'endpoint/problems/': '[%s]' % cancel_reply('123', 'abc123')})
-            solver = Solver(client, solver_data('abc123'))
 
-            # Build a problem
-            linear = {index: 1 for index in solver.nodes}
-            quad = {key: -1 for key in solver.undirected_edges}
-            results = solver.sample_ising(linear, quad, num_reads=100)
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda a, _: choose_reply(a, {
+                'endpoint/problems/': '[%s]' % cancel_reply('123', 'abc123')})
+            return session
 
-            with self.assertRaises(CanceledFutureError):
-                results.samples
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+
+                # Build a problem
+                linear = {index: 1 for index in solver.nodes}
+                quad = {key: -1 for key in solver.undirected_edges}
+                results = solver.sample_ising(linear, quad, num_reads=100)
+
+                with self.assertRaises(CanceledFutureError):
+                    results.samples
 
     def test_submit_continue_then_ok_reply(self):
         """Handle polling for a complete problem."""
-        with Client('endpoint', 'token') as client:
-            now = datetime_in_future(0)
-            eta_min, eta_max = datetime_in_future(10), datetime_in_future(30)
-            client.session = mock.Mock()
-            client.session.post = lambda a, _: choose_reply(a, {
-                'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123', eta_min=eta_min, eta_max=eta_max, now=now)
+
+        now = datetime_in_future(0)
+        eta_min, eta_max = datetime_in_future(10), datetime_in_future(30)
+
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda a, _: choose_reply(a, {
+                'endpoint/problems/': '[%s]' % continue_reply(
+                    '123', 'abc123', eta_min=eta_min, eta_max=eta_max, now=now)
             }, date=now)
-            client.session.get = lambda a: choose_reply(a, {
-                'endpoint/problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
-                'endpoint/problems/123/': complete_reply('123', 'abc123')
+            session.get = lambda a: choose_reply(a, {
+                'endpoint/problems/?id=123': '[%s]' % complete_no_answer_reply(
+                    '123', 'abc123'),
+                'endpoint/problems/123/': complete_reply(
+                    '123', 'abc123')
             }, date=now)
-            solver = Solver(client, solver_data('abc123'))
+            return session
 
-            # Build a problem
-            linear = {index: 1 for index in solver.nodes}
-            quad = {key: -1 for key in solver.undirected_edges}
-            results = solver.sample_ising(linear, quad, num_reads=100)
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
 
-            self._check(results, linear, quad, 100)
+                # Build a problem
+                linear = {index: 1 for index in solver.nodes}
+                quad = {key: -1 for key in solver.undirected_edges}
+                results = solver.sample_ising(linear, quad, num_reads=100)
 
-            # test future has eta_min and eta_max parsed correctly
-            self.assertEqual(results.eta_min, eta_min)
-            self.assertEqual(results.eta_max, eta_max)
+                self._check(results, linear, quad, 100)
+
+                # test future has eta_min and eta_max parsed correctly
+                self.assertEqual(results.eta_min, eta_min)
+                self.assertEqual(results.eta_max, eta_max)
 
     def test_submit_continue_then_error_reply(self):
         """Handle polling for an error message."""
-        with Client('endpoint', 'token') as client:
-            client.session = mock.Mock()
-            client.session.post = lambda a, _: choose_reply(a, {'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123')})
-            client.session.get = lambda a: choose_reply(a, {
-                'endpoint/problems/?id=123': '[%s]' % error_reply('123', 'abc123', "error message")})
-            solver = Solver(client, solver_data('abc123'))
 
-            # Build a problem
-            linear = {index: 1 for index in solver.nodes}
-            quad = {key: -1 for key in solver.undirected_edges}
-            results = solver.sample_ising(linear, quad, num_reads=100)
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda a, _: choose_reply(a, {
+                'endpoint/problems/': '[%s]' % continue_reply(
+                    '123', 'abc123')})
+            session.get = lambda a: choose_reply(a, {
+                'endpoint/problems/?id=123': '[%s]' % error_reply(
+                    '123', 'abc123', "error message")})
+            return session
 
-            with self.assertRaises(SolverFailureError):
-                self._check(results, linear, quad, 100)
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
 
-    # Reduce the number of poll and submission threads so that the system can be tested
-    @mock.patch.object(Client, "_POLL_THREAD_COUNT", 1)
-    @mock.patch.object(Client, "_SUBMISSION_THREAD_COUNT", 1)
+                # Build a problem
+                linear = {index: 1 for index in solver.nodes}
+                quad = {key: -1 for key in solver.undirected_edges}
+                results = solver.sample_ising(linear, quad, num_reads=100)
+
+                with self.assertRaises(SolverFailureError):
+                    self._check(results, linear, quad, 100)
+
     def test_submit_continue_then_ok_and_error_reply(self):
         """Handle polling for the status of multiple problems."""
 
-        with Client('endpoint', 'token') as client:
-            client.session = mock.Mock()
+        # we need a "global session", because mocked responses are stateful
+        def global_mock_session():
+            session = mock.Mock()
 
             # on first status poll, return pending for both problems
             # on second status poll, return error for first problem and complete for second
@@ -344,8 +404,6 @@ class MockSubmission(_QueryTest):
                                                                       error_reply('1', 'abc123', 'error'))
                     })
 
-            client.session.get = continue_then_complete
-
             def accept_problems_with_continue_reply(path, body, ids=iter('12')):
                 problems = json.loads(body)
                 return choose_reply(path, {
@@ -353,32 +411,39 @@ class MockSubmission(_QueryTest):
                         [json.loads(continue_reply(next(ids), 'abc123')) for _ in problems])
                 })
 
-            client.session.post = accept_problems_with_continue_reply
+            session.get = continue_then_complete
+            session.post = accept_problems_with_continue_reply
 
-            solver = Solver(client, solver_data('abc123'))
+            return session
 
-            linear = {index: 1 for index in solver.nodes}
-            quad = {key: -1 for key in solver.undirected_edges}
+        session = global_mock_session()
 
-            results1 = solver.sample_ising(linear, quad, num_reads=100)
-            results2 = solver.sample_ising(linear, quad, num_reads=100)
+        with mock.patch.object(Client, 'create_session', lambda self: session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
 
-            with self.assertRaises(SolverFailureError):
-                self._check(results1, linear, quad, 100)
-            self._check(results2, linear, quad, 100)
+                linear = {index: 1 for index in solver.nodes}
+                quad = {key: -1 for key in solver.undirected_edges}
 
-    # Reduce the number of poll and submission threads so that the system can be tested
-    @mock.patch.object(Client, "_POLL_THREAD_COUNT", 1)
-    @mock.patch.object(Client, "_SUBMISSION_THREAD_COUNT", 1)
+                results1 = solver.sample_ising(linear, quad, num_reads=100)
+                results2 = solver.sample_ising(linear, quad, num_reads=100)
+
+                with self.assertRaises(SolverFailureError):
+                    self._check(results1, linear, quad, 100)
+                self._check(results2, linear, quad, 100)
+
     def test_exponential_backoff_polling(self):
         "After each poll, back-off should double"
 
-        with Client('endpoint', 'token') as client:
-            client.session = mock.Mock()
+        # we need a "global session", because mocked responses are stateful
+        def global_mock_session():
+            session = mock.Mock()
+
             # on submit, return status pending
-            client.session.post = lambda path, _: choose_reply(path, {
+            session.post = lambda path, _: choose_reply(path, {
                 'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123')
             })
+
             # on first and second status poll, return pending
             # on third status poll, return completed
             def continue_then_complete(path, state={'count': 0}):
@@ -394,108 +459,126 @@ class MockSubmission(_QueryTest):
                         'endpoint/problems/123/': complete_reply('123', 'abc123')
                     })
 
-            client.session.get = continue_then_complete
+            session.get = continue_then_complete
 
-            solver = Solver(client, solver_data('abc123'))
+            return session
 
-            future = solver.sample_qubo({})
-            future.result()
+        session = global_mock_session()
 
-            # after third poll, back-off interval should be 4 x initial back-off
-            self.assertEqual(future._poll_backoff, Client._POLL_BACKOFF_MIN * 2**2)
+        with mock.patch.object(Client, 'create_session', lambda self: session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
 
-    @mock.patch.object(Client, "_POLL_THREAD_COUNT", 1)
-    @mock.patch.object(Client, "_SUBMISSION_THREAD_COUNT", 1)
+                future = solver.sample_qubo({})
+                future.result()
+
+                # after third poll, back-off interval should be 4 x initial back-off
+                self.assertEqual(future._poll_backoff, Client._POLL_BACKOFF_MIN * 2**2)
+
     def test_eta_min_is_ignored_on_first_poll(self):
         "eta_min/earliest_estimated_completion should not be used anymore"
 
-        with Client('endpoint', 'token') as client:
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
             now = datetime_in_future(0)
             eta_min, eta_max = datetime_in_future(10), datetime_in_future(30)
-            client.session = mock.Mock()
-            client.session.post = lambda path, _: choose_reply(path, {
-                'endpoint/problems/': '[%s]' % continue_reply('1', 'abc123', eta_min=eta_min, eta_max=eta_max, now=now)
+            session = mock.Mock()
+            session.post = lambda path, _: choose_reply(path, {
+                'endpoint/problems/': '[%s]' % continue_reply(
+                    '1', 'abc123', eta_min=eta_min, eta_max=eta_max, now=now)
             }, date=now)
-            client.session.get = lambda path: choose_reply(path, {
-                'endpoint/problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
-                'endpoint/problems/1/': complete_reply('1', 'abc123')
+            session.get = lambda path: choose_reply(path, {
+                'endpoint/problems/?id=1': '[%s]' % complete_no_answer_reply(
+                    '1', 'abc123'),
+                'endpoint/problems/1/': complete_reply(
+                    '1', 'abc123')
             }, date=now)
+            return session
 
-            solver = Solver(client, solver_data('abc123'))
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
 
-            def assert_no_delay(s):
-                s and self.assertTrue(
-                    abs(s - client._POLL_BACKOFF_MIN) < client._POLL_BACKOFF_MIN / 10.0)
+                def assert_no_delay(s):
+                    s and self.assertTrue(
+                        abs(s - client._POLL_BACKOFF_MIN) < client._POLL_BACKOFF_MIN / 10.0)
 
-            with mock.patch('time.sleep', assert_no_delay):
-                future = solver.sample_qubo({})
-                future.result()
+                with mock.patch('time.sleep', assert_no_delay):
+                    future = solver.sample_qubo({})
+                    future.result()
 
-    @mock.patch.object(Client, "_POLL_THREAD_COUNT", 1)
-    @mock.patch.object(Client, "_SUBMISSION_THREAD_COUNT", 1)
     def test_immediate_polling_without_eta_min(self):
         "First poll happens with minimal delay if eta_min missing"
 
-        with Client('endpoint', 'token') as client:
+        # each thread can have its instance of a session because
+        # responses are stateless
+        def create_mock_session(client):
             now = datetime_in_future(0)
-            client.session = mock.Mock()
-            client.session.post = lambda path, _: choose_reply(path, {
+            session = mock.Mock()
+            session.post = lambda path, _: choose_reply(path, {
                 'endpoint/problems/': '[%s]' % continue_reply('1', 'abc123')
             }, date=now)
-            client.session.get = lambda path: choose_reply(path, {
+            session.get = lambda path: choose_reply(path, {
                 'endpoint/problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
                 'endpoint/problems/1/': complete_reply('1', 'abc123')
             }, date=now)
+            return session
 
-            solver = Solver(client, solver_data('abc123'))
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
 
-            def assert_no_delay(s):
-                s and self.assertTrue(
-                    abs(s - client._POLL_BACKOFF_MIN) < client._POLL_BACKOFF_MIN / 10.0)
+                def assert_no_delay(s):
+                    s and self.assertTrue(
+                        abs(s - client._POLL_BACKOFF_MIN) < client._POLL_BACKOFF_MIN / 10.0)
 
-            with mock.patch('time.sleep', assert_no_delay):
-                future = solver.sample_qubo({})
-                future.result()
+                with mock.patch('time.sleep', assert_no_delay):
+                    future = solver.sample_qubo({})
+                    future.result()
 
-    @mock.patch.object(Client, "_POLL_THREAD_COUNT", 1)
-    @mock.patch.object(Client, "_SUBMISSION_THREAD_COUNT", 1)
     def test_immediate_polling_with_local_clock_unsynced(self):
         """First poll happens with minimal delay if local clock is way off from
         the remote/server clock."""
 
-        with Client('endpoint', 'token') as client:
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
             badnow = datetime_in_future(100)
-            client.session = mock.Mock()
-            client.session.post = lambda path, _: choose_reply(path, {
+            session = mock.Mock()
+            session.post = lambda path, _: choose_reply(path, {
                 'endpoint/problems/': '[%s]' % continue_reply('1', 'abc123')
             }, date=badnow)
-            client.session.get = lambda path: choose_reply(path, {
+            session.get = lambda path: choose_reply(path, {
                 'endpoint/problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
                 'endpoint/problems/1/': complete_reply('1', 'abc123')
             }, date=badnow)
+            return session
 
-            solver = Solver(client, solver_data('abc123'))
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
 
-            def assert_no_delay(s):
-                s and self.assertTrue(
-                    abs(s - client._POLL_BACKOFF_MIN) < client._POLL_BACKOFF_MIN / 10.0)
+                def assert_no_delay(s):
+                    s and self.assertTrue(
+                        abs(s - client._POLL_BACKOFF_MIN) < client._POLL_BACKOFF_MIN / 10.0)
 
-            with mock.patch('time.sleep', assert_no_delay):
-                future = solver.sample_qubo({})
-                future.result()
+                with mock.patch('time.sleep', assert_no_delay):
+                    future = solver.sample_qubo({})
+                    future.result()
 
-    # Reduce the number of poll and submission threads so that the system can be tested
-    @mock.patch.object(Client, "_POLL_THREAD_COUNT", 1)
-    @mock.patch.object(Client, "_SUBMISSION_THREAD_COUNT", 1)
     def test_polling_recovery_after_5xx(self):
         "Polling shouldn't be aborted on 5xx responses."
 
-        with Client('endpoint', 'token') as client:
-            client.session = mock.Mock()
+        # we need a "global session", because mocked responses are stateful
+        def global_mock_session():
+            session = mock.Mock()
+
             # on submit, return status pending
-            client.session.post = lambda path, _: choose_reply(path, {
+            session.post = lambda path, _: choose_reply(path, {
                 'endpoint/problems/': '[%s]' % continue_reply('123', 'abc123')
             })
+
             # on first and second status poll, fail with 503 and 504
             # on third status poll, return completed
             statuses = iter([503, 504])
@@ -515,15 +598,21 @@ class MockSubmission(_QueryTest):
                         'endpoint/problems/123/': complete_reply('123', 'abc123')
                     })
 
-            client.session.get = continue_then_complete
+            session.get = continue_then_complete
 
-            solver = Solver(client, solver_data('abc123'))
+            return session
 
-            future = solver.sample_qubo({})
-            future.result()
+        session = global_mock_session()
 
-            # after third poll, back-off interval should be 4 x initial back-off
-            self.assertEqual(future._poll_backoff, Client._POLL_BACKOFF_MIN * 2**2)
+        with mock.patch.object(Client, 'create_session', lambda self: session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+
+                future = solver.sample_qubo({})
+                future.result()
+
+                # after third poll, back-off interval should be 4 x initial back-off
+                self.assertEqual(future._poll_backoff, Client._POLL_BACKOFF_MIN * 2**2)
 
 
 class DeleteEvent(Exception):
@@ -550,27 +639,32 @@ class MockCancel(unittest.TestCase):
         When cancel is called after the submission is finished.
         """
         submission_id = 'test-id'
-        reply_body = '[%s]' % continue_reply(submission_id, 'solver')
 
-        with Client('endpoint', 'token') as client:
-            client.session = mock.Mock()
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            reply_body = '[%s]' % continue_reply(submission_id, 'solver')
+            session.get = lambda a: choose_reply(a, {
+                'endpoint/problems/?id={}'.format(submission_id): reply_body})
+            session.delete = DeleteEvent.handle
+            return session
 
-            client.session.get = lambda a: choose_reply(a, {'endpoint/problems/?id={}'.format(submission_id): reply_body})
-            client.session.delete = DeleteEvent.handle
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+                future = solver._retrieve_problem(submission_id)
+                future.cancel()
 
-            solver = Solver(client, solver_data('abc123'))
-            future = solver._retrieve_problem(submission_id)
-            future.cancel()
-
-            try:
-                self.assertTrue(future.id is not None)
-                future.samples
-                self.fail()
-            except DeleteEvent as event:
-                if event.url == 'endpoint/problems/':
-                    self.assertEqual(event.body, '["{}"]'.format(submission_id))
-                else:
-                    self.assertEqual(event.url, 'endpoint/problems/{}/'.format(submission_id))
+                try:
+                    self.assertTrue(future.id is not None)
+                    future.samples
+                    self.fail()
+                except DeleteEvent as event:
+                    if event.url == 'endpoint/problems/':
+                        self.assertEqual(event.body, '["{}"]'.format(submission_id))
+                    else:
+                        self.assertEqual(event.url, 'endpoint/problems/{}/'.format(submission_id))
 
     def test_cancel_without_id(self):
         """Make sure the cancel method submits to the right endpoint.
@@ -578,33 +672,43 @@ class MockCancel(unittest.TestCase):
         When cancel is called before the submission has returned the problem id.
         """
         submission_id = 'test-id'
-        reply_body = '[%s]' % continue_reply(submission_id, 'solver')
-
         release_reply = threading.Event()
 
-        with Client('endpoint', 'token') as client:
-            client.session = mock.Mock()
-            client.session.get = lambda a: choose_reply(a, {'endpoint/problems/?id={}'.format(submission_id): reply_body})
+        # each thread can have its instance of a session because
+        # we use a global lock (event) in the mocked responses
+        def create_mock_session(client):
+            reply_body = '[%s]' % continue_reply(submission_id, 'solver')
+
+            session = mock.Mock()
+            session.get = lambda a: choose_reply(a, {
+                'endpoint/problems/?id={}'.format(submission_id): reply_body})
 
             def post(a, _):
                 release_reply.wait()
                 return choose_reply(a, {'endpoint/problems/': reply_body})
-            client.session.post = post
-            client.session.delete = DeleteEvent.handle
 
-            solver = Solver(client, solver_data('abc123'))
-            # Build a problem
-            linear = {index: 1 for index in solver.nodes}
-            quad = {key: -1 for key in solver.undirected_edges}
-            future = solver.sample_ising(linear, quad)
-            future.cancel()
+            session.post = post
+            session.delete = DeleteEvent.handle
 
-            try:
-                release_reply.set()
-                future.samples
-                self.fail()
-            except DeleteEvent as event:
-                if event.url == 'endpoint/problems/':
-                    self.assertEqual(event.body, '["{}"]'.format(submission_id))
-                else:
-                    self.assertEqual(event.url, 'endpoint/problems/{}/'.format(submission_id))
+            return session
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+
+                # Build a problem
+                linear = {index: 1 for index in solver.nodes}
+                quad = {key: -1 for key in solver.undirected_edges}
+
+                future = solver.sample_ising(linear, quad)
+                future.cancel()
+
+                try:
+                    release_reply.set()
+                    future.samples
+                    self.fail()
+                except DeleteEvent as event:
+                    if event.url == 'endpoint/problems/':
+                        self.assertEqual(event.body, '["{}"]'.format(submission_id))
+                    else:
+                        self.assertEqual(event.url, 'endpoint/problems/{}/'.format(submission_id))
