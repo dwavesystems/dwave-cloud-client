@@ -32,8 +32,14 @@ class _PrioritizedWorkItem(concurrent.futures.thread._WorkItem):
         if not isinstance(item, concurrent.futures.thread._WorkItem):
             raise TypeError("concurrent.futures.thread._WorkItem expected")
 
+        # copy constructor
+        kwargs = item.kwargs.copy()
+        if isinstance(item, _PrioritizedWorkItem):
+            kwargs.update(priority=item.priority)
+
+        # init from _WorkItem
         super(_PrioritizedWorkItem, self).__init__(
-            item.future, item.fn, item.args, item.kwargs)
+            item.future, item.fn, item.args, kwargs)
 
         self.priority = self.kwargs.pop('priority', sys.maxsize)
 
