@@ -51,8 +51,14 @@ import requests
 import warnings
 import operator
 import collections
+
+import base64
+import hashlib
+import concurrent.futures
+
 from itertools import chain
 from functools import partial, wraps
+from concurrent.futures import ThreadPoolExecutor
 
 from dateutil.parser import parse as parse_datetime
 from plucky import pluck
@@ -63,6 +69,8 @@ from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config, parse_float
 from dwave.cloud.solver import Solver, available_solvers
+from dwave.cloud.concurrency import PriorityThreadPoolExecutor
+from dwave.cloud.upload import FileView, ChunkedData
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent,
     datetime_to_timestamp, utcnow, epochnow, cached)
@@ -166,7 +174,7 @@ class Client(object):
     _SOLVERS_CACHE_MAXAGE = 300
 
     # Multipart upload parameters
-    _UPLOAD_PART_SIZE_BYTES = 5
+    _UPLOAD_PART_SIZE_BYTES = 1
 
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None,
@@ -422,23 +430,12 @@ class Client(object):
             worker.start()
             self._load_workers.append(worker)
 
-        # Build the problem (multipart) upload queue, start its workers
-        self._upload_problem_queue = queue.Queue()
-        self._upload_problem_workers = []
-        for _ in range(self._UPLOAD_PROBLEM_THREAD_COUNT):
-            worker = threading.Thread(target=self._do_upload_problem)
-            worker.daemon = True
-            worker.start()
-            self._upload_problem_workers.append(worker)
+        # Setup multipart upload executors
+        self._upload_problem_executor = \
+            ThreadPoolExecutor(self._UPLOAD_PROBLEM_THREAD_COUNT)
 
-        # Build the problem (part) upload queue, start its workers
-        self._upload_part_queue = queue.Queue()
-        self._upload_part_workers = []
-        for _ in range(self._UPLOAD_PART_THREAD_COUNT):
-            worker = threading.Thread(target=self._do_upload_part)
-            worker.daemon = True
-            worker.start()
-            self._upload_part_workers.append(worker)
+        self._upload_part_executor = \
+            PriorityThreadPoolExecutor(self._UPLOAD_PART_THREAD_COUNT)
 
     def create_session(self):
         """Create a new requests session based on client's (self) params.
@@ -493,10 +490,11 @@ class Client(object):
         self._poll_queue.join()
         logger.debug("Joining load queue")
         self._load_queue.join()
-        logger.debug("Joining problem upload queue")
-        self._upload_problem_queue.join()
-        logger.debug("Joining problem part upload queue")
-        self._upload_part_queue.join()
+
+        logger.debug("Shutting down problem upload executor")
+        self._upload_problem_executor.shutdown()
+        logger.debug("Shutting down problem part upload executor")
+        self._upload_part_executor.shutdown()
 
         # Send kill-task to all worker threads
         # Note: threads can't be 'killed' in Python, they have to die by
@@ -509,15 +507,10 @@ class Client(object):
             self._poll_queue.put((-1, None))
         for _ in self._load_workers:
             self._load_queue.put(None)
-        for _ in self._upload_problem_workers:
-            self._upload_problem_queue.put(None)
-        for _ in self._upload_part_workers:
-            self._upload_part_queue.put(None)
 
         # Wait for threads to die
         for worker in chain(self._submission_workers, self._cancel_workers,
-                            self._poll_workers, self._load_workers,
-                            self._upload_problem_workers, self._upload_part_workers):
+                            self._poll_workers, self._load_workers):
             worker.join()
 
         # Close the main thread's session
@@ -1447,67 +1440,108 @@ class Client(object):
         finally:
             session.close()
 
-    _Problem = collections.namedtuple('_Problem', ['data', 'future'])
-    _ProblemPart = collections.namedtuple('_ProblemPart', ['data', 'no', 'future'])
+    def _upload(self, problem):
+        """Initiate multipart problem upload, returning the result Future."""
+        return self._upload_problem_executor.submit(
+            self._do_upload_problem, problem=problem)
 
-    def _upload(self, data, future):
-        self._upload_problem_queue.put(self._Problem(data, future))
+    @staticmethod
+    def _initiate_multipart_upload(session, size):
+        """Sync http request using `session`."""
 
-    def _do_upload_problem(self):
+        logger.debug("Initiating problem multipart upload (size=%r)", size)
+
+        path = '/bqm/multipart'
+        try:
+            response = session.post(path, json=dict(size=size))
+        except requests.exceptions.Timeout:
+            raise RequestTimeout
+
+        if response.status_code == 401:
+            raise SolverAuthenticationError()
+        else:
+            response.raise_for_status()
+
+        try:
+            problem_id = response.json()['id']
+        except KeyError:
+            raise InvalidAPIResponseError("problem ID missing")
+
+        logger.debug("Multipart upload initiated (problem_id=%r)", problem_id)
+
+        return problem_id
+
+    @staticmethod
+    def _part_checksum(part):
+        return base64.b64encode(hashlib.md5(part).digest()).decode('ascii')
+
+    @staticmethod
+    def _upload_multipart_part(session, problem_id, part_id, data):
+        logger.debug("Uploading part_id=%r of problem_id=%r", part_id, problem_id)
+
+        path = '/bqm/multipart/{problem_id}/part/{part_id}'.format(
+            problem_id=problem_id, part_id=part_id)
+        headers = {
+            'Content-MD5': Client._part_checksum(data),
+            'Content-Type': 'application/octet-stream',
+        }
+        try:
+            response = session.put(path, data=data, headers=headers)
+        except requests.exceptions.Timeout:
+            raise RequestTimeout
+
+        if response.status_code == 401:
+            raise SolverAuthenticationError()
+        else:
+            response.raise_for_status()
+
+        logger.debug("Uploaded part_id=%r of problem_id=%r", part_id, problem_id)
+
+    def _check_parts(self):
+        pass
+
+    def _do_upload_problem(self, problem):
+        """Uploads problem to SAPI using multipart.
+
+        Args:
+            problem (bytes/str/file-like):
+                Problem description.
+
+        """
+
+        # in python 3.7+ we could create the session once, on thread init,
+        # via executor initializer
         session = self.create_session()
-        while True:
-            try:
-                # fetch problem definition to upload
-                problem = self._upload_problem_queue.get()
 
-                # `None` task signifies thread termination
-                if problem is None:
-                    return
+        chunks = ChunkedData(problem, chunk_size=self._UPLOAD_PART_SIZE_BYTES)
+        size = len(data.view)
 
-                data = problem.data
-                size = len(data)
+        problem_id = self._initiate_multipart_upload(session, size)
 
-                # initiate multipart upload
-                logger.debug("Initiating problem multipart upload (size=%r)", size)
-                path = "/bqm/multipart"
-                try:
-                    response = session.post(path, json=dict(size=size))
-                except requests.exceptions.Timeout:
-                    raise RequestTimeout
+        parts = []
+        for chunk_no, chunk_data in enumerate(chunks):
+            part = self._upload_part_executor.submit(
+                self._do_upload_part, problem_id, chunk_no, chunk_data)
+            part.add_done_callback(self._check_parts)
+            parts.append(part)
 
-                if response.status_code == 401:
-                    raise SolverAuthenticationError()
-                else:
-                    response.raise_for_status()
+        # wait for parts to upload/fail
+        concurrent.futures.wait(parts)
 
-                try:
-                    problem_id = response.json()['id']
-                except KeyError:
-                    raise InvalidAPIResponseError("problem ID missing")
+        # TODO: re-upload failed parts
 
-                logger.debug("Multipart upload initiated (problem_id=%r)", problem_id)
+        # TODO: verify all parts uploaded via status call
 
-                # queue parts upload
+        # TODO: send a combine request
 
-
-            except Exception as exc:
-                logger.exception('Problem upload error', exc)
-
+        # TODO: fail-safe close
         session.close()
 
-    def _do_upload_part(self):
-        while True:
-            try:
-                # fetch problem part definition to upload
-                part = self._upload_part_queue.get()
-
-                # `None` task signifies thread termination
-                if part is None:
-                    return
-
-                # XXX: upload `part`
-
-                logger.debug("Problem part upload initiated (part no %r)", part.no)
-
-            except Exception as exc:
-                logger.exception('Problem part upload error', exc)
+    def _do_upload_part(self, problem_id, chunk_no, chunk_data):
+        session = self.create_session()
+        try:
+            self._upload_multipart_part(session, problem_id, chunk_no, chunk_data)
+        except Exception as e:
+            raise
+        finally:
+            session.close()
