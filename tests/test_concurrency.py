@@ -18,6 +18,7 @@ import threading
 import concurrent.futures
 
 from dwave.cloud.concurrency import (
+    _PriorityOrderedItem,
     _PrioritizedWorkItem,
     _PrioritizingQueue,
     PriorityThreadPoolExecutor,
@@ -37,10 +38,10 @@ class Test_PrioritizedWorkItem(unittest.TestCase):
         w = concurrent.futures.thread._WorkItem(future, fn, args, kwargs)
         pw = _PrioritizedWorkItem(w)
         self.assertEqual(pw.priority, sys.maxsize)
-        self.assertEqual(pw.future, future)
-        self.assertEqual(pw.fn, fn)
-        self.assertEqual(pw.args, args)
-        self.assertEqual(pw.kwargs, kwargs)
+        self.assertEqual(pw.item.future, future)
+        self.assertEqual(pw.item.fn, fn)
+        self.assertEqual(pw.item.args, args)
+        self.assertEqual(pw.item.kwargs, kwargs)
 
         # with priority
         kwargs_pri = kwargs.copy()
@@ -48,10 +49,10 @@ class Test_PrioritizedWorkItem(unittest.TestCase):
         w = concurrent.futures.thread._WorkItem(future, fn, args, kwargs_pri)
         pw = _PrioritizedWorkItem(w)
         self.assertEqual(pw.priority, priority)
-        self.assertEqual(pw.future, future)
-        self.assertEqual(pw.fn, fn)
-        self.assertEqual(pw.args, args)
-        self.assertEqual(pw.kwargs, kwargs)
+        self.assertEqual(pw.item.future, future)
+        self.assertEqual(pw.item.fn, fn)
+        self.assertEqual(pw.item.args, args)
+        self.assertEqual(pw.item.kwargs, kwargs)
 
     def test_priority_ordering(self):
         w1 = _PrioritizedWorkItem(
@@ -64,19 +65,20 @@ class Test_PrioritizedWorkItem(unittest.TestCase):
         self.assertGreater(w2, w1)
 
         # always greater that None
-        self.assertLess(None, w1)
-        self.assertGreater(w1, None)
-        self.assertNotEqual(w1, None)
+        none = _PriorityOrderedItem(None)
+        self.assertLess(none, w1)
+        self.assertGreater(w1, none)
+        self.assertNotEqual(w1, none)
 
 
 class Test_PrioritizingQueue(unittest.TestCase):
 
     def test_prioritization(self):
-        w1 = concurrent.futures.thread._WorkItem(None, None, (), dict(priority=1))
+        w1 = concurrent.futures.thread._WorkItem(None, None, (1,), dict(priority=1))
         w2 = _PrioritizedWorkItem(
-            concurrent.futures.thread._WorkItem(None, None, (), dict(priority=2)))
+            concurrent.futures.thread._WorkItem(None, None, (2,), dict(priority=2)))
         w3 = None
-        w4 = concurrent.futures.thread._WorkItem(None, None, (), {})
+        w4 = concurrent.futures.thread._WorkItem(None, None, (3,), {})
 
         q = _PrioritizingQueue()
 
@@ -88,9 +90,9 @@ class Test_PrioritizingQueue(unittest.TestCase):
 
         # verify order on get
         self.assertEqual(q.get(), None)
-        self.assertEqual(q.get().priority, 1)
-        self.assertEqual(q.get().priority, 2)
-        self.assertEqual(q.get().priority, sys.maxsize)
+        self.assertEqual(q.get().args, (1,))
+        self.assertEqual(q.get().item.args, (2,))
+        self.assertEqual(q.get().args, (3,))
         self.assertTrue(q.empty())
 
     def test_double_none_edgecase(self):
