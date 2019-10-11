@@ -155,7 +155,7 @@ class Client(object):
     # Number of worker threads for each problem processing task
     _SUBMISSION_THREAD_COUNT = 5
     _UPLOAD_PROBLEM_THREAD_COUNT = 1
-    _UPLOAD_PART_THREAD_COUNT = 1
+    _UPLOAD_PART_THREAD_COUNT = 10
     _CANCEL_THREAD_COUNT = 1
     _POLL_THREAD_COUNT = 2
     _LOAD_THREAD_COUNT = 5
@@ -1458,8 +1458,11 @@ class Client(object):
         logger.debug("Initiating problem multipart upload (size=%r)", size)
 
         path = 'bqm/multipart'
+        body = dict(size=size)
+
+        logger.trace("session.post(path=%r, json=%r)", path, body)
         try:
-            response = session.post(path, json=dict(size=size))
+            response = session.post(path, json=body)
         except requests.exceptions.Timeout:
             raise RequestTimeout
 
@@ -1509,6 +1512,9 @@ class Client(object):
             'Content-MD5': checksum,
             'Content-Type': 'application/octet-stream',
         }
+
+        logger.trace("session.put(path=%r, data=%r, headers=%r)",
+                     path, part_stream, headers)
         try:
             response = session.put(path, data=part_stream, headers=headers)
         except requests.exceptions.Timeout:
