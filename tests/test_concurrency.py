@@ -93,6 +93,15 @@ class Test_PrioritizingQueue(unittest.TestCase):
         self.assertEqual(q.get().priority, sys.maxsize)
         self.assertTrue(q.empty())
 
+    def test_double_none_edgecase(self):
+        # this can happen on interpreter exit (concurrent.futures.thread._python_exit)
+        # thread count adjustment, manual calls to executor.shutdown, etc.
+        q = _PrioritizingQueue()
+        q.put(None)
+        q.put(None)
+        self.assertEqual(q.get(), None)
+        self.assertEqual(q.get(), None)
+
 
 class TestPriorityThreadPoolExecutor(unittest.TestCase):
 
