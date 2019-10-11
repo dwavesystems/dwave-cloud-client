@@ -1457,7 +1457,7 @@ class Client(object):
 
         logger.debug("Initiating problem multipart upload (size=%r)", size)
 
-        path = '/bqm/multipart'
+        path = 'bqm/multipart'
         try:
             response = session.post(path, json=dict(size=size))
         except requests.exceptions.Timeout:
@@ -1482,17 +1482,35 @@ class Client(object):
         return base64.b64encode(hashlib.md5(part).digest()).decode('ascii')
 
     @staticmethod
-    def _upload_multipart_part(session, problem_id, part_id, data):
+    def _upload_multipart_part(session, problem_id, part_id, part_stream):
+        """Upload one problem part. Sync http request.
+
+        Args:
+            session (:class:`requests.Session`):
+                Session used for all API requests.
+            problem_id (str):
+                Problem id.
+            part_id (int):
+                Part number/id.
+            part_stream (:class:`io.BufferedIOBase`/binary-stream-like):
+                Problem part data container that supports `read` operation.
+
+        """
         logger.debug("Uploading part_id=%r of problem_id=%r", part_id, problem_id)
 
-        path = '/bqm/multipart/{problem_id}/part/{part_id}'.format(
+        # TODO: work-around to get a checksum of a binary stream
+        data = part_stream.read()
+        checksum = Client._part_checksum(data)
+        del data
+
+        path = 'bqm/multipart/{problem_id}/part/{part_id}'.format(
             problem_id=problem_id, part_id=part_id)
         headers = {
-            'Content-MD5': Client._part_checksum(data),
+            'Content-MD5': checksum,
             'Content-Type': 'application/octet-stream',
         }
         try:
-            response = session.put(path, data=data, headers=headers)
+            response = session.put(path, data=part_stream, headers=headers)
         except requests.exceptions.Timeout:
             raise RequestTimeout
 
@@ -1503,11 +1521,11 @@ class Client(object):
 
         logger.debug("Uploaded part_id=%r of problem_id=%r", part_id, problem_id)
 
-    def _check_parts(self):
+    def _check_parts(self, future):
         pass
 
     def _do_upload_problem(self, problem):
-        """Uploads problem to SAPI using multipart.
+        """Upload a problem to SAPI using multipart upload interface.
 
         Args:
             problem (bytes/str/file-like):
@@ -1520,7 +1538,7 @@ class Client(object):
         session = self.create_session()
 
         chunks = ChunkedData(problem, chunk_size=self._UPLOAD_PART_SIZE_BYTES)
-        size = len(data.view)
+        size = len(chunks.view)
 
         problem_id = self._initiate_multipart_upload(session, size)
 
