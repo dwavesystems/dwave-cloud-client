@@ -1446,10 +1446,10 @@ class Client(object):
         finally:
             session.close()
 
-    def _upload(self, problem):
-        """Initiate multipart problem upload, returning the result Future."""
+    def upload_problem(self, problem):
+        """Initiate multipart problem upload, returning the result as Future."""
         return self._upload_problem_executor.submit(
-            self._do_upload_problem, problem=problem)
+            self._upload_problem_worker, problem=problem)
 
     @staticmethod
     def _initiate_multipart_upload(session, size):
@@ -1524,7 +1524,7 @@ class Client(object):
     def _check_parts(self, future):
         pass
 
-    def _do_upload_problem(self, problem):
+    def _upload_problem_worker(self, problem):
         """Upload a problem to SAPI using multipart upload interface.
 
         Args:
@@ -1545,7 +1545,7 @@ class Client(object):
         parts = []
         for chunk_no, chunk_data in enumerate(chunks):
             part = self._upload_part_executor.submit(
-                self._do_upload_part, problem_id, chunk_no, chunk_data)
+                self._upload_part_worker, problem_id, chunk_no, chunk_data)
             part.add_done_callback(self._check_parts)
             parts.append(part)
 
@@ -1561,7 +1561,7 @@ class Client(object):
         # TODO: fail-safe close
         session.close()
 
-    def _do_upload_part(self, problem_id, chunk_no, chunk_data):
+    def _upload_part_worker(self, problem_id, chunk_no, chunk_data):
         session = self.create_session()
         try:
             self._upload_multipart_part(session, problem_id, chunk_no, chunk_data)

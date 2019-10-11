@@ -21,6 +21,9 @@ from concurrent.futures import ThreadPoolExecutor, wait
 
 from dwave.cloud.utils import tictoc
 from dwave.cloud.upload import RandomAccessIOBaseView, FileView, ChunkedData
+from dwave.cloud.client import Client
+
+from tests import config
 
 
 class TestFileViewABC(unittest.TestCase):
@@ -212,3 +215,16 @@ class TestChunkedData(unittest.TestCase):
         cd = ChunkedData(self.data, chunk_size=len(self.data))
         chunks_expected = [self.data]
         self.verify_chunking(cd, chunks_expected)
+
+
+@unittest.skipUnless(config, "No live server configuration available.")
+class TestMultipartUpload(unittest.TestCase):
+
+    def test_smoke_test(self):
+        with Client(**config) as client:
+            data = b'123'
+            future = client.upload_problem(data)
+            try:
+                future.result()
+            except Exception as e:
+                self.fail()
