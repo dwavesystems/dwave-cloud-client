@@ -26,7 +26,7 @@ __all__ = ['Client', 'Solver', 'Future']
 
 # configure logger `dwave.cloud` root logger, inherited in submodules
 # (write level warning+ to stderr, include timestamp/module/level)
-formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
+formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(threadName)s %(message)s')
 handler = logging.StreamHandler()
 handler.setFormatter(formatter)
 root = logging.getLogger(__name__)
