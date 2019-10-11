@@ -142,7 +142,7 @@ class Client(object):
     STATUS_CANCELLED = 'CANCELLED'
 
     # Default API endpoint
-    DEFAULT_API_ENDPOINT = 'https://cloud.dwavesys.com/sapi'
+    DEFAULT_API_ENDPOINT = 'https://cloud.dwavesys.com/sapi/'
 
     # Cases when multiple status flags qualify
     ANY_STATUS_ONGOING = [STATUS_IN_PROGRESS, STATUS_PENDING]
@@ -444,7 +444,12 @@ class Client(object):
         create and use an isolated session.
         """
 
-        session = BaseUrlSession(base_url=self.endpoint)
+        # allow endpoint path to not end with /
+        endpoint = self.endpoint
+        if not endpoint.endswith('/'):
+            endpoint += '/'
+
+        session = BaseUrlSession(base_url=endpoint)
         session.mount('http://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
         session.mount('https://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
         session.headers.update({'X-Auth-Token': self.token,
