@@ -461,7 +461,8 @@ class Client(object):
             session.headers.update({'Connection': 'close'})
 
         # Debug-log headers
-        logger.debug("session.headers=%r", session.headers)
+        logger.debug("create_session(thread.id=%r, session.headers=%r)",
+            threading.get_ident(), session.headers)
 
         return session
 
