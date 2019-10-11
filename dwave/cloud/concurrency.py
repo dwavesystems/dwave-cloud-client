@@ -28,9 +28,33 @@ __all__ = ['PriorityThreadPoolExecutor']
 
 
 @functools.total_ordering
-class _PrioritizedWorkItem(concurrent.futures.thread._WorkItem):
-    """Extension of :class:`concurrent.futures.thread._WorkItem` that handles
-    execution priority passed in `kwargs`.
+class _PriorityOrderedItem(object):
+    """Generic priority queue item with ordering defined according to the
+    priority attribute.
+    """
+
+    def __init__(self, item, priority=None):
+        # by default, None < Any
+        if priority is None:
+            if item is None:
+                priority = -sys.maxsize
+            else:
+                priority = sys.maxsize
+
+        self.item = item
+        self.priority = priority
+
+    def __lt__(self, other):
+        return self.priority < other.priority
+
+    def __eq__(self, other):
+        return self.priority == other.priority
+
+
+class _PrioritizedWorkItem(_PriorityOrderedItem):
+    """Extension of :class:`_PriorityOrderedItem` that handles execution
+    priority passed in `kwargs` of :class:`concurrent.futures.thread._WorkItem`
+    items.
     """
 
     def __init__(self, item):
@@ -38,23 +62,12 @@ class _PrioritizedWorkItem(concurrent.futures.thread._WorkItem):
             raise TypeError("concurrent.futures.thread._WorkItem expected")
 
         # copy constructor
-        kwargs = item.kwargs.copy()
         if isinstance(item, _PrioritizedWorkItem):
-            kwargs.update(priority=item.priority)
+            priority = item.priority
+        else:
+            priority = item.kwargs.pop('priority', sys.maxsize)
 
-        # init from _WorkItem
-        super(_PrioritizedWorkItem, self).__init__(
-            item.future, item.fn, item.args, kwargs)
-
-        self.priority = self.kwargs.pop('priority', sys.maxsize)
-
-    def __lt__(self, other):
-        # None < _PrioritizedWorkItem(..)
-        if other is None:
-            return False
-
-        # otherwise, compare only on priority
-        return self.priority < other.priority
+        super(_PrioritizedWorkItem, self).__init__(item, priority)
 
 
 class _PrioritizingQueue(queue.PriorityQueue):
@@ -67,9 +80,16 @@ class _PrioritizingQueue(queue.PriorityQueue):
         # unpack item, extract priority
         if isinstance(item, concurrent.futures.thread._WorkItem):
             item = _PrioritizedWorkItem(item)
+        else:
+            item = _PriorityOrderedItem(item)
 
         # in python 2, `queue.PriorityQueue` is an old-style class!
         queue.PriorityQueue.put(self, item, *args, **kwargs)
+
+    def get(self, *args, **kwargs):
+        # in python 2, `queue.PriorityQueue` is an old-style class!
+        prioritized_item = queue.PriorityQueue.get(self, *args, **kwargs)
+        return prioritized_item.item
 
 
 class PriorityThreadPoolExecutor(concurrent.futures.ThreadPoolExecutor):
