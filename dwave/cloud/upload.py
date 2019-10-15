@@ -30,13 +30,13 @@ except ImportError:     # pragma: no cover
 
 import six
 
-__all__ = ['FileView', 'ChunkedData']
+__all__ = ['FileBuffer', 'ChunkedData']
 
 logger = logging.getLogger(__name__)
 
 
-class RandomAccessIOBaseView(abc.Sized):
-    """Abstract base class for random access file-like object views.
+class RandomAccessIOBaseBuffer(abc.Sized):
+    """Abstract base class for random access file-like object buffers.
 
     Concrete subclasses must provide __len__ and __getitem__.
     """
@@ -48,7 +48,7 @@ class RandomAccessIOBaseView(abc.Sized):
         raise KeyError
 
 
-class FileView(RandomAccessIOBaseView):
+class FileBuffer(RandomAccessIOBaseBuffer):
     """Provide thread-safe random access to a file-like object via item getter
     interface.
 
@@ -61,7 +61,7 @@ class FileView(RandomAccessIOBaseView):
             Require file-like object to be a :class:`io.IOBase` subclass.
 
     Note:
-        :class:`FileView` behavior is invariant to data encoding of the
+        :class:`FileBuffer` behavior is invariant to data encoding of the
         file-like object. For example, if the file is opened in binary mode
         (or file is :class:`io.BytesIO` instance), :class:`bytes` are returned
         as slices. If the file is opened in text mode (or it's
@@ -71,13 +71,13 @@ class FileView(RandomAccessIOBaseView):
         Access overlapping segments of a file from multiple threads::
 
             with open('/path/to/file', 'rb') as fp:   # binary mode, read access
-                fv = FileView(fp):
+                fb = FileBuffer(fp):
 
                 # in thread 1:
-                seg = fv[0:10]
+                seg = fb[0:10]
 
                 # in thread 2:
-                seg = fv[5:15]
+                seg = fb[5:15]
 
     """
 
@@ -170,7 +170,7 @@ class ChunkedData(object):
             try:
                 self.view = data.getbuffer()
             except AttributeError:  # pragma: no cover
-                # python 2: fallback to FileView
+                # python 2: fallback to FileBuffer
                 pass
 
         if self.view is None and isinstance(data, io.IOBase):
@@ -179,7 +179,7 @@ class ChunkedData(object):
                 raise ValueError("seekable file-like data object expected")
             if not data.readable():
                 raise ValueError("readable file-like data object expected")
-            self.view = FileView(data)
+            self.view = FileBuffer(data)
 
         # TODO: use stream view if possible
 
@@ -197,7 +197,7 @@ class ChunkedData(object):
         return self.num_chunks
 
     def chunk(self, idx):
-        """Return :class:`io.BytesIO`-wrapped zero-indexed chunk data."""
+        """Return zero-indexed chunk data as a binary stream."""
 
         start = idx * self.chunk_size
         stop = start + self.chunk_size

@@ -20,78 +20,78 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor, wait
 
 from dwave.cloud.utils import tictoc
-from dwave.cloud.upload import RandomAccessIOBaseView, FileView, ChunkedData
+from dwave.cloud.upload import RandomAccessIOBaseBuffer, FileBuffer, ChunkedData
 from dwave.cloud.client import Client
 
 from tests import config
 
 
-class TestFileViewABC(unittest.TestCase):
+class TestFileBufferABC(unittest.TestCase):
 
     def test_invalid(self):
-        class InvalidFileView(RandomAccessIOBaseView):
+        class InvalidFileBuffer(RandomAccessIOBaseBuffer):
             pass
 
         with self.assertRaises(TypeError):
-            InvalidFileView()
+            InvalidFileBuffer()
 
     def test_valid(self):
-        class ValidFileView(RandomAccessIOBaseView):
+        class ValidFileBuffer(RandomAccessIOBaseBuffer):
             def __len__(self):
                 return NotImplementedError
             def __getitem__(self, key):
                 return NotImplementedError
 
         try:
-            fv = ValidFileView()
+            ValidFileBuffer()
         except:
-            self.fail("unexpected interface of RandomAccessIOBaseView")
+            self.fail("unexpected interface of RandomAccessIOBaseBuffer")
 
 
-class TestFileView(unittest.TestCase):
+class TestFileBuffer(unittest.TestCase):
     data = b'0123456789'
 
-    def verify_getter(self, fv, data):
+    def verify_getter(self, fb, data):
         n = len(data)
 
         # integer indexing
-        self.assertEqual(fv[0], data[0:1])
-        self.assertEqual(fv[n-1], data[n-1:n])
+        self.assertEqual(fb[0], data[0:1])
+        self.assertEqual(fb[n-1], data[n-1:n])
 
         # negative integer indexing
-        self.assertEqual(fv[-1], data[-1:n])
-        self.assertEqual(fv[-n], data[0:1])
+        self.assertEqual(fb[-1], data[-1:n])
+        self.assertEqual(fb[-n], data[0:1])
 
         # out of bounds integer indexing
-        self.assertEqual(fv[n], data[n:n+1])
+        self.assertEqual(fb[n], data[n:n+1])
 
         # non-integer key
         with self.assertRaises(TypeError):
-            fv['a']
+            fb['a']
 
         # empty slices
-        self.assertEqual(fv[1:0], b'')
+        self.assertEqual(fb[1:0], b'')
 
         # slicing
-        self.assertEqual(fv[:], data[:])
-        self.assertEqual(fv[0:n//2], data[0:n//2])
-        self.assertEqual(fv[-n//2:], data[-n//2:])
+        self.assertEqual(fb[:], data[:])
+        self.assertEqual(fb[0:n//2], data[0:n//2])
+        self.assertEqual(fb[-n//2:], data[-n//2:])
 
     def test_view_from_memory_bytes(self):
         data = self.data
         fp = io.BytesIO(data)
-        fv = FileView(fp)
+        fb = FileBuffer(fp)
 
-        self.assertEqual(len(fv), len(data))
-        self.verify_getter(fv, data)
+        self.assertEqual(len(fb), len(data))
+        self.verify_getter(fb, data)
 
     def test_view_from_memory_string(self):
         data = self.data.decode()
         fp = io.StringIO(data)
-        fv = FileView(fp)
+        fb = FileBuffer(fp)
 
-        self.assertEqual(len(fv), len(data))
-        self.verify_getter(fv, data)
+        self.assertEqual(len(fb), len(data))
+        self.verify_getter(fb, data)
 
     def test_view_from_file_like(self):
         data = self.data
@@ -100,10 +100,10 @@ class TestFileView(unittest.TestCase):
         with tempfile.TemporaryFile() as fp:
             fp.write(data)
             fp.seek(0)
-            fv = FileView(fp, strict=False)
+            fb = FileBuffer(fp, strict=False)
 
-            self.assertEqual(len(fv), len(data))
-            self.verify_getter(fv, data)
+            self.assertEqual(len(fb), len(data))
+            self.verify_getter(fb, data)
 
     def test_view_from_disk_file(self):
         data = self.data
@@ -113,24 +113,24 @@ class TestFileView(unittest.TestCase):
         os.write(fd, data)
         os.close(fd)
 
-        # test FileView from file on disk (read access)
+        # test FileBuffer from file on disk (read access)
         with io.open(path, 'rb') as fp:
-            fv = FileView(fp)
+            fb = FileBuffer(fp)
 
-            self.assertEqual(len(fv), len(data))
-            self.verify_getter(fv, data)
+            self.assertEqual(len(fb), len(data))
+            self.verify_getter(fb, data)
 
         # works also for read+write access
         with io.open(path, 'r+b') as fp:
-            fv = FileView(fp)
+            fb = FileBuffer(fp)
 
-            self.assertEqual(len(fv), len(data))
-            self.verify_getter(fv, data)
+            self.assertEqual(len(fb), len(data))
+            self.verify_getter(fb, data)
 
         # fail without read access
         with io.open(path, 'wb') as fp:
             with self.assertRaises(ValueError):
-                fv = FileView(fp)
+                FileBuffer(fp)
 
         # remove temp file
         os.unlink(path)
@@ -139,7 +139,7 @@ class TestFileView(unittest.TestCase):
         # setup a shared file view
         data = self.data
         fp = io.BytesIO(data)
-        fv = FileView(fp)
+        fb = FileBuffer(fp)
 
         # file slices
         slice_a = slice(0, 7)
@@ -150,12 +150,12 @@ class TestFileView(unittest.TestCase):
         sleep = 0.25
         def blocking_seek(start):
             time.sleep(sleep)
-            return io.BytesIO.seek(fv._fp, start)
-        fv._fp.seek = blocking_seek
+            return io.BytesIO.seek(fb._fp, start)
+        fb._fp.seek = blocking_seek
 
         # define the worker
         def worker(slice_):
-            return fv[slice_]
+            return fb[slice_]
 
         # run the worker a few times in parallel
         executor = ThreadPoolExecutor(max_workers=3)
