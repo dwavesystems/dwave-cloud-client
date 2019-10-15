@@ -1452,7 +1452,11 @@ class Client(object):
 
     @staticmethod
     def _initiate_multipart_upload(session, size):
-        """Sync http request using `session`."""
+        """Sync http request using `session`.
+
+        Note:
+            This function *can* fail. Retry should be handled by the caller.
+        """
 
         logger.debug("Initiating problem multipart upload (size=%r)", size)
 
@@ -1497,7 +1501,10 @@ class Client(object):
             part_stream (:class:`io.BufferedIOBase`/binary-stream-like):
                 Problem part data container that supports `read` operation.
 
+        Note:
+            This function *can* fail. Retry should be handled by the caller.
         """
+
         logger.debug("Uploading part_id=%r of problem_id=%r", part_id, problem_id)
 
         # TODO: work-around to get a checksum of a binary stream
@@ -1540,37 +1547,31 @@ class Client(object):
 
         # in python 3.7+ we could create the session once, on thread init,
         # via executor initializer
-        session = self.create_session()
+        with self.create_session() as session:
 
-        chunks = ChunkedData(problem, chunk_size=self._UPLOAD_PART_SIZE_BYTES)
-        size = len(chunks.view)
+            chunks = ChunkedData(problem, chunk_size=self._UPLOAD_PART_SIZE_BYTES)
+            size = len(chunks.view)
 
-        problem_id = self._initiate_multipart_upload(session, size)
+            problem_id = self._initiate_multipart_upload(session, size)
 
-        parts = []
-        for chunk_no, chunk_data in enumerate(chunks):
-            part = self._upload_part_executor.submit(
-                self._upload_part_worker, problem_id, chunk_no, chunk_data)
-            part.add_done_callback(self._check_parts)
-            parts.append(part)
+            parts = []
+            for chunk_no, chunk_data in enumerate(chunks):
+                part = self._upload_part_executor.submit(
+                    self._upload_part_worker, problem_id, chunk_no, chunk_data)
+                part.add_done_callback(self._check_parts)
+                parts.append(part)
 
-        # wait for parts to upload/fail
-        concurrent.futures.wait(parts)
+            # wait for parts to upload/fail
+            concurrent.futures.wait(parts)
 
-        # TODO: re-upload failed parts
+            # TODO: re-upload failed parts
 
-        # TODO: verify all parts uploaded via status call
+            # TODO: verify all parts uploaded via status call
 
-        # TODO: send a combine request
+            # TODO: send a combine request
 
-        # TODO: fail-safe close
-        session.close()
+            # TODO: fail-safe close
 
     def _upload_part_worker(self, problem_id, chunk_no, chunk_data):
-        session = self.create_session()
-        try:
+        with self.create_session() as session:
             self._upload_multipart_part(session, problem_id, chunk_no, chunk_data)
-        except Exception as e:
-            raise
-        finally:
-            session.close()
