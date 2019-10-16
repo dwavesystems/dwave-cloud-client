@@ -77,6 +77,49 @@ class TestFileBuffer(unittest.TestCase):
         self.assertEqual(fb[0:n//2], data[0:n//2])
         self.assertEqual(fb[-n//2:], data[-n//2:])
 
+    def verify_getinto(self, fb, data):
+        n = len(data)
+
+        # integer indexing
+        b = bytearray(n)
+        self.assertEqual(fb.getinto(0, b), 1)
+        self.assertEqual(b[0], data[0])
+
+        self.assertEqual(fb.getinto(n-1, b), 1)
+        self.assertEqual(b[0], data[n-1])
+
+        # negative integer indexing
+        self.assertEqual(fb.getinto(-1, b), 1)
+        self.assertEqual(b[0], data[-1])
+
+        self.assertEqual(fb.getinto(-n, b), 1)
+        self.assertEqual(b[0], data[-n])
+
+        # out of bounds integer indexing => nop
+        self.assertEqual(fb.getinto(n, b), 0)
+
+        # non-integer key
+        with self.assertRaises(TypeError):
+            fb.getinto('a', b)
+
+        # empty slices
+        self.assertEqual(fb.getinto(slice(1, 0), b), 0)
+
+        # slicing
+        b = bytearray(n)
+        self.assertEqual(fb.getinto(slice(None), b), n)
+        self.assertEqual(b, data)
+
+        b = bytearray(n)
+        self.assertEqual(fb.getinto(slice(0, n//2), b), n//2)
+        self.assertEqual(b[0:n//2], data[0:n//2])
+        self.assertEqual(b[n//2:], bytearray(n//2))
+
+        b = bytearray(n)
+        self.assertEqual(fb.getinto(slice(-n//2, None), b), n//2)
+        self.assertEqual(b[:n//2], data[-n//2:])
+        self.assertEqual(b[n//2:], bytearray(n//2))
+
     def test_view_from_memory_bytes(self):
         data = self.data
         fp = io.BytesIO(data)
@@ -84,6 +127,7 @@ class TestFileBuffer(unittest.TestCase):
 
         self.assertEqual(len(fb), len(data))
         self.verify_getter(fb, data)
+        self.verify_getinto(fb, data)
 
     def test_view_from_memory_string(self):
         data = self.data.decode()
@@ -103,6 +147,7 @@ class TestFileBuffer(unittest.TestCase):
 
             self.assertEqual(len(fb), len(data))
             self.verify_getter(fb, data)
+            self.verify_getinto(fb, data)
 
     def test_view_from_disk_file(self):
         data = self.data
@@ -118,6 +163,7 @@ class TestFileBuffer(unittest.TestCase):
 
             self.assertEqual(len(fb), len(data))
             self.verify_getter(fb, data)
+            self.verify_getinto(fb, data)
 
         # works also for read+write access
         with io.open(path, 'r+b') as fp:
@@ -125,6 +171,7 @@ class TestFileBuffer(unittest.TestCase):
 
             self.assertEqual(len(fb), len(data))
             self.verify_getter(fb, data)
+            self.verify_getinto(fb, data)
 
         # fail without read access
         with io.open(path, 'wb') as fp:
