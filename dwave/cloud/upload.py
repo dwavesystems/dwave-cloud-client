@@ -182,8 +182,24 @@ class FileView(io.RawIOBase):
     def __init__(self, fb):
         super(FileView, self).__init__()
         self._fb = fb
+        self._pos = 0
         self._offset = 0
         self._size = len(fb)
+
+    def seek(self, pos, whence=io.SEEK_SET):
+        if whence == io.SEEK_SET:
+            self._pos = pos
+        elif whence == io.SEEK_CUR:
+            self._pos += pos
+        elif whence == io.SEEK_END:
+            self._pos = self._size + pos
+        else:
+            raise ValueError("whence must be one of 'io.SEEK_{SET,CUR,END}'")
+
+        return self._pos
+
+    def tell(self):
+        return self._pos
 
     def readinto(self, b):
         """Read bytes into a pre-allocated bytes-like object b.
@@ -192,8 +208,17 @@ class FileView(io.RawIOBase):
             int:
                 The number of bytes read.
         """
-        key = slice(self._offset, self._offset + self._size)
-        return self._fb.getinto(key, b)
+        start = self._offset + self._pos
+        stop = self._offset + self._size
+        key = slice(start, stop)
+        n = self._fb.getinto(key, b)
+        self._pos += n
+
+        # indicate EOF to read()
+        if n == 0:
+            return None
+
+        return n
 
     def __len__(self):
         return self._size
