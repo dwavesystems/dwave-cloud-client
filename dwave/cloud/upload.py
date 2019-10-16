@@ -155,8 +155,9 @@ class FileBuffer(RandomAccessIOBaseBuffer):
         object b.
 
         Returns:
-            :class:`bytes`/:class:`str`
+            :class:`bytes`
         """
+        # XXX: for consistency with bytearray, return int for int index?
 
         start, stop = self._getkey_to_range(key)
         size = stop - start

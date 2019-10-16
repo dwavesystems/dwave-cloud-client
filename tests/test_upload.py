@@ -20,7 +20,8 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor, wait
 
 from dwave.cloud.utils import tictoc
-from dwave.cloud.upload import RandomAccessIOBaseBuffer, FileBuffer, ChunkedData
+from dwave.cloud.upload import (
+    RandomAccessIOBaseBuffer, FileBuffer, FileView, ChunkedData)
 from dwave.cloud.client import Client
 
 from tests import config
@@ -126,7 +127,7 @@ class TestFileBuffer(unittest.TestCase):
         self.assertEqual(fb.getinto(slice(None), b), m)
         self.assertEqual(b, data[:m])
 
-    def test_view_from_memory_bytes(self):
+    def test_buffer_from_memory_bytes(self):
         data = self.data
         fp = io.BytesIO(data)
         fb = FileBuffer(fp)
@@ -135,14 +136,14 @@ class TestFileBuffer(unittest.TestCase):
         self.verify_getter(fb, data)
         self.verify_getinto(fb, data)
 
-    def test_view_from_memory_string(self):
+    def test_buffer_from_memory_string(self):
         data = self.data.decode()
         fp = io.StringIO(data)
 
         with self.assertRaises(TypeError):
             fb = FileBuffer(fp)
 
-    def test_view_from_file_like(self):
+    def test_buffer_from_file_like(self):
         data = self.data
 
         # create file-like temporary object (on POSIX this is a tmp file)
@@ -155,7 +156,7 @@ class TestFileBuffer(unittest.TestCase):
             self.verify_getter(fb, data)
             self.verify_getinto(fb, data)
 
-    def test_view_from_disk_file(self):
+    def test_buffer_from_disk_file(self):
         data = self.data
 
         # create temporary file
@@ -223,6 +224,58 @@ class TestFileBuffer(unittest.TestCase):
 
         # verify runtime is consistent with a blocking critical section
         self.assertGreaterEqual(timer.dt, 0.9 * len(results) * sleep)
+
+
+class TestFileView(unittest.TestCase):
+    data = b'0123456789'
+
+    def test_file_interface(self):
+        data = self.data
+        size = len(data)
+        fp = io.BytesIO(data)
+        fb = FileBuffer(fp)
+        fv = FileView(fb)
+
+        # partial read
+        self.assertEqual(fv.read(1), data[0:1])
+
+        # read all, also check continuity
+        self.assertEqual(fv.read(), data[1:])
+
+        # seek and tell
+        self.assertEqual(len(fv), size)
+
+        self.assertEqual(fv.seek(2), 2)
+        self.assertEqual(fv.tell(), 2)
+
+        self.assertEqual(fv.seek(2, io.SEEK_CUR), 4)
+        self.assertEqual(fv.tell(), 4)
+
+        self.assertEqual(fv.seek(0, io.SEEK_END), size)
+        self.assertEqual(fv.tell(), size)
+
+        # IOBase derived methods
+        fv.seek(0)
+        self.assertEqual(fv.readlines(), [data])
+
+    def test_view_interface(self):
+        data = self.data
+        size = len(data)
+        fp = io.BytesIO(data)
+        fb = FileBuffer(fp)
+        fv = FileView(fb)
+
+        # view, slice index
+        subfv = fv[1:-1]
+        self.assertEqual(subfv.read(), data[1:-1])
+        self.assertEqual(len(subfv), size - 2)
+
+        # view, integer index
+        self.assertEqual(fv[2], data[2:3])
+
+        # view are independent
+        self.assertEqual(fv[:2].read(), data[:2])
+        self.assertEqual(fv[-2:].read(), data[-2:])
 
 
 class TestChunkedData(unittest.TestCase):
