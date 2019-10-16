@@ -100,12 +100,16 @@ class FileBuffer(RandomAccessIOBaseBuffer):
         return self._size
 
     def _getkey_to_range(self, key):
-        """Resolve slice/int key to start-stop range bounds."""
+        """Resolve slice/int key to start-stop range bounds.
+
+        Returns: (start, stop, is_item?)
+        """
 
         if isinstance(key, slice):
             start, stop, stride = key.indices(len(self))
             if stride != 1:
                 raise NotImplementedError("stride of 1 required")
+            is_item = False
         else:
             try:
                 start = int(key)
@@ -117,8 +121,9 @@ class FileBuffer(RandomAccessIOBaseBuffer):
                 start %= len(self)
 
             stop = start + 1
+            is_item = True
 
-        return start, stop
+        return start, stop, is_item
 
     def getinto(self, key, b):
         """Copy a slice of file's content into a pre-allocated bytes-like
@@ -135,7 +140,7 @@ class FileBuffer(RandomAccessIOBaseBuffer):
                 The number of bytes read (0 for EOF).
         """
 
-        start, stop = self._getkey_to_range(key)
+        start, stop, _ = self._getkey_to_range(key)
 
         # empty slice
         if stop <= start:
@@ -151,15 +156,17 @@ class FileBuffer(RandomAccessIOBaseBuffer):
             return self._fp.readinto(target)
 
     def __getitem__(self, key):
-        """Fetch a slice of file's content into a pre-allocated bytes-like
-        object b.
+        """Fetch a slice of file's content as bytes. For integer index, return
+        a single byte value as integer.
 
         Returns:
-            :class:`bytes`
-        """
-        # XXX: for consistency with bytearray, return int for int index?
+            int/:class:`bytes`
 
-        start, stop = self._getkey_to_range(key)
+        Note:
+            Behavior consistent with bytes/bytearray/memoryview.
+        """
+
+        start, stop, is_item = self._getkey_to_range(key)
         size = stop - start
         if size <= 0:
             return bytes()
@@ -168,7 +175,12 @@ class FileBuffer(RandomAccessIOBaseBuffer):
         n = self.getinto(key, b)
         del b[n:]
 
-        return bytes(b)
+        if is_item:
+            # note: for out-of-bounds access this will automatically raise an
+            # `IndexError`, as expected, because `n` will be zero
+            return b[0]
+        else:
+            return bytes(b)
 
 
 class FileView(io.RawIOBase):

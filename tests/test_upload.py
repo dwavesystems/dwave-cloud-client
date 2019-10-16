@@ -56,15 +56,16 @@ class TestFileBuffer(unittest.TestCase):
         n = len(data)
 
         # integer indexing
-        self.assertEqual(fb[0], data[0:1])
-        self.assertEqual(fb[n-1], data[n-1:n])
+        self.assertEqual(fb[0], data[0])
+        self.assertEqual(fb[n-1], data[n-1])
 
         # negative integer indexing
-        self.assertEqual(fb[-1], data[-1:n])
-        self.assertEqual(fb[-n], data[0:1])
+        self.assertEqual(fb[-1], data[-1])
+        self.assertEqual(fb[-n], data[-n])
 
         # out of bounds integer indexing
-        self.assertEqual(fb[n], data[n:n+1])
+        with self.assertRaises(IndexError):
+            fb[n]
 
         # non-integer key
         with self.assertRaises(TypeError):
@@ -271,7 +272,11 @@ class TestFileView(unittest.TestCase):
         self.assertEqual(len(subfv), size - 2)
 
         # view, integer index
-        self.assertEqual(fv[2], data[2:3])
+        self.assertEqual(fv[2], data[2])
+
+        # view, out of bounds index
+        with self.assertRaises(IndexError):
+            fv[size]
 
         # view are independent
         self.assertEqual(fv[:2].read(), data[:2])
