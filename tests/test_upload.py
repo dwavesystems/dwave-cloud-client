@@ -88,10 +88,9 @@ class TestFileBuffer(unittest.TestCase):
     def test_view_from_memory_string(self):
         data = self.data.decode()
         fp = io.StringIO(data)
-        fb = FileBuffer(fp)
 
-        self.assertEqual(len(fb), len(data))
-        self.verify_getter(fb, data)
+        with self.assertRaises(TypeError):
+            fb = FileBuffer(fp)
 
     def test_view_from_file_like(self):
         data = self.data
@@ -129,7 +128,7 @@ class TestFileBuffer(unittest.TestCase):
 
         # fail without read access
         with io.open(path, 'wb') as fp:
-            with self.assertRaises(ValueError):
+            with self.assertRaises(TypeError):
                 FileBuffer(fp)
 
         # remove temp file

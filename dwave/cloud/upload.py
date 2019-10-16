@@ -49,23 +49,21 @@ class RandomAccessIOBaseBuffer(abc.Sized):
 
 
 class FileBuffer(RandomAccessIOBaseBuffer):
-    """Provide thread-safe random access to a file-like object via item getter
-    interface.
+    """Provide thread-safe memory buffer-like random access to a file-like
+    object via an item getter interface.
 
     Args:
-        fp (:class:`io.IOBase`/file-like):
-            A file-like object that supports seek, read and tell operations.
+        fp (:class:`io.BufferedIOBase`/binary-file-like):
+            A file-like object that supports seek and readinto operations.
             Thread-safety of these operations is not assumed.
 
         strict (bool, default=True):
-            Require file-like object to be a :class:`io.IOBase` subclass.
+            Require file-like object to be a :class:`io.BufferedIOBase`
+            subclass.
 
     Note:
-        :class:`FileBuffer` behavior is invariant to data encoding of the
-        file-like object. For example, if the file is opened in binary mode
-        (or file is :class:`io.BytesIO` instance), :class:`bytes` are returned
-        as slices. If the file is opened in text mode (or it's
-        :class:`io.StringIO`), slicing returns :class:`str` instances.
+        :class:`FileBuffer` requires a file-like object to support buffered
+        binary read access.
 
     Example:
         Access overlapping segments of a file from multiple threads::
@@ -84,17 +82,15 @@ class FileBuffer(RandomAccessIOBaseBuffer):
     def __init__(self, fp, strict=True):
         if strict:
             valid = lambda f: (
-                isinstance(f, io.IOBase) and f.seekable() and f.readable())
+                isinstance(f, io.BufferedIOBase) and f.seekable() and f.readable())
         else:
-            valid = lambda f: all([
-                hasattr(f, 'read'), hasattr(f, 'seek'), hasattr(f, 'tell')])
+            valid = lambda f: all([hasattr(f, 'readinto'), hasattr(f, 'seek')])
 
         if not valid(fp):
-            raise ValueError("expected file-like, seekable, readable object")
+            raise TypeError("expected file-like, seekable, readable object")
 
         # store file size, assuming it won't change
-        fp.seek(0, os.SEEK_END)
-        self._size = fp.tell()
+        self._size = fp.seek(0, os.SEEK_END)
         self._fp = fp
 
         # multiple threads will be accessing the underlying file 
@@ -103,12 +99,8 @@ class FileBuffer(RandomAccessIOBaseBuffer):
     def __len__(self):
         return self._size
 
-    def __getitem__(self, key):
-        """Fetch a slice of file's content.
-
-        Returns:
-            :class:`bytes`/:class:`str`
-        """
+    def _getkey_to_range(self, key):
+        """Resolve slice/int key to start-stop range bounds."""
 
         if isinstance(key, slice):
             start, stop, stride = key.indices(len(self))
@@ -126,14 +118,56 @@ class FileBuffer(RandomAccessIOBaseBuffer):
 
             stop = start + 1
 
-        # empty slices
+        return start, stop
+
+    def getinto(self, key, b):
+        """Copy a slice of file's content into a pre-allocated bytes-like
+        object b. For example, b might be a `bytearray`.
+
+        Args:
+            key (slice/int):
+                Source data address coded as a `slice` object or int position.
+            b (bytes-like):
+                Target pre-allocated bytes-like object.
+
+        Returns:
+            int:
+                The number of bytes read (0 for EOF).
+        """
+
+        start, stop = self._getkey_to_range(key)
+
+        # empty slice
         if stop <= start:
-            return bytes()
+            return 0
+
+        # read source[start:stop] => target[0:stop-start]
+        size = stop - start
+        target = memoryview(b)[:size]
 
         # slice is an atomic "seek and read" operation
         with self._lock:
             self._fp.seek(start)
-            return self._fp.read(stop - start)
+            return self._fp.readinto(target)
+
+    def __getitem__(self, key):
+        """Fetch a slice of file's content into a pre-allocated bytes-like
+        object b.
+
+        Returns:
+            :class:`bytes`/:class:`str`
+        """
+
+        start, stop = self._getkey_to_range(key)
+        size = stop - start
+        if size <= 0:
+            return bytes()
+
+        b = bytearray(size)
+        n = self.getinto(key, b)
+        del b[n:]
+
+        return bytes(b)
 
 
 class ChunkedData(object):
