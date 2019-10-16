@@ -120,6 +120,12 @@ class TestFileBuffer(unittest.TestCase):
         self.assertEqual(b[:n//2], data[-n//2:])
         self.assertEqual(b[n//2:], bytearray(n//2))
 
+        # slicing into a buffer too small
+        m = 3
+        b = bytearray(m)
+        self.assertEqual(fb.getinto(slice(None), b), m)
+        self.assertEqual(b, data[:m])
+
     def test_view_from_memory_bytes(self):
         data = self.data
         fp = io.BytesIO(data)

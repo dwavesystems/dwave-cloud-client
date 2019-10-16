@@ -141,9 +141,9 @@ class FileBuffer(RandomAccessIOBaseBuffer):
         if stop <= start:
             return 0
 
-        # read source[start:stop] => target[0:stop-start]
+        # copy source[start:stop] => target[0:stop-start]
         size = stop - start
-        target = memoryview(b)[:size]
+        target = memoryview(b).cast('B')[:size]
 
         # slice is an atomic "seek and read" operation
         with self._lock:
@@ -168,6 +168,63 @@ class FileBuffer(RandomAccessIOBaseBuffer):
         del b[n:]
 
         return bytes(b)
+
+
+class FileView(io.RawIOBase):
+    """A raw binary stream subclass with memoryview-like interface to
+    :class:`.FileBuffer` (binary-file-like wrapper).
+
+    Args:
+        fb (:class:`.FileBuffer`):
+            A file-buffer-like object that supports `getinto` operation.
+    """
+
+    def __init__(self, fb):
+        super(FileView, self).__init__()
+        self._fb = fb
+        self._offset = 0
+        self._size = len(fb)
+
+    def readinto(self, b):
+        """Read bytes into a pre-allocated bytes-like object b.
+
+        Returns:
+            int:
+                The number of bytes read.
+        """
+        key = slice(self._offset, self._offset + self._size)
+        return self._fb.getinto(key, b)
+
+    def __len__(self):
+        return self._size
+
+    def __getitem__(self, key):
+        """Return memoryview-like slice: byte value for an integer index,
+        sub-FileView for a slice index key.
+        """
+
+        # slice key
+        if isinstance(key, slice):
+            start, stop, stride = key.indices(len(self))
+            if stride != 1:
+                raise NotImplementedError("stride of 1 required")
+
+            view = FileView(self._fb)
+            view._offset += start
+            view._size = stop - start
+            return view
+
+        # integer key
+        try:
+            start = int(key)
+        except:
+            raise TypeError("slice or integral key expected")
+
+        # negative indices wrap around
+        if start < 0:
+            start %= len(self)
+
+        return self._fb[self._offset + start]
 
 
 class ChunkedData(object):
