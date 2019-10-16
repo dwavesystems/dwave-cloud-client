@@ -148,7 +148,7 @@ class FileBuffer(RandomAccessIOBaseBuffer):
 
         # copy source[start:stop] => target[0:stop-start]
         size = stop - start
-        target = memoryview(b).cast('B')[:size]
+        target = memoryview(b)[:size]
 
         # slice is an atomic "seek and read" operation
         with self._lock:
