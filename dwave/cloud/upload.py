@@ -91,6 +91,11 @@ class FileBuffer(RandomAccessIOBaseBuffer):
 
         # store file size, assuming it won't change
         self._size = fp.seek(0, os.SEEK_END)
+        if self._size is None:
+            # handle python2, when `fp.seek()` is `file.seek()`
+            # note: not a thread-safe way
+            self._size = fp.tell()
+
         self._fp = fp
 
         # multiple threads will be accessing the underlying file 
