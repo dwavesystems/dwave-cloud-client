@@ -290,10 +290,10 @@ class TestChunkedData(unittest.TestCase):
         self.assertEqual(len(cd), len(chunks_expected))
         self.assertEqual(cd.num_chunks, len(chunks_expected))
 
-        chunks_iter = [c.getvalue() for c in cd]
+        chunks_iter = [c.read() for c in cd]
         chunks_explicit = []
         for idx in range(len(cd)):
-            chunks_explicit.append(cd.chunk(idx).getvalue())
+            chunks_explicit.append(cd.chunk(idx).read())
 
         self.assertListEqual(chunks_iter, chunks_expected)
         self.assertListEqual(chunks_explicit, chunks_iter)

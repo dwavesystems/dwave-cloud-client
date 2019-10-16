@@ -30,7 +30,7 @@ except ImportError:     # pragma: no cover
 
 import six
 
-__all__ = ['FileBuffer', 'ChunkedData']
+__all__ = ['FileBuffer', 'FileView', 'ChunkedData']
 
 logger = logging.getLogger(__name__)
 
@@ -199,12 +199,12 @@ class FileView(io.RawIOBase):
         self._offset = 0
         self._size = len(fb)
 
-    def seek(self, pos, whence=io.SEEK_SET):
-        if whence == io.SEEK_SET:
+    def seek(self, pos, whence=os.SEEK_SET):
+        if whence == os.SEEK_SET:
             self._pos = pos
-        elif whence == io.SEEK_CUR:
+        elif whence == os.SEEK_CUR:
             self._pos += pos
-        elif whence == io.SEEK_END:
+        elif whence == os.SEEK_END:
             self._pos = self._size + pos
         else:
             raise ValueError("whence must be one of 'io.SEEK_{SET,CUR,END}'")
@@ -264,8 +264,8 @@ class ChunkedData(object):
     """Unifying and performant streaming file-like interface to (large problem)
     data chunks.
 
-    Handles streaming (not yet), in-file and in-memory data. Provides access to
-    chunk data.
+    Handles in-file and in-memory data. Non-seekable streams are not yet
+    supported. Provides access to chunk data.
 
     Args:
         data (bytes/str/binary-file-like):
@@ -290,12 +290,7 @@ class ChunkedData(object):
 
         if isinstance(data, bytes):
             data = io.BytesIO(data)
-            # use non-locking memory view over bytes if available
-            try:
-                self.view = data.getbuffer()
-            except AttributeError:  # pragma: no cover
-                # python 2: fallback to FileBuffer
-                pass
+            # TODO: use non-locking memory view over bytes if available
 
         if self.view is None and isinstance(data, io.IOBase):
             # use locking file view if possible
@@ -303,7 +298,7 @@ class ChunkedData(object):
                 raise ValueError("seekable file-like data object expected")
             if not data.readable():
                 raise ValueError("readable file-like data object expected")
-            self.view = FileBuffer(data)
+            self.view = FileView(FileBuffer(data))
 
         # TODO: use stream view if possible
 
@@ -325,7 +320,7 @@ class ChunkedData(object):
 
         start = idx * self.chunk_size
         stop = start + self.chunk_size
-        return io.BytesIO(self.view[start:stop])
+        return self.view[start:stop]
 
     def __iter__(self):
         for idx in range(len(self)):
