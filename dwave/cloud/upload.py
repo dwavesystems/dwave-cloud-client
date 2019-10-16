@@ -213,11 +213,6 @@ class FileView(io.RawIOBase):
         key = slice(start, stop)
         n = self._fb.getinto(key, b)
         self._pos += n
-
-        # indicate EOF to read()
-        if n == 0:
-            return None
-
         return n
 
     def __len__(self):
