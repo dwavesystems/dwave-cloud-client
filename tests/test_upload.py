@@ -54,6 +54,8 @@ class TestFileBuffer(unittest.TestCase):
 
     def verify_getter(self, fb, data):
         n = len(data)
+        # python 2 fix: indexing of bytes returns a slice (not int)
+        data = bytearray(data)
 
         # integer indexing
         self.assertEqual(fb[0], data[0])
@@ -81,6 +83,8 @@ class TestFileBuffer(unittest.TestCase):
 
     def verify_getinto(self, fb, data):
         n = len(data)
+        # python 2 fix: indexing of bytes returns a slice (not int)
+        data = bytearray(data)
 
         # integer indexing
         b = bytearray(n)
@@ -228,7 +232,8 @@ class TestFileBuffer(unittest.TestCase):
 
 
 class TestFileView(unittest.TestCase):
-    data = b'0123456789'
+    # python 2 fix: indexing of bytes returns a slice (not int)
+    data = bytearray(b'0123456789')
 
     def test_file_interface(self):
         data = self.data
