@@ -188,6 +188,32 @@ class FileBuffer(RandomAccessIOBaseBuffer):
             return bytes(b)
 
 
+class MemoryBuffer(FileBuffer):
+    """FileBuffer-stand-in for in-memory buffers."""
+
+    def __init__(self, buf):
+        self._buf = buf
+
+    def __len__(self):
+        return len(self._buf)
+
+    def getinto(self, key, b):
+        start, stop, _ = self._getkey_to_range(key)
+
+        # empty slice
+        if stop <= start:
+            return 0
+
+        # copy source[start:stop] => target[0:stop-start]
+        size = stop - start
+        target = memoryview(b)[:size]
+
+        # copy
+        target = self._buf[start:stop]
+
+        return len(target)
+
+
 class FileView(io.RawIOBase):
     """A raw binary stream subclass with memoryview-like interface to
     :class:`.FileBuffer` (binary-file-like wrapper).
@@ -238,7 +264,7 @@ class FileView(io.RawIOBase):
 
     def __getitem__(self, key):
         """Return memoryview-like slice: byte value for an integer index,
-        sub-FileView for a slice index key.
+        sub-FileView for a slice index.
         """
 
         # slice key
@@ -256,7 +282,7 @@ class FileView(io.RawIOBase):
         try:
             start = int(key)
         except:
-            raise TypeError("slice or integral key expected")
+            raise TypeError("slice or integer key expected")
 
         # negative indices wrap around
         if start < 0:
@@ -270,7 +296,7 @@ class ChunkedData(object):
     data chunks.
 
     Handles in-file and in-memory data. Non-seekable streams are not yet
-    supported. Provides access to chunk data.
+    supported. Provides access to chunk data via file-like interface.
 
     Args:
         data (bytes/str/binary-file-like):
@@ -294,8 +320,11 @@ class ChunkedData(object):
             data = data.encode('ascii')
 
         if isinstance(data, (bytes, bytearray)):
-            data = io.BytesIO(data)
-            # TODO: use non-locking memory view over bytes if available
+            # note: `BytesIO` (in py3.5+) will use buffer protocol (reuse data
+            # buffer) only for `bytes` objects, and make a copy otherwise!
+
+            # use non-locking memory view over data buffer
+            self.view = FileView(MemoryBuffer(data))
 
         if self.view is None and isinstance(data, io.IOBase):
             # use locking file view if possible
@@ -321,7 +350,16 @@ class ChunkedData(object):
         return self.num_chunks
 
     def chunk(self, idx):
-        """Return zero-indexed chunk data as a binary stream."""
+        """Return binary file-like object for a specified data chunk.
+
+        Args:
+            idx (int):
+                Zero-based chunk index.
+
+        Returns:
+            :class:`.FileView`
+
+        """
 
         start = idx * self.chunk_size
         stop = start + self.chunk_size
