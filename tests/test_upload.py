@@ -308,6 +308,11 @@ class TestChunkedData(unittest.TestCase):
         chunks_expected = [b'012', b'345', b'678', b'9']
         self.verify_chunking(cd, chunks_expected)
 
+    def test_chunks_from_bytearray(self):
+        cd = ChunkedData(bytearray(self.data), chunk_size=3)
+        chunks_expected = [b'012', b'345', b'678', b'9']
+        self.verify_chunking(cd, chunks_expected)
+
     def test_chunks_from_str(self):
         cd = ChunkedData(self.data.decode('ascii'), chunk_size=3)
         chunks_expected = [b'012', b'345', b'678', b'9']

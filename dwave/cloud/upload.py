@@ -293,7 +293,7 @@ class ChunkedData(object):
         if isinstance(data, six.string_types):
             data = data.encode('ascii')
 
-        if isinstance(data, bytes):
+        if isinstance(data, (bytes, bytearray)):
             data = io.BytesIO(data)
             # TODO: use non-locking memory view over bytes if available
 
