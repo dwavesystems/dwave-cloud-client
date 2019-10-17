@@ -70,7 +70,7 @@ from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config, parse_float
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
-from dwave.cloud.upload import FileView, ChunkedData
+from dwave.cloud.upload import ChunkedData
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent,
     datetime_to_timestamp, utcnow, epochnow, cached)
@@ -1548,16 +1548,16 @@ class Client(object):
         # in python 3.7+ we could create the session once, on thread init,
         # via executor initializer
         with self.create_session() as session:
-
             chunks = ChunkedData(problem, chunk_size=self._UPLOAD_PART_SIZE_BYTES)
             size = len(chunks.view)
 
             problem_id = self._initiate_multipart_upload(session, size)
 
             parts = []
-            for chunk_no, chunk_data in enumerate(chunks):
+            streams = collections.OrderedDict(enumerate(chunks))
+            for chunk_no, chunk_stream in streams.items():
                 part = self._upload_part_executor.submit(
-                    self._upload_part_worker, problem_id, chunk_no, chunk_data)
+                    self._upload_part_worker, problem_id, chunk_no, chunk_stream)
                 part.add_done_callback(self._check_parts)
                 parts.append(part)
 
@@ -1572,6 +1572,6 @@ class Client(object):
 
             # TODO: fail-safe close
 
-    def _upload_part_worker(self, problem_id, chunk_no, chunk_data):
+    def _upload_part_worker(self, problem_id, chunk_no, chunk_stream):
         with self.create_session() as session:
-            self._upload_multipart_part(session, problem_id, chunk_no, chunk_data)
+            self._upload_multipart_part(session, problem_id, chunk_no, chunk_stream)

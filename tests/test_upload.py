@@ -347,4 +347,4 @@ class TestMultipartUpload(unittest.TestCase):
             try:
                 future.result()
             except Exception as e:
-                self.fail()
+                self.fail(e)
