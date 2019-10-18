@@ -35,22 +35,96 @@ __all__ = ['FileBuffer', 'FileView', 'ChunkedData']
 logger = logging.getLogger(__name__)
 
 
-class RandomAccessIOBaseBuffer(abc.Sized):
-    """Abstract base class for random access file-like object buffers.
+class Gettable(abc.Sized):
+    """Abstract base class for objects that implement standard and efficient
+    item getters.
 
-    Concrete subclasses must provide __len__ and __getitem__.
+    Concrete subclasses must provide __len__ and __getitem__/getinto.
     """
 
     __slots__ = ()
 
     @abstractmethod
     def __getitem__(self, key):     # pragma: no cover
+        """Standard item getter, integer and slice indices supported."""
         raise KeyError
 
+    @abstractmethod
+    def getinto(self, key, buf):    # pragma: no cover
+        """Optimized item getter (without the temporary buffer)."""
+        raise NotImplementedError
 
-class FileBuffer(RandomAccessIOBaseBuffer):
-    """Provide thread-safe memory buffer-like random access to a file-like
-    object via an item getter interface.
+
+class GettableBase(Gettable):
+    """Base class for sized data containers with a thread-safe efficient item
+    getter.
+
+    Subclasses must implement __len__ and getinto.
+    """
+
+    def __len__(self):
+        raise NotImplementedError
+
+    def _getkey_to_range(self, key):
+        """Resolve slice/int key to start-stop range bounds.
+
+        Returns: (start, stop, is_item?)
+        """
+
+        if isinstance(key, slice):
+            start, stop, stride = key.indices(len(self))
+            if stride != 1:
+                raise NotImplementedError("stride of 1 required")
+            is_item = False
+        else:
+            try:
+                start = int(key)
+            except:
+                raise TypeError("slice or integral key expected")
+
+            # negative indices wrap around
+            if start < 0:
+                start %= len(self)
+
+            stop = start + 1
+            is_item = True
+
+        return start, stop, is_item
+
+    def getinto(self, key, buf):
+        raise NotImplementedError
+
+    def __getitem__(self, key):
+        """Fetch a slice of file's content as bytes. For integer index, return
+        a single byte value as integer.
+
+        Returns:
+            int/:class:`bytes`
+
+        Note:
+            Behavior consistent with bytes/bytearray/memoryview.
+        """
+
+        start, stop, is_item = self._getkey_to_range(key)
+        size = stop - start
+        if size <= 0:
+            return bytes()
+
+        b = bytearray(size)
+        n = self.getinto(key, b)
+        del b[n:]
+
+        if is_item:
+            # note: for out-of-bounds access this will automatically raise an
+            # `IndexError`, as expected, because `n` will be zero
+            return b[0]
+        else:
+            return bytes(b)
+
+
+class FileBuffer(GettableBase):
+    """Provide thread-safe memory buffer-like random read access to a file-like
+    object via an efficient item getter interface.
 
     Args:
         fp (:class:`io.BufferedIOBase`/binary-file-like):
@@ -104,40 +178,14 @@ class FileBuffer(RandomAccessIOBaseBuffer):
     def __len__(self):
         return self._size
 
-    def _getkey_to_range(self, key):
-        """Resolve slice/int key to start-stop range bounds.
-
-        Returns: (start, stop, is_item?)
-        """
-
-        if isinstance(key, slice):
-            start, stop, stride = key.indices(len(self))
-            if stride != 1:
-                raise NotImplementedError("stride of 1 required")
-            is_item = False
-        else:
-            try:
-                start = int(key)
-            except:
-                raise TypeError("slice or integral key expected")
-
-            # negative indices wrap around
-            if start < 0:
-                start %= len(self)
-
-            stop = start + 1
-            is_item = True
-
-        return start, stop, is_item
-
-    def getinto(self, key, b):
+    def getinto(self, key, buf):
         """Copy a slice of file's content into a pre-allocated bytes-like
         object b. For example, b might be a `bytearray`.
 
         Args:
             key (slice/int):
                 Source data address coded as a `slice` object or int position.
-            b (bytes-like):
+            buf (bytes-like):
                 Target pre-allocated bytes-like object.
 
         Returns:
@@ -153,42 +201,15 @@ class FileBuffer(RandomAccessIOBaseBuffer):
 
         # copy source[start:stop] => target[0:stop-start]
         size = stop - start
-        target = memoryview(b)[:size]
+        target = memoryview(buf)[:size]
 
         # slice is an atomic "seek and read" operation
         with self._lock:
             self._fp.seek(start)
             return self._fp.readinto(target)
 
-    def __getitem__(self, key):
-        """Fetch a slice of file's content as bytes. For integer index, return
-        a single byte value as integer.
 
-        Returns:
-            int/:class:`bytes`
-
-        Note:
-            Behavior consistent with bytes/bytearray/memoryview.
-        """
-
-        start, stop, is_item = self._getkey_to_range(key)
-        size = stop - start
-        if size <= 0:
-            return bytes()
-
-        b = bytearray(size)
-        n = self.getinto(key, b)
-        del b[n:]
-
-        if is_item:
-            # note: for out-of-bounds access this will automatically raise an
-            # `IndexError`, as expected, because `n` will be zero
-            return b[0]
-        else:
-            return bytes(b)
-
-
-class MemoryBuffer(FileBuffer):
+class MemoryBuffer(GettableBase):
     """FileBuffer-stand-in for in-memory buffers."""
 
     def __init__(self, buf):
@@ -197,7 +218,7 @@ class MemoryBuffer(FileBuffer):
     def __len__(self):
         return len(self._buf)
 
-    def getinto(self, key, b):
+    def getinto(self, key, buf):
         start, stop, _ = self._getkey_to_range(key)
 
         # empty slice
@@ -206,12 +227,12 @@ class MemoryBuffer(FileBuffer):
 
         # copy source[start:stop] => target[0:stop-start]
         size = stop - start
-        target = memoryview(b)[:size]
+        target = memoryview(buf)
 
         # copy
-        target = self._buf[start:stop]
+        target[:size] = self._buf[start:stop]
 
-        return len(target)
+        return size
 
 
 class FileView(io.RawIOBase):

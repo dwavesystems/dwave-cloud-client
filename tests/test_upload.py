@@ -21,7 +21,7 @@ from concurrent.futures import ThreadPoolExecutor, wait
 
 from dwave.cloud.utils import tictoc
 from dwave.cloud.upload import (
-    RandomAccessIOBaseBuffer, FileBuffer, FileView, ChunkedData)
+    Gettable, FileBuffer, FileView, ChunkedData)
 from dwave.cloud.client import Client
 
 from tests import config
@@ -30,23 +30,25 @@ from tests import config
 class TestFileBufferABC(unittest.TestCase):
 
     def test_invalid(self):
-        class InvalidFileBuffer(RandomAccessIOBaseBuffer):
+        class InvalidGettable(Gettable):
             pass
 
         with self.assertRaises(TypeError):
-            InvalidFileBuffer()
+            InvalidGettable()
 
     def test_valid(self):
-        class ValidFileBuffer(RandomAccessIOBaseBuffer):
+        class ValidGettable(Gettable):
             def __len__(self):
                 return NotImplementedError
             def __getitem__(self, key):
                 return NotImplementedError
+            def getinto(self, key):
+                return NotImplementedError
 
         try:
-            ValidFileBuffer()
+            ValidGettable()
         except:
-            self.fail("unexpected interface of RandomAccessIOBaseBuffer")
+            self.fail("unexpected interface of Gettable")
 
 
 class TestFileBuffer(unittest.TestCase):
