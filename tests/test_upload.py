@@ -21,13 +21,13 @@ from concurrent.futures import ThreadPoolExecutor, wait
 
 from dwave.cloud.utils import tictoc
 from dwave.cloud.upload import (
-    Gettable, FileBuffer, FileView, ChunkedData)
+    Gettable, GettableFile, FileView, ChunkedData)
 from dwave.cloud.client import Client
 
 from tests import config
 
 
-class TestFileBufferABC(unittest.TestCase):
+class TestGettableABC(unittest.TestCase):
 
     def test_invalid(self):
         class InvalidGettable(Gettable):
@@ -51,7 +51,7 @@ class TestFileBufferABC(unittest.TestCase):
             self.fail("unexpected interface of Gettable")
 
 
-class TestFileBuffer(unittest.TestCase):
+class TestGettableFile(unittest.TestCase):
     data = b'0123456789'
 
     def verify_getter(self, fb, data):
@@ -137,18 +137,18 @@ class TestFileBuffer(unittest.TestCase):
     def test_buffer_from_memory_bytes(self):
         data = self.data
         fp = io.BytesIO(data)
-        fb = FileBuffer(fp)
+        gf = GettableFile(fp)
 
-        self.assertEqual(len(fb), len(data))
-        self.verify_getter(fb, data)
-        self.verify_getinto(fb, data)
+        self.assertEqual(len(gf), len(data))
+        self.verify_getter(gf, data)
+        self.verify_getinto(gf, data)
 
     def test_buffer_from_memory_string(self):
         data = self.data.decode()
         fp = io.StringIO(data)
 
         with self.assertRaises(TypeError):
-            fb = FileBuffer(fp)
+            GettableFile(fp)
 
     def test_buffer_from_file_like(self):
         data = self.data
@@ -157,11 +157,11 @@ class TestFileBuffer(unittest.TestCase):
         with tempfile.TemporaryFile() as fp:
             fp.write(data)
             fp.seek(0)
-            fb = FileBuffer(fp, strict=False)
+            gf = GettableFile(fp, strict=False)
 
-            self.assertEqual(len(fb), len(data))
-            self.verify_getter(fb, data)
-            self.verify_getinto(fb, data)
+            self.assertEqual(len(gf), len(data))
+            self.verify_getter(gf, data)
+            self.verify_getinto(gf, data)
 
     def test_buffer_from_disk_file(self):
         data = self.data
@@ -171,26 +171,26 @@ class TestFileBuffer(unittest.TestCase):
         os.write(fd, data)
         os.close(fd)
 
-        # test FileBuffer from file on disk (read access)
+        # test GettableFile from file on disk (read access)
         with io.open(path, 'rb') as fp:
-            fb = FileBuffer(fp)
+            gf = GettableFile(fp)
 
-            self.assertEqual(len(fb), len(data))
-            self.verify_getter(fb, data)
-            self.verify_getinto(fb, data)
+            self.assertEqual(len(gf), len(data))
+            self.verify_getter(gf, data)
+            self.verify_getinto(gf, data)
 
         # works also for read+write access
         with io.open(path, 'r+b') as fp:
-            fb = FileBuffer(fp)
+            gf = GettableFile(fp)
 
-            self.assertEqual(len(fb), len(data))
-            self.verify_getter(fb, data)
-            self.verify_getinto(fb, data)
+            self.assertEqual(len(gf), len(data))
+            self.verify_getter(gf, data)
+            self.verify_getinto(gf, data)
 
         # fail without read access
         with io.open(path, 'wb') as fp:
             with self.assertRaises(TypeError):
-                FileBuffer(fp)
+                GettableFile(fp)
 
         # remove temp file
         os.unlink(path)
@@ -199,7 +199,7 @@ class TestFileBuffer(unittest.TestCase):
         # setup a shared file view
         data = self.data
         fp = io.BytesIO(data)
-        fb = FileBuffer(fp)
+        gf = GettableFile(fp)
 
         # file slices
         slice_a = slice(0, 7)
@@ -210,12 +210,12 @@ class TestFileBuffer(unittest.TestCase):
         sleep = 0.25
         def blocking_seek(start):
             time.sleep(sleep)
-            return io.BytesIO.seek(fb._fp, start)
-        fb._fp.seek = blocking_seek
+            return io.BytesIO.seek(gf._fp, start)
+        gf._fp.seek = blocking_seek
 
         # define the worker
         def worker(slice_):
-            return fb[slice_]
+            return gf[slice_]
 
         # run the worker a few times in parallel
         executor = ThreadPoolExecutor(max_workers=3)
@@ -241,8 +241,8 @@ class TestFileView(unittest.TestCase):
         data = self.data
         size = len(data)
         fp = io.BytesIO(data)
-        fb = FileBuffer(fp)
-        fv = FileView(fb)
+        gf = GettableFile(fp)
+        fv = FileView(gf)
 
         # partial read
         self.assertEqual(fv.read(1), data[0:1])
@@ -270,8 +270,8 @@ class TestFileView(unittest.TestCase):
         data = self.data
         size = len(data)
         fp = io.BytesIO(data)
-        fb = FileBuffer(fp)
-        fv = FileView(fb)
+        gf = GettableFile(fp)
+        fv = FileView(gf)
 
         # view, slice index
         subfv = fv[1:-1]

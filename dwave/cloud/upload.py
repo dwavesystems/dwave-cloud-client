@@ -30,7 +30,7 @@ except ImportError:     # pragma: no cover
 
 import six
 
-__all__ = ['FileBuffer', 'FileView', 'ChunkedData']
+__all__ = ['ChunkedData']
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +122,7 @@ class GettableBase(Gettable):
             return bytes(b)
 
 
-class FileBuffer(GettableBase):
+class GettableFile(GettableBase):
     """Provide thread-safe memory buffer-like random read access to a file-like
     object via an efficient item getter interface.
 
@@ -136,20 +136,20 @@ class FileBuffer(GettableBase):
             subclass.
 
     Note:
-        :class:`FileBuffer` requires a file-like object to support buffered
-        binary read access.
+        :class:`.GettableFile` implements :class:`.Gettable` interface over a
+        file-like object that supports buffered binary read access.
 
     Example:
         Access overlapping segments of a file from multiple threads::
 
             with open('/path/to/file', 'rb') as fp:   # binary mode, read access
-                fb = FileBuffer(fp):
+                gf = GettableFile(fp):
 
                 # in thread 1:
-                seg = fb[0:10]
+                seg = gf[0:10]
 
                 # in thread 2:
-                seg = fb[5:15]
+                seg = gf[5:15]
 
     """
 
@@ -210,7 +210,7 @@ class FileBuffer(GettableBase):
 
 
 class MemoryBuffer(GettableBase):
-    """FileBuffer-stand-in for in-memory buffers."""
+    """GettableFile-stand-in for in-memory buffers."""
 
     def __init__(self, buf):
         self._buf = buf
@@ -237,11 +237,13 @@ class MemoryBuffer(GettableBase):
 
 class FileView(io.RawIOBase):
     """A raw binary stream subclass with memoryview-like interface to
-    :class:`.FileBuffer` (binary-file-like wrapper).
+    :class:`.GettableFile` (binary-file-like wrapper).
 
     Args:
-        fb (:class:`.FileBuffer`):
-            A file-buffer-like object that supports `getinto` operation.
+        fb (:class:`.GettableFile`):
+            A file-buffer-like object that supports efficient and thread-safe
+            `getinto` operation.
+
     """
 
     def __init__(self, fb):
@@ -353,7 +355,7 @@ class ChunkedData(object):
                 raise ValueError("seekable file-like data object expected")
             if not data.readable():
                 raise ValueError("readable file-like data object expected")
-            self.view = FileView(FileBuffer(data))
+            self.view = FileView(GettableFile(data))
 
         # TODO: use stream view if possible
 
