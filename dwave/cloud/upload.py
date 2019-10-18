@@ -180,7 +180,7 @@ class GettableFile(GettableBase):
 
     def getinto(self, key, buf):
         """Copy a slice of file's content into a pre-allocated bytes-like
-        object b. For example, b might be a `bytearray`.
+        object buf. For example, buf might be a `bytearray`.
 
         Args:
             key (slice/int):
@@ -213,7 +213,7 @@ class GettableMemory(GettableBase):
     """Provide the :class:`Gettable` interface to a bytes-like object.
 
     Args:
-        fp (bytes/bytearray/memoryview/bytes-like):
+        buf (bytes/bytearray/memoryview/bytes-like):
             Bytes-like object.
 
     """
@@ -241,22 +241,32 @@ class GettableMemory(GettableBase):
 
 
 class FileView(io.RawIOBase):
-    """A raw binary stream subclass with memoryview-like interface to
-    :class:`.GettableFile` (binary-file-like wrapper).
+    """A raw binary stream subclass with memoryview-like interface to a
+    :class:`.GettableBase`-derived object.
 
     Args:
-        fb (:class:`.GettableFile`):
-            A file-buffer-like object that supports efficient and thread-safe
-            `getinto` operation.
+        raw (:class:`.GettableFile`/:class:`.GettableMemory`/:class:`.GettableBase`-derived):
+            A :class:`.GettableBase`-derived object that (essentially) supports
+            efficient and thread-safe `getinto` operation.
 
+    Note:
+        Although similar to :mod:`mmap` for files, :class:`.FileView` provides:
+        - a unified interface to *both* files and memory objects
+        - a way to ensure file "seek & read" operation is atomic (thread-safe)
+          via the :class:`.Gettable` layer
+
+    Note:
+        Use the slice syntax (item getter) to retrieve an isolated file segment
+        view (a new instance of :class:`.FileView` that references the same
+        underlying data, but supports independent read operations).
     """
 
-    def __init__(self, fb):
+    def __init__(self, raw):
         super(FileView, self).__init__()
-        self._fb = fb
+        self._raw = raw
         self._pos = 0
         self._offset = 0
-        self._size = len(fb)
+        self._size = len(raw)
 
     def seek(self, pos, whence=os.SEEK_SET):
         if whence == os.SEEK_SET:
@@ -283,7 +293,7 @@ class FileView(io.RawIOBase):
         start = self._offset + self._pos
         stop = self._offset + self._size
         key = slice(start, stop)
-        n = self._fb.getinto(key, b)
+        n = self._raw.getinto(key, b)
         self._pos += n
         return n
 
@@ -301,7 +311,7 @@ class FileView(io.RawIOBase):
             if stride != 1:
                 raise NotImplementedError("stride of 1 required")
 
-            view = FileView(self._fb)
+            view = FileView(self._raw)
             view._offset += start
             view._size = stop - start
             return view
@@ -316,7 +326,7 @@ class FileView(io.RawIOBase):
         if start < 0:
             start %= len(self)
 
-        return self._fb[self._offset + start]
+        return self._raw[self._offset + start]
 
 
 class ChunkedData(object):
@@ -327,8 +337,8 @@ class ChunkedData(object):
     supported. Provides access to chunk data via file-like interface.
 
     Args:
-        data (bytes/str/binary-file-like):
-            Encoded problem data, in-memory or in-file.
+        data (bytes-like/file-like):
+            Encoded problem data, in-memory or in-file (opened for binary read).
 
         chunk_size (int):
             Chunk size in bytes.
