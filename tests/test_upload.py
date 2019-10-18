@@ -21,7 +21,7 @@ from concurrent.futures import ThreadPoolExecutor, wait
 
 from dwave.cloud.utils import tictoc
 from dwave.cloud.upload import (
-    Gettable, GettableFile, FileView, ChunkedData)
+    Gettable, GettableFile, GettableMemory, FileView, ChunkedData)
 from dwave.cloud.client import Client
 
 from tests import config
@@ -51,106 +51,106 @@ class TestGettableABC(unittest.TestCase):
             self.fail("unexpected interface of Gettable")
 
 
-class TestGettableFile(unittest.TestCase):
+class TestGettables(unittest.TestCase):
     data = b'0123456789'
 
-    def verify_getter(self, fb, data):
+    def verify_getitem(self, gettable, data):
         n = len(data)
         # python 2 fix: indexing of bytes returns a slice (not int)
         data = bytearray(data)
 
         # integer indexing
-        self.assertEqual(fb[0], data[0])
-        self.assertEqual(fb[n-1], data[n-1])
+        self.assertEqual(gettable[0], data[0])
+        self.assertEqual(gettable[n-1], data[n-1])
 
         # negative integer indexing
-        self.assertEqual(fb[-1], data[-1])
-        self.assertEqual(fb[-n], data[-n])
+        self.assertEqual(gettable[-1], data[-1])
+        self.assertEqual(gettable[-n], data[-n])
 
         # out of bounds integer indexing
         with self.assertRaises(IndexError):
-            fb[n]
+            gettable[n]
 
         # non-integer key
         with self.assertRaises(TypeError):
-            fb['a']
+            gettable['a']
 
         # empty slices
-        self.assertEqual(fb[1:0], b'')
+        self.assertEqual(gettable[1:0], b'')
 
         # slicing
-        self.assertEqual(fb[:], data[:])
-        self.assertEqual(fb[0:n//2], data[0:n//2])
-        self.assertEqual(fb[-n//2:], data[-n//2:])
+        self.assertEqual(gettable[:], data[:])
+        self.assertEqual(gettable[0:n//2], data[0:n//2])
+        self.assertEqual(gettable[-n//2:], data[-n//2:])
 
-    def verify_getinto(self, fb, data):
+    def verify_getinto(self, gettable, data):
         n = len(data)
         # python 2 fix: indexing of bytes returns a slice (not int)
         data = bytearray(data)
 
         # integer indexing
         b = bytearray(n)
-        self.assertEqual(fb.getinto(0, b), 1)
+        self.assertEqual(gettable.getinto(0, b), 1)
         self.assertEqual(b[0], data[0])
 
-        self.assertEqual(fb.getinto(n-1, b), 1)
+        self.assertEqual(gettable.getinto(n-1, b), 1)
         self.assertEqual(b[0], data[n-1])
 
         # negative integer indexing
-        self.assertEqual(fb.getinto(-1, b), 1)
+        self.assertEqual(gettable.getinto(-1, b), 1)
         self.assertEqual(b[0], data[-1])
 
-        self.assertEqual(fb.getinto(-n, b), 1)
+        self.assertEqual(gettable.getinto(-n, b), 1)
         self.assertEqual(b[0], data[-n])
 
         # out of bounds integer indexing => nop
-        self.assertEqual(fb.getinto(n, b), 0)
+        self.assertEqual(gettable.getinto(n, b), 0)
 
         # non-integer key
         with self.assertRaises(TypeError):
-            fb.getinto('a', b)
+            gettable.getinto('a', b)
 
         # empty slices
-        self.assertEqual(fb.getinto(slice(1, 0), b), 0)
+        self.assertEqual(gettable.getinto(slice(1, 0), b), 0)
 
         # slicing
         b = bytearray(n)
-        self.assertEqual(fb.getinto(slice(None), b), n)
+        self.assertEqual(gettable.getinto(slice(None), b), n)
         self.assertEqual(b, data)
 
         b = bytearray(n)
-        self.assertEqual(fb.getinto(slice(0, n//2), b), n//2)
+        self.assertEqual(gettable.getinto(slice(0, n//2), b), n//2)
         self.assertEqual(b[0:n//2], data[0:n//2])
         self.assertEqual(b[n//2:], bytearray(n//2))
 
         b = bytearray(n)
-        self.assertEqual(fb.getinto(slice(-n//2, None), b), n//2)
+        self.assertEqual(gettable.getinto(slice(-n//2, None), b), n//2)
         self.assertEqual(b[:n//2], data[-n//2:])
         self.assertEqual(b[n//2:], bytearray(n//2))
 
         # slicing into a buffer too small
         m = 3
         b = bytearray(m)
-        self.assertEqual(fb.getinto(slice(None), b), m)
+        self.assertEqual(gettable.getinto(slice(None), b), m)
         self.assertEqual(b, data[:m])
 
-    def test_buffer_from_memory_bytes(self):
+    def test_gettable_file_from_memory_bytes(self):
         data = self.data
         fp = io.BytesIO(data)
         gf = GettableFile(fp)
 
         self.assertEqual(len(gf), len(data))
-        self.verify_getter(gf, data)
+        self.verify_getitem(gf, data)
         self.verify_getinto(gf, data)
 
-    def test_buffer_from_memory_string(self):
+    def test_gettable_file_from_memory_string(self):
         data = self.data.decode()
         fp = io.StringIO(data)
 
         with self.assertRaises(TypeError):
             GettableFile(fp)
 
-    def test_buffer_from_file_like(self):
+    def test_gettable_file_from_file_like(self):
         data = self.data
 
         # create file-like temporary object (on POSIX this is a tmp file)
@@ -160,10 +160,10 @@ class TestGettableFile(unittest.TestCase):
             gf = GettableFile(fp, strict=False)
 
             self.assertEqual(len(gf), len(data))
-            self.verify_getter(gf, data)
+            self.verify_getitem(gf, data)
             self.verify_getinto(gf, data)
 
-    def test_buffer_from_disk_file(self):
+    def test_gettable_file_from_disk_file(self):
         data = self.data
 
         # create temporary file
@@ -176,7 +176,7 @@ class TestGettableFile(unittest.TestCase):
             gf = GettableFile(fp)
 
             self.assertEqual(len(gf), len(data))
-            self.verify_getter(gf, data)
+            self.verify_getitem(gf, data)
             self.verify_getinto(gf, data)
 
         # works also for read+write access
@@ -184,7 +184,7 @@ class TestGettableFile(unittest.TestCase):
             gf = GettableFile(fp)
 
             self.assertEqual(len(gf), len(data))
-            self.verify_getter(gf, data)
+            self.verify_getitem(gf, data)
             self.verify_getinto(gf, data)
 
         # fail without read access
@@ -195,7 +195,7 @@ class TestGettableFile(unittest.TestCase):
         # remove temp file
         os.unlink(path)
 
-    def test_critical_section_respected(self):
+    def test_gettable_file_critical_section_respected(self):
         # setup a shared file view
         data = self.data
         fp = io.BytesIO(data)
@@ -231,6 +231,20 @@ class TestGettableFile(unittest.TestCase):
 
         # verify runtime is consistent with a blocking critical section
         self.assertGreaterEqual(timer.dt, 0.9 * len(results) * sleep)
+
+    def test_gettable_memory_from_bytes_like(self):
+        data_objects = [
+            bytes(self.data),
+            bytearray(self.data),
+            memoryview(self.data)
+        ]
+
+        for data in data_objects:
+            gm = GettableMemory(data)
+
+            self.assertEqual(len(gm), len(data))
+            self.verify_getitem(gm, data)
+            self.verify_getinto(gm, data)
 
 
 class TestFileView(unittest.TestCase):
