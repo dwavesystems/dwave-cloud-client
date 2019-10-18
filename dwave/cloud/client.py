@@ -54,6 +54,7 @@ import collections
 
 import base64
 import hashlib
+import codecs
 import concurrent.futures
 
 from itertools import chain
@@ -1472,6 +1473,7 @@ class Client(object):
         if response.status_code == 401:
             raise SolverAuthenticationError()
         else:
+            logger.trace("Multipart upload initiate response: %r", response.text)
             response.raise_for_status()
 
         try:
@@ -1484,8 +1486,22 @@ class Client(object):
         return problem_id
 
     @staticmethod
-    def _part_checksum(part):
-        return base64.b64encode(hashlib.md5(part).digest()).decode('ascii')
+    def _digest(data):
+        return hashlib.md5(data).digest()
+
+    @staticmethod
+    def _checksum_b64(digest):
+        return base64.b64encode(digest).decode('ascii')
+
+    @staticmethod
+    def _checksum_hex(digest):
+        return digest.hex()
+
+    @staticmethod
+    def _combined_checksum(checksums):
+        # XXX: drop this requirement server-side
+        combined = ''.join(h for _, h in sorted(checksums.items()))
+        return Client._checksum_hex(Client._digest(combined.encode('ascii')))
 
     @staticmethod
     def _upload_multipart_part(session, problem_id, part_id, part_stream):
@@ -1501,6 +1517,9 @@ class Client(object):
             part_stream (:class:`io.BufferedIOBase`/binary-stream-like):
                 Problem part data container that supports `read` operation.
 
+        Returns:
+            Hex digest of part data MD5 checksum.
+
         Note:
             This function *can* fail. Retry should be handled by the caller.
         """
@@ -1509,7 +1528,10 @@ class Client(object):
 
         # TODO: work-around to get a checksum of a binary stream
         data = part_stream.read()
-        checksum = Client._part_checksum(data)
+        digest = Client._digest(data)
+        # b64 for header, hex for master checksum
+        checksum = Client._checksum_b64(digest)
+        hexdigest = Client._checksum_hex(digest)
         del data
 
         # rewind the stream after read
@@ -1532,9 +1554,12 @@ class Client(object):
         if response.status_code == 401:
             raise SolverAuthenticationError()
         else:
+            logger.trace("Part upload response: %r", response.text)
             response.raise_for_status()
 
         logger.debug("Uploaded part_id=%r of problem_id=%r", part_id, problem_id)
+
+        return hexdigest
 
     @staticmethod
     def _get_multipart_upload_status(session, problem_id):
@@ -1551,13 +1576,18 @@ class Client(object):
         if response.status_code == 401:
             raise SolverAuthenticationError()
         else:
+            logger.trace("Upload status response: %r", response.text)
             response.raise_for_status()
 
-        problem_status = response.json()
+        try:
+            problem_status = response.json()
+            problem_status['status']
+            problem_status['parts']
+        except KeyError:
+            raise InvalidAPIResponseError("'status' and/or 'parts' missing")
 
         logger.debug("Got upload status=%r for problem_id=%r",
                      problem_status['status'], problem_id)
-        logger.trace("For problem_id=%r, status=%r", problem_id, problem_status)
 
         return problem_status
 
@@ -1569,6 +1599,29 @@ class Client(object):
             logger.debug("Upload status check failed with %r", e)
 
         return {"status": "UNDEFINED", "parts": []}
+
+    @staticmethod
+    def _combine_uploaded_parts(session, problem_id, checksum):
+        logger.debug("Combining uploaded parts of problem_id=%r", problem_id)
+
+        path = 'bqm/multipart/{problem_id}/combine'.format(problem_id=problem_id)
+        body = dict(checksum=checksum)
+
+        logger.trace("session.post(path=%r, json=%r)", path, body)
+
+        try:
+            response = session.post(path, json=body)
+        except requests.exceptions.Timeout:
+            raise RequestTimeout
+
+        if response.status_code == 401:
+            raise SolverAuthenticationError()
+        else:
+            logger.trace("Combine parts response: %r", response.text)
+            response.raise_for_status()
+
+        logger.debug("Issued a combine command for problem_id=%r", problem_id)
+
 
     def _check_parts(self, future):
         pass
@@ -1607,10 +1660,20 @@ class Client(object):
 
             # TODO: verify all parts uploaded via status call
 
-            # TODO: send a combine request
+            # collect checksums
+            checksums = {}
+            for f in parts:
+                part_no, hexdigest = f.result()
+                checksums[part_no] = hexdigest
 
-            # TODO: fail-safe close
+            # send a combine request
+            combine_checksum = Client._combined_checksum(checksums)
+            self._combine_uploaded_parts(session, problem_id, combine_checksum)
 
     def _upload_part_worker(self, problem_id, chunk_no, chunk_stream):
         with self.create_session() as session:
-            self._upload_multipart_part(session, problem_id, chunk_no, chunk_stream)
+            part_id = chunk_no + 1
+            part_checksum = self._upload_multipart_part(
+                session, problem_id, part_id=part_id, part_stream=chunk_stream)
+
+            return part_id, part_checksum
