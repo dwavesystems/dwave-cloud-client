@@ -209,8 +209,14 @@ class GettableFile(GettableBase):
             return self._fp.readinto(target)
 
 
-class MemoryBuffer(GettableBase):
-    """GettableFile-stand-in for in-memory buffers."""
+class GettableMemory(GettableBase):
+    """Provide the :class:`Gettable` interface to a bytes-like object.
+
+    Args:
+        fp (bytes/bytearray/memoryview/bytes-like):
+            Bytes-like object.
+
+    """
 
     def __init__(self, buf):
         self._buf = buf
@@ -226,11 +232,10 @@ class MemoryBuffer(GettableBase):
             return 0
 
         # copy source[start:stop] => target[0:stop-start]
-        size = stop - start
-        target = memoryview(buf)
-
-        # copy
-        target[:size] = self._buf[start:stop]
+        source_view = self._buf[start:stop]
+        target_view = memoryview(buf)
+        size = min(len(source_view), len(target_view))
+        target_view[:size] = source_view[:size]
 
         return size
 
@@ -347,7 +352,7 @@ class ChunkedData(object):
             # buffer) only for `bytes` objects, and make a copy otherwise!
 
             # use non-locking memory view over data buffer
-            self.view = FileView(MemoryBuffer(data))
+            self.view = FileView(GettableMemory(data))
 
         if self.view is None and isinstance(data, io.IOBase):
             # use locking file view if possible
