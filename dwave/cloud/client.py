@@ -1512,6 +1512,9 @@ class Client(object):
         checksum = Client._part_checksum(data)
         del data
 
+        # rewind the stream after read
+        part_stream.seek(0)
+
         path = 'bqm/multipart/{problem_id}/part/{part_id}'.format(
             problem_id=problem_id, part_id=part_id)
         headers = {
@@ -1533,6 +1536,40 @@ class Client(object):
 
         logger.debug("Uploaded part_id=%r of problem_id=%r", part_id, problem_id)
 
+    @staticmethod
+    def _get_multipart_upload_status(session, problem_id):
+        logger.debug("Checking upload status of problem_id=%r", problem_id)
+
+        path = 'bqm/multipart/{problem_id}/status'.format(problem_id=problem_id)
+
+        logger.trace("session.get(path=%r)", path)
+        try:
+            response = session.get(path)
+        except requests.exceptions.Timeout:
+            raise RequestTimeout
+
+        if response.status_code == 401:
+            raise SolverAuthenticationError()
+        else:
+            response.raise_for_status()
+
+        problem_status = response.json()
+
+        logger.debug("Got upload status=%r for problem_id=%r",
+                     problem_status['status'], problem_id)
+        logger.trace("For problem_id=%r, status=%r", problem_id, problem_status)
+
+        return problem_status
+
+    @staticmethod
+    def _failsafe_get_multipart_upload_status(session, problem_id):
+        try:
+            return Client._get_multipart_upload_status(session, problem_id)
+        except Exception as e:
+            logger.debug("Upload status check failed with %r", e)
+
+        return {"status": "UNDEFINED", "parts": []}
+
     def _check_parts(self, future):
         pass
 
@@ -1552,6 +1589,8 @@ class Client(object):
             size = len(chunks.view)
 
             problem_id = self._initiate_multipart_upload(session, size)
+            problem_status = \
+                self._failsafe_get_multipart_upload_status(session, problem_id)
 
             parts = []
             streams = collections.OrderedDict(enumerate(chunks))
