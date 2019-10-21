@@ -1487,19 +1487,23 @@ class Client(object):
 
     @staticmethod
     def _digest(data):
+        # return: bytes(md5digest(data))
         return hashlib.md5(data).digest()
 
     @staticmethod
     def _checksum_b64(digest):
+        # return: str(base64(digest))
         return base64.b64encode(digest).decode('ascii')
 
     @staticmethod
     def _checksum_hex(digest):
-        return digest.hex()
+        # return: str(hex(digest))
+        return codecs.encode(digest, 'hex').decode('ascii')
 
     @staticmethod
     def _combined_checksum(checksums):
         # XXX: drop this requirement server-side
+        # return: str(hex(cat(hexdigests)))
         combined = ''.join(h for _, h in sorted(checksums.items()))
         return Client._checksum_hex(Client._digest(combined.encode('ascii')))
 
