@@ -1509,7 +1509,8 @@ class Client(object):
         return Client._checksum_hex(Client._digest(digest))
 
     @staticmethod
-    def _upload_multipart_part(session, problem_id, part_id, part_stream):
+    def _upload_multipart_part(session, problem_id, part_id, part_stream,
+                               uploaded_part_checksum=None):
         """Upload one problem part. Sync http request.
 
         Args:
@@ -1521,6 +1522,10 @@ class Client(object):
                 Part number/id.
             part_stream (:class:`io.BufferedIOBase`/binary-stream-like):
                 Problem part data container that supports `read` operation.
+            uploaded_part_checksum (str/None):
+                Checksum of previously uploaded part. Optional, but if specified
+                checksum is verified, and part is uploaded only if checksums
+                don't match.
 
         Returns:
             Hex digest of part data MD5 checksum.
@@ -1537,6 +1542,15 @@ class Client(object):
         b64digest = Client._checksum_b64(digest)
         hexdigest = Client._checksum_hex(digest)
         del data
+
+        if uploaded_part_checksum is not None:
+            if hexdigest == uploaded_part_checksum:
+                logger.debug("Uploaded part checksum matches. "
+                             "Skipping upload for part_id=%r.", part_id)
+                return hexdigest
+            else:
+                logger.debug("Uploaded part checksum does not match. "
+                             "Re-uploading part_id=%r.", part_id)
 
         # rewind the stream after read
         part_stream.seek(0)
@@ -1626,7 +1640,6 @@ class Client(object):
 
         logger.debug("Issued a combine command for problem_id=%r", problem_id)
 
-
     def _check_parts(self, future):
         pass
 
@@ -1646,14 +1659,30 @@ class Client(object):
             size = len(chunks.view)
 
             problem_id = self._initiate_multipart_upload(session, size)
+
+            # check problem status (uploaded, partially uploaded?)
             problem_status = \
                 self._failsafe_get_multipart_upload_status(session, problem_id)
+
+            if problem_status.get('status') == 'UPLOAD_COMPLETED':
+                logger.debug("Problem already uploaded.")
+                return
+
+            uploaded_parts = {}
+            if problem_status.get('status') == 'UPLOAD_IN_PROGRESS':
+                for part in problem_status.get('parts', ()):
+                    part_no = part.get('part_number')
+                    checksum = part.get('checksum', '').strip('"')  # fix double-quoting bug
+                    uploaded_parts[part_no] = checksum
 
             parts = []
             streams = collections.OrderedDict(enumerate(chunks))
             for chunk_no, chunk_stream in streams.items():
+                part_no = chunk_no + 1
                 part = self._upload_part_executor.submit(
-                    self._upload_part_worker, problem_id, chunk_no, chunk_stream)
+                    self._upload_part_worker,
+                    problem_id, part_no, chunk_stream,
+                    uploaded_part_checksum=uploaded_parts.get(part_no))
                 part.add_done_callback(self._check_parts)
                 parts.append(part)
 
@@ -1663,6 +1692,9 @@ class Client(object):
             # TODO: re-upload failed parts
 
             # TODO: verify all parts uploaded via status call
+            # TODO: failsafe status get
+            final_problem_status = \
+                self._get_multipart_upload_status(session, problem_id)
 
             # collect checksums
             checksums = {}
@@ -1674,10 +1706,12 @@ class Client(object):
             combine_checksum = Client._combined_checksum(checksums)
             self._combine_uploaded_parts(session, problem_id, combine_checksum)
 
-    def _upload_part_worker(self, problem_id, chunk_no, chunk_stream):
-        with self.create_session() as session:
-            part_id = chunk_no + 1
-            part_checksum = self._upload_multipart_part(
-                session, problem_id, part_id=part_id, part_stream=chunk_stream)
+    def _upload_part_worker(self, problem_id, part_no, chunk_stream,
+                            uploaded_part_checksum=None):
 
-            return part_id, part_checksum
+        with self.create_session() as session:
+            part_checksum = self._upload_multipart_part(
+                session, problem_id, part_id=part_no, part_stream=chunk_stream,
+                uploaded_part_checksum=uploaded_part_checksum)
+
+            return part_no, part_checksum
