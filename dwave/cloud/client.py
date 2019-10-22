@@ -1487,25 +1487,26 @@ class Client(object):
 
     @staticmethod
     def _digest(data):
-        # return: bytes(md5digest(data))
+        # data: bytes => md5(data): bytes
         return hashlib.md5(data).digest()
 
     @staticmethod
     def _checksum_b64(digest):
-        # return: str(base64(digest))
+        # digest: bytes => base64(digest): str
         return base64.b64encode(digest).decode('ascii')
 
     @staticmethod
     def _checksum_hex(digest):
-        # return: str(hex(digest))
+        # digest: bytes => hex(digest): str
         return codecs.encode(digest, 'hex').decode('ascii')
 
     @staticmethod
     def _combined_checksum(checksums):
-        # XXX: drop this requirement server-side
-        # return: str(hex(cat(hexdigests)))
+        # TODO: drop this requirement server-side
+        # checksums: Dict[int, str] => hex(md5(cat(digests))): str
         combined = ''.join(h for _, h in sorted(checksums.items()))
-        return Client._checksum_hex(Client._digest(combined.encode('ascii')))
+        digest = codecs.decode(combined, 'hex')
+        return Client._checksum_hex(Client._digest(digest))
 
     @staticmethod
     def _upload_multipart_part(session, problem_id, part_id, part_stream):
@@ -1530,11 +1531,10 @@ class Client(object):
 
         logger.debug("Uploading part_id=%r of problem_id=%r", part_id, problem_id)
 
-        # TODO: work-around to get a checksum of a binary stream
+        # TODO: work-around to get a checksum of a binary stream (avoid 2x read)
         data = part_stream.read()
         digest = Client._digest(data)
-        # b64 for header, hex for master checksum
-        checksum = Client._checksum_b64(digest)
+        b64digest = Client._checksum_b64(digest)
         hexdigest = Client._checksum_hex(digest)
         del data
 
@@ -1544,7 +1544,7 @@ class Client(object):
         path = 'bqm/multipart/{problem_id}/part/{part_id}'.format(
             problem_id=problem_id, part_id=part_id)
         headers = {
-            'Content-MD5': checksum,
+            'Content-MD5': b64digest,
             'Content-Type': 'application/octet-stream',
         }
 
@@ -1666,9 +1666,9 @@ class Client(object):
 
             # collect checksums
             checksums = {}
-            for f in parts:
-                part_no, hexdigest = f.result()
-                checksums[part_no] = hexdigest
+            for p in parts:
+                part_no, checksum = p.result()
+                checksums[part_no] = checksum
 
             # send a combine request
             combine_checksum = Client._combined_checksum(checksums)
