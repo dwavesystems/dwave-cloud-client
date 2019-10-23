@@ -298,8 +298,8 @@ class UnstructuredSolver(BaseSolver):
         """Sample from the specified :term:`BQM`.
 
         Args:
-            bqm (:class:`~dimod.BinaryQuadraticModel`):
-                A binary quadratic model.
+            bqm (:class:`~dimod.BinaryQuadraticModel`/str):
+                A binary quadratic model, or a reference to one.
 
             **params:
                 Parameters for the sampling method, solver-specific.

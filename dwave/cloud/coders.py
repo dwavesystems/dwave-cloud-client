@@ -17,6 +17,8 @@ from __future__ import division, absolute_import
 import struct
 import base64
 
+import six
+
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_tail, active_qubits)
 
@@ -260,6 +262,12 @@ def encode_problem_as_bq(problem, compress=False):
     Returns:
         encoded submission dictionary
     """
+
+    if isinstance(problem, six.string_types):
+        return {
+            'format': 'bqm-ref',
+            'data': problem
+        }
 
     import zlib
     import json
