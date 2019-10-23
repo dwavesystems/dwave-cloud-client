@@ -17,6 +17,7 @@ from __future__ import division, absolute_import
 import sys
 import time
 import random
+import logging
 import platform
 import itertools
 
@@ -52,6 +53,8 @@ except ImportError:  # pragma: no cover
 __all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
            'default_text_input', 'click_info_switch', 'datetime_to_timestamp',
            'datetime_to_timestamp', 'utcnow', 'epochnow', 'tictoc']
+
+logger = logging.getLogger(__name__)
 
 
 def evaluate_ising(linear, quad, state):
@@ -402,6 +405,50 @@ class cached(object):
         wrapper._maxage = self.maxage
 
         return wrapper
+
+
+class retried(object):
+    """Decorator that retries running the wrapped function `retries` times,
+    logging exceptions along the way.
+
+    Example:
+        Retry up to three times::
+
+            import random
+
+            def f(thresh):
+                r = random.random()
+                if r < thresh:
+                    raise ValueError
+                return r
+
+            retried_f = retried(3)(f)
+
+            retried_f(0.5)
+    """
+
+    def __init__(self, retries=1):
+        self.retries = retries
+
+    def __call__(self, fn):
+        if not callable(fn):
+            raise TypeError("decorated object must be callable")
+
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            for retries_left in range(self.retries, -1, -1):
+                try:
+                    return fn(*args, **kwargs)
+
+                except Exception as exc:
+                    logger.debug(
+                        "Running %s(*%r, **%r) failed with %r. Retries left: %d",
+                        fn.__name__, args, kwargs, exc, retries_left)
+
+                    if retries_left == 0:
+                        raise exc
+
+        return wrapped
 
 
 class tictoc(object):
