@@ -441,9 +441,10 @@ class retried(object):
                     return fn(*args, **kwargs)
 
                 except Exception as exc:
+                    fn_name = getattr(fn, '__name__', 'unnamed')
                     logger.debug(
                         "Running %s(*%r, **%r) failed with %r. Retries left: %d",
-                        fn.__name__, args, kwargs, exc, retries_left)
+                        fn_name, args, kwargs, exc, retries_left)
 
                     if retries_left == 0:
                         raise exc

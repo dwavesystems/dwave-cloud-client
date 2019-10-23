@@ -20,7 +20,7 @@ from datetime import datetime
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_head, strip_tail,
     active_qubits, generate_random_ising_problem,
-    default_text_input, utcnow, cached)
+    default_text_input, utcnow, cached, retried)
 from dwave.cloud.testing import mock
 
 
@@ -207,6 +207,55 @@ class TestCachedDecorator(unittest.TestCase):
             self.assertRaises(ZeroDivisionError, f)
             self.assertEqual(f(), 1)
             self.assertEqual(f(), 0.5)
+
+
+class TestRetriedDecorator(unittest.TestCase):
+
+    def test_func_called(self):
+        """Wrapped function is called with correct arguments."""
+
+        @retried()
+        def f(a, b):
+            return a, b
+
+        self.assertEqual(f(1, b=2), (1, 2))
+
+    def test_exc_raised(self):
+        """Correct exception is raised after number of retries exceeded."""
+
+        @retried()
+        def f():
+            raise ValueError
+
+        with self.assertRaises(ValueError):
+            f()
+
+    def test_func_called_only_until_succeeds(self):
+        """Wrapped function is called no more times then it takes to succeed."""
+
+        err = ValueError
+        val = mock.sentinel
+
+        # f succeeds on 3rd try
+        f = mock.Mock(side_effect=[err, err, val.a, val.b])
+        ret = retried(3)(f)()
+        self.assertEqual(ret, val.a)
+        self.assertEqual(f.call_count, 3)
+
+        # fail with only on retry
+        f = mock.Mock(side_effect=[err, err, val.a, val.b])
+        with self.assertRaises(err):
+            ret = retried(1)(f)()
+
+        # no errors, return without retries
+        f = mock.Mock(side_effect=[val.a, val.b, val.c])
+        ret = retried(3)(f)()
+        self.assertEqual(ret, val.a)
+        self.assertEqual(f.call_count, 1)
+
+    def test_decorator(self):
+        with self.assertRaises(TypeError):
+            retried()("not-a-function")
 
 
 if __name__ == '__main__':
