@@ -1447,7 +1447,16 @@ class Client(object):
             session.close()
 
     def upload_problem(self, problem):
-        """Initiate multipart problem upload, returning the result as Future."""
+        """Initiate multipart problem upload, returning the result as Future.
+
+        Args:
+            problem (bytes-like/file-like):
+                Problem data to upload.
+
+        Returns:
+            str:
+                Problem ID. Can be used to submit problems by reference.
+        """
         return self._upload_problem_executor.submit(
             self._upload_problem_worker, problem=problem)
 
@@ -1683,7 +1692,7 @@ class Client(object):
 
             if problem_status.get('status') == 'UPLOAD_COMPLETED':
                 logger.debug("Problem already uploaded.")
-                return
+                return problem_id
 
             uploaded_parts = \
                 self._uploaded_parts_from_problem_status(problem_status)
@@ -1729,3 +1738,5 @@ class Client(object):
             # send a combine request
             combine_checksum = Client._combined_checksum(final_uploaded_parts)
             self._combine_uploaded_parts(session, problem_id, combine_checksum)
+
+            return problem_id
