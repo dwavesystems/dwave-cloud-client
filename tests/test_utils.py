@@ -235,20 +235,21 @@ class TestRetriedDecorator(unittest.TestCase):
 
         err = ValueError
         val = mock.sentinel
+        attrs = dict(__name__='f')
 
         # f succeeds on 3rd try
-        f = mock.Mock(side_effect=[err, err, val.a, val.b])
+        f = mock.Mock(side_effect=[err, err, val.a, val.b], **attrs)
         ret = retried(3)(f)()
         self.assertEqual(ret, val.a)
         self.assertEqual(f.call_count, 3)
 
         # fail with only on retry
-        f = mock.Mock(side_effect=[err, err, val.a, val.b])
+        f = mock.Mock(side_effect=[err, err, val.a, val.b], **attrs)
         with self.assertRaises(err):
             ret = retried(1)(f)()
 
         # no errors, return without retries
-        f = mock.Mock(side_effect=[val.a, val.b, val.c])
+        f = mock.Mock(side_effect=[val.a, val.b, val.c], **attrs)
         ret = retried(3)(f)()
         self.assertEqual(ret, val.a)
         self.assertEqual(f.call_count, 1)
