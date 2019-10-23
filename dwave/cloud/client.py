@@ -74,7 +74,7 @@ from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.upload import ChunkedData
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent,
-    datetime_to_timestamp, utcnow, epochnow, cached)
+    datetime_to_timestamp, utcnow, epochnow, cached, retried)
 
 __all__ = ['Client']
 
@@ -176,6 +176,7 @@ class Client(object):
 
     # Multipart upload parameters
     _UPLOAD_PART_SIZE_BYTES = 5 * 1024 * 1024
+    _UPLOAD_PART_RETRIES = 2
 
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None,
@@ -1659,6 +1660,7 @@ class Client(object):
                 uploaded_parts[part_no] = checksum
         return uploaded_parts
 
+    @retried(_UPLOAD_PART_RETRIES)
     def _upload_part_worker(self, problem_id, part_no, chunk_stream,
                             uploaded_part_checksum=None):
 
@@ -1706,6 +1708,7 @@ class Client(object):
                     self._upload_part_worker,
                     problem_id, part_no, chunk_stream,
                     uploaded_part_checksum=uploaded_parts.get(part_no))
+
                 parts[part_no] = part_future
 
             # wait for parts to upload/fail
