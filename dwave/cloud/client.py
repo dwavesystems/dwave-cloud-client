@@ -175,7 +175,7 @@ class Client(object):
     _SOLVERS_CACHE_MAXAGE = 300
 
     # Multipart upload parameters
-    _UPLOAD_PART_SIZE_BYTES = 1
+    _UPLOAD_PART_SIZE_BYTES = 5 * 1024 * 1024
 
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None,
