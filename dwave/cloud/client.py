@@ -1640,8 +1640,25 @@ class Client(object):
 
         logger.debug("Issued a combine command for problem_id=%r", problem_id)
 
-    def _check_parts(self, future):
-        pass
+    @staticmethod
+    def _uploaded_parts_from_problem_status(problem_status):
+        uploaded_parts = {}
+        if problem_status.get('status') == 'UPLOAD_IN_PROGRESS':
+            for part in problem_status.get('parts', ()):
+                part_no = part.get('part_number')
+                checksum = part.get('checksum', '').strip('"')  # fix double-quoting bug
+                uploaded_parts[part_no] = checksum
+        return uploaded_parts
+
+    def _upload_part_worker(self, problem_id, part_no, chunk_stream,
+                            uploaded_part_checksum=None):
+
+        with self.create_session() as session:
+            part_checksum = self._upload_multipart_part(
+                session, problem_id, part_id=part_no, part_stream=chunk_stream,
+                uploaded_part_checksum=uploaded_part_checksum)
+
+            return part_no, part_checksum
 
     def _upload_problem_worker(self, problem):
         """Upload a problem to SAPI using multipart upload interface.
@@ -1660,7 +1677,7 @@ class Client(object):
 
             problem_id = self._initiate_multipart_upload(session, size)
 
-            # check problem status (uploaded, partially uploaded?)
+            # check problem status, so we only upload parts missing or invalid
             problem_status = \
                 self._failsafe_get_multipart_upload_status(session, problem_id)
 
@@ -1668,50 +1685,47 @@ class Client(object):
                 logger.debug("Problem already uploaded.")
                 return
 
-            uploaded_parts = {}
-            if problem_status.get('status') == 'UPLOAD_IN_PROGRESS':
-                for part in problem_status.get('parts', ()):
-                    part_no = part.get('part_number')
-                    checksum = part.get('checksum', '').strip('"')  # fix double-quoting bug
-                    uploaded_parts[part_no] = checksum
+            uploaded_parts = \
+                self._uploaded_parts_from_problem_status(problem_status)
 
-            parts = []
+            # enqueue all parts, worker skips if checksum matches
+            parts = {}
             streams = collections.OrderedDict(enumerate(chunks))
             for chunk_no, chunk_stream in streams.items():
                 part_no = chunk_no + 1
-                part = self._upload_part_executor.submit(
+                part_future = self._upload_part_executor.submit(
                     self._upload_part_worker,
                     problem_id, part_no, chunk_stream,
                     uploaded_part_checksum=uploaded_parts.get(part_no))
-                part.add_done_callback(self._check_parts)
-                parts.append(part)
+                parts[part_no] = part_future
 
             # wait for parts to upload/fail
-            concurrent.futures.wait(parts)
+            concurrent.futures.wait(parts.values())
 
-            # TODO: re-upload failed parts
-
-            # TODO: verify all parts uploaded via status call
-            # TODO: failsafe status get
+            # verify all parts uploaded via status call
             final_problem_status = \
                 self._get_multipart_upload_status(session, problem_id)
 
-            # collect checksums
-            checksums = {}
-            for p in parts:
-                part_no, checksum = p.result()
-                checksums[part_no] = checksum
+            final_uploaded_parts = \
+                self._uploaded_parts_from_problem_status(final_problem_status)
+
+            if len(final_uploaded_parts) != len(parts):
+                errmsg = "Multipart upload failed for some parts."
+                logger.error(errmsg)
+                logger.debug("problem_id=%r, expected_parts=%r, uploaded_parts=%r",
+                             problem_id, parts.keys(), final_uploaded_parts.keys())
+                raise ProblemUploadError(errmsg)
+
+            for part_no, part_future in parts.items():
+                _, part_checksum = part_future.result()
+                remote_checksum = final_uploaded_parts[part_no]
+                if part_checksum != remote_checksum:
+                    errmsg = ("Checksum mismatch for part_no={!r} "
+                              "(local {!r} != remote {!r})".format(
+                                  part_no, part_checksum, remote_checksum))
+                    logger.error(errmsg)
+                    raise ProblemUploadError(errmsg)
 
             # send a combine request
-            combine_checksum = Client._combined_checksum(checksums)
+            combine_checksum = Client._combined_checksum(final_uploaded_parts)
             self._combine_uploaded_parts(session, problem_id, combine_checksum)
-
-    def _upload_part_worker(self, problem_id, part_no, chunk_stream,
-                            uploaded_part_checksum=None):
-
-        with self.create_session() as session:
-            part_checksum = self._upload_multipart_part(
-                session, problem_id, part_id=part_no, part_stream=chunk_stream,
-                uploaded_part_checksum=uploaded_part_checksum)
-
-            return part_no, part_checksum

@@ -70,3 +70,7 @@ class InvalidAPIResponseError(Exception):
 
 class InvalidProblemError(ValueError):
     """Solver cannot handle the given binary quadratic model."""
+
+
+class ProblemUploadError(Exception):
+    """Problem multipart upload failed."""
