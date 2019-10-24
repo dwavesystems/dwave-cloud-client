@@ -351,7 +351,7 @@ class UnstructuredSolver(BaseSolver):
             To use this method, dimod package has to be installed.
         """
         if hasattr(bqm, 'to_serializable'):
-            data = encode_problem_as_bq(bqm)['data']
+            data = encode_problem_as_bq(bqm, compress=True)['data']
         else:
             # raw data (ready for upload) in `bqm`
             data = bqm

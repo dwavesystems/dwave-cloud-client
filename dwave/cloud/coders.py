@@ -14,6 +14,8 @@
 
 from __future__ import division, absolute_import
 
+import zlib
+import json
 import struct
 import base64
 
@@ -251,6 +253,23 @@ def decode_qp_numpy(msg, return_matrix=True):
     return result
 
 
+def _encode_problem_as_bq_ref(problem):
+    assert isinstance(problem, six.string_types)
+
+    return problem
+
+def _encode_problem_as_bq_json(problem):
+    assert hasattr(problem, 'to_serializable')
+
+    return problem.to_serializable(use_bytes=False)
+
+def _encode_problem_as_bq_json_zlib(problem):
+    assert hasattr(problem, 'to_serializable')
+
+    serialized_bqm = _encode_problem_as_bq_json(problem)
+    return zlib.compress(bytes(json.dumps(serialized_bqm), "ascii"))
+
+
 def encode_problem_as_bq(problem, compress=False):
     """Encode the binary quadratic problem for submission in the `bq` data
     format.
@@ -266,25 +285,20 @@ def encode_problem_as_bq(problem, compress=False):
     if isinstance(problem, six.string_types):
         return {
             'format': 'bqm-ref',
-            'data': problem
+            'data': _encode_problem_as_bq_ref(problem)
         }
 
-    import zlib
-    import json
-
-    serialized_bqm = problem.to_serializable(use_bytes=False)
-
     if compress:
-        # note: compression scheme will change, and preferably move to transport layer
-        compressed_bqm = zlib.compress(bytes(json.dumps(serialized_bqm), "ascii"))
-        data = str(base64.b64encode(compressed_bqm), "ascii")
-    else:
-        data = serialized_bqm
+        return {
+            'format': 'bq-zlib',
+            'data': _encode_problem_as_bq_json_zlib(problem)
+        }
 
-    return {
-        'format': 'bq',
-        'data': data,
-    }
+    else:
+        return {
+            'format': 'bq',
+            'data': _encode_problem_as_bq_json(problem)
+        }
 
 
 def decode_bq(msg):
