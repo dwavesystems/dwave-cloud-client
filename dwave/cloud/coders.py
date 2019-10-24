@@ -256,8 +256,8 @@ def encode_problem_as_bq(problem, compress=False):
     format.
 
     Args:
-        problem (:class:`~dimod.BinaryQuadraticModel`):
-            Binary quadratic model.
+        problem (:class:`~dimod.BinaryQuadraticModel`/str):
+            A binary quadratic model, or a reference to one (Problem ID).
 
     Returns:
         encoded submission dictionary

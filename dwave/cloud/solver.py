@@ -180,6 +180,9 @@ class BaseSolver(object):
     def sample_bqm(self, bqm, **params):
         raise NotImplementedError
 
+    def upload_bqm(self, bqm):
+        raise NotImplementedError
+
     # Derived properties
 
     @property
@@ -299,13 +302,14 @@ class UnstructuredSolver(BaseSolver):
 
         Args:
             bqm (:class:`~dimod.BinaryQuadraticModel`/str):
-                A binary quadratic model, or a reference to one.
+                A binary quadratic model, or a reference to one
+                (Problem ID returned by `.upload_bqm` method).
 
             **params:
                 Parameters for the sampling method, solver-specific.
 
         Returns:
-            :class:`Future`
+            :class:`~dwave.cloud.computation.Future`
 
         Note:
             To use this method, dimod package has to be installed.
@@ -325,6 +329,34 @@ class UnstructuredSolver(BaseSolver):
         self.client._submit(body, future)
 
         return future
+
+    def upload_bqm(self, bqm):
+        """Upload the specified :term:`BQM` to SAPI, returning a Problem ID
+        that can be used to submit the BQM to this solver (i.e. call the
+        `.sample_bqm` method).
+
+        Args:
+            bqm (:class:`~dimod.BinaryQuadraticModel`/bytes-like/file-like):
+                A binary quadratic model given either as an in-memory
+                :class:`~dimod.BinaryQuadraticModel` object, or as raw data
+                (encoded serialized model) in either a file-like or a bytes-like
+                object.
+
+        Returns:
+            :class:`concurrent.futures.Future`[str]:
+                Problem ID in a Future. Problem ID can be used to submit
+                problems by reference.
+
+        Note:
+            To use this method, dimod package has to be installed.
+        """
+        if hasattr(bqm, 'to_serializable'):
+            data = encode_problem_as_bq(bqm)['data']
+        else:
+            # raw data (ready for upload) in `bqm`
+            data = bqm
+
+        return self.client.upload_problem_encoded(data)
 
 
 class StructuredSolver(BaseSolver):

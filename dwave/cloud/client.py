@@ -1447,16 +1447,21 @@ class Client(object):
         finally:
             session.close()
 
-    def upload_problem(self, problem):
-        """Initiate multipart problem upload, returning the result as Future.
+    def upload_problem_encoded(self, problem):
+        """Initiate multipart problem upload, returning the Problem ID in a
+        :class:`~concurrent.futures.Future`.
 
         Args:
             problem (bytes-like/file-like):
-                Problem data to upload.
+                Encoded problem data to upload.
 
         Returns:
-            str:
-                Problem ID. Can be used to submit problems by reference.
+            :class:`concurrent.futures.Future`[str]:
+                Problem ID in a Future. Problem ID can be used to submit
+                problems by reference.
+
+        Note:
+            For a higher-level interface, use upload/submit solver methods.
         """
         return self._upload_problem_executor.submit(
             self._upload_problem_worker, problem=problem)
