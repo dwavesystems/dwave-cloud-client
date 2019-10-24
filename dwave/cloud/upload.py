@@ -354,7 +354,7 @@ class ChunkedData(object):
             raise ValueError("positive integer required for chunk size")
 
         # convenience string handler
-        if isinstance(data, six.string_types):
+        if isinstance(data, six.string_types) and not isinstance(data, six.binary_type):
             data = data.encode('ascii')
 
         if isinstance(data, (bytes, bytearray)):

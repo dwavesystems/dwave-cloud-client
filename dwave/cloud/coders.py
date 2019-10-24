@@ -18,6 +18,7 @@ import zlib
 import json
 import struct
 import base64
+import codecs
 
 import six
 
@@ -266,8 +267,8 @@ def _encode_problem_as_bq_json(problem):
 def _encode_problem_as_bq_json_zlib(problem):
     assert hasattr(problem, 'to_serializable')
 
-    serialized_bqm = _encode_problem_as_bq_json(problem)
-    return zlib.compress(bytes(json.dumps(serialized_bqm), "ascii"))
+    bqm_dict = _encode_problem_as_bq_json(problem)
+    return zlib.compress(codecs.encode(json.dumps(bqm_dict), "ascii"))
 
 
 def encode_problem_as_bq(problem, compress=False):
