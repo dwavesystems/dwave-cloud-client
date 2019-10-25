@@ -145,7 +145,7 @@ def uniform_get(sequence, index, default=None):
         return sequence[index] if index < len(sequence) else default
 
 
-def qubo_to_ising(qubo):
+def reformat_qubo_as_ising(qubo):
     """Split QUBO coefficients into linear and quadratic terms (the Ising form).
 
     Args:

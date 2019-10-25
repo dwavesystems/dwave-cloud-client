@@ -39,7 +39,7 @@ from dwave.cloud.exceptions import *
 from dwave.cloud.coders import (
     encode_problem_as_qp, encode_problem_as_bq,
     decode_qp_numpy, decode_qp, decode_bq)
-from dwave.cloud.utils import uniform_iterator, qubo_to_ising
+from dwave.cloud.utils import uniform_iterator, reformat_qubo_as_ising
 from dwave.cloud.computation import Future
 
 # Use numpy if available for fast encoding/decoding
@@ -564,7 +564,7 @@ class StructuredSolver(BaseSolver):
             (1, 0)
 
         """
-        linear, quadratic = qubo_to_ising(qubo)
+        linear, quadratic = reformat_qubo_as_ising(qubo)
         return self._sample('qubo', linear, quadratic, params)
 
     def sample_bqm(self, bqm, **params):
