@@ -357,10 +357,10 @@ class TestChunkedData(unittest.TestCase):
 class TestMultipartUpload(unittest.TestCase):
 
     def test_smoke_test(self):
+        data = b'123'
         with Client(**config) as client:
-            data = b'123'
-            future = client.upload_problem(data)
+            future = client.upload_problem_encoded(data)
             try:
-                future.result()
+                problem_id = future.result()
             except Exception as e:
                 self.fail(e)
