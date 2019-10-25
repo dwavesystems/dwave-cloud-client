@@ -394,6 +394,7 @@ def choose_reply(key, replies, statuses=None):
         raise NotImplementedError(key)
 
 
+@mock.patch('time.sleep', lambda *args: None)
 class TestMockedMultipartUpload(unittest.TestCase):
 
     @mock.patch.multiple(Client, _UPLOAD_PART_SIZE_BYTES=1)
