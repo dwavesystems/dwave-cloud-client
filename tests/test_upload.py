@@ -15,14 +15,17 @@
 import io
 import os
 import time
+import json
 import unittest
 import tempfile
+import collections
 from concurrent.futures import ThreadPoolExecutor, wait
 
 from dwave.cloud.utils import tictoc
+from dwave.cloud.client import Client
+from dwave.cloud.testing import mock
 from dwave.cloud.upload import (
     Gettable, GettableFile, GettableMemory, FileView, ChunkedData)
-from dwave.cloud.client import Client
 
 from tests import config
 
@@ -364,3 +367,111 @@ class TestMultipartUpload(unittest.TestCase):
                 problem_id = future.result()
             except Exception as e:
                 self.fail(e)
+
+
+def choose_reply(key, replies, statuses=None):
+    """Choose the right response based on a hashable `key` and make a mock
+    response.
+    """
+
+    if statuses is None:
+        statuses = collections.defaultdict(lambda: iter([200]))
+
+    if key in replies:
+        response = mock.Mock(['text', 'json', 'raise_for_status'])
+        response.status_code = next(statuses[key])
+        response.text = replies[key]
+        response.json.side_effect = lambda: json.loads(replies[key])
+        def raise_for_status():
+            if not 200 <= response.status_code < 300:
+                raise HTTPError(response.status_code)
+        response.raise_for_status = raise_for_status
+        return response
+    else:
+        raise NotImplementedError(key)
+
+
+class TestMockedMultipartUpload(unittest.TestCase):
+
+    @mock.patch.multiple(Client, _UPLOAD_PART_SIZE_BYTES=1)
+    def test_single_problem_end_to_end(self):
+        upload_data = b'123'
+        upload_problem_id = '84ef154c-28f9-46ed-9f22-aec0583499f2'
+
+        parts = list(range(len(upload_data)))
+        part_data = [upload_data[i:i+1] for i in parts]
+
+        _md5 = Client._digest
+        _hex = Client._checksum_hex
+        _b64 = Client._checksum_b64
+        part_digest = [_md5(part_data[i]) for i in parts]
+        combine_checksum = _hex(_md5(b''.join(part_digest)))
+
+        # we need a "global session", because mocked responses are stateful
+        def global_mock_session():
+            session = mock.MagicMock()
+            session.__enter__ = lambda *args: session
+
+            def get(path, seq=iter(range(2))):
+                all_parts = [{"part_number": i+1,
+                              "checksum": _hex(part_digest[i])} for i in parts]
+
+                return choose_reply((path, next(seq)), {
+                    # initial upload status
+                    ('bqm/multipart/{}/status'.format(upload_problem_id), 0):
+                        json.dumps({"status": "UPLOAD_IN_PROGRESS", "parts": []}),
+
+                    # final upload status
+                    ('bqm/multipart/{}/status'.format(upload_problem_id), 1):
+                        json.dumps({"status": "UPLOAD_IN_PROGRESS", "parts": all_parts}),
+                })
+
+            def post(path, **kwargs):
+                json_ = kwargs.pop('json')
+                body = json.dumps(json_)
+                return choose_reply((path, body), {
+                    # initiate upload
+                    ('bqm/multipart',
+                     json.dumps({'size': len(upload_data)})):
+                        json.dumps({'id': upload_problem_id}),
+
+                    # combine parts
+                    ('bqm/multipart/{}/combine'.format(upload_problem_id),
+                     json.dumps({'checksum': combine_checksum})):
+                        json.dumps({}),
+                })
+
+            def put(path, data, headers):
+                body = data.read()
+                headers = json.dumps(headers)
+                replies = {
+                    (
+                        'bqm/multipart/{}/part/{}'.format(upload_problem_id, i+1),
+                        part_data[i],
+                        json.dumps({
+                            'Content-MD5': _b64(part_digest[i]),
+                            'Content-Type': 'application/octet-stream'
+                        })
+                    ): json.dumps({})
+                    for i in parts
+                }
+                return choose_reply((path, body, headers), replies)
+
+            session.get = get
+            session.put = put
+            session.post = post
+
+            return session
+
+        session = global_mock_session()
+
+        with mock.patch.object(Client, 'create_session', lambda self: session):
+            with Client('endpoint', 'token') as client:
+
+                future = client.upload_problem_encoded(upload_data)
+                try:
+                    returned_problem_id = future.result()
+                except Exception as e:
+                    self.fail(e)
+
+                self.assertEqual(returned_problem_id, upload_problem_id)
