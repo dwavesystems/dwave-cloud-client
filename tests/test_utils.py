@@ -258,6 +258,60 @@ class TestRetriedDecorator(unittest.TestCase):
         with self.assertRaises(TypeError):
             retried()("not-a-function")
 
+    def test_backoff_constant(self):
+        """Constant retry back-off."""
+
+        # 1s delay before a retry
+        backoff = 1
+
+        with mock.patch('time.sleep') as sleep:
+
+            @retried(retries=2, backoff=backoff)
+            def f():
+                raise ValueError
+
+            with self.assertRaises(ValueError):
+                f()
+
+            calls = [mock.call(backoff), mock.call(backoff)]
+            sleep.assert_has_calls(calls)
+
+    def test_backoff_seq(self):
+        """Retry back-off defined via list."""
+
+        # progressive delay
+        backoff = [1, 2, 3]
+
+        with mock.patch('time.sleep') as sleep:
+
+            @retried(retries=3, backoff=backoff)
+            def f():
+                raise ValueError
+
+            with self.assertRaises(ValueError):
+                f()
+
+            calls = [mock.call(b) for b in backoff]
+            sleep.assert_has_calls(calls)
+
+    def test_backoff_func(self):
+        """Retry back-off defined via callable."""
+
+        def backoff(retry):
+            return 2 ** retry
+
+        with mock.patch('time.sleep') as sleep:
+
+            @retried(retries=3, backoff=backoff)
+            def f():
+                raise ValueError
+
+            with self.assertRaises(ValueError):
+                f()
+
+            calls = [mock.call(backoff(1)), mock.call(backoff(2)), mock.call(backoff(3))]
+            sleep.assert_has_calls(calls)
+
 
 if __name__ == '__main__':
     unittest.main()

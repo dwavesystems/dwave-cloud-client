@@ -20,6 +20,7 @@ import random
 import logging
 import platform
 import itertools
+import numbers
 
 try:
     import collections.abc as abc
@@ -412,6 +413,13 @@ class retried(object):
     """Decorator that retries running the wrapped function `retries` times,
     logging exceptions along the way.
 
+    Args:
+        retries (int, default=1):
+            Decorated function is allowed to fail `retries` times.
+
+        backoff (number/List[number]/callable, default=0):
+            Delay (in seconds) before a retry.
+
     Example:
         Retry up to three times::
 
@@ -428,8 +436,17 @@ class retried(object):
             retried_f(0.5)
     """
 
-    def __init__(self, retries=1):
+    def __init__(self, retries=1, backoff=0):
         self.retries = retries
+
+        # normalize `backoff` to callable
+        if isinstance(backoff, numbers.Number):
+            self.backoff = lambda retry: backoff
+        elif isinstance(backoff, abc.Sequence):
+            it = iter(backoff)
+            self.backoff = lambda retry: next(it)
+        else:
+            self.backoff = backoff
 
     def __call__(self, fn):
         if not callable(fn):
@@ -449,6 +466,9 @@ class retried(object):
 
                     if retries_left == 0:
                         raise exc
+
+                retry = self.retries - retries_left + 1
+                time.sleep(self.backoff(retry))
 
         return wrapped
 
