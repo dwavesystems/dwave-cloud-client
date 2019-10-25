@@ -433,30 +433,30 @@ class TestMockedMultipartUpload(unittest.TestCase):
 
             def post(path, **kwargs):
                 json_ = kwargs.pop('json')
-                body = json.dumps(json_)
+                body = json.dumps(sorted(json_.items()))
                 return choose_reply((path, body), {
                     # initiate upload
                     ('bqm/multipart',
-                     json.dumps({'size': len(upload_data)})):
+                     json.dumps([('size', len(upload_data))])):
                         json.dumps({'id': upload_problem_id}),
 
                     # combine parts
                     ('bqm/multipart/{}/combine'.format(upload_problem_id),
-                     json.dumps({'checksum': combine_checksum})):
+                     json.dumps([('checksum', combine_checksum)])):
                         json.dumps({}),
                 })
 
             def put(path, data, headers):
                 body = data.read()
-                headers = json.dumps(headers)
+                headers = json.dumps(sorted(headers.items()))
                 replies = {
                     (
                         'bqm/multipart/{}/part/{}'.format(upload_problem_id, i+1),
                         part_data[i],
-                        json.dumps({
-                            'Content-MD5': _b64(part_digest[i]),
-                            'Content-Type': 'application/octet-stream'
-                        })
+                        json.dumps(sorted([
+                            ('Content-MD5', _b64(part_digest[i])),
+                            ('Content-Type',     'application/octet-stream')
+                        ]))
                     ): json.dumps({})
                     for i in parts
                 }
@@ -518,31 +518,31 @@ class TestMockedMultipartUpload(unittest.TestCase):
 
             def post(path, **kwargs):
                 json_ = kwargs.pop('json')
-                body = json.dumps(json_)
+                body = json.dumps(sorted(json_.items()))
                 return choose_reply((path, body), {
                     # initiate upload
                     ('bqm/multipart',
-                     json.dumps({'size': len(upload_data)})):
+                     json.dumps([('size', len(upload_data))])):
                         json.dumps({'id': upload_problem_id}),
 
                     # combine parts
                     ('bqm/multipart/{}/combine'.format(upload_problem_id),
-                     json.dumps({'checksum': combine_checksum})):
+                     json.dumps([('checksum', combine_checksum)])):
                         json.dumps({}),
                 })
 
             def put(path, data, headers):
                 body = data.read()
-                headers = json.dumps(headers)
+                headers = json.dumps(sorted(headers.items()))
                 replies = {
                     # only the first part!
                     (
                         'bqm/multipart/{}/part/{}'.format(upload_problem_id, i+1),
                         part_data[i],
-                        json.dumps({
-                            'Content-MD5': _b64(part_digest[i]),
-                            'Content-Type': 'application/octet-stream'
-                        })
+                        json.dumps(sorted([
+                            ('Content-MD5', _b64(part_digest[i])),
+                            ('Content-Type',     'application/octet-stream')
+                        ]))
                     ): json.dumps({})
                     for i in parts[:1]
                 }
@@ -604,31 +604,31 @@ class TestMockedMultipartUpload(unittest.TestCase):
 
             def post(path, **kwargs):
                 json_ = kwargs.pop('json')
-                body = json.dumps(json_)
+                body = json.dumps(sorted(json_.items()))
                 return choose_reply((path, body), {
                     # initiate upload
                     ('bqm/multipart',
-                     json.dumps({'size': len(upload_data)})):
+                     json.dumps([('size', len(upload_data))])):
                         json.dumps({'id': upload_problem_id}),
 
                     # combine parts
                     ('bqm/multipart/{}/combine'.format(upload_problem_id),
-                     json.dumps({'checksum': combine_checksum})):
+                     json.dumps([('checksum', combine_checksum)])):
                         json.dumps({}),
                 })
 
             def put(path, data, headers, seq=iter(range(Client._UPLOAD_PART_RETRIES+1))):
                 body = data.read()
                 data.seek(0)
-                headers = json.dumps(headers)
+                headers = json.dumps(sorted(headers.items()))
                 keys = [
                     (
                         'bqm/multipart/{}/part/{}'.format(upload_problem_id, i+1),
                         part_data[i],
-                        json.dumps({
-                            'Content-MD5': _b64(part_digest[i]),
-                            'Content-Type': 'application/octet-stream'
-                        })
+                        json.dumps(sorted([
+                            ('Content-MD5', _b64(part_digest[i])),
+                            ('Content-Type',     'application/octet-stream')
+                        ]))
                     ) for i in parts
                 ]
                 attempt = next(seq)
