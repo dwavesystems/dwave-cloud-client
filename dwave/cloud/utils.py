@@ -283,9 +283,10 @@ class TimeoutingHTTPAdapter(requests.adapters.HTTPAdapter):
         return super(TimeoutingHTTPAdapter, self).send(*args, **kwargs)
 
 
-# Note: BaseUrlSession is taken from https://github.com/requests/toolbelt. This
-# simple extension didn't warrant a new dependency. If we later decide to use
-# additional features from `requests-toolbelt`, remove it from here.
+# Note: BaseUrlSession is taken from https://github.com/requests/toolbelt under
+# an Apache 2 license. This simple extension didn't warrant a new dependency.
+# If we later decide to use additional features from `requests-toolbelt`,
+# remove it from here.
 
 class BaseUrlSession(requests.Session):
     """A Session with a URL that all requests will use as a base."""
