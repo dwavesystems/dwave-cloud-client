@@ -1691,7 +1691,13 @@ class Client(object):
             chunks = ChunkedData(problem, chunk_size=self._UPLOAD_PART_SIZE_BYTES)
             size = len(chunks.view)
 
-            problem_id = self._initiate_multipart_upload(session, size)
+            try:
+                problem_id = self._initiate_multipart_upload(session, size)
+            except Exception as e:
+                errmsg = ("Multipart upload initialization failed "
+                          "with {!r}.".format(e))
+                logger.error(errmsg)
+                raise ProblemUploadError(errmsg)
 
             # check problem status, so we only upload parts missing or invalid
             problem_status = \
@@ -1719,15 +1725,26 @@ class Client(object):
             # wait for parts to upload/fail
             concurrent.futures.wait(parts.values())
 
+            # verify all parts uploaded without error
+            for part_no, part_future in parts.items():
+                try:
+                    part_future.result()
+                except Exception as e:
+                    errmsg = ("Multipart upload of problem_id={!r} failed for "
+                              "part_no={!r} with {!r}.".format(problem_id, part_no, e))
+                    logger.error(errmsg)
+                    raise ProblemUploadError(errmsg)
+
             # verify all parts uploaded via status call
+            # (check remote checksum matches the local one)
             final_problem_status = \
-                self._get_multipart_upload_status(session, problem_id)
+                self._failsafe_get_multipart_upload_status(session, problem_id)
 
             final_uploaded_parts = \
                 self._uploaded_parts_from_problem_status(final_problem_status)
 
             if len(final_uploaded_parts) != len(parts):
-                errmsg = "Multipart upload failed for some parts."
+                errmsg = "Multipart upload unexpectedly failed for some parts."
                 logger.error(errmsg)
                 logger.debug("problem_id=%r, expected_parts=%r, uploaded_parts=%r",
                              problem_id, parts.keys(), final_uploaded_parts.keys())
@@ -1743,8 +1760,14 @@ class Client(object):
                     logger.error(errmsg)
                     raise ProblemUploadError(errmsg)
 
-            # send a combine request
+            # send parts combine request
             combine_checksum = Client._combined_checksum(final_uploaded_parts)
-            self._combine_uploaded_parts(session, problem_id, combine_checksum)
+            try:
+                self._combine_uploaded_parts(session, problem_id, combine_checksum)
+            except Exception as e:
+                errmsg = ("Multipart upload of problem_id={!r} failed on parts "
+                          "combine with {!r}".format(problem_id, e))
+                logger.error(errmsg)
+                raise ProblemUploadError(errmsg)
 
             return problem_id
