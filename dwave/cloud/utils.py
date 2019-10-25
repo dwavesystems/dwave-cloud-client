@@ -468,7 +468,9 @@ class retried(object):
                         raise exc
 
                 retry = self.retries - retries_left + 1
-                time.sleep(self.backoff(retry))
+                delay = self.backoff(retry)
+                logger.debug("Sleeping for %s seconds before retrying.", delay)
+                time.sleep(delay)
 
         return wrapped
 
