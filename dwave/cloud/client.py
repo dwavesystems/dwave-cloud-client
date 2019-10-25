@@ -177,6 +177,7 @@ class Client(object):
     # Multipart upload parameters
     _UPLOAD_PART_SIZE_BYTES = 5 * 1024 * 1024
     _UPLOAD_PART_RETRIES = 2
+    _UPLOAD_REQUEST_RETRIES = 2
 
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None,
@@ -1467,6 +1468,7 @@ class Client(object):
             self._upload_problem_worker, problem=problem)
 
     @staticmethod
+    @retried(_UPLOAD_REQUEST_RETRIES)
     def _initiate_multipart_upload(session, size):
         """Sync http request using `session`.
 
@@ -1524,6 +1526,7 @@ class Client(object):
         return Client._checksum_hex(Client._digest(digest))
 
     @staticmethod
+    @retried(_UPLOAD_PART_RETRIES)
     def _upload_multipart_part(session, problem_id, part_id, part_stream,
                                uploaded_part_checksum=None):
         """Upload one problem part. Sync http request.
@@ -1544,9 +1547,6 @@ class Client(object):
 
         Returns:
             Hex digest of part data MD5 checksum.
-
-        Note:
-            This function *can* fail. Retry should be handled by the caller.
         """
 
         logger.debug("Uploading part_id=%r of problem_id=%r", part_id, problem_id)
@@ -1595,6 +1595,7 @@ class Client(object):
         return hexdigest
 
     @staticmethod
+    @retried(_UPLOAD_REQUEST_RETRIES)
     def _get_multipart_upload_status(session, problem_id):
         logger.debug("Checking upload status of problem_id=%r", problem_id)
 
@@ -1634,6 +1635,7 @@ class Client(object):
         return {"status": "UNDEFINED", "parts": []}
 
     @staticmethod
+    @retried(_UPLOAD_REQUEST_RETRIES)
     def _combine_uploaded_parts(session, problem_id, checksum):
         logger.debug("Combining uploaded parts of problem_id=%r", problem_id)
 
@@ -1665,7 +1667,6 @@ class Client(object):
                 uploaded_parts[part_no] = checksum
         return uploaded_parts
 
-    @retried(_UPLOAD_PART_RETRIES)
     def _upload_part_worker(self, problem_id, part_no, chunk_stream,
                             uploaded_part_checksum=None):
 
