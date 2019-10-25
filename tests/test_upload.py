@@ -21,9 +21,12 @@ import tempfile
 import collections
 from concurrent.futures import ThreadPoolExecutor, wait
 
+from requests.exceptions import HTTPError
+
 from dwave.cloud.utils import tictoc
 from dwave.cloud.client import Client
 from dwave.cloud.testing import mock
+from dwave.cloud.exceptions import ProblemUploadError
 from dwave.cloud.upload import (
     Gettable, GettableFile, GettableMemory, FileView, ChunkedData)
 
@@ -395,6 +398,8 @@ class TestMockedMultipartUpload(unittest.TestCase):
 
     @mock.patch.multiple(Client, _UPLOAD_PART_SIZE_BYTES=1)
     def test_single_problem_end_to_end(self):
+        """Verify a fresh problem multipart upload works end to end."""
+
         upload_data = b'123'
         upload_problem_id = '84ef154c-28f9-46ed-9f22-aec0583499f2'
 
@@ -475,3 +480,191 @@ class TestMockedMultipartUpload(unittest.TestCase):
                     self.fail(e)
 
                 self.assertEqual(returned_problem_id, upload_problem_id)
+
+    @mock.patch.multiple(Client, _UPLOAD_PART_SIZE_BYTES=1)
+    def test_partial_upload(self):
+        """Verify only missing parts are uploaded."""
+
+        upload_data = b'123'
+        upload_problem_id = '84ef154c-28f9-46ed-9f22-aec0583499f2'
+
+        parts = list(range(len(upload_data)))
+        part_data = [upload_data[i:i+1] for i in parts]
+
+        _md5 = Client._digest
+        _hex = Client._checksum_hex
+        _b64 = Client._checksum_b64
+        part_digest = [_md5(part_data[i]) for i in parts]
+        combine_checksum = _hex(_md5(b''.join(part_digest)))
+
+        # we need a "global session", because mocked responses are stateful
+        def global_mock_session():
+            session = mock.MagicMock()
+            session.__enter__ = lambda *args: session
+
+            def get(path, seq=iter(range(2))):
+                all_parts = [{"part_number": i+1,
+                              "checksum": _hex(part_digest[i])} for i in parts]
+
+                return choose_reply((path, next(seq)), {
+                    # initial upload status: all parts uploaded except the first one
+                    ('bqm/multipart/{}/status'.format(upload_problem_id), 0):
+                        json.dumps({"status": "UPLOAD_IN_PROGRESS", "parts": all_parts[1:]}),
+
+                    # final upload status
+                    ('bqm/multipart/{}/status'.format(upload_problem_id), 1):
+                        json.dumps({"status": "UPLOAD_IN_PROGRESS", "parts": all_parts}),
+                })
+
+            def post(path, **kwargs):
+                json_ = kwargs.pop('json')
+                body = json.dumps(json_)
+                return choose_reply((path, body), {
+                    # initiate upload
+                    ('bqm/multipart',
+                     json.dumps({'size': len(upload_data)})):
+                        json.dumps({'id': upload_problem_id}),
+
+                    # combine parts
+                    ('bqm/multipart/{}/combine'.format(upload_problem_id),
+                     json.dumps({'checksum': combine_checksum})):
+                        json.dumps({}),
+                })
+
+            def put(path, data, headers):
+                body = data.read()
+                headers = json.dumps(headers)
+                replies = {
+                    # only the first part!
+                    (
+                        'bqm/multipart/{}/part/{}'.format(upload_problem_id, i+1),
+                        part_data[i],
+                        json.dumps({
+                            'Content-MD5': _b64(part_digest[i]),
+                            'Content-Type': 'application/octet-stream'
+                        })
+                    ): json.dumps({})
+                    for i in parts[:1]
+                }
+                return choose_reply((path, body, headers), replies)
+
+            session.get = get
+            session.put = put
+            session.post = post
+
+            return session
+
+        session = global_mock_session()
+
+        with mock.patch.object(Client, 'create_session', lambda self: session):
+            with Client('endpoint', 'token') as client:
+
+                future = client.upload_problem_encoded(upload_data)
+                try:
+                    returned_problem_id = future.result()
+                except Exception as e:
+                    self.fail(e)
+
+                self.assertEqual(returned_problem_id, upload_problem_id)
+
+    def test_part_upload_retried(self):
+        """Verify upload successful even if part upload fails a few times."""
+
+        # using the default part size here (5MB), so we have only one part
+        upload_data = b'123'
+        upload_problem_id = '84ef154c-28f9-46ed-9f22-aec0583499f2'
+
+        parts = [0]
+        part_data = [upload_data]
+
+        _md5 = Client._digest
+        _hex = Client._checksum_hex
+        _b64 = Client._checksum_b64
+        part_digest = [_md5(part_data[i]) for i in parts]
+        combine_checksum = _hex(_md5(b''.join(part_digest)))
+
+        # we need a "global session", because mocked responses are stateful
+        def global_mock_session(n_failures):
+            session = mock.MagicMock()
+            session.__enter__ = lambda *args: session
+
+            def get(path, seq=iter(range(2))):
+                all_parts = [{"part_number": i+1,
+                              "checksum": _hex(part_digest[i])} for i in parts]
+
+                return choose_reply((path, next(seq)), {
+                    # initial upload status
+                    ('bqm/multipart/{}/status'.format(upload_problem_id), 0):
+                        json.dumps({"status": "UPLOAD_IN_PROGRESS", "parts": []}),
+
+                    # final upload status
+                    ('bqm/multipart/{}/status'.format(upload_problem_id), 1):
+                        json.dumps({"status": "UPLOAD_IN_PROGRESS", "parts": all_parts}),
+                })
+
+            def post(path, **kwargs):
+                json_ = kwargs.pop('json')
+                body = json.dumps(json_)
+                return choose_reply((path, body), {
+                    # initiate upload
+                    ('bqm/multipart',
+                     json.dumps({'size': len(upload_data)})):
+                        json.dumps({'id': upload_problem_id}),
+
+                    # combine parts
+                    ('bqm/multipart/{}/combine'.format(upload_problem_id),
+                     json.dumps({'checksum': combine_checksum})):
+                        json.dumps({}),
+                })
+
+            def put(path, data, headers, seq=iter(range(Client._UPLOAD_PART_RETRIES+1))):
+                body = data.read()
+                data.seek(0)
+                headers = json.dumps(headers)
+                keys = [
+                    (
+                        'bqm/multipart/{}/part/{}'.format(upload_problem_id, i+1),
+                        part_data[i],
+                        json.dumps({
+                            'Content-MD5': _b64(part_digest[i]),
+                            'Content-Type': 'application/octet-stream'
+                        })
+                    ) for i in parts
+                ]
+                attempt = next(seq)
+                if attempt < n_failures:
+                    return choose_reply((path, body, headers),
+                                        replies={key: '{}' for key in keys},
+                                        statuses={key: iter([500]) for key in keys})
+                else:
+                    return choose_reply((path, body, headers),
+                                        replies={key: '{}' for key in keys})
+
+            session.get = get
+            session.put = put
+            session.post = post
+
+            return session
+
+        # part upload fails exactly _UPLOAD_PART_RETRIES times;
+        # problem upload must recover
+        session = global_mock_session(n_failures=Client._UPLOAD_PART_RETRIES)
+        with mock.patch.object(Client, 'create_session', lambda self: session):
+            with Client('endpoint', 'token') as client:
+
+                future = client.upload_problem_encoded(upload_data)
+                try:
+                    returned_problem_id = future.result()
+                except Exception as e:
+                    self.fail(e)
+
+                self.assertEqual(returned_problem_id, upload_problem_id)
+
+        # part upload fails exactly _UPLOAD_PART_RETRIES + 1 times;
+        # problem upload will also fail
+        session = global_mock_session(n_failures=Client._UPLOAD_PART_RETRIES + 1)
+        with mock.patch.object(Client, 'create_session', lambda self: session):
+            with Client('endpoint', 'token') as client:
+
+                with self.assertRaises(ProblemUploadError):
+                    client.upload_problem_encoded(upload_data).result()
