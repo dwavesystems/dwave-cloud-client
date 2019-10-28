@@ -28,6 +28,7 @@ from dwave.cloud import Client
 from dwave.cloud.utils import (
     default_text_input, click_info_switch, generate_random_ising_problem,
     datetime_to_timestamp, utcnow, strtrunc, CLIError)
+from dwave.cloud.coders import encode_problem_as_bq
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError,
@@ -421,3 +422,62 @@ def sample(config_file, profile, solver_def, biases, couplings, random_problem,
     echo("Samples: {!r}".format(result.samples))
     echo("Occurrences: {!r}".format(result.occurrences))
     echo("Energies: {!r}".format(result.energies))
+
+
+@cli.command()
+@click.option('--config-file', '-c', default=None,
+              type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
+@click.option('--profile', '-p', default=None,
+              help='Connection profile (section) name')
+@click.option('--problem-id', '-i', default=None,
+              help='Problem ID (optional)')
+@click.option('--format', '-f', default='bq-zlib',
+              type=click.Choice(['coo', 'bq-zlib'], case_sensitive=False),
+              help='Problem data encoding')
+@click.argument('input_file', metavar='FILE', type=click.File('rb'))
+def upload(config_file, profile, problem_id, format, input_file):
+    """Multipart problem upload with cold restart support."""
+
+    try:
+        client = Client.from_config(config_file=config_file, profile=profile)
+    except Exception as e:
+        click.echo("Invalid configuration: {}".format(e))
+        return 1
+    if config_file:
+        click.echo("Using configuration file: {}".format(config_file))
+    if profile:
+        click.echo("Using profile: {}".format(profile))
+    click.echo("Using endpoint: {}".format(client.endpoint))
+
+    click.echo(("Preparing to upload a problem from {!r} "
+                "in {!r} format.").format(input_file.name, format))
+
+    if format == 'coo':
+        click.echo("Transcoding 'coo' to 'bq-zlib'.")
+
+        try:
+            import dimod
+        except ImportError: # pragma: no cover
+            raise RuntimeError("Can't decode 'coo' format without dimod. "
+                               "Re-install the library with 'bqm' support.")
+
+        # note: `BQM.from_coo` doesn't support files opened in binary (yet);
+        # fallback to reopen for now
+        with open(input_file.name, 'rt') as fp:
+            bqm = dimod.BinaryQuadraticModel.from_coo(fp)
+            problem = encode_problem_as_bq(bqm, compress=True)['data']
+
+    elif format == 'bq-zlib':
+        problem = input_file
+
+    click.echo("Uploading...")
+
+    try:
+        future = client.upload_problem_encoded(
+            problem=problem, problem_id=problem_id)
+        remote_problem_id = future.result()
+    except Exception as e:
+        click.echo(e)
+        return 2
+
+    click.echo("Upload done. Problem ID: {!r}".format(remote_problem_id))
