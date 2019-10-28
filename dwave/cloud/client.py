@@ -1449,13 +1449,17 @@ class Client(object):
         finally:
             session.close()
 
-    def upload_problem_encoded(self, problem):
+    def upload_problem_encoded(self, problem, problem_id=None):
         """Initiate multipart problem upload, returning the Problem ID in a
         :class:`~concurrent.futures.Future`.
 
         Args:
             problem (bytes-like/file-like):
                 Encoded problem data to upload.
+
+            problem_id (str, optional):
+                Problem ID. If provided, problem will be re-uploaded. Previously
+                uploaded parts, with a matching checksum, are skipped.
 
         Returns:
             :class:`concurrent.futures.Future`[str]:
@@ -1466,16 +1470,12 @@ class Client(object):
             For a higher-level interface, use upload/submit solver methods.
         """
         return self._upload_problem_executor.submit(
-            self._upload_problem_worker, problem=problem)
+            self._upload_problem_worker, problem=problem, problem_id=problem_id)
 
     @staticmethod
     @retried(_UPLOAD_REQUEST_RETRIES, backoff=_UPLOAD_RETRIES_BACKOFF)
     def _initiate_multipart_upload(session, size):
-        """Sync http request using `session`.
-
-        Note:
-            This function *can* fail. Retry should be handled by the caller.
-        """
+        """Sync http request using `session`."""
 
         logger.debug("Initiating problem multipart upload (size=%r)", size)
 
@@ -1678,12 +1678,16 @@ class Client(object):
 
             return part_no, part_checksum
 
-    def _upload_problem_worker(self, problem):
+    def _upload_problem_worker(self, problem, problem_id=None):
         """Upload a problem to SAPI using multipart upload interface.
 
         Args:
             problem (bytes/str/file-like):
                 Problem description.
+
+            problem_id (str, optional):
+                Problem ID under which to upload the problem. If omitted, a new
+                problem is created.
 
         """
 
@@ -1693,13 +1697,14 @@ class Client(object):
             chunks = ChunkedData(problem, chunk_size=self._UPLOAD_PART_SIZE_BYTES)
             size = len(chunks.view)
 
-            try:
-                problem_id = self._initiate_multipart_upload(session, size)
-            except Exception as e:
-                errmsg = ("Multipart upload initialization failed "
-                          "with {!r}.".format(e))
-                logger.error(errmsg)
-                raise ProblemUploadError(errmsg)
+            if problem_id is None:
+                try:
+                    problem_id = self._initiate_multipart_upload(session, size)
+                except Exception as e:
+                    errmsg = ("Multipart upload initialization failed "
+                              "with {!r}.".format(e))
+                    logger.error(errmsg)
+                    raise ProblemUploadError(errmsg)
 
             # check problem status, so we only upload parts missing or invalid
             problem_status = \
