@@ -47,13 +47,19 @@ import time
 import json
 import logging
 import threading
-import posixpath
 import requests
 import warnings
 import operator
 import collections
+
+import base64
+import hashlib
+import codecs
+import concurrent.futures
+
 from itertools import chain
 from functools import partial, wraps
+from concurrent.futures import ThreadPoolExecutor
 
 from dateutil.parser import parse as parse_datetime
 from plucky import pluck
@@ -64,9 +70,11 @@ from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config, legacy_load_config, parse_float
 from dwave.cloud.solver import Solver, available_solvers
+from dwave.cloud.concurrency import PriorityThreadPoolExecutor
+from dwave.cloud.upload import ChunkedData
 from dwave.cloud.utils import (
-    datetime_to_timestamp, utcnow, TimeoutingHTTPAdapter, user_agent,
-    epochnow, cached)
+    TimeoutingHTTPAdapter, BaseUrlSession, user_agent,
+    datetime_to_timestamp, utcnow, epochnow, cached, retried)
 
 __all__ = ['Client']
 
@@ -135,7 +143,7 @@ class Client(object):
     STATUS_CANCELLED = 'CANCELLED'
 
     # Default API endpoint
-    DEFAULT_API_ENDPOINT = 'https://cloud.dwavesys.com/sapi'
+    DEFAULT_API_ENDPOINT = 'https://cloud.dwavesys.com/sapi/'
 
     # Cases when multiple status flags qualify
     ANY_STATUS_ONGOING = [STATUS_IN_PROGRESS, STATUS_PENDING]
@@ -147,6 +155,8 @@ class Client(object):
 
     # Number of worker threads for each problem processing task
     _SUBMISSION_THREAD_COUNT = 5
+    _UPLOAD_PROBLEM_THREAD_COUNT = 1
+    _UPLOAD_PART_THREAD_COUNT = 10
     _CANCEL_THREAD_COUNT = 1
     _POLL_THREAD_COUNT = 2
     _LOAD_THREAD_COUNT = 5
@@ -163,6 +173,12 @@ class Client(object):
 
     # Downloaded solver definition cache maxage [sec]
     _SOLVERS_CACHE_MAXAGE = 300
+
+    # Multipart upload parameters
+    _UPLOAD_PART_SIZE_BYTES = 5 * 1024 * 1024
+    _UPLOAD_PART_RETRIES = 2
+    _UPLOAD_REQUEST_RETRIES = 2
+    _UPLOAD_RETRIES_BACKOFF = lambda retry: 2 ** retry
 
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None,
@@ -367,26 +383,20 @@ class Client(object):
         else:
             raise ValueError("Expecting a features dictionary or a string name for 'solver'")
 
+        # Store connection/session parameters
         self.endpoint = endpoint
-        self.token = token
         self.default_solver = solver_def
+
+        self.token = token
         self.request_timeout = parse_float(request_timeout)
         self.polling_timeout = parse_float(polling_timeout)
 
-        # Create a :mod:`requests` session. `requests` will manage our url parsing, https, etc.
-        self.session = requests.Session()
-        self.session.mount('http://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
-        self.session.mount('https://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
-        self.session.headers.update({'X-Auth-Token': self.token,
-                                     'User-Agent': user_agent(__packagename__, __version__)})
-        self.session.proxies = {'http': proxy, 'https': proxy}
-        if permissive_ssl:
-            self.session.verify = False
-        if connection_close:
-            self.session.headers.update({'Connection': 'close'})
+        self.proxy = proxy
+        self.permissive_ssl = permissive_ssl
+        self.connection_close = connection_close
 
-        # Debug-log headers
-        logger.debug("session.headers=%r", self.session.headers)
+        # Create session for main thread only
+        self.session = self.create_session()
 
         # Build the problem submission queue, start its workers
         self._submission_queue = queue.Queue()
@@ -424,6 +434,41 @@ class Client(object):
             worker.start()
             self._load_workers.append(worker)
 
+        # Setup multipart upload executors
+        self._upload_problem_executor = \
+            ThreadPoolExecutor(self._UPLOAD_PROBLEM_THREAD_COUNT)
+
+        self._upload_part_executor = \
+            PriorityThreadPoolExecutor(self._UPLOAD_PART_THREAD_COUNT)
+
+    def create_session(self):
+        """Create a new requests session based on client's (self) params.
+
+        Note: since `requests.Session` is NOT thread-safe, every thread should
+        create and use an isolated session.
+        """
+
+        # allow endpoint path to not end with /
+        endpoint = self.endpoint
+        if not endpoint.endswith('/'):
+            endpoint += '/'
+
+        session = BaseUrlSession(base_url=endpoint)
+        session.mount('http://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
+        session.mount('https://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
+        session.headers.update({'X-Auth-Token': self.token,
+                                'User-Agent': user_agent(__packagename__, __version__)})
+        session.proxies = {'http': self.proxy, 'https': self.proxy}
+        if self.permissive_ssl:
+            session.verify = False
+        if self.connection_close:
+            session.headers.update({'Connection': 'close'})
+
+        # Debug-log headers
+        logger.debug("create_session(session.headers=%r)", session.headers)
+
+        return session
+
     def close(self):
         """Perform a clean shutdown.
 
@@ -455,6 +500,11 @@ class Client(object):
         logger.debug("Joining load queue")
         self._load_queue.join()
 
+        logger.debug("Shutting down problem upload executor")
+        self._upload_problem_executor.shutdown()
+        logger.debug("Shutting down problem part upload executor")
+        self._upload_part_executor.shutdown()
+
         # Send kill-task to all worker threads
         # Note: threads can't be 'killed' in Python, they have to die by
         # natural causes
@@ -472,7 +522,7 @@ class Client(object):
                             self._poll_workers, self._load_workers):
             worker.join()
 
-        # Close the requests session
+        # Close the main thread's session
         self.session.close()
 
     def __enter__(self):
@@ -508,10 +558,10 @@ class Client(object):
     def _fetch_solvers(self, name=None):
         if name is not None:
             logger.debug("Fetching definition of a solver with name=%r", name)
-            url = posixpath.join(self.endpoint, 'solvers/remote/{}/'.format(name))
+            url = 'solvers/remote/{}/'.format(name)
         else:
             logger.debug("Fetching definitions of all available solvers")
-            url = posixpath.join(self.endpoint, 'solvers/remote/')
+            url = 'solvers/remote/'
 
         try:
             response = self.session.get(url)
@@ -970,6 +1020,7 @@ class Client(object):
         Note:
             This method is always run inside of a daemon thread.
         """
+        session = self.create_session()
         try:
             while True:
                 # Pull as many problems as we can, block on the first one,
@@ -994,7 +1045,7 @@ class Client(object):
                 body = '[' + ','.join(mess.body for mess in ready_problems) + ']'
                 try:
                     try:
-                        response = self.session.post(posixpath.join(self.endpoint, 'problems/'), body)
+                        response = session.post('problems/', body)
                         localtime_of_response = epochnow()
                     except requests.exceptions.Timeout:
                         raise RequestTimeout
@@ -1026,6 +1077,9 @@ class Client(object):
 
         except BaseException as err:
             logger.exception(err)
+
+        finally:
+            session.close()
 
     def _handle_problem_status(self, message, future):
         """Handle the results of a problem submission or results request.
@@ -1128,6 +1182,7 @@ class Client(object):
         Note:
             This method is always run inside of a daemon thread.
         """
+        session = self.create_session()
         try:
             while True:
                 # Pull as many problems as we can, block when none are available.
@@ -1150,7 +1205,7 @@ class Client(object):
                     body = [item[0] for item in item_list]
 
                     try:
-                        self.session.delete(posixpath.join(self.endpoint, 'problems/'), json=body)
+                        session.delete('problems/', json=body)
                     except requests.exceptions.Timeout:
                         raise RequestTimeout
 
@@ -1167,6 +1222,9 @@ class Client(object):
 
         except Exception as err:
             logger.exception(err)
+
+        finally:
+            session.close()
 
     def _is_clock_diff_acceptable(self, future):
         if not future or future.clock_diff is None:
@@ -1213,6 +1271,7 @@ class Client(object):
         Note:
             This method is always run inside of a daemon thread.
         """
+        session = self.create_session()
         try:
             # grouped futures (all scheduled within _POLL_GROUP_TIMEFRAME)
             frame_futures = {}
@@ -1282,7 +1341,7 @@ class Client(object):
                     logger.trace("Executing poll API request")
 
                     try:
-                        response = self.session.get(posixpath.join(self.endpoint, query_string))
+                        response = session.get(query_string)
                     except requests.exceptions.Timeout:
                         raise RequestTimeout
 
@@ -1325,13 +1384,17 @@ class Client(object):
         except Exception as err:
             logger.exception(err)
 
+        finally:
+            session.close()
+
     def _load(self, future):
         """Enqueue a problem to download results from the server.
 
         Args:
-            future: Future` object corresponding to the query
+            future (:class:`~dwave.cloud.computation.Future`):
+                Future object corresponding to the remote computation.
 
-        This method is threadsafe.
+        This method is thread-safe.
         """
         self._load_queue.put(future)
 
@@ -1343,6 +1406,7 @@ class Client(object):
         Note:
             This method is always run inside of a daemon thread.
         """
+        session = self.create_session()
         try:
             while True:
                 # Select a problem
@@ -1356,7 +1420,7 @@ class Client(object):
                 query_string = 'problems/{}/'.format(future.id)
                 try:
                     try:
-                        response = self.session.get(posixpath.join(self.endpoint, query_string))
+                        response = session.get(query_string)
                     except requests.exceptions.Timeout:
                         raise RequestTimeout
 
@@ -1381,3 +1445,336 @@ class Client(object):
 
         except Exception as err:
             logger.error('Load result error: ' + str(err))
+
+        finally:
+            session.close()
+
+    def upload_problem_encoded(self, problem, problem_id=None):
+        """Initiate multipart problem upload, returning the Problem ID in a
+        :class:`~concurrent.futures.Future`.
+
+        Args:
+            problem (bytes-like/file-like):
+                Encoded problem data to upload.
+
+            problem_id (str, optional):
+                Problem ID. If provided, problem will be re-uploaded. Previously
+                uploaded parts, with a matching checksum, are skipped.
+
+        Returns:
+            :class:`concurrent.futures.Future`[str]:
+                Problem ID in a Future. Problem ID can be used to submit
+                problems by reference.
+
+        Note:
+            For a higher-level interface, use upload/submit solver methods.
+        """
+        return self._upload_problem_executor.submit(
+            self._upload_problem_worker, problem=problem, problem_id=problem_id)
+
+    @staticmethod
+    @retried(_UPLOAD_REQUEST_RETRIES, backoff=_UPLOAD_RETRIES_BACKOFF)
+    def _initiate_multipart_upload(session, size):
+        """Sync http request using `session`."""
+
+        logger.debug("Initiating problem multipart upload (size=%r)", size)
+
+        path = 'bqm/multipart'
+        body = dict(size=size)
+
+        logger.trace("session.post(path=%r, json=%r)", path, body)
+        try:
+            response = session.post(path, json=body)
+        except requests.exceptions.Timeout:
+            raise RequestTimeout
+
+        if response.status_code == 401:
+            raise SolverAuthenticationError()
+        else:
+            logger.trace("Multipart upload initiate response: %r", response.text)
+            response.raise_for_status()
+
+        try:
+            problem_id = response.json()['id']
+        except KeyError:
+            raise InvalidAPIResponseError("problem ID missing")
+
+        logger.debug("Multipart upload initiated (problem_id=%r)", problem_id)
+
+        return problem_id
+
+    @staticmethod
+    def _digest(data):
+        # data: bytes => md5(data): bytes
+        return hashlib.md5(data).digest()
+
+    @staticmethod
+    def _checksum_b64(digest):
+        # digest: bytes => base64(digest): str
+        return base64.b64encode(digest).decode('ascii')
+
+    @staticmethod
+    def _checksum_hex(digest):
+        # digest: bytes => hex(digest): str
+        return codecs.encode(digest, 'hex').decode('ascii')
+
+    @staticmethod
+    def _combined_checksum(checksums):
+        # TODO: drop this requirement server-side
+        # checksums: Dict[int, str] => hex(md5(cat(digests))): str
+        combined = ''.join(h for _, h in sorted(checksums.items()))
+        digest = codecs.decode(combined, 'hex')
+        return Client._checksum_hex(Client._digest(digest))
+
+    @staticmethod
+    @retried(_UPLOAD_PART_RETRIES, backoff=_UPLOAD_RETRIES_BACKOFF)
+    def _upload_multipart_part(session, problem_id, part_id, part_stream,
+                               uploaded_part_checksum=None):
+        """Upload one problem part. Sync http request.
+
+        Args:
+            session (:class:`requests.Session`):
+                Session used for all API requests.
+            problem_id (str):
+                Problem id.
+            part_id (int):
+                Part number/id.
+            part_stream (:class:`io.BufferedIOBase`/binary-stream-like):
+                Problem part data container that supports `read` operation.
+            uploaded_part_checksum (str/None):
+                Checksum of previously uploaded part. Optional, but if specified
+                checksum is verified, and part is uploaded only if checksums
+                don't match.
+
+        Returns:
+            Hex digest of part data MD5 checksum.
+        """
+
+        logger.debug("Uploading part_id=%r of problem_id=%r", part_id, problem_id)
+
+        # TODO: work-around to get a checksum of a binary stream (avoid 2x read)
+        data = part_stream.read()
+        digest = Client._digest(data)
+        b64digest = Client._checksum_b64(digest)
+        hexdigest = Client._checksum_hex(digest)
+        del data
+
+        if uploaded_part_checksum is not None:
+            if hexdigest == uploaded_part_checksum:
+                logger.debug("Uploaded part checksum matches. "
+                             "Skipping upload for part_id=%r.", part_id)
+                return hexdigest
+            else:
+                logger.debug("Uploaded part checksum does not match. "
+                             "Re-uploading part_id=%r.", part_id)
+
+        # rewind the stream after read
+        part_stream.seek(0)
+
+        path = 'bqm/multipart/{problem_id}/part/{part_id}'.format(
+            problem_id=problem_id, part_id=part_id)
+        headers = {
+            'Content-MD5': b64digest,
+            'Content-Type': 'application/octet-stream',
+        }
+
+        logger.trace("session.put(path=%r, data=%r, headers=%r)",
+                     path, part_stream, headers)
+        try:
+            response = session.put(path, data=part_stream, headers=headers)
+        except requests.exceptions.Timeout:
+            raise RequestTimeout
+
+        if response.status_code == 401:
+            raise SolverAuthenticationError()
+        else:
+            logger.trace("Part upload response: %r", response.text)
+            response.raise_for_status()
+
+        logger.debug("Uploaded part_id=%r of problem_id=%r", part_id, problem_id)
+
+        return hexdigest
+
+    @staticmethod
+    @retried(_UPLOAD_REQUEST_RETRIES, backoff=_UPLOAD_RETRIES_BACKOFF)
+    def _get_multipart_upload_status(session, problem_id):
+        logger.debug("Checking upload status of problem_id=%r", problem_id)
+
+        path = 'bqm/multipart/{problem_id}/status'.format(problem_id=problem_id)
+
+        logger.trace("session.get(path=%r)", path)
+        try:
+            response = session.get(path)
+        except requests.exceptions.Timeout:
+            raise RequestTimeout
+
+        if response.status_code == 401:
+            raise SolverAuthenticationError()
+        else:
+            logger.trace("Upload status response: %r", response.text)
+            response.raise_for_status()
+
+        try:
+            problem_status = response.json()
+            problem_status['status']
+            problem_status['parts']
+        except KeyError:
+            raise InvalidAPIResponseError("'status' and/or 'parts' missing")
+
+        logger.debug("Got upload status=%r for problem_id=%r",
+                     problem_status['status'], problem_id)
+
+        return problem_status
+
+    @staticmethod
+    def _failsafe_get_multipart_upload_status(session, problem_id):
+        try:
+            return Client._get_multipart_upload_status(session, problem_id)
+        except Exception as e:
+            logger.debug("Upload status check failed with %r", e)
+
+        return {"status": "UNDEFINED", "parts": []}
+
+    @staticmethod
+    @retried(_UPLOAD_REQUEST_RETRIES, backoff=_UPLOAD_RETRIES_BACKOFF)
+    def _combine_uploaded_parts(session, problem_id, checksum):
+        logger.debug("Combining uploaded parts of problem_id=%r", problem_id)
+
+        path = 'bqm/multipart/{problem_id}/combine'.format(problem_id=problem_id)
+        body = dict(checksum=checksum)
+
+        logger.trace("session.post(path=%r, json=%r)", path, body)
+
+        try:
+            response = session.post(path, json=body)
+        except requests.exceptions.Timeout:
+            raise RequestTimeout
+
+        if response.status_code == 401:
+            raise SolverAuthenticationError()
+        else:
+            logger.trace("Combine parts response: %r", response.text)
+            response.raise_for_status()
+
+        logger.debug("Issued a combine command for problem_id=%r", problem_id)
+
+    @staticmethod
+    def _uploaded_parts_from_problem_status(problem_status):
+        uploaded_parts = {}
+        if problem_status.get('status') == 'UPLOAD_IN_PROGRESS':
+            for part in problem_status.get('parts', ()):
+                part_no = part.get('part_number')
+                checksum = part.get('checksum', '').strip('"')  # fix double-quoting bug
+                uploaded_parts[part_no] = checksum
+        return uploaded_parts
+
+    def _upload_part_worker(self, problem_id, part_no, chunk_stream,
+                            uploaded_part_checksum=None):
+
+        with self.create_session() as session:
+            part_checksum = self._upload_multipart_part(
+                session, problem_id, part_id=part_no, part_stream=chunk_stream,
+                uploaded_part_checksum=uploaded_part_checksum)
+
+            return part_no, part_checksum
+
+    def _upload_problem_worker(self, problem, problem_id=None):
+        """Upload a problem to SAPI using multipart upload interface.
+
+        Args:
+            problem (bytes/str/file-like):
+                Problem description.
+
+            problem_id (str, optional):
+                Problem ID under which to upload the problem. If omitted, a new
+                problem is created.
+
+        """
+
+        # in python 3.7+ we could create the session once, on thread init,
+        # via executor initializer
+        with self.create_session() as session:
+            chunks = ChunkedData(problem, chunk_size=self._UPLOAD_PART_SIZE_BYTES)
+            size = len(chunks.view)
+
+            if problem_id is None:
+                try:
+                    problem_id = self._initiate_multipart_upload(session, size)
+                except Exception as e:
+                    errmsg = ("Multipart upload initialization failed "
+                              "with {!r}.".format(e))
+                    logger.error(errmsg)
+                    raise ProblemUploadError(errmsg)
+
+            # check problem status, so we only upload parts missing or invalid
+            problem_status = \
+                self._failsafe_get_multipart_upload_status(session, problem_id)
+
+            if problem_status.get('status') == 'UPLOAD_COMPLETED':
+                logger.debug("Problem already uploaded.")
+                return problem_id
+
+            uploaded_parts = \
+                self._uploaded_parts_from_problem_status(problem_status)
+
+            # enqueue all parts, worker skips if checksum matches
+            parts = {}
+            streams = collections.OrderedDict(enumerate(chunks))
+            for chunk_no, chunk_stream in streams.items():
+                part_no = chunk_no + 1
+                part_future = self._upload_part_executor.submit(
+                    self._upload_part_worker,
+                    problem_id, part_no, chunk_stream,
+                    uploaded_part_checksum=uploaded_parts.get(part_no))
+
+                parts[part_no] = part_future
+
+            # wait for parts to upload/fail
+            concurrent.futures.wait(parts.values())
+
+            # verify all parts uploaded without error
+            for part_no, part_future in parts.items():
+                try:
+                    part_future.result()
+                except Exception as e:
+                    errmsg = ("Multipart upload of problem_id={!r} failed for "
+                              "part_no={!r} with {!r}.".format(problem_id, part_no, e))
+                    logger.error(errmsg)
+                    raise ProblemUploadError(errmsg)
+
+            # verify all parts uploaded via status call
+            # (check remote checksum matches the local one)
+            final_problem_status = \
+                self._failsafe_get_multipart_upload_status(session, problem_id)
+
+            final_uploaded_parts = \
+                self._uploaded_parts_from_problem_status(final_problem_status)
+
+            if len(final_uploaded_parts) != len(parts):
+                errmsg = "Multipart upload unexpectedly failed for some parts."
+                logger.error(errmsg)
+                logger.debug("problem_id=%r, expected_parts=%r, uploaded_parts=%r",
+                             problem_id, parts.keys(), final_uploaded_parts.keys())
+                raise ProblemUploadError(errmsg)
+
+            for part_no, part_future in parts.items():
+                _, part_checksum = part_future.result()
+                remote_checksum = final_uploaded_parts[part_no]
+                if part_checksum != remote_checksum:
+                    errmsg = ("Checksum mismatch for part_no={!r} "
+                              "(local {!r} != remote {!r})".format(
+                                  part_no, part_checksum, remote_checksum))
+                    logger.error(errmsg)
+                    raise ProblemUploadError(errmsg)
+
+            # send parts combine request
+            combine_checksum = Client._combined_checksum(final_uploaded_parts)
+            try:
+                self._combine_uploaded_parts(session, problem_id, combine_checksum)
+            except Exception as e:
+                errmsg = ("Multipart upload of problem_id={!r} failed on parts "
+                          "combine with {!r}".format(problem_id, e))
+                logger.error(errmsg)
+                raise ProblemUploadError(errmsg)
+
+            return problem_id

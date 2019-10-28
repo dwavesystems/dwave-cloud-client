@@ -71,42 +71,45 @@ class TestUnstructuredSolver(unittest.TestCase):
         # build a test problem
         bqm = dimod.BQM.from_ising({}, {'ab': 1})
 
+        # use a global mocked session, so we can modify it on-fly
+        session = mock.Mock()
+
         # construct a functional solver by mocking client and api response data
-        with Client('endpoint', 'token') as client:
-            client.session = mock.Mock()
-            solver = UnstructuredSolver(client, unstructured_solver_data())
+        with mock.patch.object(Client, 'create_session', lambda self: session):
+            with Client('endpoint', 'token') as client:
+                solver = UnstructuredSolver(client, unstructured_solver_data())
 
-            # direct bqm sampling
-            ss = dimod.ExactSolver().sample(bqm)
-            client.session.post = lambda path, _: choose_reply(
-                path, {'endpoint/problems/': complete_reply(ss)})
+                # direct bqm sampling
+                ss = dimod.ExactSolver().sample(bqm)
+                session.post = lambda path, _: choose_reply(
+                    path, {'problems/': complete_reply(ss)})
 
-            fut = solver.sample_bqm(bqm)
-            numpy.testing.assert_array_equal(fut.sampleset, ss)
-            numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
-            numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
-            numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)
+                fut = solver.sample_bqm(bqm)
+                numpy.testing.assert_array_equal(fut.sampleset, ss)
+                numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
+                numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
+                numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)
 
-            # ising sampling
-            lin, quad, _ = bqm.to_ising()
-            ss = dimod.ExactSolver().sample_ising(lin, quad)
-            client.session.post = lambda path, _: choose_reply(
-                path, {'endpoint/problems/': complete_reply(ss)})
+                # ising sampling
+                lin, quad, _ = bqm.to_ising()
+                ss = dimod.ExactSolver().sample_ising(lin, quad)
+                session.post = lambda path, _: choose_reply(
+                    path, {'problems/': complete_reply(ss)})
 
-            fut = solver.sample_ising(lin, quad)
-            numpy.testing.assert_array_equal(fut.sampleset, ss)
-            numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
-            numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
-            numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)
+                fut = solver.sample_ising(lin, quad)
+                numpy.testing.assert_array_equal(fut.sampleset, ss)
+                numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
+                numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
+                numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)
 
-            # qubo sampling
-            qubo, _ = bqm.to_qubo()
-            ss = dimod.ExactSolver().sample_qubo(qubo)
-            client.session.post = lambda path, _: choose_reply(
-                path, {'endpoint/problems/': complete_reply(ss)})
+                # qubo sampling
+                qubo, _ = bqm.to_qubo()
+                ss = dimod.ExactSolver().sample_qubo(qubo)
+                session.post = lambda path, _: choose_reply(
+                    path, {'problems/': complete_reply(ss)})
 
-            fut = solver.sample_qubo(qubo)
-            numpy.testing.assert_array_equal(fut.sampleset, ss)
-            numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
-            numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
-            numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)
+                fut = solver.sample_qubo(qubo)
+                numpy.testing.assert_array_equal(fut.sampleset, ss)
+                numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
+                numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
+                numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)

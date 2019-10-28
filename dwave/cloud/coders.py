@@ -14,8 +14,13 @@
 
 from __future__ import division, absolute_import
 
+import zlib
+import json
 import struct
 import base64
+import codecs
+
+import six
 
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_tail, active_qubits)
@@ -249,34 +254,52 @@ def decode_qp_numpy(msg, return_matrix=True):
     return result
 
 
+def _encode_problem_as_bq_ref(problem):
+    assert isinstance(problem, six.string_types)
+
+    return problem
+
+def _encode_problem_as_bq_json(problem):
+    assert hasattr(problem, 'to_serializable')
+
+    return problem.to_serializable(use_bytes=False)
+
+def _encode_problem_as_bq_json_zlib(problem):
+    assert hasattr(problem, 'to_serializable')
+
+    bqm_dict = _encode_problem_as_bq_json(problem)
+    return zlib.compress(codecs.encode(json.dumps(bqm_dict), "ascii"))
+
+
 def encode_problem_as_bq(problem, compress=False):
     """Encode the binary quadratic problem for submission in the `bq` data
     format.
 
     Args:
-        problem (:class:`~dimod.BinaryQuadraticModel`):
-            Binary quadratic model.
+        problem (:class:`~dimod.BinaryQuadraticModel`/str):
+            A binary quadratic model, or a reference to one (Problem ID).
 
     Returns:
         encoded submission dictionary
     """
 
-    import zlib
-    import json
-
-    serialized_bqm = problem.to_serializable(use_bytes=False)
+    if isinstance(problem, six.string_types):
+        return {
+            'format': 'bqm-ref',
+            'data': _encode_problem_as_bq_ref(problem)
+        }
 
     if compress:
-        # note: compression scheme will change, and preferably move to transport layer
-        compressed_bqm = zlib.compress(bytes(json.dumps(serialized_bqm), "ascii"))
-        data = str(base64.b64encode(compressed_bqm), "ascii")
-    else:
-        data = serialized_bqm
+        return {
+            'format': 'bq-zlib',
+            'data': _encode_problem_as_bq_json_zlib(problem)
+        }
 
-    return {
-        'format': 'bq',
-        'data': data,
-    }
+    else:
+        return {
+            'format': 'bq',
+            'data': _encode_problem_as_bq_json(problem)
+        }
 
 
 def decode_bq(msg):

@@ -17,14 +17,24 @@ from __future__ import division, absolute_import
 import sys
 import time
 import random
+import logging
 import platform
 import itertools
+import numbers
 
 try:
     import collections.abc as abc
-except ImportError:
-    # 2.7
+    from urllib.parse import urljoin
+except ImportError:     # pragma: no cover
+    # python 2
     import collections as abc
+    from urlparse import urljoin
+
+try:
+    perf_counter = time.perf_counter
+except AttributeError:  # pragma: no cover
+    # python 2
+    perf_counter = time.time
 
 from datetime import datetime
 from dateutil.tz import UTC
@@ -43,7 +53,9 @@ except ImportError:  # pragma: no cover
 
 __all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
            'default_text_input', 'click_info_switch', 'datetime_to_timestamp',
-           'datetime_to_timestamp', 'utcnow', 'epochnow']
+           'datetime_to_timestamp', 'utcnow', 'epochnow', 'tictoc']
+
+logger = logging.getLogger(__name__)
 
 
 def evaluate_ising(linear, quad, state):
@@ -110,6 +122,10 @@ def generate_random_ising_problem(solver, h_range=None, j_range=None):
     return lin, quad
 
 
+def generate_const_ising_problem(solver, h=1, j=-1):
+    return generate_random_ising_problem(solver, h_range=[h, h], j_range=[j, j])
+
+
 def uniform_iterator(sequence):
     """Uniform (key, value) iteration on a `dict`,
     or (idx, value) on a `list`."""
@@ -128,6 +144,25 @@ def uniform_get(sequence, index, default=None):
         return sequence.get(index, default)
     else:
         return sequence[index] if index < len(sequence) else default
+
+
+def reformat_qubo_as_ising(qubo):
+    """Split QUBO coefficients into linear and quadratic terms (the Ising form).
+
+    Args:
+        qubo (dict[(int, int), float]):
+            Coefficients of a quadratic unconstrained binary optimization
+            (QUBO) model.
+
+    Returns:
+        (dict[int, float], dict[(int, int), float])
+
+    """
+
+    lin = {u: bias for (u, v), bias in six.iteritems(qubo) if u == v}
+    quad = {(u, v): bias for (u, v), bias in six.iteritems(qubo) if u != v}
+
+    return lin, quad
 
 
 def strip_head(sequence, values):
@@ -249,6 +284,33 @@ class TimeoutingHTTPAdapter(requests.adapters.HTTPAdapter):
         return super(TimeoutingHTTPAdapter, self).send(*args, **kwargs)
 
 
+# Note: BaseUrlSession is taken from https://github.com/requests/toolbelt under
+# an Apache 2 license. This simple extension didn't warrant a new dependency.
+# If we later decide to use additional features from `requests-toolbelt`,
+# remove it from here.
+
+class BaseUrlSession(requests.Session):
+    """A Session with a URL that all requests will use as a base."""
+
+    base_url = None
+
+    def __init__(self, base_url=None):
+        if base_url:
+            self.base_url = base_url
+        super(BaseUrlSession, self).__init__()
+
+    def request(self, method, url, *args, **kwargs):
+        """Send the request after generating the complete URL."""
+        url = self.create_url(url)
+        return super(BaseUrlSession, self).request(
+            method, url, *args, **kwargs
+        )
+
+    def create_url(self, url):
+        """Create the URL based off this partial path."""
+        return urljoin(self.base_url, url)
+
+
 def user_agent(name, version):
     """Return User-Agent ~ "name/version language/version interpreter/version os/version"."""
 
@@ -345,3 +407,80 @@ class cached(object):
         wrapper._maxage = self.maxage
 
         return wrapper
+
+
+class retried(object):
+    """Decorator that retries running the wrapped function `retries` times,
+    logging exceptions along the way.
+
+    Args:
+        retries (int, default=1):
+            Decorated function is allowed to fail `retries` times.
+
+        backoff (number/List[number]/callable, default=0):
+            Delay (in seconds) before a retry.
+
+    Example:
+        Retry up to three times::
+
+            import random
+
+            def f(thresh):
+                r = random.random()
+                if r < thresh:
+                    raise ValueError
+                return r
+
+            retried_f = retried(3)(f)
+
+            retried_f(0.5)
+    """
+
+    def __init__(self, retries=1, backoff=0):
+        self.retries = retries
+
+        # normalize `backoff` to callable
+        if isinstance(backoff, numbers.Number):
+            self.backoff = lambda retry: backoff
+        elif isinstance(backoff, abc.Sequence):
+            it = iter(backoff)
+            self.backoff = lambda retry: next(it)
+        else:
+            self.backoff = backoff
+
+    def __call__(self, fn):
+        if not callable(fn):
+            raise TypeError("decorated object must be callable")
+
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            for retries_left in range(self.retries, -1, -1):
+                try:
+                    return fn(*args, **kwargs)
+
+                except Exception as exc:
+                    fn_name = getattr(fn, '__name__', 'unnamed')
+                    logger.debug(
+                        "Running %s(*%r, **%r) failed with %r. Retries left: %d",
+                        fn_name, args, kwargs, exc, retries_left)
+
+                    if retries_left == 0:
+                        raise exc
+
+                retry = self.retries - retries_left + 1
+                delay = self.backoff(retry)
+                logger.debug("Sleeping for %s seconds before retrying.", delay)
+                time.sleep(delay)
+
+        return wrapped
+
+
+class tictoc(object):
+    """Timer as a context manager."""
+
+    def __enter__(self):
+        self.tick = perf_counter()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.dt = perf_counter() - self.tick

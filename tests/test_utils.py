@@ -20,7 +20,7 @@ from datetime import datetime
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_head, strip_tail,
     active_qubits, generate_random_ising_problem,
-    default_text_input, utcnow, cached)
+    default_text_input, utcnow, cached, retried)
 from dwave.cloud.testing import mock
 
 
@@ -207,6 +207,110 @@ class TestCachedDecorator(unittest.TestCase):
             self.assertRaises(ZeroDivisionError, f)
             self.assertEqual(f(), 1)
             self.assertEqual(f(), 0.5)
+
+
+class TestRetriedDecorator(unittest.TestCase):
+
+    def test_func_called(self):
+        """Wrapped function is called with correct arguments."""
+
+        @retried()
+        def f(a, b):
+            return a, b
+
+        self.assertEqual(f(1, b=2), (1, 2))
+
+    def test_exc_raised(self):
+        """Correct exception is raised after number of retries exceeded."""
+
+        @retried()
+        def f():
+            raise ValueError
+
+        with self.assertRaises(ValueError):
+            f()
+
+    def test_func_called_only_until_succeeds(self):
+        """Wrapped function is called no more times then it takes to succeed."""
+
+        err = ValueError
+        val = mock.sentinel
+        attrs = dict(__name__='f')
+
+        # f succeeds on 3rd try
+        f = mock.Mock(side_effect=[err, err, val.a, val.b], **attrs)
+        ret = retried(3)(f)()
+        self.assertEqual(ret, val.a)
+        self.assertEqual(f.call_count, 3)
+
+        # fail with only on retry
+        f = mock.Mock(side_effect=[err, err, val.a, val.b], **attrs)
+        with self.assertRaises(err):
+            ret = retried(1)(f)()
+
+        # no errors, return without retries
+        f = mock.Mock(side_effect=[val.a, val.b, val.c], **attrs)
+        ret = retried(3)(f)()
+        self.assertEqual(ret, val.a)
+        self.assertEqual(f.call_count, 1)
+
+    def test_decorator(self):
+        with self.assertRaises(TypeError):
+            retried()("not-a-function")
+
+    def test_backoff_constant(self):
+        """Constant retry back-off."""
+
+        # 1s delay before a retry
+        backoff = 1
+
+        with mock.patch('time.sleep') as sleep:
+
+            @retried(retries=2, backoff=backoff)
+            def f():
+                raise ValueError
+
+            with self.assertRaises(ValueError):
+                f()
+
+            calls = [mock.call(backoff), mock.call(backoff)]
+            sleep.assert_has_calls(calls)
+
+    def test_backoff_seq(self):
+        """Retry back-off defined via list."""
+
+        # progressive delay
+        backoff = [1, 2, 3]
+
+        with mock.patch('time.sleep') as sleep:
+
+            @retried(retries=3, backoff=backoff)
+            def f():
+                raise ValueError
+
+            with self.assertRaises(ValueError):
+                f()
+
+            calls = [mock.call(b) for b in backoff]
+            sleep.assert_has_calls(calls)
+
+    def test_backoff_func(self):
+        """Retry back-off defined via callable."""
+
+        def backoff(retry):
+            return 2 ** retry
+
+        with mock.patch('time.sleep') as sleep:
+
+            @retried(retries=3, backoff=backoff)
+            def f():
+                raise ValueError
+
+            with self.assertRaises(ValueError):
+                f()
+
+            calls = [mock.call(backoff(1)), mock.call(backoff(2)), mock.call(backoff(3))]
+            sleep.assert_has_calls(calls)
 
 
 if __name__ == '__main__':

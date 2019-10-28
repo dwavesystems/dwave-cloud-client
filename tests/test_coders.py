@@ -28,6 +28,7 @@ from dwave.cloud.coders import (
     encode_problem_as_qp, decode_qp, decode_qp_numpy,
     encode_problem_as_bq, decode_bq)
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
+from dwave.cloud.utils import generate_const_ising_problem
 
 
 def get_structured_solver():
@@ -88,8 +89,7 @@ class TestQPCoders(unittest.TestCase):
         """Test biases and coupling strengths are properly encoded (base64 little-endian doubles)."""
 
         solver = get_structured_solver()
-        linear = {index: 1 for index in solver.nodes}
-        quadratic = {key: -1 for key in solver.undirected_edges}
+        linear, quadratic = generate_const_ising_problem(solver, h=1, j=-1)
         request = encode_problem_as_qp(solver, linear, quadratic)
         self.assertEqual(request['format'], 'qp')
         self.assertEqual(request['lin'],  self.encode_doubles([1, 1, 1, 1]))
@@ -99,8 +99,8 @@ class TestQPCoders(unittest.TestCase):
         """Inactive qubits should be encoded as NaNs. Inactive couplers should be omitted."""
 
         solver = get_structured_solver()
-        linear = {index: 1 for index in sorted(list(solver.nodes))[:2]}
-        quadratic = {key: -1 for key in sorted(list(solver.undirected_edges))[:1]}
+        linear = {0: 1, 1: 1}
+        quadratic = {(0, 1): -1}
         request = encode_problem_as_qp(solver, linear, quadratic)
         self.assertEqual(request['format'], 'qp')
         # [1, 1, NaN, NaN]

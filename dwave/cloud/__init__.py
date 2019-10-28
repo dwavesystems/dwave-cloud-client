@@ -26,12 +26,15 @@ __all__ = ['Client', 'Solver', 'Future']
 
 # configure logger `dwave.cloud` root logger, inherited in submodules
 # (write level warning+ to stderr, include timestamp/module/level)
-formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-handler = logging.StreamHandler()
-handler.setFormatter(formatter)
-root = logging.getLogger(__name__)
-root.setLevel(logging.WARNING)
-root.addHandler(handler)
+_formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(threadName)s %(message)s')
+_handler = logging.StreamHandler()
+_handler.setFormatter(_formatter)
+
+# expose the root logger to simplify access; for example:
+# `dwave.cloud.logger.setLevel(logging.DEBUG)`
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
+logger.addHandler(_handler)
 
 
 # add TRACE log level and Logger.trace() method
@@ -55,4 +58,4 @@ def _apply_loglevel_from_env(logger):
     if requested_level:
         logger.setLevel(requested_level)
 
-_apply_loglevel_from_env(root)
+_apply_loglevel_from_env(logger)
