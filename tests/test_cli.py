@@ -24,6 +24,7 @@ from dwave.cloud.config import load_config
 from dwave.cloud.testing import mock, isolated_environ
 
 from tests import config, test_config_path, test_config_profile
+from tests.test_mock_solver_loading import solver_object
 
 
 def touch(path):
@@ -184,10 +185,10 @@ class TestCli(unittest.TestCase):
             with runner.isolated_filesystem():
                 touch(config_file)
                 result = runner.invoke(cli, ['ping',
-                                            '--config-file', config_file,
-                                            '--profile', profile,
-                                            '--request-timeout', '.5',
-                                            '--polling-timeout', '30'])
+                                             '--config-file', config_file,
+                                             '--profile', profile,
+                                             '--request-timeout', '.5',
+                                             '--polling-timeout', '30'])
 
             # proper arguments passed to Client.from_config?
             m.from_config.assert_called_with(
@@ -195,11 +196,11 @@ class TestCli(unittest.TestCase):
                 request_timeout=0.5, polling_timeout=30)
 
             # get solver called?
-            c = m.from_config(config_file=config_file, profile=profile)
+            c = m.from_config.return_value
             c.get_solver.assert_called_with()
 
             # sampling method called on solver?
-            s = c.get_solver()
+            s = c.get_solver.return_value
             s.sample_ising.assert_called_with({0: 1}, {})
 
         self.assertEqual(result.exit_code, 0)
@@ -257,23 +258,88 @@ class TestCli(unittest.TestCase):
             with runner.isolated_filesystem():
                 touch(config_file)
                 result = runner.invoke(cli, ['sample',
-                                            '--config-file', config_file,
-                                            '--profile', profile,
-                                            '--solver', solver,
-                                            '-h', biases,
-                                            '-j', couplings,
-                                            '-n', num_reads])
+                                             '--config-file', config_file,
+                                             '--profile', profile,
+                                             '--solver', solver,
+                                             '-h', biases,
+                                             '-j', couplings,
+                                             '-n', num_reads])
 
             # proper arguments passed to Client.from_config?
             m.from_config.assert_called_with(config_file=config_file, profile=profile, solver=solver)
 
             # get solver called?
-            c = m.from_config(config_file=config_file, profile=profile, solver=solver)
+            c = m.from_config.return_value
             c.get_solver.assert_called_with()
 
             # sampling method called on solver?
-            s = c.get_solver()
+            s = c.get_solver.return_value
             s.sample_ising.assert_called_with([0], {(0, 4): 1}, num_reads=10)
+
+        self.assertEqual(result.exit_code, 0)
+
+    def test_solvers(self):
+        config_file = 'dwave.conf'
+        profile = 'profile'
+        solver = '{"qpu": true}'
+        solvers = [solver_object('A'), solver_object('B')]
+
+        with mock.patch('dwave.cloud.cli.Client') as m:
+            # mock returned solvers
+            client = m.from_config.return_value.__enter__.return_value
+            client.get_solvers.return_value = solvers
+
+            runner = CliRunner()
+            with runner.isolated_filesystem():
+                touch(config_file)
+                result = runner.invoke(cli, ['solvers',
+                                             '--config-file', config_file,
+                                             '--profile', profile,
+                                             '--solver', solver])
+
+            # proper arguments passed to Client.from_config?
+            m.from_config.assert_called_with(
+                config_file=config_file, profile=profile, solver=solver)
+
+            # get solvers called?
+            client.get_solvers.assert_called_with()
+
+        # verify exit code and stdout printout
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(result.output.count('Solver:'), 2)
+        self.assertIn('Solver: A', result.output)
+        self.assertIn('Solver: B', result.output)
+
+    def test_upload(self):
+        config_file = 'dwave.conf'
+        profile = 'profile'
+        format = 'bq-zlib'
+        problem_id = 'prob:lem:id'
+        filename = 'filename'
+
+        with mock.patch('dwave.cloud.cli.Client') as m:
+
+            runner = CliRunner()
+            with runner.isolated_filesystem():
+                touch(config_file)
+                touch(filename)
+                result = runner.invoke(cli, ['upload',
+                                             '--config-file', config_file,
+                                             '--profile', profile,
+                                             '--format', format,
+                                             '--problem-id', problem_id,
+                                             filename])
+
+                # proper arguments passed to Client.from_config?
+                m.from_config.assert_called_with(config_file=config_file, profile=profile)
+
+                # upload method called on client?
+                c = m.from_config.return_value
+                self.assertTrue(c.upload_problem_encoded.called)
+
+                # verify problem_id
+                args, kwargs = c.upload_problem_encoded.call_args
+                self.assertEqual(kwargs.get('problem_id'), problem_id)
 
         self.assertEqual(result.exit_code, 0)
 
