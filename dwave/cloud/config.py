@@ -59,6 +59,8 @@ Environment variables:
 
     ``DWAVE_API_PROXY``: URL for proxy connections to D-Wave API.
 
+    ``DWAVE_API_HEADERS``: Optional additional HTTP headers.
+
 Examples:
     The following are typical examples of using :func:`~dwave.cloud.client.Client.from_config`
     to create a configured client.
@@ -195,12 +197,14 @@ Examples:
     {'client': u'sw',
      'endpoint': u'https://url.of.some.dwavesystem.com/sapi',
      'proxy': None,
+     'headers': None,
      'solver': 'EXAMPLE_2000Q_SYSTEM',
      'token': u'ABC-123456789123456789123456789'}
     >>> dc.config.load_config("./dwave_c.conf", profile='dw2000b', solver='Solver3')   # doctest: +SKIP
     {'client': u'qpu',
      'endpoint': u'https://url.of.some.dwavesystem.com/sapi',
      'proxy': None,
+     'headers': None,
      'solver': 'Solver3',
      'token': u'DEF-987654321987654321987654321'}
 
@@ -540,18 +544,18 @@ def load_profile_from_files(filenames=None, profile=None):
         The following example code loads profile values from parsing both these files,
         by default loading the first profile encountered or an explicitly specified profile.
 
-        >>> import dwave.cloud as dc
-        >>> dc.config.load_profile_from_files(["./dwave_a.conf", "./dwave_b.conf"])   # doctest: +SKIP
-        {'client': u'sw',
-         'endpoint': u'https://url.of.some.dwavesystem.com/sapi',
-         'solver': u'EXAMPLE_2000Q_SYSTEM_A',
-         'token': u'DEF-987654321987654321987654321'}
-        >>> dc.config.load_profile_from_files(["./dwave_a.conf", "./dwave_b.conf"],
-        ...                                   profile='dw2000b')   # doctest: +SKIP
-        {'client': u'qpu',
-        'endpoint': u'https://url.of.some.other.dwavesystem.com/sapi',
-        'solver': u'EXAMPLE_2000Q_SYSTEM_B',
-        'token': u'ABC-123456789123456789123456789'}
+        >>> from dwave.cloud import config
+        >>> config.load_profile_from_files(["./dwave_a.conf", "./dwave_b.conf"])   # doctest: +SKIP
+        {'client': 'sw',
+         'endpoint': 'https://url.of.some.dwavesystem.com/sapi',
+         'solver': 'EXAMPLE_2000Q_SYSTEM_A',
+         'token': 'DEF-987654321987654321987654321'}
+        >>> config.load_profile_from_files(["./dwave_a.conf", "./dwave_b.conf"],
+        ...                                profile='dw2000b')   # doctest: +SKIP
+        {'client': 'qpu',
+        'endpoint': 'https://url.of.some.other.dwavesystem.com/sapi',
+        'solver': 'EXAMPLE_2000Q_SYSTEM_B',
+        'token': 'ABC-123456789123456789123456789'}
 
     """
 
@@ -617,7 +621,8 @@ def get_default_config():
 
 
 def load_config(config_file=None, profile=None, client=None,
-                endpoint=None, token=None, solver=None, proxy=None):
+                endpoint=None, token=None, solver=None,
+                proxy=None, headers=None):
     """Load D-Wave Cloud Client configuration based on a configuration file.
 
     Configuration values can be specified in multiple ways, ranked in the following
@@ -648,13 +653,13 @@ def load_config(config_file=None, profile=None, client=None,
     file is not explicitly specified, detected on the system, or defined via
     an environment variable.
 
-    Environment variables: ``DWAVE_CONFIG_FILE``, ``DWAVE_PROFILE``, ``DWAVE_API_CLIENT``,
-    ``DWAVE_API_ENDPOINT``, ``DWAVE_API_TOKEN``, ``DWAVE_API_SOLVER``, ``DWAVE_API_PROXY``.
+    Environment variables: ``DWAVE_CONFIG_FILE``, ``DWAVE_PROFILE``,
+    ``DWAVE_API_CLIENT``, ``DWAVE_API_ENDPOINT``, ``DWAVE_API_TOKEN``,
+    ``DWAVE_API_SOLVER``, ``DWAVE_API_PROXY``, ``DWAVE_API_HEADERS``.
 
     Environment variables are described in :mod:`dwave.cloud.config`.
 
     Args:
-
         config_file (str/[str]/None/False/True, default=None):
             Path to configuration file(s).
 
@@ -689,7 +694,7 @@ def load_config(config_file=None, profile=None, client=None,
         token (str, default=None):
             API authorization token.
 
-        solver (str, default=None):
+        solver (dict/str, default=None):
             :term:`solver` features, as a JSON-encoded dictionary of feature constraints,
             the client should use. See :meth:`~dwave.cloud.client.Client.get_solvers` for
             semantics of supported feature constraints.
@@ -705,13 +710,16 @@ def load_config(config_file=None, profile=None, client=None,
             username/password, port, scheme, etc. If undefined, client
             uses the system-level proxy, if defined, or connects directly to the API.
 
+        headers (dict/str, default=None):
+            Header lines to include in API calls, each line formatted as
+             ``Key: value``, or a parsed dictionary.
+
     Returns:
         dict:
-            Mapping of configuration keys to values for the profile
-            (section), as read from the configuration file and optionally overridden by
-            environment values and specified keyword arguments.
-            Always contains the `client`, `endpoint`, `token`, `solver`, and `proxy`
-            keys.
+            Mapping of configuration keys to values for the profile (section),
+            as read from the configuration file and optionally overridden by
+            environment values and specified keyword arguments. Always contains
+            the `client`, `endpoint`, `token`, `solver`, and `proxy` keys.
 
     Raises:
         :exc:`ValueError`:
@@ -727,16 +735,17 @@ def load_config(config_file=None, profile=None, client=None,
         This example loads the configuration from an auto-detected configuration file
         in the home directory of a Windows system user.
 
-        >>> import dwave.cloud as dc
-        >>> dc.config.load_config()
-        {'client': u'qpu',
-         'endpoint': u'https://url.of.some.dwavesystem.com/sapi',
+        >>> from dwave.cloud import config
+        >>> config.load_config()
+        {'client': 'qpu',
+         'endpoint': 'https://url.of.some.dwavesystem.com/sapi',
          'proxy': None,
-         'solver': u'EXAMPLE_2000Q_SYSTEM_A',
-         'token': u'DEF-987654321987654321987654321'}
+         'solver': 'EXAMPLE_2000Q_SYSTEM_A',
+         'token': 'DEF-987654321987654321987654321',
+         'headers': None}
         >>> See which configuration file was loaded
-        >>> dc.config.get_configfile_paths()
-        [u'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf']
+        >>> config.get_configfile_paths()
+        ['C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf']
 
         Additional examples are given in :mod:`dwave.cloud.config`.
 
@@ -774,6 +783,7 @@ def load_config(config_file=None, profile=None, client=None,
     section['token'] = token or os.getenv("DWAVE_API_TOKEN", section.get('token'))
     section['solver'] = solver or os.getenv("DWAVE_API_SOLVER", section.get('solver'))
     section['proxy'] = proxy or os.getenv("DWAVE_API_PROXY", section.get('proxy'))
+    section['headers'] = headers or os.getenv("DWAVE_API_HEADERS", section.get('headers'))
 
     return section
 

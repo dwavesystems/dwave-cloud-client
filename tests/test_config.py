@@ -47,6 +47,8 @@ class TestConfig(unittest.TestCase):
         endpoint = https://url.to.alpha/api
         proxy = http://user:pass@myproxy.com:8080/
         token = alpha-token
+        headers =  key-1:value-1
+          key-2: value-2
     """
 
     def parse_config_string(self, text):
@@ -127,6 +129,8 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(config['endpoint'], "https://url.to.alpha/api")
         # default values are inherited
         self.assertEqual(config['client'], "qpu")
+        # multi-line values are read
+        self.assertEqual(config['headers'], "key-1:value-1\nkey-2: value-2")
 
     def _load_config_from_files(self, asked, provided=None, data=None):
         self.assertEqual(asked, provided)
@@ -210,6 +214,7 @@ class TestConfig(unittest.TestCase):
                 self.assertEqual(load_config(client='manual')['client'], 'manual')
                 self.assertEqual(load_config(solver='manual')['solver'], 'manual')
                 self.assertEqual(load_config(proxy='manual')['proxy'], 'manual')
+                self.assertEqual(load_config(headers='headers')['headers'], 'headers')
 
     def test_config_load__profile_arg_nonexisting(self):
         """load_config should fail if the profile specified in kwargs or env in
@@ -332,3 +337,25 @@ class TestConfig(unittest.TestCase):
             m.assert_has_calls([mock.call('file1', 'r'), mock.call('file2', 'r')])
             self.assertEqual(section['endpoint'], 'alpha')
             self.assertEqual(section['solver'], 'DW_2000Q_2')
+
+    def test_config_load_env_override(self):
+        with mock.patch("dwave.cloud.config.load_config_from_files",
+                        partial(self._load_config_from_files, data=u"", provided=['myfile'])):
+
+            with mock.patch.dict(os.environ, {'DWAVE_API_CLIENT': 'test'}):
+                self.assertEqual(load_config(config_file='myfile')['client'], 'test')
+
+            with mock.patch.dict(os.environ, {'DWAVE_API_ENDPOINT': 'test'}):
+                self.assertEqual(load_config(config_file='myfile')['endpoint'], 'test')
+
+            with mock.patch.dict(os.environ, {'DWAVE_API_TOKEN': 'test'}):
+                self.assertEqual(load_config(config_file='myfile')['token'], 'test')
+
+            with mock.patch.dict(os.environ, {'DWAVE_API_SOLVER': 'test'}):
+                self.assertEqual(load_config(config_file='myfile')['solver'], 'test')
+
+            with mock.patch.dict(os.environ, {'DWAVE_API_PROXY': 'test'}):
+                self.assertEqual(load_config(config_file='myfile')['proxy'], 'test')
+
+            with mock.patch.dict(os.environ, {'DWAVE_API_HEADERS': 'test'}):
+                self.assertEqual(load_config(config_file='myfile')['headers'], 'test')

@@ -114,6 +114,9 @@ class Client(object):
         connection_close (bool, default=False):
             Force HTTP(S) connection close after each request.
 
+        headers (dict/str):
+            Additional HTTP headers.
+
     Other Parameters:
         Unrecognized keys (str):
             All unrecognized keys are passed through to the appropriate client class constructor
@@ -183,7 +186,7 @@ class Client(object):
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None,
                     endpoint=None, token=None, solver=None, proxy=None,
-                    legacy_config_fallback=False, **kwargs):
+                    headers=None, legacy_config_fallback=False, **kwargs):
         """Client factory method to instantiate a client instance from configuration.
 
         Configuration values can be specified in multiple ways, ranked in the following
@@ -211,8 +214,9 @@ class Client(object):
         file is not explicitly specified, detected on the system, or defined via
         an environment variable.
 
-        Environment variables: ``DWAVE_CONFIG_FILE``, ``DWAVE_PROFILE``, ``DWAVE_API_CLIENT``,
-        ``DWAVE_API_ENDPOINT``, ``DWAVE_API_TOKEN``, ``DWAVE_API_SOLVER``, ``DWAVE_API_PROXY``.
+        Environment variables: ``DWAVE_CONFIG_FILE``, ``DWAVE_PROFILE``,
+        ``DWAVE_API_CLIENT``, ``DWAVE_API_ENDPOINT``, ``DWAVE_API_TOKEN``,
+        ``DWAVE_API_SOLVER``, ``DWAVE_API_PROXY``, ``DWAVE_API_HEADERS``.
 
         Environment variables are described in :mod:`dwave.cloud.config`.
 
@@ -268,6 +272,10 @@ class Client(object):
                 username/password, port, scheme, etc. If undefined, client
                 uses the system-level proxy, if defined, or connects directly to the API.
 
+            headers (dict/str, default=None):
+                Newline-separated additional HTTP headers to include with each
+                API request, or a dictionary of (key, value) pairs.
+
             legacy_config_fallback (bool, default=False):
                 If True and loading from a standard D-Wave Cloud Client configuration
                 file (``dwave.conf``) fails, tries loading a legacy configuration file (``~/.dwrc``).
@@ -292,7 +300,6 @@ class Client(object):
                 Config file parse failed.
 
         Examples:
-
             A variety of examples are given in :mod:`dwave.cloud.config`.
 
             This example initializes :class:`~dwave.cloud.client.Client` from an
@@ -309,7 +316,8 @@ class Client(object):
         # (`./dwave.conf`, `~/.config/dwave/dwave.conf`, etc)
         config = load_config(
             config_file=config_file, profile=profile, client=client,
-            endpoint=endpoint, token=token, solver=solver, proxy=proxy)
+            endpoint=endpoint, token=token, solver=solver, proxy=proxy,
+            headers=headers)
         logger.debug("Config loaded: %r", config)
 
         # fallback to legacy `.dwrc` if key variables missing
@@ -319,8 +327,8 @@ class Client(object):
 
             if not config.get('token'):
                 config = legacy_load_config(
-                    profile=profile, client=client,
-                    endpoint=endpoint, token=token, solver=solver, proxy=proxy)
+                    profile=profile, client=client, endpoint=endpoint,
+                    token=token, solver=solver, proxy=proxy, headers=headers)
                 logger.debug("Legacy config loaded: %r", config)
 
         # manual override of other (client-custom) arguments
@@ -335,7 +343,7 @@ class Client(object):
 
     def __init__(self, endpoint=None, token=None, solver=None, proxy=None,
                  permissive_ssl=False, request_timeout=60, polling_timeout=None,
-                 connection_close=False, **kwargs):
+                 connection_close=False, headers=None, **kwargs):
         """To setup the connection a pipeline of queues/workers is constructed.
 
         There are five interactions with the server the connection manages:
@@ -357,16 +365,18 @@ class Client(object):
 
         logger.debug(
             "Creating a client for (endpoint=%r, token=%r, solver=%r, proxy=%r, "
-            "permissive_ssl=%r, request_timeout=%r, polling_timeout=%r, **kwargs=%r)",
-            endpoint, token, solver, proxy, permissive_ssl, request_timeout, polling_timeout, kwargs
+            "permissive_ssl=%r, request_timeout=%r, polling_timeout=%r, "
+            "connection_close=%r, headers=%r, **kwargs=%r)",
+            endpoint, token, solver, proxy,
+            permissive_ssl, request_timeout, polling_timeout,
+            connection_close, headers, kwargs
         )
 
+        # parse solver
         if not solver:
             solver_def = {}
-
         elif isinstance(solver, collections.Mapping):
             solver_def = solver
-
         elif isinstance(solver, six.string_types):
             # support features dict encoded as JSON in our config INI file
             # TODO: push this decoding to the config module, once we switch to a
@@ -379,9 +389,27 @@ class Client(object):
                 # features dict (equality constraint on full solver name)
                 logger.debug("Invalid solver JSON, assuming string name: %r", solver)
                 solver_def = dict(name__eq=solver)
-
         else:
             raise ValueError("Expecting a features dictionary or a string name for 'solver'")
+        logger.debug("Parsed solver=%r", solver_def)
+
+        # parse headers
+        if not headers:
+            headers_dict = {}
+        elif isinstance(headers, collections.Mapping):
+            headers_dict = headers
+        elif isinstance(headers, six.string_types):
+            try:
+                # valid  headers = "Field-1: value-1\nField-2: value-2"
+                headers_dict = {key.strip(): val.strip()
+                                for key, val in [line.split(':')
+                                                 for line in headers.strip().split('\n')]}
+            except Exception as e:
+                logger.debug("Invalid headers: %r", headers)
+                headers_dict = {}
+        else:
+            raise ValueError("HTTP headers expected in a dict, or a string")
+        logger.debug("Parsed headers=%r", headers_dict)
 
         # Store connection/session parameters
         self.endpoint = endpoint
@@ -392,6 +420,7 @@ class Client(object):
         self.polling_timeout = parse_float(polling_timeout)
 
         self.proxy = proxy
+        self.headers = headers_dict
         self.permissive_ssl = permissive_ssl
         self.connection_close = connection_close
 
@@ -456,6 +485,8 @@ class Client(object):
         session = BaseUrlSession(base_url=endpoint)
         session.mount('http://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
         session.mount('https://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
+        if self.headers:
+            session.headers.update(self.headers)
         session.headers.update({'X-Auth-Token': self.token,
                                 'User-Agent': user_agent(__packagename__, __version__)})
         session.proxies = {'http': self.proxy, 'https': self.proxy}
