@@ -184,10 +184,10 @@ class TestCli(unittest.TestCase):
             with runner.isolated_filesystem():
                 touch(config_file)
                 result = runner.invoke(cli, ['ping',
-                                            '--config-file', config_file,
-                                            '--profile', profile,
-                                            '--request-timeout', '.5',
-                                            '--polling-timeout', '30'])
+                                             '--config-file', config_file,
+                                             '--profile', profile,
+                                             '--request-timeout', '.5',
+                                             '--polling-timeout', '30'])
 
             # proper arguments passed to Client.from_config?
             m.from_config.assert_called_with(
@@ -257,12 +257,12 @@ class TestCli(unittest.TestCase):
             with runner.isolated_filesystem():
                 touch(config_file)
                 result = runner.invoke(cli, ['sample',
-                                            '--config-file', config_file,
-                                            '--profile', profile,
-                                            '--solver', solver,
-                                            '-h', biases,
-                                            '-j', couplings,
-                                            '-n', num_reads])
+                                             '--config-file', config_file,
+                                             '--profile', profile,
+                                             '--solver', solver,
+                                             '-h', biases,
+                                             '-j', couplings,
+                                             '-n', num_reads])
 
             # proper arguments passed to Client.from_config?
             m.from_config.assert_called_with(config_file=config_file, profile=profile, solver=solver)
@@ -274,6 +274,39 @@ class TestCli(unittest.TestCase):
             # sampling method called on solver?
             s = c.get_solver()
             s.sample_ising.assert_called_with([0], {(0, 4): 1}, num_reads=10)
+
+        self.assertEqual(result.exit_code, 0)
+
+    def test_upload(self):
+        config_file = 'dwave.conf'
+        profile = 'profile'
+        format = 'bq-zlib'
+        problem_id = 'prob:lem:id'
+        filename = 'filename'
+
+        with mock.patch('dwave.cloud.cli.Client') as m:
+
+            runner = CliRunner()
+            with runner.isolated_filesystem():
+                touch(config_file)
+                touch(filename)
+                result = runner.invoke(cli, ['upload',
+                                             '--config-file', config_file,
+                                             '--profile', profile,
+                                             '--format', format,
+                                             '--problem-id', problem_id,
+                                             filename])
+
+                # proper arguments passed to Client.from_config?
+                m.from_config.assert_called_with(config_file=config_file, profile=profile)
+
+                # upload method called on client?
+                c = m.from_config()
+                self.assertTrue(c.upload_problem_encoded.called)
+
+                # verify problem_id
+                args, kwargs = c.upload_problem_encoded.call_args
+                self.assertEqual(kwargs.get('problem_id'), problem_id)
 
         self.assertEqual(result.exit_code, 0)
 
