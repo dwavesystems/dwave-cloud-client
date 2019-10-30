@@ -195,11 +195,11 @@ class TestCli(unittest.TestCase):
                 request_timeout=0.5, polling_timeout=30)
 
             # get solver called?
-            c = m.from_config(config_file=config_file, profile=profile)
+            c = m.from_config.return_value
             c.get_solver.assert_called_with()
 
             # sampling method called on solver?
-            s = c.get_solver()
+            s = c.get_solver.return_value
             s.sample_ising.assert_called_with({0: 1}, {})
 
         self.assertEqual(result.exit_code, 0)
@@ -268,11 +268,11 @@ class TestCli(unittest.TestCase):
             m.from_config.assert_called_with(config_file=config_file, profile=profile, solver=solver)
 
             # get solver called?
-            c = m.from_config(config_file=config_file, profile=profile, solver=solver)
+            c = m.from_config.return_value
             c.get_solver.assert_called_with()
 
             # sampling method called on solver?
-            s = c.get_solver()
+            s = c.get_solver.return_value
             s.sample_ising.assert_called_with([0], {(0, 4): 1}, num_reads=10)
 
         self.assertEqual(result.exit_code, 0)
@@ -301,7 +301,7 @@ class TestCli(unittest.TestCase):
                 m.from_config.assert_called_with(config_file=config_file, profile=profile)
 
                 # upload method called on client?
-                c = m.from_config()
+                c = m.from_config.return_value
                 self.assertTrue(c.upload_problem_encoded.called)
 
                 # verify problem_id
