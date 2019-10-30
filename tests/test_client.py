@@ -230,6 +230,35 @@ class ClientFactory(unittest.TestCase):
             with dwave.cloud.Client.from_config(solver='solver') as client:
                 self.assertEqual(client.default_solver, {"name__eq": "solver"})
 
+    def test_headers_from_config(self):
+        headers_dict = {"key-1": "value-1", "key-2": "value-2"}
+        headers_str = """  key-1:value-1
+            key-2: value-2
+        """
+        conf = dict(token='token', headers=headers_str)
+
+        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+            with dwave.cloud.Client.from_config() as client:
+                self.assertDictEqual(client.headers, headers_dict)
+
+    def test_headers_from_kwargs(self):
+        headers_dict = {"key-1": "value-1", "key-2": "value-2"}
+        headers_str = "key-2:value-2\nkey-1:value-1"
+        conf = dict(token='token')
+
+        def load_config(**kwargs):
+            return merge(kwargs, conf, op=lambda a, b: a or b)
+
+        # headers as dict
+        with mock.patch("dwave.cloud.client.load_config", load_config):
+            with dwave.cloud.Client.from_config(headers=headers_dict) as client:
+                self.assertDictEqual(client.headers, headers_dict)
+
+        # headers as str
+        with mock.patch("dwave.cloud.client.load_config", load_config):
+            with dwave.cloud.Client.from_config(headers=headers_str) as client:
+                self.assertDictEqual(client.headers, headers_dict)
+
 
 class FeatureBasedSolverSelection(unittest.TestCase):
     """Test Client.get_solvers(**filters)."""

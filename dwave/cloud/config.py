@@ -694,7 +694,7 @@ def load_config(config_file=None, profile=None, client=None,
         token (str, default=None):
             API authorization token.
 
-        solver (str, default=None):
+        solver (dict/str, default=None):
             :term:`solver` features, as a JSON-encoded dictionary of feature constraints,
             the client should use. See :meth:`~dwave.cloud.client.Client.get_solvers` for
             semantics of supported feature constraints.
@@ -710,17 +710,16 @@ def load_config(config_file=None, profile=None, client=None,
             username/password, port, scheme, etc. If undefined, client
             uses the system-level proxy, if defined, or connects directly to the API.
 
-        headers (str, default=None):
+        headers (dict/str, default=None):
             Header lines to include in API calls, each line formatted as
-             ``Key: value``.
+             ``Key: value``, or a parsed dictionary.
 
     Returns:
         dict:
-            Mapping of configuration keys to values for the profile
-            (section), as read from the configuration file and optionally overridden by
-            environment values and specified keyword arguments.
-            Always contains the `client`, `endpoint`, `token`, `solver`, and `proxy`
-            keys.
+            Mapping of configuration keys to values for the profile (section),
+            as read from the configuration file and optionally overridden by
+            environment values and specified keyword arguments. Always contains
+            the `client`, `endpoint`, `token`, `solver`, and `proxy` keys.
 
     Raises:
         :exc:`ValueError`:

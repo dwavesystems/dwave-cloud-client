@@ -272,9 +272,9 @@ class Client(object):
                 username/password, port, scheme, etc. If undefined, client
                 uses the system-level proxy, if defined, or connects directly to the API.
 
-            headers (str, default=None):
+            headers (dict/str, default=None):
                 Newline-separated additional HTTP headers to include with each
-                API request.
+                API request, or a dictionary of (key, value) pairs.
 
             legacy_config_fallback (bool, default=False):
                 If True and loading from a standard D-Wave Cloud Client configuration
