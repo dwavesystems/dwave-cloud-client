@@ -53,9 +53,12 @@ def _apply_loglevel_from_env(logger):
     name = os.getenv('DWAVE_LOG_LEVEL') or ''
     if not name:
         return
-    levels = {'debug': logging.DEBUG, 'trace': logging.TRACE}
+    levels = {'debug': logging.DEBUG, 'trace': logging.TRACE,
+              'info': logging.INFO, 'warning': logging.WARNING,
+              'error': logging.ERROR, 'critical': logging.CRITICAL}
     requested_level = levels.get(name.lower())
     if requested_level:
         logger.setLevel(requested_level)
+        logger.info("Log level set to %r", requested_level)
 
 _apply_loglevel_from_env(logger)
