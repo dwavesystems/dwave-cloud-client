@@ -20,6 +20,7 @@ import logging
 from dwave.cloud.client import Client
 from dwave.cloud.solver import Solver
 from dwave.cloud.computation import Future
+from dwave.cloud.utils import set_loglevel
 
 __all__ = ['Client', 'Solver', 'Future']
 
@@ -50,21 +51,6 @@ logging.Logger.trace = _trace
 
 # apply DWAVE_LOG_LEVEL
 def _apply_loglevel_from_env(logger):
-    level = os.getenv('DWAVE_LOG_LEVEL') or ''
-    level = level.strip().lower()
-    if not level:
-        return
-
-    known_levels = {'debug': logging.DEBUG, 'trace': logging.TRACE,
-                    'info': logging.INFO, 'warning': logging.WARNING,
-                    'error': logging.ERROR, 'critical': logging.CRITICAL}
-    try:
-        resolved_level = int(level)
-    except ValueError:
-        resolved_level = known_levels.get(level)
-
-    if resolved_level is not None:
-        logger.setLevel(resolved_level)
-        logger.info("Log level set to %r", resolved_level)
+    set_loglevel(logger, os.getenv('DWAVE_LOG_LEVEL'))
 
 _apply_loglevel_from_env(logger)
