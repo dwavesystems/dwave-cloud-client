@@ -234,11 +234,18 @@ def _ping(config_file, profile, solver_def, request_timeout, polling_timeout, ou
     except Exception as e:
         raise CLIError("Unexpected error while fetching solver: {!r}".format(e), 5)
 
+    if hasattr(solver, 'nodes'):
+        # structured solver: use arbitrary, but existing node
+        problem = ({solver.nodes.pop(): 0}, {})
+    else:
+        # unstructured solver doesn't constrain problem graph
+        problem = ({0: 1}, {})
+
     t1 = timer()
     output("Using solver: {solver_id}", solver_id=solver.id)
 
     try:
-        future = solver.sample_ising({0: 1}, {})
+        future = solver.sample_ising(*problem)
         timing = future.timing
     except RequestTimeout:
         raise CLIError("API connection timed out.", 8)
