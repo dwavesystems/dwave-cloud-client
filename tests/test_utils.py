@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import unittest
 from collections import OrderedDict
 from itertools import count
@@ -20,7 +21,7 @@ from datetime import datetime
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_head, strip_tail,
     active_qubits, generate_random_ising_problem,
-    default_text_input, utcnow, cached, retried)
+    default_text_input, utcnow, cached, retried, parse_loglevel)
 from dwave.cloud.testing import mock
 
 
@@ -117,6 +118,25 @@ class TestSimpleUtils(unittest.TestCase):
         self.assertEqual(t.utcoffset().total_seconds(), 0.0)
         unaware = t.replace(tzinfo=None)
         self.assertLess((now - unaware).total_seconds(), 1.0)
+
+    def test_parse_loglevel_invalid(self):
+        """Parsing invalid log levels returns NOTSET."""
+        notset = logging.NOTSET
+
+        self.assertEqual(parse_loglevel(''), notset)
+        self.assertEqual(parse_loglevel('  '), notset)
+        self.assertEqual(parse_loglevel(None), notset)
+        self.assertEqual(parse_loglevel(notset), notset)
+        self.assertEqual(parse_loglevel('nonexisting'), notset)
+        self.assertEqual(parse_loglevel({'a': 1}), notset)
+        self.assertIsNone(parse_loglevel('nonexisting', default=None))
+
+    def test_parse_loglevel_numeric_and_symbolic(self):
+        self.assertEqual(parse_loglevel('info'), logging.INFO)
+        self.assertEqual(parse_loglevel('INFO'), logging.INFO)
+        self.assertEqual(parse_loglevel(logging.INFO), logging.INFO)
+        self.assertEqual(parse_loglevel(str(logging.INFO)), logging.INFO)
+        self.assertEqual(parse_loglevel('  %d  ' % logging.INFO), logging.INFO)
 
 
 class TestCachedDecorator(unittest.TestCase):
