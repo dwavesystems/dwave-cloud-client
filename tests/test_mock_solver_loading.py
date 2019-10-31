@@ -47,8 +47,8 @@ def structured_solver_data(id_, incomplete=False):
     obj = {
         "properties": {
             "supported_problem_types": ["qubo", "ising"],
-            "qubits": [0, 1, 2],
-            "couplers": [[0, 1], [0, 2], [1, 2]],
+            "qubits": [1, 2, 3],
+            "couplers": [[1, 2], [1, 3], [2, 3]],
             "num_qubits": 3,
             "parameters": {"num_reads": "Number of samples to return."}
         },

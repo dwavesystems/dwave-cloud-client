@@ -486,10 +486,13 @@ class tictoc(object):
         self.dt = perf_counter() - self.tick
 
 
-def parse_loglevel(level_name):
+def parse_loglevel(level_name, default=logging.NOTSET):
     """Resolve numeric and symbolic log level names to numeric levels."""
 
-    level_name = (level_name or '').strip().lower()
+    try:
+        level_name = str(level_name or '').strip().lower()
+    except:
+        return default
 
     # note: make sure `TRACE` level is added to `logging` before calling this
     known_levels = {
@@ -507,7 +510,7 @@ def parse_loglevel(level_name):
     try:
         level = int(level_name)
     except ValueError:
-        level = known_levels.get(level_name, logging.NOTSET)
+        level = known_levels.get(level_name, default)
 
     return level
 

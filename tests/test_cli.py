@@ -180,6 +180,9 @@ class TestCli(unittest.TestCase):
         profile = 'profile'
 
         with mock.patch('dwave.cloud.cli.Client') as m:
+            # mock returned solver
+            client = m.from_config.return_value
+            client.get_solver.return_value.nodes = [5, 7, 3]
 
             runner = CliRunner()
             with runner.isolated_filesystem():
@@ -196,12 +199,11 @@ class TestCli(unittest.TestCase):
                 request_timeout=0.5, polling_timeout=30)
 
             # get solver called?
-            c = m.from_config.return_value
-            c.get_solver.assert_called_with()
+            client.get_solver.assert_called_with()
 
             # sampling method called on solver?
-            s = c.get_solver.return_value
-            s.sample_ising.assert_called_with({0: 1}, {})
+            solver = client.get_solver.return_value
+            solver.sample_ising.assert_called_with({3: 0}, {})
 
         self.assertEqual(result.exit_code, 0)
 
