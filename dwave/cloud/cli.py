@@ -235,8 +235,8 @@ def _ping(config_file, profile, solver_def, request_timeout, polling_timeout, ou
         raise CLIError("Unexpected error while fetching solver: {!r}".format(e), 5)
 
     if hasattr(solver, 'nodes'):
-        # structured solver: use arbitrary, but existing node
-        problem = ({solver.nodes.pop(): 0}, {})
+        # structured solver: use the first existing node
+        problem = ({min(solver.nodes): 0}, {})
     else:
         # unstructured solver doesn't constrain problem graph
         problem = ({0: 1}, {})
