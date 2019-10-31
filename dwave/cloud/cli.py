@@ -16,7 +16,6 @@ import os
 import sys
 import ast
 import json
-import logging
 import datetime
 
 import click
@@ -24,10 +23,11 @@ import requests.exceptions
 from timeit import default_timer as timer
 from datetime import datetime, timedelta
 
+import dwave.cloud
 from dwave.cloud import Client
 from dwave.cloud.utils import (
     default_text_input, click_info_switch, generate_random_ising_problem,
-    datetime_to_timestamp, utcnow, strtrunc, CLIError)
+    datetime_to_timestamp, utcnow, strtrunc, CLIError, set_loglevel)
 from dwave.cloud.coders import encode_problem_as_bq
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
@@ -42,10 +42,11 @@ from dwave.cloud.config import (
 
 def enable_logging(ctx, param, value):
     if value and not ctx.resilient_parsing:
-        if param.name == 'debug':
-            logging.getLogger('dwave.cloud').setLevel(logging.DEBUG)
-        elif param.name == 'trace':
-            logging.getLogger('dwave.cloud').setLevel(logging.TRACE)
+        set_loglevel(dwave.cloud.logger, param.name)
+
+def enable_loglevel(ctx, param, value):
+    if value and not ctx.resilient_parsing:
+        set_loglevel(dwave.cloud.logger, value)
 
 
 @click.group()
@@ -54,7 +55,9 @@ def enable_logging(ctx, param, value):
               help='Enable debug logging.')
 @click.option('--trace', is_flag=True, callback=enable_logging,
               help='Enable trace-level debug logging.')
-def cli(debug=False, trace=False):
+@click.option('--log', 'loglevel', metavar='LEVEL', callback=enable_loglevel,
+              help='Set custom numeric or symbolic log level.')
+def cli(debug=False, trace=False, loglevel=None):
     """D-Wave Cloud Client interactive configuration tool."""
 
 

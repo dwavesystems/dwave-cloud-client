@@ -484,3 +484,35 @@ class tictoc(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.dt = perf_counter() - self.tick
+
+
+def parse_loglevel(level_name):
+    """Resolve numeric and symbolic log level names to numeric levels."""
+
+    level_name = (level_name or '').strip().lower()
+
+    # note: make sure `TRACE` level is added to `logging` before calling this
+    known_levels = {
+        'notset': logging.NOTSET,
+        'trace': logging.TRACE,
+        'debug': logging.DEBUG,
+        'info': logging.INFO,
+        'warning': logging.WARNING,
+        'warn': logging.WARNING,
+        'error': logging.ERROR,
+        'critical': logging.CRITICAL,
+        'fatal': logging.CRITICAL
+    }
+
+    try:
+        level = int(level_name)
+    except ValueError:
+        level = known_levels.get(level_name, logging.NOTSET)
+
+    return level
+
+
+def set_loglevel(logger, level_name):
+    level = parse_loglevel(level_name)
+    logger.setLevel(level)
+    logger.info("Log level for %r namespace set to %r", logger.name, level)

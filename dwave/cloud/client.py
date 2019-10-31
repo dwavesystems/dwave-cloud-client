@@ -588,10 +588,10 @@ class Client(object):
     @cached(maxage=_SOLVERS_CACHE_MAXAGE)
     def _fetch_solvers(self, name=None):
         if name is not None:
-            logger.debug("Fetching definition of a solver with name=%r", name)
+            logger.info("Fetching definition of a solver with name=%r", name)
             url = 'solvers/remote/{}/'.format(name)
         else:
-            logger.debug("Fetching definitions of all available solvers")
+            logger.info("Fetching definitions of all available solvers")
             url = 'solvers/remote/'
 
         try:
@@ -618,10 +618,11 @@ class Client(object):
         for solver_desc in data:
             for solver_class in available_solvers:
                 try:
+                    logger.debug("Trying to instantiate %r", solver_class.__name__)
                     solver = solver_class(self, solver_desc)
                     if self.is_solver_handled(solver):
                         solvers.append(solver)
-                        logger.debug("Adding solver %r", solver)
+                        logger.info("Adding solver %r", solver)
                         break
                     else:
                         logger.debug("Skipping solver %r (not handled by this client)", solver)
