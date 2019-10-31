@@ -116,10 +116,12 @@ class BaseSolver(object):
 
         if self.supported_problem_types.isdisjoint(self._handled_problem_types):
             raise UnsupportedSolverError(
-                "Remote solver {!r} supports {} problems, but this solver handles only {}".format(
-                    self.id,
-                    list(self.supported_problem_types),
-                    list(self._handled_problem_types)))
+                ("Remote solver {id!r} supports {supports} problems, "
+                 "but {cls!r} class of solvers handles only {handled}").format(
+                    id=self.id,
+                    supports=list(self.supported_problem_types),
+                    cls=type(self).__name__,
+                    handled=list(self._handled_problem_types)))
 
         # When True the solution data will be returned as numpy matrices: False
         # TODO: deprecate
