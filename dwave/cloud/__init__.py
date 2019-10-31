@@ -51,6 +51,7 @@ logging.Logger.trace = _trace
 # apply DWAVE_LOG_LEVEL
 def _apply_loglevel_from_env(logger):
     level = os.getenv('DWAVE_LOG_LEVEL') or ''
+    level = level.strip().lower()
     if not level:
         return
 
@@ -60,7 +61,7 @@ def _apply_loglevel_from_env(logger):
     try:
         resolved_level = int(level)
     except ValueError:
-        resolved_level = known_levels.get(level.lower())
+        resolved_level = known_levels.get(level)
 
     if resolved_level is not None:
         logger.setLevel(resolved_level)
