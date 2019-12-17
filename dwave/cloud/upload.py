@@ -127,13 +127,13 @@ class GettableFile(GettableBase):
     object via an efficient item getter interface.
 
     Args:
-        fp (:class:`io.BufferedIOBase`/binary-file-like):
+        fp (:class:`io.BufferedIOBase`/:class:`io.RawIOBase`/binary-file-like):
             A file-like object that supports seek and readinto operations.
             Thread-safety of these operations is not assumed.
 
         strict (bool, default=True):
-            Require file-like object to be a :class:`io.BufferedIOBase`
-            subclass.
+            Require file-like object to be a :class:`io.BufferedIOBase` or
+            :class:`io.RawIOBase` subclass.
 
     Note:
         :class:`.GettableFile` implements :class:`.Gettable` interface over a
@@ -156,7 +156,8 @@ class GettableFile(GettableBase):
     def __init__(self, fp, strict=True):
         if strict:
             valid = lambda f: (
-                isinstance(f, io.BufferedIOBase) and f.seekable() and f.readable())
+                isinstance(f, (io.BufferedIOBase, io.RawIOBase))
+                and f.seekable() and f.readable())
         else:
             valid = lambda f: all([hasattr(f, 'readinto'), hasattr(f, 'seek')])
 
