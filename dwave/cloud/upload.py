@@ -133,7 +133,7 @@ class GettableFile(GettableBase):
 
         strict (bool, default=True):
             Require file-like object to be a :class:`io.BufferedIOBase` or
-            :class:`io.RawIOBase` subclass.
+            :class:`io.RawIOBase` instance.
 
     Note:
         :class:`.GettableFile` implements :class:`.Gettable` interface over a
