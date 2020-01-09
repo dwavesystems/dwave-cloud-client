@@ -15,15 +15,24 @@ Documentation
   :Release: |version|
   :Date: |today|
 
+.. sdk-start-marker
+
 .. toctree::
   :maxdepth: 1
 
   intro
   reference/index
+  bibliography
+
+.. sdk-end-marker
+
+.. toctree::
+  :caption: Code
+  :maxdepth: 1
+
+  Source <https://github.com/dwavesystems/dwave-cloud-client>
   installation
   license
-  bibliography
-  Source <https://github.com/dwavesystems/dwave-cloud-client>
 
 .. toctree::
   :caption: Ocean Software
