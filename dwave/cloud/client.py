@@ -72,6 +72,7 @@ from dwave.cloud.config import load_config, legacy_load_config, parse_float
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.upload import ChunkedData
+from dwave.cloud.events import dispatch_event
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent,
     datetime_to_timestamp, utcnow, epochnow, cached, retried)
@@ -357,6 +358,14 @@ class Client(object):
         are performed by asynchronously workers. For 2, 3, and 5 the workers
         gather tasks in batches.
         """
+
+        args = dict(
+            self=self, endpoint=endpoint, token=token, solver=solver, proxy=proxy,
+            permissive_ssl=permissive_ssl, request_timeout=request_timeout,
+            polling_timeout=polling_timeout, connection_close=connection_close,
+            headers=headers, kwargs=kwargs)
+        dispatch_event('before_client_init', args)
+
         if not endpoint:
             endpoint = self.DEFAULT_API_ENDPOINT
 
@@ -469,6 +478,9 @@ class Client(object):
 
         self._upload_part_executor = \
             PriorityThreadPoolExecutor(self._UPLOAD_PART_THREAD_COUNT)
+
+        dispatch_event(
+            'after_client_init', dict(self=self, args=args, return_value=None))
 
     def create_session(self):
         """Create a new requests session based on client's (self) params.
@@ -818,6 +830,10 @@ class Client(object):
             )
         """
 
+        args = dict(
+            self=self, refresh=refresh, order_by=order_by, filters=filters)
+        dispatch_event('before_get_solvers', args)
+
         def covers_op(prop, val):
             """Does LHS `prop` (range) fully cover RHS `val` (range or item)?"""
 
@@ -965,6 +981,9 @@ class Client(object):
         # and plain list reverse without sorting)
         if sort_reverse:
             solvers.reverse()
+
+        dispatch_event(
+            'after_get_solvers', dict(self=self, args=args, return_value=solvers))
 
         return solvers
 

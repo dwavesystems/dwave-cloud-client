@@ -634,6 +634,7 @@ class Future(object):
 
         raise InvalidAPIResponseError("Active variables not present in the response")
 
+    # XXX: rename to num_occurrences, alias as occurrences, but deprecate it
     @property
     def occurrences(self):
         """Occurrences buffer for the submitted job.
