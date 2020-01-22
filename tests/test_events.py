@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import unittest
-from functools import partial
 
 from dwave.cloud.testing import mock
 from dwave.cloud.client import Client
@@ -66,25 +65,25 @@ class TestEventDispatch(unittest.TestCase):
 
         # setup event handlers
         memo = {}
-        def handler(cat, data):
-            memo[cat] = data
+        def handler(event, **data):
+            memo[event] = data
 
-        add_handler('before_client_init', partial(handler, 'before'))
-        add_handler('after_client_init', partial(handler, 'after'))
+        add_handler('before_client_init', handler)
+        add_handler('after_client_init', handler)
 
         # client init
         client = Client(token='token', unknown='unknown')
 
         # test entry values
-        before = memo['before']
-        self.assertEqual(before['self'], client)
-        self.assertEqual(before['endpoint'], None)
-        self.assertEqual(before['token'], 'token')
-        self.assertEqual(before['kwargs']['unknown'], 'unknown')
+        before = memo['before_client_init']
+        self.assertEqual(before['obj'], client)
+        self.assertEqual(before['args']['endpoint'], None)
+        self.assertEqual(before['args']['token'], 'token')
+        self.assertEqual(before['args']['kwargs']['unknown'], 'unknown')
 
         # test exit values
-        after = memo['after']
-        self.assertEqual(after['self'], client)
+        after = memo['after_client_init']
+        self.assertEqual(after['obj'], client)
         self.assertEqual(after['args']['token'], 'token')
         self.assertEqual(after['args']['kwargs']['unknown'], 'unknown')
         self.assertEqual(after['return_value'], None)
@@ -94,24 +93,25 @@ class TestEventDispatch(unittest.TestCase):
 
         # setup event handlers
         memo = {}
-        def handler(cat, data):
-            memo[cat] = data
+        def handler(event, **data):
+            memo[event] = data
 
-        add_handler('before_get_solvers', partial(handler, 'before'))
-        add_handler('after_get_solvers', partial(handler, 'after'))
+        add_handler('before_get_solvers', handler)
+        add_handler('after_get_solvers', handler)
 
         # get solver(s)
         self.client.get_solver()
 
         # test entry values
-        before = memo['before']
-        self.assertEqual(before['self'], self.client)
-        self.assertIn('refresh', before)
-        self.assertIn('qpu', before['filters'])
+        before = memo['before_get_solvers']
+        self.assertEqual(before['obj'], self.client)
+        self.assertIn('refresh', before['args'])
+        self.assertIn('filters', before['args'])
+        self.assertIn('qpu', before['args']['filters'])
 
         # test exit values
-        after = memo['after']
-        self.assertEqual(after['self'], self.client)
+        after = memo['after_get_solvers']
+        self.assertEqual(after['obj'], self.client)
         self.assertIn('qpu', after['args']['filters'])
         self.assertEqual(after['return_value'], self.solvers)
 
@@ -120,11 +120,11 @@ class TestEventDispatch(unittest.TestCase):
 
         # setup event handlers
         memo = {}
-        def handler(cat, data):
-            memo[cat] = data
+        def handler(event, **data):
+            memo[event] = data
 
-        add_handler('before_sample', partial(handler, 'before'))
-        add_handler('after_sample', partial(handler, 'after'))
+        add_handler('before_sample', handler)
+        add_handler('after_sample', handler)
 
         # sample
         lin = {0: 1}
@@ -133,12 +133,13 @@ class TestEventDispatch(unittest.TestCase):
         future = self.solver.sample_ising(lin, quad, **params)
 
         # test entry values
-        before = memo['before']
-        args = dict(self=self.solver, type_='ising', linear=lin, quadratic=quad, params=params)
-        self.assertDictEqual(before, args)
+        before = memo['before_sample']
+        args = dict(type_='ising', linear=lin, quadratic=quad, params=params)
+        self.assertEqual(before['obj'], self.solver)
+        self.assertDictEqual(before['args'], args)
 
         # test exit values
-        after = memo['after']
-        self.assertEqual(after['self'], self.solver)
+        after = memo['after_sample']
+        self.assertEqual(after['obj'], self.solver)
         self.assertDictEqual(after['args'], args)
         self.assertEqual(after['return_value'], future)

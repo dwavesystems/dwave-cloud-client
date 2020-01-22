@@ -614,9 +614,8 @@ class StructuredSolver(BaseSolver):
             :class:`Future`
         """
 
-        args = dict(self=self, type_=type_, linear=linear,
-                    quadratic=quadratic, params=params)
-        dispatch_event('before_sample', args)
+        args = dict(type_=type_, linear=linear, quadratic=quadratic, params=params)
+        dispatch_event('before_sample', obj=self, args=args)
 
         # Check the problem
         if not self.check_problem(linear, quadratic):
@@ -647,8 +646,7 @@ class StructuredSolver(BaseSolver):
         logger.debug("Submitting new problem to: %s", self.id)
         self.client._submit(body, future)
 
-        dispatch_event(
-            'after_sample', dict(self=self, args=args, return_value=future))
+        dispatch_event('after_sample', obj=self, args=args, return_value=future)
 
         return future
 

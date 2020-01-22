@@ -360,11 +360,11 @@ class Client(object):
         """
 
         args = dict(
-            self=self, endpoint=endpoint, token=token, solver=solver, proxy=proxy,
+            endpoint=endpoint, token=token, solver=solver, proxy=proxy,
             permissive_ssl=permissive_ssl, request_timeout=request_timeout,
             polling_timeout=polling_timeout, connection_close=connection_close,
             headers=headers, kwargs=kwargs)
-        dispatch_event('before_client_init', args)
+        dispatch_event('before_client_init', obj=self, args=args)
 
         if not endpoint:
             endpoint = self.DEFAULT_API_ENDPOINT
@@ -480,7 +480,7 @@ class Client(object):
             PriorityThreadPoolExecutor(self._UPLOAD_PART_THREAD_COUNT)
 
         dispatch_event(
-            'after_client_init', dict(self=self, args=args, return_value=None))
+            'after_client_init', obj=self, args=args, return_value=None)
 
     def create_session(self):
         """Create a new requests session based on client's (self) params.
@@ -830,9 +830,8 @@ class Client(object):
             )
         """
 
-        args = dict(
-            self=self, refresh=refresh, order_by=order_by, filters=filters)
-        dispatch_event('before_get_solvers', args)
+        args = dict(refresh=refresh, order_by=order_by, filters=filters)
+        dispatch_event('before_get_solvers', obj=self, args=args)
 
         def covers_op(prop, val):
             """Does LHS `prop` (range) fully cover RHS `val` (range or item)?"""
@@ -983,7 +982,7 @@ class Client(object):
             solvers.reverse()
 
         dispatch_event(
-            'after_get_solvers', dict(self=self, args=args, return_value=solvers))
+            'after_get_solvers', obj=self, args=args, return_value=solvers)
 
         return solvers
 

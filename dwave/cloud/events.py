@@ -39,7 +39,17 @@ _client_event_hooks_registry = {
 
 # TODO: rewrite as decorator that automatically captures function input/output
 def add_handler(name, handler):
-    """Register a `handler` function to be called on event `name`."""
+    """Register a `handler` function to be called on event `name`.
+
+    Handler's signature are::
+
+        def before_event_handler(event_name, obj, args):
+            pass
+
+        def after_event_handler(event_name, obj, args, return_value):
+            pass
+
+    """
 
     if name not in _client_event_hooks_registry:
         raise ValueError('invalid hook name')
@@ -57,7 +67,7 @@ def dispatch_event(name, *args, **kwargs):
 
     for handler in _client_event_hooks_registry[name]:
         try:
-            handler(*args, **kwargs)
+            handler(name, *args, **kwargs)
         except Exception as e:
             logger.debug("Exception in {!r} event handler {!r}: {!r}".format(
                 name, handler, e))
