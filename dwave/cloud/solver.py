@@ -614,7 +614,7 @@ class StructuredSolver(BaseSolver):
             :class:`Future`
         """
 
-        args = dict(self=self, type=type_, linear=linear,
+        args = dict(self=self, type_=type_, linear=linear,
                     quadratic=quadratic, params=params)
         dispatch_event('before_sample', args)
 

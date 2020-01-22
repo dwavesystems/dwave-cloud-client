@@ -42,6 +42,8 @@ def add_handler(name, handler):
 
     if name not in _client_event_hooks_registry:
         raise ValueError('invalid hook name')
+    if not callable(handler):
+        raise TypeError('callable handler required')
 
     _client_event_hooks_registry[name].append(handler)
 
