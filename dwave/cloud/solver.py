@@ -41,6 +41,7 @@ from dwave.cloud.coders import (
     decode_qp_numpy, decode_qp, decode_bq)
 from dwave.cloud.utils import uniform_iterator, reformat_qubo_as_ising
 from dwave.cloud.computation import Future
+from dwave.cloud.events import dispatch_event
 
 # Use numpy if available for fast encoding/decoding
 try:
@@ -243,6 +244,8 @@ class UnstructuredSolver(BaseSolver):
         data (`dict`):
             Data from the server describing this solver.
 
+    Note:
+        Events are not yet dispatched from unstructured solvers.
     """
 
     _handled_problem_types = {"bqm"}
@@ -610,6 +613,11 @@ class StructuredSolver(BaseSolver):
         Returns:
             :class:`Future`
         """
+
+        args = dict(self=self, type_=type_, linear=linear,
+                    quadratic=quadratic, params=params)
+        dispatch_event('before_sample', args)
+
         # Check the problem
         if not self.check_problem(linear, quadratic):
             raise InvalidProblemError("Problem graph incompatible with solver.")
@@ -638,6 +646,10 @@ class StructuredSolver(BaseSolver):
 
         logger.debug("Submitting new problem to: %s", self.id)
         self.client._submit(body, future)
+
+        dispatch_event(
+            'after_sample', dict(self=self, args=args, return_value=future))
+
         return future
 
     def _format_params(self, type_, params):
