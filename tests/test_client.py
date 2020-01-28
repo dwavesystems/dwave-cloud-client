@@ -21,6 +21,7 @@ test_mock_solver_loading.py duplicates some of these tests against a mock server
 from __future__ import absolute_import
 
 import json
+import time
 import unittest
 import warnings
 
@@ -77,6 +78,31 @@ class TestTimeouts(unittest.TestCase):
         with self.assertRaises(dwave.cloud.exceptions.PollingTimeout):
             with Client(polling_timeout=0.00001, **config) as client:
                 client.get_solver().sample_qubo({}).result()
+
+
+@unittest.skipUnless(config, "No live server configuration available.")
+class TestProblemLoading(unittest.TestCase):
+    """Test loading a problem from its id"""
+
+    def test_problem_retrieval(self):
+        with Client(**config) as client:
+            solver = client.get_solver()
+
+            h = {v: -1 for v in solver.nodes}
+
+            f = solver.sample_ising(h, {})
+
+            # the id is not set right away
+            while f.id is None:
+                time.sleep(.01)
+
+            id_ = f.id
+        
+        with Client(**config) as client:
+            # get a "new" client
+            f2 = client.get_problem(id_)
+
+            self.assertIn('solutions', f2.result())
 
 
 @unittest.skipUnless(config, "No live server configuration available.")
