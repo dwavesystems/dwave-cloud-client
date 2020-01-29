@@ -13,7 +13,7 @@ This package provides a minimal Python interface to that layer without
 compromising the quality of interactions and workflow.
 
 The D-Wave Cloud Client :class:`~dwave.cloud.solver.Solver` class enables low-level control of problem
-submission. It is used, for example, by the :std:doc:`dwave-system <system:index>`
+submission. It is used, for example, by the :std:doc:`dwave-system <oceandocs:docs_system/sdk_index>`
 :class:`~dwave.system.samplers.DWaveSampler`, which enables quick incorporation
 of the D-Wave system as a sampler in your code.
 
