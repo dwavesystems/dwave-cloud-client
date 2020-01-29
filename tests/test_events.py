@@ -44,6 +44,7 @@ class TestEventDispatch(unittest.TestCase):
                     "type": "chimera",
                     "shape": [16, 16, 4]
                 },
+                "category": "qpu",
                 "tags": ["lower_noise"]
             },
             "id": "solver1",

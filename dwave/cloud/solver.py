@@ -205,14 +205,12 @@ class BaseSolver(object):
     @property
     def qpu(self):
         "Is this a QPU-based solver?"
-        # TODO: add a field for this in SAPI response; for now base decision on id/name
-        return not self.id.startswith('c4-sw_')
+        return self.properties.get('category', '').lower() == 'qpu'
 
     @property
     def software(self):
         "Is this a software-based solver?"
-        # TODO: add a field for this in SAPI response; for now base decision on id/name
-        return self.id.startswith('c4-sw_')
+        return self.properties.get('category', '').lower() == 'software'
 
     @property
     def is_qpu(self):

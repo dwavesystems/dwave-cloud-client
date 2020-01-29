@@ -280,6 +280,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                     "type": "chimera",
                     "shape": [16, 16, 4]
                 },
+                "category": "qpu",
                 "tags": ["lower_noise"]
             },
             "id": "solver1",
@@ -302,6 +303,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                     "type": "pegasus",
                     "shape": [6, 6, 12]
                 },
+                "category": "qpu",
                 "vfyc": True
             },
             "id": "solver2",
@@ -320,6 +322,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                     "type": "chimera",
                     "shape": [4, 4, 4]
                 },
+                "category": "software",
                 # the following are only present in this solver
                 "some_set": [1, 2],
                 "some_range": [1, 2],
