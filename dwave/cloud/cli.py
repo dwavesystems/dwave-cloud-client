@@ -271,7 +271,7 @@ def _ping(config_file, profile, solver_def, sampling_params, request_timeout,
     output(" * Total: {wallclock_total:.3f} ms", wallclock_total=(t2-t0)*1000.0)
     if timing:
         output("\nQPU timing:")
-        for component, duration in timing.items():
+        for component, duration in sorted(timing.items()):
             output(" * %(name)s = {%(name)s} us" % {"name": component}, **{component: duration})
     else:
         output("\nQPU timing data not available.")
