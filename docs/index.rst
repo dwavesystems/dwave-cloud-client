@@ -1,6 +1,6 @@
 ..  -*- coding: utf-8 -*-
 
-.. _contents:
+.. _index_cloud:
 
 .. include:: ../README.rst
   :start-after: index-start-marker

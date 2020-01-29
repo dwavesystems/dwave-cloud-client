@@ -32,6 +32,7 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.intersphinx',
     'sphinx.ext.mathjax',
+    'sphinx.ext.ifconfig',
 ]
 
 # autodoc_default_flags = ['members']
@@ -55,6 +56,11 @@ author = package_info.__author__
 version = package_info.__version__
 release = package_info.__version__
 
+# List of patterns, relative to source directory, that match files and
+# directories to ignore when looking for source files.
+# This patterns also effect to html_static_path and html_extra_path
+exclude_patterns = ['sdk_index.rst']
+
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
 
@@ -72,6 +78,7 @@ html_static_path = ['_static']
 def setup(app):
     app.add_stylesheet('cookie_notice.css')
     app.add_javascript('cookie_notice.js')
+    app.add_config_value('target', 'repo', 'env')
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
