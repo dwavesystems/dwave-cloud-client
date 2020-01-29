@@ -178,6 +178,7 @@ class TestCli(unittest.TestCase):
     def test_ping(self):
         config_file = 'dwave.conf'
         profile = 'profile'
+        params = dict(num_reads=10)
 
         with mock.patch('dwave.cloud.cli.Client') as m:
             # mock returned solver
@@ -190,6 +191,7 @@ class TestCli(unittest.TestCase):
                 result = runner.invoke(cli, ['ping',
                                              '--config-file', config_file,
                                              '--profile', profile,
+                                             '--sampling-params', json.dumps(params),
                                              '--request-timeout', '.5',
                                              '--polling-timeout', '30'])
 
@@ -201,9 +203,9 @@ class TestCli(unittest.TestCase):
             # get solver called?
             client.get_solver.assert_called_with()
 
-            # sampling method called on solver?
+            # sampling method called on solver with correct params?
             solver = client.get_solver.return_value
-            solver.sample_ising.assert_called_with({3: 0}, {})
+            solver.sample_ising.assert_called_with({3: 0}, {}, **params)
 
         self.assertEqual(result.exit_code, 0)
 
