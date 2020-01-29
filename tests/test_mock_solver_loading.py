@@ -42,7 +42,7 @@ bad_url = 'https://not-a-subdomain.dwavesys.com'
 bad_token = '------------------------'
 
 
-def structured_solver_data(id_, incomplete=False):
+def structured_solver_data(id_, cat='qpu', incomplete=False):
     """Return string describing a single solver."""
     obj = {
         "properties": {
@@ -50,6 +50,7 @@ def structured_solver_data(id_, incomplete=False):
             "qubits": [1, 2, 3],
             "couplers": [[1, 2], [1, 3], [2, 3]],
             "num_qubits": 3,
+            "category": cat,
             "parameters": {"num_reads": "Number of samples to return."}
         },
         "id": id_,
@@ -62,8 +63,8 @@ def structured_solver_data(id_, incomplete=False):
 
     return json.dumps(obj)
 
-def solver_object(id_, incomplete=False):
-    return Solver(client=None, data=json.loads(structured_solver_data(id_, incomplete)))
+def solver_object(id_, cat='qpu', incomplete=False):
+    return Solver(client=None, data=json.loads(structured_solver_data(id_, cat, incomplete)))
 
 
 # Define the endpoints
@@ -193,7 +194,7 @@ class MockSolverLoading(unittest.TestCase):
     def test_load_solver_missing_data(self):
         """Try to load a solver that has incomplete data."""
         with requests_mock.mock() as m:
-            m.get(solver1_url, text=structured_solver_data(solver_name, True))
+            m.get(solver1_url, text=structured_solver_data(solver_name, incomplete=True))
             with Client(url, token) as client:
                 with self.assertRaises(SolverNotFoundError):
                     client.get_solver(solver_name)
@@ -209,27 +210,30 @@ class MockSolverLoading(unittest.TestCase):
 
     def test_solver_filtering_in_client(self):
         # base client
-        self.assertTrue(Client.is_solver_handled(solver_object('test')))
-        self.assertTrue(Client.is_solver_handled(solver_object('c4-sw_')))
+        self.assertTrue(Client.is_solver_handled(solver_object('test', 'qpu')))
+        self.assertTrue(Client.is_solver_handled(solver_object('test', 'software')))
+        self.assertTrue(Client.is_solver_handled(solver_object('test', 'whatever')))
         self.assertTrue(Client.is_solver_handled(None))
         # qpu client
-        self.assertTrue(QPUClient.is_solver_handled(solver_object('test')))
-        self.assertFalse(QPUClient.is_solver_handled(solver_object('c4-sw_')))
+        self.assertTrue(QPUClient.is_solver_handled(solver_object('test', 'qpu')))
+        self.assertFalse(QPUClient.is_solver_handled(solver_object('test', 'software')))
+        self.assertFalse(QPUClient.is_solver_handled(solver_object('test', 'whatever')))
         self.assertFalse(QPUClient.is_solver_handled(None))
         # sw client
-        self.assertFalse(SoftwareClient.is_solver_handled(solver_object('test')))
-        self.assertTrue(SoftwareClient.is_solver_handled(solver_object('c4-sw_')))
+        self.assertFalse(SoftwareClient.is_solver_handled(solver_object('test', 'qpu')))
+        self.assertTrue(SoftwareClient.is_solver_handled(solver_object('test', 'software')))
+        self.assertFalse(SoftwareClient.is_solver_handled(solver_object('test', 'whatever')))
         self.assertFalse(SoftwareClient.is_solver_handled(None))
 
     def test_solver_feature_properties(self):
-        self.assertTrue(solver_object('dw2000').qpu)
-        self.assertFalse(solver_object('dw2000').software)
-        self.assertFalse(solver_object('c4-sw_x').qpu)
-        self.assertTrue(solver_object('c4-sw_x').software)
+        self.assertTrue(solver_object('solver', 'qpu').qpu)
+        self.assertFalse(solver_object('solver', 'qpu').software)
+        self.assertFalse(solver_object('solver', 'software').qpu)
+        self.assertTrue(solver_object('solver', 'software').software)
 
-        self.assertFalse(solver_object('dw2000').is_vfyc)
-        self.assertEqual(solver_object('dw2000').num_qubits, 3)
-        self.assertFalse(solver_object('dw2000').has_flux_biases)
+        self.assertFalse(solver_object('solver').is_vfyc)
+        self.assertEqual(solver_object('solver').num_qubits, 3)
+        self.assertFalse(solver_object('solver').has_flux_biases)
 
         # test .num_qubits vs .num_actual_qubits
         data = json.loads(structured_solver_data('test'))
@@ -256,7 +260,7 @@ class MockSolverLoading(unittest.TestCase):
         self.assertTrue(Solver(None, data).has_anneal_schedule)
 
         # test `.online` property
-        self.assertTrue(solver_object('dw2000').online)
+        self.assertTrue(solver_object('solver').online)
         data = json.loads(structured_solver_data('test'))
         data['status'] = 'offline'
         self.assertFalse(Solver(None, data).online)

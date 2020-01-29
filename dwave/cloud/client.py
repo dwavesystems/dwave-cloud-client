@@ -775,8 +775,8 @@ class Client(object):
         Derived properies are:
 
         * `name` (str): Solver name/id.
-        * `qpu` (bool): Is solver QPU based?
-        * `software` (bool): Is solver software based?
+        * `qpu` (bool): Solver is a QPU?
+        * `software` (bool): Solver is a software solver?
         * `online` (bool, default=True): Is solver online?
         * `num_active_qubits` (int): Number of active qubits. Less then or equal to `num_qubits`.
         * `avg_load` (float): Solver's average load (similar to Unix load average).
