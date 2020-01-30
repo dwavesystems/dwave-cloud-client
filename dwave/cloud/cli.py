@@ -188,12 +188,21 @@ def create(config_file, profile):
     return 0
 
 
-def _ping(config_file, profile, solver_def, request_timeout, polling_timeout, output):
+def _ping(config_file, profile, solver_def, sampling_params, request_timeout,
+          polling_timeout, output):
     """Helper method for the ping command that uses `output()` for info output
     and raises `CLIError()` on handled errors.
 
     This function is invariant to output format and/or error signaling mechanism.
     """
+    params = {}
+    if sampling_params is not None:
+        try:
+            params = json.loads(sampling_params)
+            assert isinstance(params, dict)
+        except:
+            raise CLIError("sampling parameters required as JSON-encoded "
+                           "map of param names to values", code=99)
 
     config = dict(config_file=config_file, profile=profile, solver=solver_def)
     if request_timeout is not None:
@@ -245,7 +254,7 @@ def _ping(config_file, profile, solver_def, request_timeout, polling_timeout, ou
     output("Using solver: {solver_id}", solver_id=solver.id)
 
     try:
-        future = solver.sample_ising(*problem)
+        future = solver.sample_ising(*problem, **params)
         timing = future.timing
     except RequestTimeout:
         raise CLIError("API connection timed out.", 8)
@@ -262,7 +271,7 @@ def _ping(config_file, profile, solver_def, request_timeout, polling_timeout, ou
     output(" * Total: {wallclock_total:.3f} ms", wallclock_total=(t2-t0)*1000.0)
     if timing:
         output("\nQPU timing:")
-        for component, duration in timing.items():
+        for component, duration in sorted(timing.items()):
             output(" * %(name)s = {%(name)s} us" % {"name": component}, **{component: duration})
     else:
         output("\nQPU timing data not available.")
@@ -274,13 +283,15 @@ def _ping(config_file, profile, solver_def, request_timeout, polling_timeout, ou
 @click.option('--profile', '-p', default=None,
               help='Connection profile (section) name')
 @click.option('--solver', '-s', 'solver_def', default=None, help='Feature-based solver definition')
+@click.option('--sampling-params', '-m', default=None, help='Sampling parameters (JSON encoded)')
 @click.option('--request-timeout', default=None, type=float,
               help='Connection and read timeouts (in seconds) for all API requests')
 @click.option('--polling-timeout', default=None, type=float,
               help='Problem polling timeout in seconds (time-to-solution timeout)')
 @click.option('--json', 'json_output', default=False, is_flag=True,
               help='JSON output')
-def ping(config_file, profile, solver_def, json_output, request_timeout, polling_timeout):
+def ping(config_file, profile, solver_def, sampling_params, json_output,
+         request_timeout, polling_timeout):
     """Ping the QPU by submitting a single-qubit problem."""
 
     now = utcnow()
@@ -296,7 +307,8 @@ def ping(config_file, profile, solver_def, json_output, request_timeout, polling
             click.echo(json.dumps(info))
 
     try:
-        _ping(config_file, profile, solver_def, request_timeout, polling_timeout, output)
+        _ping(config_file, profile, solver_def, sampling_params,
+              request_timeout, polling_timeout, output)
     except CLIError as error:
         output("Error: {error} (code: {code})", error=str(error), code=error.code)
         sys.exit(error.code)
