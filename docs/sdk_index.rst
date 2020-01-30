@@ -1,6 +1,6 @@
 .. _sdk_index_cloud:
 
-.. include:: /readmes/system.rst
+.. include:: /readmes/cloud.rst
    :start-after: index-start-marker
    :end-before: index-end-marker
 
