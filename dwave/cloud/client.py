@@ -323,8 +323,10 @@ class Client(object):
 
         # fallback to legacy `.dwrc` if key variables missing
         if legacy_config_fallback:
-            warnings.warn("'legacy_config_fallback' is deprecated, please convert "
-                          "your legacy .dwrc file to the new config format.", DeprecationWarning)
+            warnings.warn(
+                "'legacy_config_fallback' is deprecated, and it will be removed "
+                "in 0.7.0. please convert your legacy .dwrc file to the new "
+                "config format.", DeprecationWarning)
 
             if not config.get('token'):
                 config = legacy_load_config(

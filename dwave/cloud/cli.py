@@ -323,15 +323,21 @@ def ping(config_file, profile, solver_def, sampling_params, json_output,
 @click.option('--config-file', '-c', default=None,
               type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
 @click.option('--profile', '-p', default=None, help='Connection profile name')
-@click.option('--solver', '-s', 'solver_def', default=None, help='Feature-based solver filter')
+@click.option('--solver', '-s', 'solver_def', default=None,
+              help='Feature-based solver filter (default: from config)')
 @click.option('--list', '-l', 'list_solvers', default=False, is_flag=True,
-              help='List available solvers, one per line')
-def solvers(config_file, profile, solver_def, list_solvers):
+              help='Print filtered list of solver names, one per line')
+@click.option('--all', '-a', 'list_all', default=False, is_flag=True,
+              help='Ignore solver filter (list/print all solvers)')
+def solvers(config_file, profile, solver_def, list_solvers, list_all):
     """Get solver details.
 
-    Unless solver name/id specified, fetch and display details for
-    all online solvers available on the configured endpoint.
+    Solver filter is inherited from environment or the specified configuration
+    file and profile.
     """
+
+    if list_all:
+        solver_def = '{}'
 
     with Client.from_config(
             config_file=config_file, profile=profile, solver=solver_def) as client:
