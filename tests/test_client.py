@@ -81,10 +81,9 @@ class TestTimeouts(unittest.TestCase):
 
 
 @unittest.skipUnless(config, "No live server configuration available.")
-class TestProblemLoading(unittest.TestCase):
+class TestRetrieveAnswer(unittest.TestCase):
     """Test loading a problem from its id"""
-
-    def test_problem_retrieval(self):
+    def test_retrieve_answer(self):
         with Client(**config) as client:
             solver = client.get_solver()
 
@@ -100,7 +99,7 @@ class TestProblemLoading(unittest.TestCase):
         
         with Client(**config) as client:
             # get a "new" client
-            f2 = client.get_problem(id_)
+            f2 = client.retrieve_answer(id_)
 
             self.assertIn('solutions', f2.result())
 

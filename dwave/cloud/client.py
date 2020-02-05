@@ -647,7 +647,7 @@ class Client(object):
 
         return solvers
 
-    def get_problem(self, id_):
+    def retrieve_answer(self, id_):
         """Retrieve a problem by id.
         
         Args:
