@@ -15,6 +15,12 @@ Documentation
   :Release: |version|
   :Date: |today|
 
+.. note:: This documentation is for the latest version of
+   `dwave-cloud-client <https://github.com/dwavesystems/dwave-cloud-client>`_.
+   Documentation for the version currently installed by
+   `dwave-ocean-sdk <https://github.com/dwavesystems/dwave-ocean-sdk>`_
+   is here: :std:doc:`dwave-cloud-client <oceandocs:docs_cloud/sdk_index>`.
+
 .. sdk-start-marker
 
 .. toctree::
