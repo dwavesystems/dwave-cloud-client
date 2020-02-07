@@ -1,8 +1,8 @@
 ..  -*- coding: utf-8 -*-
 
-.. _contents:
+.. _index_cloud:
 
-.. include:: ../README.rst
+.. include:: README.rst
   :start-after: index-start-marker
   :end-before: index-end-marker
 

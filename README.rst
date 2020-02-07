@@ -20,8 +20,9 @@
 
 .. index-start-marker
 
-D-Wave Cloud Client
-===================
+==================
+dwave-cloud-client
+==================
 
 D-Wave Cloud Client is a minimal implementation of the REST interface used to
 communicate with D-Wave Sampler API (SAPI) servers.
@@ -31,10 +32,7 @@ and scheduling for quantum annealing resources at D-Wave Systems.
 This package provides a minimal Python interface to that layer without
 compromising the quality of interactions and workflow.
 
-Example
--------
-
-This example instantiates a D-Wave Cloud Client and solver based on the local
+The example below instantiates a D-Wave Cloud Client and solver based on the local
 system`s auto-detected default configuration file and samples a random Ising problem
 tailored to fit the solver`s graph.
 

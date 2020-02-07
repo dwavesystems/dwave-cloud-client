@@ -1,4 +1,4 @@
-.. _solver:
+.. _solver_cloud:
 
 ======
 Solver

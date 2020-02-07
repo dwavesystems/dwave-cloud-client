@@ -1,4 +1,4 @@
-.. _resources:
+.. _resources_cloud:
 
 =======
 Clients
