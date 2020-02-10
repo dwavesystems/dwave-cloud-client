@@ -1078,6 +1078,34 @@ class Client(object):
         Note:
             This method is always run inside of a daemon thread.
         """
+
+        def filter_ready(item):
+            """Pass-through ready (encoded) problems, re-enqueue ones for which
+            the encoding is in progress, and fail the ones for which encoding
+            failed.
+            """
+
+            # body is a `concurrent.futures.Future`, so make sure
+            # it's ready for submitting
+            if item.body.done():
+                exc = item.body.exception()
+                if exc:
+                    # encoding failed, submit should fail as well
+                    logger.warning("Problem encoding prior to submit "
+                                    "failed with: %r", exc)
+                    item.future._set_error(exc)
+                    self._submission_queue.task_done()
+
+                else:
+                    # problem ready for submit
+                    return [item]
+
+            else:
+                # body not ready, return the item to queue
+                self._submission_queue.put(item)
+
+            return []
+
         session = self.create_session()
         try:
             while True:
@@ -1091,21 +1119,17 @@ class Client(object):
                 if item is None:
                     break
 
-                ready_problems = [item]
+                ready_problems = filter_ready(item)
                 while len(ready_problems) < self._SUBMIT_BATCH_SIZE:
                     try:
                         item = self._submission_queue.get_nowait()
-
-                        # body is a `concurrent.futures.Future`, so make sure
-                        # it's ready for submitting
-                        if item.body.done():
-                            ready_problems.append(item)
-                        else:
-                            # body not ready, return the item to queue
-                            self._submission_queue.put(item)
-
                     except queue.Empty:
                         break
+
+                    ready_problems.extend(filter_ready(item))
+
+                if not ready_problems:
+                    continue
 
                 # Submit the problems
                 logger.debug("Submitting %d problems", len(ready_problems))
