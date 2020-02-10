@@ -43,6 +43,7 @@ from dwave.cloud.coders import (
     decode_qp_numpy, decode_qp, decode_bq)
 from dwave.cloud.utils import uniform_iterator, reformat_qubo_as_ising
 from dwave.cloud.computation import Future
+from dwave.cloud.concurrency import Present
 from dwave.cloud.events import dispatch_event
 
 # Use numpy if available for fast encoding/decoding
@@ -665,22 +666,23 @@ class StructuredSolver(BaseSolver):
         # transform some of the parameters in-place
         self._format_params(type_, combined_params)
 
-        body = json.dumps({
+        body_data = json.dumps({
             'solver': self.id,
             'data': encode_problem_as_qp(self, linear, quadratic),
             'type': type_,
             'params': combined_params
         })
-        logger.trace("Encoded sample request: %s", body)
+        logger.trace("Encoded sample request: %s", body_data)
 
-        future = Future(solver=self, id_=None, return_matrix=self.return_matrix)
+        body = Present(result=body_data)
+        computation = Future(solver=self, id_=None, return_matrix=self.return_matrix)
 
         logger.debug("Submitting new problem to: %s", self.id)
-        self.client._submit(body, future)
+        self.client._submit(body, computation)
 
-        dispatch_event('after_sample', obj=self, args=args, return_value=future)
+        dispatch_event('after_sample', obj=self, args=args, return_value=computation)
 
-        return future
+        return computation
 
     def _format_params(self, type_, params):
         """Reformat some of the parameters for sapi."""
