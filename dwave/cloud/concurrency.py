@@ -111,3 +111,21 @@ class PriorityThreadPoolExecutor(concurrent.futures.ThreadPoolExecutor):
     def __init__(self, *args, **kwargs):
         super(PriorityThreadPoolExecutor, self).__init__(*args, **kwargs)
         self._work_queue = _PrioritizingQueue()
+
+
+class Present(concurrent.futures.Future):
+    """Already resolved :class:`~concurrent.futures.Future` object.
+
+    Users should treat this class as just another
+    :class:`~concurrent.futures.Future`, the difference being an implementation
+    detail: :class:`Present` is "resolved" at construction time.
+    """
+
+    def __init__(self, result=None, exception=None):
+        super(Present, self).__init__()
+        if result is not None:
+            self.set_result(result)
+        elif exception is not None:
+            self.set_exception(exception)
+        else:
+            raise ValueError("can't provide both 'result' and 'exception'")
