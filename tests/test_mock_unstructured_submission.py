@@ -127,3 +127,33 @@ class TestUnstructuredSolver(unittest.TestCase):
                     numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
                     numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
                     numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)
+
+    def test_upload_failure(self):
+        """Submit should gracefully fail if upload as part of submit fails."""
+
+        # build a test problem
+        bqm = dimod.BQM.from_ising({}, {'ab': 1})
+
+        # use a global mocked session, so we can modify it on-fly
+        session = mock.Mock()
+
+        # upload is now part of submit, so we need to mock it
+        mock_upload_exc = ValueError('error')
+        def mock_upload(self, bqm):
+            return Present(exception=mock_upload_exc)
+
+        # construct a functional solver by mocking client and api response data
+        with mock.patch.object(Client, 'create_session', lambda self: session):
+            with Client('endpoint', 'token') as client:
+                with mock.patch.object(UnstructuredSolver, 'upload_bqm', mock_upload):
+                    solver = UnstructuredSolver(client, unstructured_solver_data())
+
+                    # direct bqm sampling
+                    ss = dimod.ExactSolver().sample(bqm)
+                    session.post = lambda path, _: choose_reply(
+                        path, {'problems/': complete_reply(ss)})
+
+                    fut = solver.sample_bqm(bqm)
+
+                    with self.assertRaises(type(mock_upload_exc)):
+                        fut.result()
