@@ -1109,8 +1109,8 @@ class Client(object):
 
                 # Submit the problems
                 logger.debug("Submitting %d problems", len(ready_problems))
-                body = '[' + ','.join(mess.body.result() for mess in ready_problems) + ']'
                 try:
+                    body = '[' + ','.join(mess.body.result() for mess in ready_problems) + ']'
                     try:
                         response = session.post('problems/', body)
                         localtime_of_response = epochnow()
