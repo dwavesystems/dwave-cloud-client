@@ -368,6 +368,31 @@ class UnstructuredSolver(BaseSolver):
 
         return computation
 
+    @staticmethod
+    def _bqm_as_fileview(bqm):
+        # New preferred BQM binary serialization.
+        # XXX: temporary until something like dwavesystems/dimod#599 is implemented.
+
+        try:
+            from dimod.serialization.fileview import FileView as BQMFileView
+            from dimod import AdjVectorBQM
+        except ImportError: # pragma: no cover
+            return
+
+        if isinstance(bqm, BQMFileView):
+            return bqm
+
+        try:
+            if not isinstance(bqm, AdjVectorBQM):
+                bqm = AdjVectorBQM(bqm)
+        except:
+            return
+
+        try:
+            return BQMFileView(bqm)
+        except:
+            return
+
     def upload_bqm(self, bqm):
         """Upload the specified :term:`BQM` to SAPI, returning a Problem ID
         that can be used to submit the BQM to this solver (i.e. call the
@@ -388,11 +413,15 @@ class UnstructuredSolver(BaseSolver):
         Note:
             To use this method, dimod package has to be installed.
         """
-        if hasattr(bqm, 'to_serializable'):
-            data = encode_problem_as_bq(bqm, compress=True)['data']
-        else:
-            # raw data (ready for upload) in `bqm`
-            data = bqm
+
+        data = self._bqm_as_fileview(bqm)
+        if data is None:
+            if hasattr(bqm, 'to_serializable'):
+                # soon to be deprecated
+                data = encode_problem_as_bq(bqm, compress=True)['data']
+            else:
+                # raw data (ready for upload) in `bqm`
+                data = bqm
 
         return self.client.upload_problem_encoded(data)
 
