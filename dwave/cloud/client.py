@@ -161,6 +161,7 @@ class Client(object):
     _SUBMISSION_THREAD_COUNT = 5
     _UPLOAD_PROBLEM_THREAD_COUNT = 1
     _UPLOAD_PART_THREAD_COUNT = 10
+    _ENCODE_PROBLEM_THREAD_COUNT = _UPLOAD_PROBLEM_THREAD_COUNT
     _CANCEL_THREAD_COUNT = 1
     _POLL_THREAD_COUNT = 2
     _LOAD_THREAD_COUNT = 5
@@ -481,6 +482,9 @@ class Client(object):
         self._upload_part_executor = \
             PriorityThreadPoolExecutor(self._UPLOAD_PART_THREAD_COUNT)
 
+        self._encode_problem_executor = \
+            ThreadPoolExecutor(self._ENCODE_PROBLEM_THREAD_COUNT)
+
         dispatch_event(
             'after_client_init', obj=self, args=args, return_value=None)
 
@@ -549,6 +553,8 @@ class Client(object):
         self._upload_problem_executor.shutdown()
         logger.debug("Shutting down problem part upload executor")
         self._upload_part_executor.shutdown()
+        logger.debug("Shutting down problem encoder executor")
+        self._encode_problem_executor.shutdown()
 
         # Send kill-task to all worker threads
         # Note: threads can't be 'killed' in Python, they have to die by
@@ -1072,6 +1078,38 @@ class Client(object):
         Note:
             This method is always run inside of a daemon thread.
         """
+
+        def task_done():
+            self._submission_queue.task_done()
+
+        def filter_ready(item):
+            """Pass-through ready (encoded) problems, re-enqueue ones for which
+            the encoding is in progress, and fail the ones for which encoding
+            failed.
+            """
+
+            # body is a `concurrent.futures.Future`, so make sure
+            # it's ready for submitting
+            if item.body.done():
+                exc = item.body.exception()
+                if exc:
+                    # encoding failed, submit should fail as well
+                    logger.info("Problem encoding prior to submit "
+                                "failed with: %r", exc)
+                    item.future._set_error(exc)
+                    task_done()
+
+                else:
+                    # problem ready for submit
+                    return [item]
+
+            else:
+                # body not ready, return the item to queue
+                self._submission_queue.put(item)
+                task_done()
+
+            return []
+
         session = self.create_session()
         try:
             while True:
@@ -1083,19 +1121,25 @@ class Client(object):
                 item = self._submission_queue.get()
 
                 if item is None:
+                    task_done()
                     break
 
-                ready_problems = [item]
+                ready_problems = filter_ready(item)
                 while len(ready_problems) < self._SUBMIT_BATCH_SIZE:
                     try:
-                        ready_problems.append(self._submission_queue.get_nowait())
+                        item = self._submission_queue.get_nowait()
                     except queue.Empty:
                         break
 
+                    ready_problems.extend(filter_ready(item))
+
+                if not ready_problems:
+                    continue
+
                 # Submit the problems
                 logger.debug("Submitting %d problems", len(ready_problems))
-                body = '[' + ','.join(mess.body for mess in ready_problems) + ']'
                 try:
+                    body = '[' + ','.join(mess.body.result() for mess in ready_problems) + ']'
                     try:
                         response = session.post('problems/', body)
                         localtime_of_response = epochnow()
@@ -1115,14 +1159,14 @@ class Client(object):
 
                     for mess in ready_problems:
                         mess.future._set_error(exception, sys.exc_info())
-                        self._submission_queue.task_done()
+                        task_done()
                     continue
 
                 # Pass on the information
                 for submission, res in zip(ready_problems, message):
                     submission.future._set_clock_diff(response, localtime_of_response)
                     self._handle_problem_status(res, submission.future)
-                    self._submission_queue.task_done()
+                    task_done()
 
                 # this is equivalent to a yield to scheduler in other threading libraries
                 time.sleep(0)

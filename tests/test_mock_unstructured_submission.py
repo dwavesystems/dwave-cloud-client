@@ -23,6 +23,7 @@ import numpy
 from dwave.cloud.client import Client
 from dwave.cloud.solver import UnstructuredSolver
 from dwave.cloud.testing import mock
+from dwave.cloud.concurrency import Present
 
 
 def unstructured_solver_data():
@@ -74,42 +75,111 @@ class TestUnstructuredSolver(unittest.TestCase):
         # use a global mocked session, so we can modify it on-fly
         session = mock.Mock()
 
+        # upload is now part of submit, so we need to mock it
+        mock_problem_id = 'mock-problem-id'
+        def mock_upload(self, bqm):
+            return Present(result=mock_problem_id)
+
         # construct a functional solver by mocking client and api response data
         with mock.patch.object(Client, 'create_session', lambda self: session):
             with Client('endpoint', 'token') as client:
-                solver = UnstructuredSolver(client, unstructured_solver_data())
+                with mock.patch.object(UnstructuredSolver, 'upload_bqm', mock_upload):
+                    solver = UnstructuredSolver(client, unstructured_solver_data())
 
-                # direct bqm sampling
-                ss = dimod.ExactSolver().sample(bqm)
-                session.post = lambda path, _: choose_reply(
-                    path, {'problems/': complete_reply(ss)})
+                    # direct bqm sampling
+                    ss = dimod.ExactSolver().sample(bqm)
+                    session.post = lambda path, _: choose_reply(
+                        path, {'problems/': complete_reply(ss)})
 
-                fut = solver.sample_bqm(bqm)
-                numpy.testing.assert_array_equal(fut.sampleset, ss)
-                numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
-                numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
-                numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)
+                    fut = solver.sample_bqm(bqm)
+                    numpy.testing.assert_array_equal(fut.sampleset, ss)
+                    numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
+                    numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
+                    numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)
 
-                # ising sampling
-                lin, quad, _ = bqm.to_ising()
-                ss = dimod.ExactSolver().sample_ising(lin, quad)
-                session.post = lambda path, _: choose_reply(
-                    path, {'problems/': complete_reply(ss)})
+                    # submit of pre-uploaded bqm problem
+                    fut = solver.sample_bqm(mock_problem_id)
+                    numpy.testing.assert_array_equal(fut.sampleset, ss)
+                    numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
+                    numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
+                    numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)
 
-                fut = solver.sample_ising(lin, quad)
-                numpy.testing.assert_array_equal(fut.sampleset, ss)
-                numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
-                numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
-                numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)
+                    # ising sampling
+                    lin, quad, _ = bqm.to_ising()
+                    ss = dimod.ExactSolver().sample_ising(lin, quad)
+                    session.post = lambda path, _: choose_reply(
+                        path, {'problems/': complete_reply(ss)})
 
-                # qubo sampling
-                qubo, _ = bqm.to_qubo()
-                ss = dimod.ExactSolver().sample_qubo(qubo)
-                session.post = lambda path, _: choose_reply(
-                    path, {'problems/': complete_reply(ss)})
+                    fut = solver.sample_ising(lin, quad)
+                    numpy.testing.assert_array_equal(fut.sampleset, ss)
+                    numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
+                    numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
+                    numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)
 
-                fut = solver.sample_qubo(qubo)
-                numpy.testing.assert_array_equal(fut.sampleset, ss)
-                numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
-                numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
-                numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)
+                    # qubo sampling
+                    qubo, _ = bqm.to_qubo()
+                    ss = dimod.ExactSolver().sample_qubo(qubo)
+                    session.post = lambda path, _: choose_reply(
+                        path, {'problems/': complete_reply(ss)})
+
+                    fut = solver.sample_qubo(qubo)
+                    numpy.testing.assert_array_equal(fut.sampleset, ss)
+                    numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
+                    numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
+                    numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)
+
+    def test_upload_failure(self):
+        """Submit should gracefully fail if upload as part of submit fails."""
+
+        # build a test problem
+        bqm = dimod.BQM.from_ising({}, {'ab': 1})
+
+        # use a global mocked session, so we can modify it on-fly
+        session = mock.Mock()
+
+        # upload is now part of submit, so we need to mock it
+        mock_upload_exc = ValueError('error')
+        def mock_upload(self, bqm):
+            return Present(exception=mock_upload_exc)
+
+        # construct a functional solver by mocking client and api response data
+        with mock.patch.object(Client, 'create_session', lambda self: session):
+            with Client('endpoint', 'token') as client:
+                with mock.patch.object(UnstructuredSolver, 'upload_bqm', mock_upload):
+                    solver = UnstructuredSolver(client, unstructured_solver_data())
+
+                    # direct bqm sampling
+                    ss = dimod.ExactSolver().sample(bqm)
+                    session.post = lambda path, _: choose_reply(
+                        path, {'problems/': complete_reply(ss)})
+
+                    fut = solver.sample_bqm(bqm)
+
+                    with self.assertRaises(type(mock_upload_exc)):
+                        fut.result()
+
+    def test_many_upload_failures(self):
+        """Failure handling in high concurrency mode works correctly."""
+
+        # build a test problem
+        bqm = dimod.BQM.from_ising({}, {'ab': 1})
+
+        # use a global mocked session, so we can modify it on-fly
+        session = mock.Mock()
+
+        # upload is now part of submit, so we need to mock it
+        mock_upload_exc = ValueError('error')
+        def mock_upload(self, bqm):
+            return Present(exception=mock_upload_exc)
+
+        # construct a functional solver by mocking client and api response data
+        with mock.patch.object(Client, 'create_session', lambda self: session):
+            with Client('endpoint', 'token') as client:
+                with mock.patch.object(UnstructuredSolver, 'upload_bqm', mock_upload):
+                    solver = UnstructuredSolver(client, unstructured_solver_data())
+
+                    futs = [solver.sample_bqm(bqm) for _ in range(100)]
+
+                    for fut in futs:
+                        with self.assertRaises(type(mock_upload_exc)):
+                            fut.result()
