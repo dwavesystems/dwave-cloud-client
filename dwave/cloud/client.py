@@ -161,6 +161,7 @@ class Client(object):
     _SUBMISSION_THREAD_COUNT = 5
     _UPLOAD_PROBLEM_THREAD_COUNT = 1
     _UPLOAD_PART_THREAD_COUNT = 10
+    _ENCODE_PROBLEM_THREAD_COUNT = _UPLOAD_PROBLEM_THREAD_COUNT
     _CANCEL_THREAD_COUNT = 1
     _POLL_THREAD_COUNT = 2
     _LOAD_THREAD_COUNT = 5
@@ -481,6 +482,9 @@ class Client(object):
         self._upload_part_executor = \
             PriorityThreadPoolExecutor(self._UPLOAD_PART_THREAD_COUNT)
 
+        self._encode_problem_executor = \
+            ThreadPoolExecutor(self._ENCODE_PROBLEM_THREAD_COUNT)
+
         dispatch_event(
             'after_client_init', obj=self, args=args, return_value=None)
 
@@ -549,6 +553,8 @@ class Client(object):
         self._upload_problem_executor.shutdown()
         logger.debug("Shutting down problem part upload executor")
         self._upload_part_executor.shutdown()
+        logger.debug("Shutting down problem encoder executor")
+        self._encode_problem_executor.shutdown()
 
         # Send kill-task to all worker threads
         # Note: threads can't be 'killed' in Python, they have to die by
@@ -1088,13 +1094,22 @@ class Client(object):
                 ready_problems = [item]
                 while len(ready_problems) < self._SUBMIT_BATCH_SIZE:
                     try:
-                        ready_problems.append(self._submission_queue.get_nowait())
+                        item = self._submission_queue.get_nowait()
+
+                        # body is a `concurrent.futures.Future`, so make sure
+                        # it's ready for submitting
+                        if item.body.done():
+                            ready_problems.append(item)
+                        else:
+                            # body not ready, return the item to queue
+                            self._submission_queue.put(item)
+
                     except queue.Empty:
                         break
 
                 # Submit the problems
                 logger.debug("Submitting %d problems", len(ready_problems))
-                body = '[' + ','.join(mess.body for mess in ready_problems) + ']'
+                body = '[' + ','.join(mess.body.result() for mess in ready_problems) + ']'
                 try:
                     try:
                         response = session.post('problems/', body)
