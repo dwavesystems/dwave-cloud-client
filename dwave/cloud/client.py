@@ -1079,6 +1079,9 @@ class Client(object):
             This method is always run inside of a daemon thread.
         """
 
+        def task_done():
+            self._submission_queue.task_done()
+
         def filter_ready(item):
             """Pass-through ready (encoded) problems, re-enqueue ones for which
             the encoding is in progress, and fail the ones for which encoding
@@ -1091,10 +1094,10 @@ class Client(object):
                 exc = item.body.exception()
                 if exc:
                     # encoding failed, submit should fail as well
-                    logger.warning("Problem encoding prior to submit "
-                                    "failed with: %r", exc)
+                    logger.info("Problem encoding prior to submit "
+                                "failed with: %r", exc)
                     item.future._set_error(exc)
-                    self._submission_queue.task_done()
+                    task_done()
 
                 else:
                     # problem ready for submit
@@ -1103,6 +1106,7 @@ class Client(object):
             else:
                 # body not ready, return the item to queue
                 self._submission_queue.put(item)
+                task_done()
 
             return []
 
@@ -1117,6 +1121,7 @@ class Client(object):
                 item = self._submission_queue.get()
 
                 if item is None:
+                    task_done()
                     break
 
                 ready_problems = filter_ready(item)
@@ -1154,14 +1159,14 @@ class Client(object):
 
                     for mess in ready_problems:
                         mess.future._set_error(exception, sys.exc_info())
-                        self._submission_queue.task_done()
+                        task_done()
                     continue
 
                 # Pass on the information
                 for submission, res in zip(ready_problems, message):
                     submission.future._set_clock_diff(response, localtime_of_response)
                     self._handle_problem_status(res, submission.future)
-                    self._submission_queue.task_done()
+                    task_done()
 
                 # this is equivalent to a yield to scheduler in other threading libraries
                 time.sleep(0)
