@@ -60,6 +60,8 @@ matrix:
 
   allow_failures:
     - python: "nightly"
+    - os: osx
+      env: TOXENV=py27
 
 install:
   - pip install --upgrade setuptools
