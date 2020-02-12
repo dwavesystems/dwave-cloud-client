@@ -550,6 +550,22 @@ def _install_contrib_package(name):
     assert name in contrib
     pkg = contrib[name]
 
+    # basic pkg info
+    click.echo(pkg['title'])
+    click.echo(pkg['description'])
+
+    # license prompt
+    license = pkg['license']
+    msgtpl = ("This package is available under the {name!r} license.\n"
+              "The terms of the license are available online: {url!s}")
+    click.echo(msgtpl.format(name=license['name'], url=license['url']))
+
+    val = default_text_input('Install (y/n)?', default='y', optional=False)
+    if val.lower() != 'y':
+        click.echo('Skipping: {}'.format(name))
+        return
+
+    click.echo('Installing: {}'.format(name))
     for req in pkg['requirements']:
         try:
             # NOTE: py35+ required
@@ -559,3 +575,4 @@ def _install_contrib_package(name):
                 check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as err:
             click.echo(err.stdout)
+    click.echo('Successfully installed {}'.format(name))

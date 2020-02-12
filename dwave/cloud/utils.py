@@ -178,15 +178,7 @@ def strip_tail(sequence, values):
     return list(reversed(list(strip_head(reversed(sequence), values))))
 
 
-def default_text_input(prompt, default=None, optional=True):
-    if default:
-        prompt = "{} [{}]: ".format(prompt, default)
-    else:
-        if optional:
-            prompt = "{} [skip]: ".format(prompt)
-        else:
-            prompt = "{}: ".format(prompt)
-
+def input_with_default(prompt, default, optional):
     line = ''
     while not line:
         line = six.moves.input(prompt)
@@ -197,6 +189,18 @@ def default_text_input(prompt, default=None, optional=True):
                 break
             click.echo("Input required, please try again.")
     return line
+
+
+def default_text_input(prompt, default=None, optional=True):
+    if default:
+        prompt = "{} [{}]: ".format(prompt, default)
+    else:
+        if optional:
+            prompt = "{} [skip]: ".format(prompt)
+        else:
+            prompt = "{}: ".format(prompt)
+
+    return input_with_default(prompt, default, optional)
 
 
 def click_info_switch(f):
