@@ -580,7 +580,7 @@ def _is_pip_package_installed(requirement):
     return res.returncode == 0
 
 
-def _install_contrib_package(name, verbose=False):
+def _install_contrib_package(name, verbose=False, prompt=True):
     """pip install non-oss package `name` from dwave's pypi repo."""
 
     contrib = get_contrib_packages()
@@ -608,10 +608,11 @@ def _install_contrib_package(name, verbose=False):
               "The terms of the license are available online: {url}")
     click.echo(msgtpl.format(name=license['name'], url=license['url']))
 
-    val = default_text_input('Install (y/n)?', default='y', optional=False)
-    if val.lower() != 'y':
-        click.echo('Skipping: {}'.format(title))
-        return
+    if prompt:
+        val = default_text_input('Install (y/n)?', default='y', optional=False)
+        if val.lower() != 'y':
+            click.echo('Skipping: {}.\n'.format(title))
+            return
 
     click.echo('Installing: {}'.format(title))
     for req in pkg['requirements']:
@@ -625,24 +626,25 @@ def _install_contrib_package(name, verbose=False):
         if res.returncode or verbose:
             click.echo(res.stdout)
 
-    click.echo('Successfully installed {}\n'.format(title))
+    click.echo('Successfully installed {}.\n'.format(title))
 
 
 @cli.command()
-@click.option('--all', '-a', 'install_all', default=False, is_flag=True,
-              help='Install all non-open-source packages available')
+@click.option('--accept-all', '--all', '-a', default=False,
+              is_flag=True, help='Install all non-open-source packages available')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Increase output verbosity')
-def setup(install_all, verbose):
+def setup(accept_all, verbose):
     """Setup optional Ocean packages and configuration file(s)."""
 
     contrib = get_contrib_packages()
     packages = list(contrib)
 
     if not packages:
-        install_all = False
-    elif install_all:
+        install = False
+    elif accept_all:
         click.echo("Installing all optional non-open-source packages.\n")
+        install = True
     else:
         # The default flow: SDK installed, so some contrib packages registered
         # and `dwave setup` ran without `--all` flag.
@@ -650,12 +652,12 @@ def setup(install_all, verbose):
                    "configure your environment.\n")
         prompt = "Do you want to select non-open-source packages to install (y/n)?"
         val = default_text_input(prompt, default='y')
-        install_all = val.lower() == 'y'
+        install = val.lower() == 'y'
         click.echo()
 
-    if install_all:
+    if install:
         for pkg in packages:
-            _install_contrib_package(pkg, verbose=verbose)
+            _install_contrib_package(pkg, verbose=verbose, prompt=not accept_all)
 
     click.echo("Creating the D-Wave configuration file.")
     return _config_create(config_file=None, profile=None)
