@@ -532,6 +532,10 @@ def install(list_all, install_all, packages):
     if install_all:
         packages = list(contrib)
 
+    if not packages:
+        click.echo('Nothing to do. Try "dwave install --help".')
+        return
+
     # check all packages are registered/available
     for pkg in packages:
         if pkg not in contrib:
@@ -598,6 +602,8 @@ def _install_contrib_package(name):
                 [sys.executable, "-m", "pip", "install", req,
                  "--extra-index", dwave_contrib_repo],
                 check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
         except subprocess.CalledProcessError as err:
             click.echo(err.stdout)
-    click.echo('Successfully installed {}'.format(title))
+
+    click.echo('Successfully installed {}\n'.format(title))
