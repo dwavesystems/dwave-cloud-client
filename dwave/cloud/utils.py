@@ -39,6 +39,8 @@ except AttributeError:  # pragma: no cover
 from datetime import datetime
 from dateutil.tz import UTC
 from functools import wraps
+from pkg_resources import iter_entry_points
+from collections import OrderedDict
 
 import six
 import click
@@ -176,15 +178,7 @@ def strip_tail(sequence, values):
     return list(reversed(list(strip_head(reversed(sequence), values))))
 
 
-def default_text_input(prompt, default=None, optional=True):
-    if default:
-        prompt = "{} [{}]: ".format(prompt, default)
-    else:
-        if optional:
-            prompt = "{} [skip]: ".format(prompt)
-        else:
-            prompt = "{}: ".format(prompt)
-
+def input_with_default(prompt, default, optional):
     line = ''
     while not line:
         line = six.moves.input(prompt)
@@ -195,6 +189,18 @@ def default_text_input(prompt, default=None, optional=True):
                 break
             click.echo("Input required, please try again.")
     return line
+
+
+def default_text_input(prompt, default=None, optional=True):
+    if default:
+        prompt = "{} [{}]: ".format(prompt, default)
+    else:
+        if optional:
+            prompt = "{} [skip]: ".format(prompt)
+        else:
+            prompt = "{}: ".format(prompt)
+
+    return input_with_default(prompt, default, optional)
 
 
 def click_info_switch(f):
@@ -519,3 +525,24 @@ def set_loglevel(logger, level_name):
     level = parse_loglevel(level_name)
     logger.setLevel(level)
     logger.info("Log level for %r namespace set to %r", logger.name, level)
+
+
+def get_contrib_config():
+    """Return all registered contrib (non-open-source) Ocean packages."""
+
+    contrib = [ep.load() for ep in iter_entry_points('dwave_contrib')]
+    return contrib
+
+def get_contrib_packages():
+    """Combine all contrib packages in an ordered dict. Assumes package names
+    are unique.
+    """
+
+    contrib = get_contrib_config()
+
+    packages = OrderedDict()
+    for dist in contrib:
+        for pkg in dist:
+            packages[pkg['name']] = pkg
+
+    return packages

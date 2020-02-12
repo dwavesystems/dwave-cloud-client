@@ -17,6 +17,8 @@ import sys
 import ast
 import json
 import datetime
+import subprocess
+import pkg_resources
 
 import click
 import requests.exceptions
@@ -27,7 +29,8 @@ import dwave.cloud
 from dwave.cloud import Client
 from dwave.cloud.utils import (
     default_text_input, click_info_switch, generate_random_ising_problem,
-    datetime_to_timestamp, utcnow, strtrunc, CLIError, set_loglevel)
+    datetime_to_timestamp, utcnow, strtrunc, CLIError, set_loglevel,
+    get_contrib_packages)
 from dwave.cloud.coders import encode_problem_as_bq
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
@@ -116,6 +119,11 @@ def inspect(config_file, profile):
               help='Connection profile (section) name')
 def create(config_file, profile):
     """Create and/or update cloud client configuration file."""
+    return _config_create(config_file, profile)
+
+
+def _config_create(config_file, profile):
+    """`dwave config create` helper."""
 
     # determine the config file path
     if config_file:
@@ -509,3 +517,147 @@ def upload(config_file, profile, problem_id, format, input_file):
         return 2
 
     click.echo("Upload done. Problem ID: {!r}".format(remote_problem_id))
+
+
+@cli.command()
+@click.option('--list', '-l', 'list_all', default=False, is_flag=True,
+              help='List available contrib (non-OSS) packages')
+@click.option('--all', '-a', 'install_all', default=False, is_flag=True,
+              help='Install all contrib (non-OSS) packages')
+@click.option('--verbose', '-v', default=False, is_flag=True,
+              help='Increase output verbosity')
+@click.argument('packages', nargs=-1)
+def install(list_all, install_all, verbose, packages):
+    """Install optional non-open-source Ocean packages."""
+
+    contrib = get_contrib_packages()
+
+    if list_all:
+        if verbose:
+            # ~YAML output
+            for pkg, specs in contrib.items():
+                click.echo("Package: {}".format(pkg))
+                click.echo("  Title: {}".format(specs['title']))
+                click.echo("  Description: {}".format(specs['description']))
+                click.echo("  License: {}".format(specs['license']['name']))
+                click.echo("  License-URL: {}".format(specs['license']['url']))
+                click.echo("  Requires: {}".format(', '.join(specs['requirements'])))
+                click.echo()
+        else:
+            # concise list of available packages
+            click.echo("Available packages: {}.".format(', '.join(contrib.keys())))
+        return
+
+    if install_all:
+        packages = list(contrib)
+
+    if not packages:
+        click.echo('Nothing to do. Try "dwave install --help".')
+        return
+
+    # check all packages are registered/available
+    for pkg in packages:
+        if pkg not in contrib:
+            click.echo("Package {!r} not found.".format(pkg))
+            return 1
+
+    for pkg in packages:
+        _install_contrib_package(pkg, verbose=verbose)
+
+
+def _is_pip_package_installed(requirement):
+    """Checks if a pip `requirement` is installed."""
+
+    reqs = list(pkg_resources.parse_requirements(requirement))
+    assert len(reqs) == 1
+    req = reqs[0]
+
+    # NOTE: py35+ required
+    res = subprocess.run(
+        [sys.executable, "-m", "pip", "show", req.name],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+    return res.returncode == 0
+
+
+def _install_contrib_package(name, verbose=False, prompt=True):
+    """pip install non-oss package `name` from dwave's pypi repo."""
+
+    contrib = get_contrib_packages()
+    dwave_contrib_repo = "https://pypi.dwavesys.com/simple"
+
+    assert name in contrib
+    pkg = contrib[name]
+    title = pkg['title']
+
+    # check is `name` package is already installed
+    # right now the only way to check that is to check if all dependants from
+    # requirements are installed
+    # NOTE: currently we do not check if versions match!
+    if all(_is_pip_package_installed(req) for req in pkg['requirements']):
+        click.echo("{} already installed.\n".format(title))
+        return
+
+    # basic pkg info
+    click.echo(title)
+    click.echo(pkg['description'])
+
+    # license prompt
+    license = pkg['license']
+    msgtpl = ("This package is available under the {name} license.\n"
+              "The terms of the license are available online: {url}")
+    click.echo(msgtpl.format(name=license['name'], url=license['url']))
+
+    if prompt:
+        val = default_text_input('Install (y/n)?', default='y', optional=False)
+        if val.lower() != 'y':
+            click.echo('Skipping: {}.\n'.format(title))
+            return
+
+    click.echo('Installing: {}'.format(title))
+    for req in pkg['requirements']:
+
+        # NOTE: py35+ required
+        res = subprocess.run(
+            [sys.executable, "-m", "pip", "install", req,
+             "--extra-index", dwave_contrib_repo],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+        if res.returncode or verbose:
+            click.echo(res.stdout)
+
+    click.echo('Successfully installed {}.\n'.format(title))
+
+
+@cli.command()
+@click.option('--accept-all', '--all', '-a', default=False,
+              is_flag=True, help='Install all non-open-source packages available')
+@click.option('--verbose', '-v', default=False, is_flag=True,
+              help='Increase output verbosity')
+def setup(accept_all, verbose):
+    """Setup optional Ocean packages and configuration file(s)."""
+
+    contrib = get_contrib_packages()
+    packages = list(contrib)
+
+    if not packages:
+        install = False
+    elif accept_all:
+        click.echo("Installing all optional non-open-source packages.\n")
+        install = True
+    else:
+        # The default flow: SDK installed, so some contrib packages registered
+        # and `dwave setup` ran without `--all` flag.
+        click.echo("Optionally install non-open-source packages and "
+                   "configure your environment.\n")
+        prompt = "Do you want to select non-open-source packages to install (y/n)?"
+        val = default_text_input(prompt, default='y')
+        install = val.lower() == 'y'
+        click.echo()
+
+    if install:
+        for pkg in packages:
+            _install_contrib_package(pkg, verbose=verbose, prompt=not accept_all)
+
+    click.echo("Creating the D-Wave configuration file.")
+    return _config_create(config_file=None, profile=None)
