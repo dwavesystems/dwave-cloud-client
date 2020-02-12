@@ -18,6 +18,7 @@ import ast
 import json
 import datetime
 import subprocess
+import pkg_resources
 
 import click
 import requests.exceptions
@@ -541,6 +542,21 @@ def install(list_all, install_all, packages):
         _install_contrib_package(pkg)
 
 
+def _is_pip_package_installed(requirement):
+    """Checks if a pip `requirement` is installed."""
+
+    reqs = list(pkg_resources.parse_requirements(requirement))
+    assert len(reqs) == 1
+    req = reqs[0]
+
+        # NOTE: py35+ required
+    ret = subprocess.run(
+        [sys.executable, "-m", "pip", "show", req.name],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+    return ret.returncode == 0
+
+
 def _install_contrib_package(name):
     """pip install non-oss package `name` from dwave's pypi repo."""
 
@@ -549,9 +565,18 @@ def _install_contrib_package(name):
 
     assert name in contrib
     pkg = contrib[name]
+    title = pkg['title']
+
+    # check is `name` package is already installed
+    # right now the only way to check that is to check if all dependants from
+    # requirements are installed
+    # NOTE: currently we do not check if versions match!
+    if all(_is_pip_package_installed(req) for req in pkg['requirements']):
+        click.echo("{} already installed.".format(title))
+        return
 
     # basic pkg info
-    click.echo(pkg['title'])
+    click.echo(title)
     click.echo(pkg['description'])
 
     # license prompt
@@ -562,10 +587,10 @@ def _install_contrib_package(name):
 
     val = default_text_input('Install (y/n)?', default='y', optional=False)
     if val.lower() != 'y':
-        click.echo('Skipping: {}'.format(name))
+        click.echo('Skipping: {}'.format(title))
         return
 
-    click.echo('Installing: {}'.format(name))
+    click.echo('Installing: {}'.format(title))
     for req in pkg['requirements']:
         try:
             # NOTE: py35+ required
@@ -575,4 +600,4 @@ def _install_contrib_package(name):
                 check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as err:
             click.echo(err.stdout)
-    click.echo('Successfully installed {}'.format(name))
+    click.echo('Successfully installed {}'.format(title))
