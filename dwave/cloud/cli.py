@@ -17,6 +17,7 @@ import sys
 import ast
 import json
 import datetime
+import subprocess
 
 import click
 import requests.exceptions
@@ -27,7 +28,8 @@ import dwave.cloud
 from dwave.cloud import Client
 from dwave.cloud.utils import (
     default_text_input, click_info_switch, generate_random_ising_problem,
-    datetime_to_timestamp, utcnow, strtrunc, CLIError, set_loglevel)
+    datetime_to_timestamp, utcnow, strtrunc, CLIError, set_loglevel,
+    get_contrib_packages)
 from dwave.cloud.coders import encode_problem_as_bq
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
@@ -509,3 +511,51 @@ def upload(config_file, profile, problem_id, format, input_file):
         return 2
 
     click.echo("Upload done. Problem ID: {!r}".format(remote_problem_id))
+
+
+@cli.command()
+@click.option('--list', '-l', 'list_all', default=False, is_flag=True,
+              help='List available contrib (non-OSS) packages')
+@click.option('--all', '-a', 'install_all', default=False, is_flag=True,
+              help='Install all contrib (non-OSS) packages')
+@click.argument('packages', nargs=-1)
+def install(list_all, install_all, packages):
+    """Install optional non-open-source Ocean packages."""
+
+    contrib = get_contrib_packages()
+
+    if list_all:
+        click.echo("Available packages: {}.".format(', '.join(contrib.keys())))
+        return
+
+    if install_all:
+        packages = list(contrib)
+
+    # check all packages are registered/available
+    for pkg in packages:
+        if pkg not in contrib:
+            click.echo("Package {!r} not found.".format(pkg))
+            return 1
+
+    for pkg in packages:
+        _install_contrib_package(pkg)
+
+
+def _install_contrib_package(name):
+    """pip install non-oss package `name` from dwave's pypi repo."""
+
+    contrib = get_contrib_packages()
+    dwave_contrib_repo = "https://pypi.dwavesys.com/simple"
+
+    assert name in contrib
+    pkg = contrib[name]
+
+    for req in pkg['requirements']:
+        try:
+            # NOTE: py35+ required
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", req,
+                 "--extra-index", dwave_contrib_repo],
+                check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as err:
+            click.echo(err.stdout)
