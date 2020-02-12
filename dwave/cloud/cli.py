@@ -557,7 +557,7 @@ def install(list_all, install_all, verbose, packages):
             return 1
 
     for pkg in packages:
-        _install_contrib_package(pkg)
+        _install_contrib_package(pkg, verbose=verbose)
 
 
 def _is_pip_package_installed(requirement):
@@ -567,15 +567,15 @@ def _is_pip_package_installed(requirement):
     assert len(reqs) == 1
     req = reqs[0]
 
-        # NOTE: py35+ required
-    ret = subprocess.run(
+    # NOTE: py35+ required
+    res = subprocess.run(
         [sys.executable, "-m", "pip", "show", req.name],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-    return ret.returncode == 0
+    return res.returncode == 0
 
 
-def _install_contrib_package(name):
+def _install_contrib_package(name, verbose=False):
     """pip install non-oss package `name` from dwave's pypi repo."""
 
     contrib = get_contrib_packages()
@@ -610,14 +610,14 @@ def _install_contrib_package(name):
 
     click.echo('Installing: {}'.format(title))
     for req in pkg['requirements']:
-        try:
-            # NOTE: py35+ required
-            subprocess.run(
-                [sys.executable, "-m", "pip", "install", req,
-                 "--extra-index", dwave_contrib_repo],
-                check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-        except subprocess.CalledProcessError as err:
-            click.echo(err.stdout)
+        # NOTE: py35+ required
+        res = subprocess.run(
+            [sys.executable, "-m", "pip", "install", req,
+             "--extra-index", dwave_contrib_repo],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+        if res.returncode or verbose:
+            click.echo(res.stdout)
 
     click.echo('Successfully installed {}\n'.format(title))
