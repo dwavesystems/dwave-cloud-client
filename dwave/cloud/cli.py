@@ -595,7 +595,7 @@ def _install_contrib_package(name, verbose=False):
     # requirements are installed
     # NOTE: currently we do not check if versions match!
     if all(_is_pip_package_installed(req) for req in pkg['requirements']):
-        click.echo("{} already installed.".format(title))
+        click.echo("{} already installed.\n".format(title))
         return
 
     # basic pkg info
@@ -604,8 +604,8 @@ def _install_contrib_package(name, verbose=False):
 
     # license prompt
     license = pkg['license']
-    msgtpl = ("This package is available under the {name!r} license.\n"
-              "The terms of the license are available online: {url!s}")
+    msgtpl = ("This package is available under the {name} license.\n"
+              "The terms of the license are available online: {url}")
     click.echo(msgtpl.format(name=license['name'], url=license['url']))
 
     val = default_text_input('Install (y/n)?', default='y', optional=False)
@@ -630,25 +630,32 @@ def _install_contrib_package(name, verbose=False):
 
 @cli.command()
 @click.option('--all', '-a', 'install_all', default=False, is_flag=True,
-              help='Install all contrib (non-OSS) packages')
+              help='Install all non-open-source packages available')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Increase output verbosity')
 def setup(install_all, verbose):
     """Setup optional Ocean packages and configuration file(s)."""
 
-    if install_all:
-        click.echo("Installing all optional non-open-source packages.")
+    contrib = get_contrib_packages()
+    packages = list(contrib)
+
+    if not packages:
+        install_all = False
+    elif install_all:
+        click.echo("Installing all optional non-open-source packages.\n")
     else:
-        prompt = "Do you want to install optional non-open-source packages (y/n)?"
+        # The default flow: SDK installed, so some contrib packages registered
+        # and `dwave setup` ran without `--all` flag.
+        click.echo("Optionally install non-open-source packages and "
+                   "configure your environment.\n")
+        prompt = "Do you want to select non-open-source packages to install (y/n)?"
         val = default_text_input(prompt, default='y')
         install_all = val.lower() == 'y'
+        click.echo()
 
     if install_all:
-        contrib = get_contrib_packages()
-        packages = list(contrib)
-        click.echo()
         for pkg in packages:
             _install_contrib_package(pkg, verbose=verbose)
 
-    click.echo("\nCreating the D-Wave configuration file.")
+    click.echo("Creating the D-Wave configuration file.")
     return _config_create(config_file=None, profile=None)
