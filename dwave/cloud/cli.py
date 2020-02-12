@@ -519,14 +519,28 @@ def upload(config_file, profile, problem_id, format, input_file):
               help='List available contrib (non-OSS) packages')
 @click.option('--all', '-a', 'install_all', default=False, is_flag=True,
               help='Install all contrib (non-OSS) packages')
+@click.option('--verbose', '-v', default=False, is_flag=True,
+              help='Increase output verbosity')
 @click.argument('packages', nargs=-1)
-def install(list_all, install_all, packages):
+def install(list_all, install_all, verbose, packages):
     """Install optional non-open-source Ocean packages."""
 
     contrib = get_contrib_packages()
 
     if list_all:
-        click.echo("Available packages: {}.".format(', '.join(contrib.keys())))
+        if verbose:
+            # ~YAML output
+            for pkg, specs in contrib.items():
+                click.echo("Package: {}".format(pkg))
+                click.echo("  Title: {}".format(specs['title']))
+                click.echo("  Description: {}".format(specs['description']))
+                click.echo("  License: {}".format(specs['license']['name']))
+                click.echo("  License-URL: {}".format(specs['license']['url']))
+                click.echo("  Requires: {}".format(', '.join(specs['requirements'])))
+                click.echo()
+        else:
+            # concise list of available packages
+            click.echo("Available packages: {}.".format(', '.join(contrib.keys())))
         return
 
     if install_all:
