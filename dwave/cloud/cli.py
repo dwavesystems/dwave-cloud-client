@@ -119,6 +119,11 @@ def inspect(config_file, profile):
               help='Connection profile (section) name')
 def create(config_file, profile):
     """Create and/or update cloud client configuration file."""
+    return _config_create(config_file, profile)
+
+
+def _config_create(config_file, profile):
+    """`dwave config create` helper."""
 
     # determine the config file path
     if config_file:
@@ -621,3 +626,29 @@ def _install_contrib_package(name, verbose=False):
             click.echo(res.stdout)
 
     click.echo('Successfully installed {}\n'.format(title))
+
+
+@cli.command()
+@click.option('--all', '-a', 'install_all', default=False, is_flag=True,
+              help='Install all contrib (non-OSS) packages')
+@click.option('--verbose', '-v', default=False, is_flag=True,
+              help='Increase output verbosity')
+def setup(install_all, verbose):
+    """Setup optional Ocean packages and configuration file(s)."""
+
+    if install_all:
+        click.echo("Installing all optional non-open-source packages.")
+    else:
+        prompt = "Do you want to install optional non-open-source packages (y/n)?"
+        val = default_text_input(prompt, default='y')
+        install_all = val.lower() == 'y'
+
+    if install_all:
+        contrib = get_contrib_packages()
+        packages = list(contrib)
+        click.echo()
+        for pkg in packages:
+            _install_contrib_package(pkg, verbose=verbose)
+
+    click.echo("\nCreating the D-Wave configuration file.")
+    return _config_create(config_file=None, profile=None)
