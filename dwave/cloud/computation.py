@@ -517,9 +517,9 @@ class Future(object):
     def set_id(self, id_):
         """Sets the problem ID, notifying the related event.
 
-        NOTE: :attr:`Future.id` should always be set via this setter. Ideally,
+        NOTE: :attr:`.Future.id` should always be set via this setter. Ideally,
         we would replace get_id/set_id pair with a property, but that would
-        break compatibility, as it would modify the getter behaviour (since
+        break compatibility, as it would modify the getter behavior (since
         get_id is a blocking call).
 
         """

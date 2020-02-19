@@ -764,5 +764,5 @@ class TestComputationID(unittest.TestCase):
                 # release the mocked sapi reply with the id
                 release_reply.set()
 
-                # verify the id is not available
+                # verify the id is now available
                 self.assertEqual(future.get_id(), submission_id)
