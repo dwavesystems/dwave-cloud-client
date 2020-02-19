@@ -1206,7 +1206,7 @@ class Client(object):
             if 'id' not in message:
                 raise InvalidAPIResponseError("'id' missing in problem description response")
 
-            future.id = message['id']
+            future.set_id(message['id'])
             future.remote_status = status = message['status']
 
             # The future may not have the ID set yet
