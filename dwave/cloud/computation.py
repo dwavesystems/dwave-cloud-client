@@ -112,7 +112,11 @@ class Future(object):
         self.return_matrix = return_matrix
 
         #: The id the server will use to identify this problem, None until the id is actually known
-        self.id = id_
+        self.id = None
+
+        # Event for ID readiness notification
+        self._id_ready_event = threading.Event()
+        self.set_id(id_)
 
         #: `datetime` the Future was created (immediately before enqueued in Client's submit queue)
         self.time_created = utcnow()
@@ -486,6 +490,43 @@ class Future(object):
             if self.id is not None and not self._cancel_sent:
                 self._cancel_sent = True
                 self.solver.client._cancel(self.id, self)
+
+    def get_id(self, timeout=None):
+        """Return the submitted problem ID. Block until the ID becomes known,
+        or until `timeout` expires.
+
+        Args:
+            timeout (float, default=None):
+                Timeout in seconds. By default, wait indefinitely for problem
+                id to become known/available.
+
+        Returns:
+            str:
+                Problem ID, as returned by SAPI.
+
+        Raises:
+            :exc:`concurrent.futures.TimeoutError`:
+                When `timeout` exceeded, and problem id not ready.
+
+        """
+        if not self._id_ready_event.wait(timeout=timeout):
+            raise TimeoutError("problem id not available yet")
+
+        return self.id
+
+    def set_id(self, id_):
+        """Sets the problem ID, notifying the related event.
+
+        NOTE: :attr:`Future.id` should always be set via this setter. Ideally,
+        we would replace get_id/set_id pair with a property, but that would
+        break compatibility, as it would modify the getter behaviour (since
+        get_id is a blocking call).
+
+        """
+        self.id = id_
+
+        if self.id is not None:
+            self._id_ready_event.set()
 
     def result(self):
         """Results for a submitted job.
