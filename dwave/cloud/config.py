@@ -600,9 +600,11 @@ def get_default_config():
         # D-Wave solver API endpoint URL defaults to a production endpoint
         #endpoint = https://cloud.dwavesys.com/sapi
 
-        # Default client is for the QPU resource (QPU sampler)
+        # Default client is the generic base client which works with all
+        # available remote solvers/samplers. It can be specialized for the
+        # QPU resource (QPU sampler), and software samplers.
         # Possible values: `qpu`, `sw`, `base` (equal to unspecified)
-        client = qpu
+        #client = base
 
         # Profile name to use if otherwise unspecified.
         # If undefined, the first section below will be used as the default profile.
