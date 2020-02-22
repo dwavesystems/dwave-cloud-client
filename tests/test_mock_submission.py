@@ -716,15 +716,15 @@ class TestComputationID(unittest.TestCase):
         # f.id should be None
         self.assertIsNone(f.id)
         with self.assertRaises(TimeoutError):
-            f.get_id(timeout=1)
+            f.wait_id(timeout=1)
 
         # set it
         submission_id = 'test-id'
-        f.set_id(submission_id)
+        f.id = submission_id
 
         # validate it's available
-        self.assertEqual(f.get_id(), submission_id)
-        self.assertEqual(f.get_id(timeout=1), submission_id)
+        self.assertEqual(f.wait_id(), submission_id)
+        self.assertEqual(f.wait_id(timeout=1), submission_id)
         self.assertEqual(f.id, submission_id)
 
     def test_id_integration(self):
@@ -759,10 +759,10 @@ class TestComputationID(unittest.TestCase):
 
                 # initially, the id is not available
                 with self.assertRaises(TimeoutError):
-                    future.get_id(timeout=1)
+                    future.wait_id(timeout=1)
 
                 # release the mocked sapi reply with the id
                 release_reply.set()
 
                 # verify the id is now available
-                self.assertEqual(future.get_id(), submission_id)
+                self.assertEqual(future.wait_id(), submission_id)

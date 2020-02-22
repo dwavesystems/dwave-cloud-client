@@ -106,17 +106,16 @@ class Future(object):
         self._cancel_sent = False
         self._single_cancel_lock = threading.Lock()  # Make sure we only call cancel once
 
+        # ID readiness notification
+        self._id_ready_event = threading.Event()
+
         # Should the results be decoded as python lists or numpy matrices
         if return_matrix and not _numpy:
             raise ValueError("Matrix result requested without numpy.")
         self.return_matrix = return_matrix
 
         #: The id the server will use to identify this problem, None until the id is actually known
-        self.id = None
-
-        # Event for ID readiness notification
-        self._id_ready_event = threading.Event()
-        self.set_id(id_)
+        self.id = id_
 
         #: `datetime` the Future was created (immediately before enqueued in Client's submit queue)
         self.time_created = utcnow()
@@ -491,9 +490,11 @@ class Future(object):
                 self._cancel_sent = True
                 self.solver.client._cancel(self.id, self)
 
-    def get_id(self, timeout=None):
-        """Return the submitted problem ID. Block until the ID becomes known,
-        or until `timeout` expires.
+    def wait_id(self, timeout=None):
+        """Blocking id getter.
+
+        Return the submitted problem ID, but unlike :meth:`.id`, block until the
+        ID becomes known, or until `timeout` expires.
 
         Args:
             timeout (float, default=None):
@@ -512,20 +513,20 @@ class Future(object):
         if not self._id_ready_event.wait(timeout=timeout):
             raise TimeoutError("problem id not available yet")
 
-        return self.id
+        return self._id
 
-    def set_id(self, id_):
-        """Sets the problem ID, notifying the related event.
+    @property
+    def id(self):
+        """Simple non-blocking id getter for backward compat."""
+        return self._id
 
-        NOTE: :attr:`.Future.id` should always be set via this setter. Ideally,
-        we would replace get_id/set_id pair with a property, but that would
-        break compatibility, as it would modify the getter behavior (since
-        get_id is a blocking call).
+    @id.setter
+    def id(self, value):
+        """Sets the problem ID, notifying the related event."""
+        self._id = value
 
-        """
-        self.id = id_
-
-        if self.id is not None:
+        # notify ID is set/ready
+        if value is not None:
             self._id_ready_event.set()
 
     def result(self):
