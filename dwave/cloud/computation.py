@@ -106,6 +106,9 @@ class Future(object):
         self._cancel_sent = False
         self._single_cancel_lock = threading.Lock()  # Make sure we only call cancel once
 
+        # ID readiness notification
+        self._id_ready_event = threading.Event()
+
         # Should the results be decoded as python lists or numpy matrices
         if return_matrix and not _numpy:
             raise ValueError("Matrix result requested without numpy.")
@@ -486,6 +489,45 @@ class Future(object):
             if self.id is not None and not self._cancel_sent:
                 self._cancel_sent = True
                 self.solver.client._cancel(self.id, self)
+
+    def wait_id(self, timeout=None):
+        """Blocking id getter.
+
+        Return the submitted problem ID, but unlike :meth:`.id`, block until the
+        ID becomes known, or until `timeout` expires.
+
+        Args:
+            timeout (float, default=None):
+                Timeout in seconds. By default, wait indefinitely for problem
+                id to become known/available.
+
+        Returns:
+            str:
+                Problem ID, as returned by SAPI.
+
+        Raises:
+            :exc:`concurrent.futures.TimeoutError`:
+                When `timeout` exceeded, and problem id not ready.
+
+        """
+        if not self._id_ready_event.wait(timeout=timeout):
+            raise TimeoutError("problem id not available yet")
+
+        return self._id
+
+    @property
+    def id(self):
+        """Simple non-blocking id getter for backward compat."""
+        return self._id
+
+    @id.setter
+    def id(self, value):
+        """Sets the problem ID, notifying the related event."""
+        self._id = value
+
+        # notify ID is set/ready
+        if value is not None:
+            self._id_ready_event.set()
 
     def result(self):
         """Results for a submitted job.

@@ -28,9 +28,11 @@ from dateutil.tz import UTC
 from dateutil.parser import parse as parse_datetime
 from requests.structures import CaseInsensitiveDict
 from requests.exceptions import HTTPError
+from concurrent.futures import TimeoutError
 
 from dwave.cloud.utils import evaluate_ising, generate_const_ising_problem
 from dwave.cloud.client import Client, Solver
+from dwave.cloud.computation import Future
 from dwave.cloud.exceptions import SolverFailureError, CanceledFutureError
 from dwave.cloud.testing import mock
 
@@ -702,3 +704,65 @@ class MockCancel(unittest.TestCase):
                         self.assertEqual(event.body, '["{}"]'.format(submission_id))
                     else:
                         self.assertEqual(event.url, 'problems/{}/'.format(submission_id))
+
+
+class TestComputationID(unittest.TestCase):
+
+    def test_id_getter_setter(self):
+        """Future.get_id/get_id works in isolation as expected."""
+
+        f = Future(solver=None, id_=None)
+
+        # f.id should be None
+        self.assertIsNone(f.id)
+        with self.assertRaises(TimeoutError):
+            f.wait_id(timeout=1)
+
+        # set it
+        submission_id = 'test-id'
+        f.id = submission_id
+
+        # validate it's available
+        self.assertEqual(f.wait_id(), submission_id)
+        self.assertEqual(f.wait_id(timeout=1), submission_id)
+        self.assertEqual(f.id, submission_id)
+
+    def test_id_integration(self):
+        """Problem ID getter blocks correctly when ID set by the client."""
+
+        submission_id = 'test-id'
+        solver_name = 'solver-id'
+        release_reply = threading.Event()
+
+        # each thread can have its instance of a session because
+        # we use a global lock (event) in the mocked responses
+        def create_mock_session(client):
+            session = mock.Mock()
+
+            # delayed submit; emulates waiting in queue
+            def post(path, _):
+                release_reply.wait()
+                reply_body = complete_reply(submission_id, solver_name)
+                return choose_reply(path, {'problems/': '[%s]' % reply_body})
+
+            session.post = post
+
+            return session
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data(solver_name))
+
+                linear, quadratic = test_problem(solver)
+
+                future = solver.sample_ising(linear, quadratic)
+
+                # initially, the id is not available
+                with self.assertRaises(TimeoutError):
+                    future.wait_id(timeout=1)
+
+                # release the mocked sapi reply with the id
+                release_reply.set()
+
+                # verify the id is now available
+                self.assertEqual(future.wait_id(), submission_id)
