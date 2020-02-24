@@ -33,12 +33,6 @@ matrix:
       env: TOXENV=py35
       deploy:
 
-    - os: linux
-      sudo: required
-      python: "2.7"
-      env: TOXENV=py27
-      deploy:
-
     - os: osx
       osx_image: xcode10.2    # Python 3.7.2 running on macOS 10.14.3
       language: generic
@@ -49,19 +43,8 @@ matrix:
         - source env/bin/activate
       deploy:
 
-    - os: osx
-      language: generic
-      env: TOXENV=py27
-      before_install:
-        - pip install virtualenv
-        - virtualenv env -p python2
-        - source env/bin/activate
-      deploy:
-
   allow_failures:
     - python: "nightly"
-    - os: osx
-      env: TOXENV=py27
 
 install:
   - pip install --upgrade setuptools
