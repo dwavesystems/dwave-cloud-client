@@ -47,6 +47,7 @@ Methods
 
    client.Client.from_config
    client.Client.solvers
+   client.Client.retrieve_answer
    client.Client.get_solver
    client.Client.get_solvers
    client.Client.is_solver_handled

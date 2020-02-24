@@ -68,6 +68,7 @@ import six
 
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
+from dwave.cloud.computation import Future
 from dwave.cloud.config import load_config, legacy_load_config, parse_float
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
@@ -653,6 +654,21 @@ class Client(object):
             # propagate all other/decoding errors, like InvalidAPIResponseError, etc.
 
         return solvers
+
+    def retrieve_answer(self, id_):
+        """Retrieve a problem by id.
+        
+        Args:
+            id_ (str):
+                As returned by :attr:`Future.id`.
+
+        Returns:
+            :class:`Future`
+        
+        """
+        future = Future(None, id_)
+        self._load(future)
+        return future
 
     def get_solvers(self, refresh=False, order_by='avg_load', **filters):
         """Return a filtered list of solvers handled by this client.
@@ -1241,6 +1257,14 @@ class Client(object):
 
                 # If the message is complete, forward it to the future object
                 if 'answer' in message:
+
+                    # If the future does not know which solver it's associated
+                    # with, we get it from the info provided from the server.
+                    # An alternative to making this call here would be to pass
+                    # self in with the message
+                    if future.solver is None:
+                        future.solver = self.get_solver(name=message['solver'])
+
                     future._set_message(message)
                 # If the problem is complete, but we don't have the result data
                 # put the problem in the queue for loading results.
