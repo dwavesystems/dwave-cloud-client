@@ -524,10 +524,12 @@ def upload(config_file, profile, problem_id, format, input_file):
               help='List available contrib (non-OSS) packages')
 @click.option('--all', '-a', 'install_all', default=False, is_flag=True,
               help='Install all contrib (non-OSS) packages')
+@click.option('--accept-license', '--yes', '-y', default=False, is_flag=True,
+              help='Accept license(s) without prompting')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Increase output verbosity')
 @click.argument('packages', nargs=-1)
-def install(list_all, install_all, verbose, packages):
+def install(list_all, install_all, accept_license, verbose, packages):
     """Install optional non-open-source Ocean packages."""
 
     contrib = get_contrib_packages()
@@ -555,14 +557,14 @@ def install(list_all, install_all, verbose, packages):
         click.echo('Nothing to do. Try "dwave install --help".')
         return
 
-    # check all packages are registered/available
+    # check all packages requested are registered/available
     for pkg in packages:
         if pkg not in contrib:
             click.echo("Package {!r} not found.".format(pkg))
             return 1
 
     for pkg in packages:
-        _install_contrib_package(pkg, verbose=verbose)
+        _install_contrib_package(pkg, verbose=verbose, prompt=not accept_license)
 
 
 def _is_pip_package_installed(requirement):
@@ -630,11 +632,12 @@ def _install_contrib_package(name, verbose=False, prompt=True):
 
 
 @cli.command()
-@click.option('--accept-all', '--all', '-a', default=False,
-              is_flag=True, help='Install all non-open-source packages available')
+@click.option('--install-all', '--all', '-a', default=False, is_flag=True,
+              help='Install all non-open-source packages '\
+                   'available and accept licenses without prompting')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Increase output verbosity')
-def setup(accept_all, verbose):
+def setup(install_all, verbose):
     """Setup optional Ocean packages and configuration file(s)."""
 
     contrib = get_contrib_packages()
@@ -642,7 +645,7 @@ def setup(accept_all, verbose):
 
     if not packages:
         install = False
-    elif accept_all:
+    elif install_all:
         click.echo("Installing all optional non-open-source packages.\n")
         install = True
     else:
@@ -657,7 +660,7 @@ def setup(accept_all, verbose):
 
     if install:
         for pkg in packages:
-            _install_contrib_package(pkg, verbose=verbose, prompt=not accept_all)
+            _install_contrib_package(pkg, verbose=verbose, prompt=not install_all)
 
     click.echo("Creating the D-Wave configuration file.")
     return _config_create(config_file=None, profile=None)
