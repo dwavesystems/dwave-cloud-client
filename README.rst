@@ -65,7 +65,7 @@ Installation
 
 .. installation-start-marker
 
-Compatible with Python 2 and 3:
+Tested on Python 3.5+ (Python 2 support is not guaranteed):
 
 .. code-block:: bash
 
