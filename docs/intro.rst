@@ -22,7 +22,7 @@ Configuration
 =============
 
 It's recommended you set up your D-Wave Cloud Client configuration through the
-:ref:`interactive CLI utility <interactiveCliConfiguration>`.
+:std:doc:`interactive CLI utility <oceandocs:docs_cli>`.
 
 As described in the :std:doc:`Using a D-Wave System <oceandocs:overview/dwavesys>` section
 of Ocean Documentation, for your code to access remote D-Wave compute resources, you must
@@ -67,7 +67,7 @@ data and configuration folders see the homebase_ tool.)
 .. _homebase: https://github.com/dwavesystems/homebase
 
 You can check the directories searched by :func:`~dwave.cloud.config.get_configfile_paths`
-from a console using the :ref:`interactive CLI utility <interactiveCliConfiguration>`;
+from a console using the :std:doc:`interactive CLI utility <oceandocs:docs_cli>`;
 for example::
 
   $ dwave config ls -m
@@ -124,33 +124,6 @@ variables; for example:
 
 For details on supported environment variables and prioritizing between these and
 values set explicitly or through a configuration file, see :mod:`dwave.cloud.config`.
-
-.. _interactiveCliConfiguration:
-
-Interactive CLI Configuration
------------------------------
-
-As part of the installation of the D-Wave Cloud Client package, a `dwave` executable
-is installed; for example, in a virtual environment it might be installed as
-`<virtual_environment>\\Scripts\\dwave.exe`. Running this file from your system's
-console opens an interactive command line interface (CLI) that guides you through
-setting up a D-Wave Cloud Client configuration file. It also provides additional helpful
-functionality; for example:
-
-* List and update existing configuration files on your system
-* Establish a connection to (ping) a solver and return timing information
-* Show information on configured solvers
-
-Run *dwave* -\\-\ *help* for information on all the CLI options.
-
-.. note:: If you work in a Bash shell and want command completion for `dwave`, add
-
-          .. code-block:: bash
-
-             eval "$(_DWAVE_COMPLETE=source <path>/dwave)"
-
-          to your shell's `.bashrc` configuration file, where `<path>` is the absolute
-          path to the installed `dwave` executable, for example `/home/Mary/my-quantum-app/env/bin`.
 
 Work Flow
 =========

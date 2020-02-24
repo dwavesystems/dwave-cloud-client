@@ -29,7 +29,7 @@ Managing Files
 
 These functions manage your D-Wave Cloud Client configuration files.
 It's recommended you set up your configuration through the
-:ref:`interactive CLI utility <interactiveCliConfiguration>` instead.
+:std:doc:`interactive CLI utility <oceandocs:docs_cli>` instead.
 
 .. autosummary::
    :toctree: generated
