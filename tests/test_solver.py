@@ -84,10 +84,11 @@ class PropertyLoading(unittest.TestCase):
             solver = client.get_solver()
 
             if solver.qpu:
-                dnr = solver.max_num_reads()
-                # double the anneal_time
-                anneal_time = 2*solver.properties['default_annealing_time']
-                self.assertEqual(dnr // 2, self.max_num_reads(annealing_time=anneal_time))
+                # for lower anneal time num_reads is bounded by num_reads_range
+                anneal_time = 10 * solver.properties['default_annealing_time']
+                num_reads = solver.max_num_reads(annealing_time=anneal_time)
+                # doubling the anneal_time, num_reads halves
+                self.assertEqual(num_reads // 2, solver.max_num_reads(annealing_time=2*anneal_time))
             else:
                 self.assertEqual(solver.max_num_reads(),
                                  solver.properties['num_reads_range'][1])
