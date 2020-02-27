@@ -27,6 +27,11 @@ from datetime import datetime
 
 import numpy
 
+try:
+    import dimod
+except ImportError:
+    dimod = None
+
 from dwave.cloud.utils import evaluate_ising, generate_random_ising_problem
 from dwave.cloud.client import Client
 from dwave.cloud.exceptions import (
@@ -182,6 +187,25 @@ class Submission(_QueryTest):
                 quad = {key: value for key, value in quad.items() if index not in key}
 
             self._submit_and_check(solver, linear, quad)
+
+    @unittest.skipUnless(dimod, "dimod required for 'Solver.sample_bqm'")
+    def test_submit_bqm_problem(self):
+        """Submit a problem with all supported coefficients set."""
+
+        with Client(**config) as client:
+            solver = client.get_solver()
+
+            linear, quad = generate_random_ising_problem(solver)
+
+            bqm = dimod.BinaryQuadraticModel.from_ising(linear, quad)
+            results = solver.sample_bqm(bqm, num_reads=100)
+
+            # Did we get the right number of samples?
+            self.assertEqual(100, sum(results.occurrences))
+
+            # Make sure the number of occurrences and energies are all correct
+            for energy, state in zip(results.energies, results.samples):
+                self.assertAlmostEqual(energy, evaluate_ising(linear, quad, state))
 
     def test_reverse_annealing(self):
         with Client(**config) as client:
