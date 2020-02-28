@@ -27,6 +27,11 @@ from datetime import datetime
 
 import numpy
 
+try:
+    import dimod
+except ImportError:
+    dimod = None
+
 from dwave.cloud.utils import evaluate_ising, generate_random_ising_problem
 from dwave.cloud.client import Client
 from dwave.cloud.exceptions import (
@@ -79,10 +84,11 @@ class PropertyLoading(unittest.TestCase):
             solver = client.get_solver()
 
             if solver.qpu:
-                dnr = solver.max_num_reads()
-                # double the anneal_time
-                anneal_time = 2*solver.properties['default_annealing_time']
-                self.assertEqual(dnr // 2, self.max_num_reads(annealing_time=anneal_time))
+                # for lower anneal time num_reads is bounded by num_reads_range
+                anneal_time = 10 * solver.properties['default_annealing_time']
+                num_reads = solver.max_num_reads(annealing_time=anneal_time)
+                # doubling the anneal_time, num_reads halves
+                self.assertEqual(num_reads // 2, solver.max_num_reads(annealing_time=2*anneal_time))
             else:
                 self.assertEqual(solver.max_num_reads(),
                                  solver.properties['num_reads_range'][1])
@@ -182,6 +188,25 @@ class Submission(_QueryTest):
                 quad = {key: value for key, value in quad.items() if index not in key}
 
             self._submit_and_check(solver, linear, quad)
+
+    @unittest.skipUnless(dimod, "dimod required for 'Solver.sample_bqm'")
+    def test_submit_bqm_problem(self):
+        """Submit a problem with all supported coefficients set."""
+
+        with Client(**config) as client:
+            solver = client.get_solver()
+
+            linear, quad = generate_random_ising_problem(solver)
+
+            bqm = dimod.BinaryQuadraticModel.from_ising(linear, quad)
+            results = solver.sample_bqm(bqm, num_reads=100)
+
+            # Did we get the right number of samples?
+            self.assertEqual(100, sum(results.occurrences))
+
+            # Make sure the number of occurrences and energies are all correct
+            for energy, state in zip(results.energies, results.samples):
+                self.assertAlmostEqual(energy, evaluate_ising(linear, quad, state))
 
     def test_reverse_annealing(self):
         with Client(**config) as client:

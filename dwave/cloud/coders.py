@@ -28,7 +28,7 @@ from dwave.cloud.utils import (
 __all__ = ['encode_problem_as_qp', 'decode_qp', 'decode_qp_numpy']
 
 
-def encode_problem_as_qp(solver, linear, quadratic):
+def encode_problem_as_qp(solver, linear, quadratic, undirected_biases=False):
     """Encode the binary quadratic problem for submission to a given solver,
     using the `qp` format for data.
 
@@ -41,6 +41,9 @@ def encode_problem_as_qp(solver, linear, quadratic):
 
         quadratic (dict[(variable, variable), bias]):
             Quadratic terms of the model.
+
+        undirected_biases (boolean, default=False):
+            Are (quadratic) biases specified on undirected edges?
 
     Returns:
         encoded submission dictionary
@@ -56,14 +59,23 @@ def encode_problem_as_qp(solver, linear, quadratic):
     nan = float('nan')
     lin = [uniform_get(linear, qubit, 0 if qubit in active else nan)
            for qubit in solver._encoding_qubits]
+
     lin = base64.b64encode(struct.pack('<' + ('d' * len(lin)), *lin))
 
     # Encode the coefficients of the quadratic terms of the objective
     # in the same manner as the linear terms, in the order given by the
     # _encoding_couplers property, discarding tailing zero couplings
-    quad = [quadratic.get((q1,q2), 0) + quadratic.get((q2,q1), 0)
-            for (q1,q2) in solver._encoding_couplers
-            if q1 in active and q2 in active]
+    if undirected_biases:
+        # quadratic biases are given in a triangular or symmetric matrix
+        quad = [quadratic.get((q1,q2), quadratic.get((q2,q1), 0))
+                for (q1,q2) in solver._encoding_couplers
+                if q1 in active and q2 in active]
+    else:
+        # quadratic biases are defined on directed edges, conflate with sum
+        quad = [quadratic.get((q1,q2), 0) + quadratic.get((q2,q1), 0)
+                for (q1,q2) in solver._encoding_couplers
+                if q1 in active and q2 in active]
+
     quad = base64.b64encode(struct.pack('<' + ('d' * len(quad)), *quad))
 
     # The name for this encoding is 'qp' and is explicitly included in the

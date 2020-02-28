@@ -657,10 +657,11 @@ class StructuredSolver(BaseSolver):
                                "Re-install the library with 'bqm' support.")
 
         ising = bqm.spin
-        return self.sample_ising(ising.linear, ising.quadratic, **params)
+        return self._sample('ising', ising.linear, ising.quadratic, params,
+                            undirected_biases=True)
 
-    def _sample(self, type_, linear, quadratic, params):
-        """Internal method for `sample_ising` and `sample_qubo`.
+    def _sample(self, type_, linear, quadratic, params, undirected_biases=False):
+        """Internal method for `sample_ising`, `sample_qubo` and `sample_bqm`.
 
         Args:
             linear (list/dict):
@@ -669,8 +670,13 @@ class StructuredSolver(BaseSolver):
             quadratic (dict[(int, int), float]):
                 Quadratic terms of the model.
 
-            **params:
+            params (dict):
                 Parameters for the sampling method, solver-specific.
+
+            undirected_biases (boolean, default=False):
+                Are (quadratic) biases specified on undirected edges? For
+                triangular or symmetric matrix of quadratic biases set it to
+                ``True``.
 
         Returns:
             :class:`Future`
@@ -697,7 +703,8 @@ class StructuredSolver(BaseSolver):
 
         body_data = json.dumps({
             'solver': self.id,
-            'data': encode_problem_as_qp(self, linear, quadratic),
+            'data': encode_problem_as_qp(self, linear, quadratic,
+                                         undirected_biases=undirected_biases),
             'type': type_,
             'params': combined_params
         })

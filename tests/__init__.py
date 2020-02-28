@@ -24,7 +24,7 @@ try:
     # by default, use `test` profile from `tests/dwave.conf`,
     # with secrets (token) read from env
     default_config_path = os.path.join(os.path.dirname(__file__), 'dwave.conf')
-    default_config_profile = 'test'
+    default_config_profile = 'qpu'
 
     # allow manual override of config file and profile used for tests
     test_config_path = os.getenv('DWAVE_CONFIG_FILE', default_config_path)

@@ -147,6 +147,19 @@ class TestQPCoders(unittest.TestCase):
         # [0]
         self.assertEqual(request['quad'], self.encode_doubles([0]))
 
+    def test_qp_request_encoding_undirected_biases(self):
+        """Quadratic terms are correctly encoded when given as undirected biases."""
+
+        solver = get_structured_solver()
+        linear = {}
+        quadratic = {(0,3): -1, (3,0): -1}
+        request = encode_problem_as_qp(solver, linear, quadratic, undirected_biases=True)
+        self.assertEqual(request['format'], 'qp')
+        # [0, NaN, NaN, 0]
+        self.assertEqual(request['lin'],  self.encode_doubles([0, self.nan, self.nan, 0]))
+        # [-1]
+        self.assertEqual(request['quad'], self.encode_doubles([-1]))
+
     def test_qp_response_decoding(self):
         res = decode_qp(copy.deepcopy(self.res_msg))
 
