@@ -89,14 +89,14 @@ Examples:
     >>> from dwave.cloud import Client
     >>> client = Client.from_config(config_file='~/jane/my_path_to_config/my_cloud_conf.conf')  # doctest: +SKIP
     >>> # code that uses client
-    >>> client.close()
+    >>> client.close()   # doctest: +SKIP
 
     This second example auto-detects a configuration file on the local system following the
     user/system configuration paths of :func:`get_configfile_paths`. It passes through
     to the instantiated client an unrecognized key-value pair my_param=`my_value`.
 
     >>> from dwave.cloud import Client
-    >>> client = Client.from_config(my_param=`my_value`)
+    >>> client = Client.from_config(my_param="my_value")
     >>> # code that uses client
     >>> client.close()
 
