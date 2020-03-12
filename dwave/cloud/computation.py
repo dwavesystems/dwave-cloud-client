@@ -407,7 +407,7 @@ class Future(object):
             >>> computation = solver.sample_qubo(Q, num_reads=100)   # doctest: +SKIP
             >>> computation.wait(timeout=10)    # doctest: +SKIP
             False
-            >>> computation.remote_status
+            >>> computation.remote_status        # doctest: +SKIP
             'IN_PROGRESS'
             >>> computation.wait(timeout=10)    # doctest: +SKIP
             True
