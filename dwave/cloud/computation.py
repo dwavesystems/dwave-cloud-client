@@ -748,7 +748,7 @@ class Future(object):
                                "Re-install the library with 'bqm' support.")
 
         # filter inactive variables from samples
-        variables = set(self.variables)
+        variables = self.variables
         samples = [[sample[v] for v in variables] for sample in self.samples]
 
         # infer vartype from problem type
