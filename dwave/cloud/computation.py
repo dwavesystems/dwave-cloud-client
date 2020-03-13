@@ -756,8 +756,8 @@ class Future(object):
         vartype_from_problem_type = {'ising': 'SPIN', 'qubo': 'BINARY'}
         vartype = vartype_from_problem_type[self.problem_type]
 
-        # include timing in info
-        info = dict(timing=self.timing)
+        # include timing and id in info
+        info = dict(timing=self.timing, problem_id=self.id)
 
         sampleset = dimod.SampleSet.from_samples(
             (samples, variables), vartype=vartype,
