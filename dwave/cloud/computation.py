@@ -732,9 +732,8 @@ class Future(object):
         else:
             return [1] * len(result['solutions'])
 
-    @property
-    def sampleset(self):
-        """Return :class:`~dimod.SampleSet` representation of the results."""
+    def wait_sampleset(self):
+        """Blocking sampleset getter."""
 
         result = self._load_result()
         if 'sampleset' in result:
@@ -764,7 +763,29 @@ class Future(object):
             energy=self.energies, num_occurrences=self.occurrences,
             info=info, sort_labels=True)
 
-        self._result['sampleset'] = sampleset
+        # this means that samplesets retrieved BEFORE this function are called
+        # are not the same object as after, but it is a simpler implementation
+        self._result['sampleset'] = self._sampleset = sampleset
+
+        return sampleset
+
+    @property
+    def sampleset(self):
+        """Return :class:`~dimod.SampleSet` representation of the results."""
+
+        try:
+            return self._sampleset
+        except AttributeError:
+            pass
+
+        try:
+            import dimod
+        except ImportError:
+            raise RuntimeError("Can't construct SampleSet without dimod. "
+                               "Re-install the library with 'bqm' support.")
+
+        self._sampleset = sampleset = dimod.SampleSet.from_future(
+            self, lambda f: f.wait_sampleset())
 
         return sampleset
 
