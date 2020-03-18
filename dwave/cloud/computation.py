@@ -85,9 +85,9 @@ class Future(object):
 
         >>> from dwave.cloud import Client
         >>> client = Client.from_config()
-        >>> solver = client.get_solver()
-        >>> u, v = next(iter(solver.edges))
-        >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+        >>> solver = client.get_solver()        # doctest: +SKIP
+        >>> u, v = next(iter(solver.edges))     # doctest: +SKIP
+        >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}   # doctest: +SKIP
         >>> computation = solver.sample_qubo(Q, num_reads=100)   # doctest: +SKIP
         >>> computation.done()  # doctest: +SKIP
         False
@@ -259,9 +259,9 @@ class Future(object):
 
             >>> import dwave.cloud as dc
             >>> client = dc.Client.from_config()
-            >>> solver = client.get_solver()
-            >>> u, v = next(iter(solver.edges))
-            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            >>> solver = client.get_solver()      # doctest: +SKIP
+            >>> u, v = next(iter(solver.edges))   # doctest: +SKIP
+            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}    # doctest: +SKIP
             >>> computation = [solver.sample_qubo(Q, num_reads=1000),
             ...                solver.sample_qubo(Q, num_reads=50),
             ...                solver.sample_qubo(Q, num_reads=10)]   # doctest: +SKIP
@@ -356,9 +356,9 @@ class Future(object):
 
             >>> import dwave.cloud as dc
             >>> client = dc.Client.from_config()
-            >>> solver = client.get_solver()
-            >>> u, v = next(iter(solver.edges))
-            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            >>> solver = client.get_solver()       # doctest: +SKIP
+            >>> u, v = next(iter(solver.edges))    # doctest: +SKIP
+            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}    # doctest: +SKIP
             >>> computation = [solver.sample_qubo(Q, num_reads=1000),
             ...                solver.sample_qubo(Q, num_reads=50),
             ...                solver.sample_qubo(Q, num_reads=10)]   # doctest: +SKIP
@@ -401,13 +401,13 @@ class Future(object):
 
             >>> from dwave.cloud import Client
             >>> client = Client.from_config()
-            >>> solver = client.get_solver()
-            >>> u, v = next(iter(solver.edges))
-            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            >>> solver = client.get_solver()          # doctest: +SKIP
+            >>> u, v = next(iter(solver.edges))       # doctest: +SKIP
+            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}  # doctest: +SKIP
             >>> computation = solver.sample_qubo(Q, num_reads=100)   # doctest: +SKIP
             >>> computation.wait(timeout=10)    # doctest: +SKIP
             False
-            >>> computation.remote_status
+            >>> computation.remote_status        # doctest: +SKIP
             'IN_PROGRESS'
             >>> computation.wait(timeout=10)    # doctest: +SKIP
             True
@@ -434,9 +434,9 @@ class Future(object):
 
             >>> from dwave.cloud import Client
             >>> client = Client.from_config()
-            >>> solver = client.get_solver()
-            >>> u, v = next(iter(solver.edges))
-            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            >>> solver = client.get_solver()        # doctest: +SKIP
+            >>> u, v = next(iter(solver.edges))     # doctest: +SKIP
+            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}    # doctest: +SKIP
             >>> computation = solver.sample_qubo(Q, num_reads=100)   # doctest: +SKIP
             >>> computation.done()  # doctest: +SKIP
             False
@@ -460,9 +460,9 @@ class Future(object):
 
             >>> from dwave.cloud import Client
             >>> client = Client.from_config()
-            >>> solver = client.get_solver()
-            >>> u, v = next(iter(solver.edges))
-            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}
+            >>> solver = client.get_solver()          # doctest: +SKIP
+            >>> u, v = next(iter(solver.edges))       # doctest: +SKIP
+            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}   # doctest: +SKIP
             >>> computation = solver.sample_qubo(Q, num_reads=100)   # doctest: +SKIP
             >>> computation.cancel()  # doctest: +SKIP
             >>> computation.done()   # doctest: +SKIP
@@ -792,10 +792,10 @@ class Future(object):
             prints timing information for the job.
 
             >>> from dwave.cloud import Client
-            >>> with Client.from_config() as client:
+            >>> with Client.from_config() as client:      # doctest: +SKIP
             ...     solver = client.get_solver()
             ...     u, v = next(iter(solver.edges))
-            ...     computation = solver.sample_ising({u: -1, v: 1},{}, num_reads=5)   # doctest: +SKIP
+            ...     computation = solver.sample_ising({u: -1, v: 1},{}, num_reads=5)
             ...     print(computation.timing)
             ...
             {'total_real_time': 10961, 'anneal_time_per_run': 20, ...}
