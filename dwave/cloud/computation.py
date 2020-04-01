@@ -84,7 +84,7 @@ class Future(object):
         whether the sampling is completed.
 
         >>> from dwave.cloud import Client
-        >>> client = Client.from_config()
+        >>> client = Client.from_config()       # doctest: +SKIP
         >>> solver = client.get_solver()        # doctest: +SKIP
         >>> u, v = next(iter(solver.edges))     # doctest: +SKIP
         >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}   # doctest: +SKIP
@@ -95,7 +95,7 @@ class Future(object):
         u'1cefeb6d-ebd5-4592-87c0-4cc43ec03e27'
         >>> computation.done()   # doctest: +SKIP
         True
-        >>> client.close()
+        >>> client.close()       # doctest: +SKIP
     """
 
     def __init__(self, solver, id_, return_matrix=False):
@@ -258,7 +258,7 @@ class Future(object):
             :code:`first = next(Future.as_completed(computation))` instead.)
 
             >>> import dwave.cloud as dc
-            >>> client = dc.Client.from_config()
+            >>> client = dc.Client.from_config()  # doctest: +SKIP
             >>> solver = client.get_solver()      # doctest: +SKIP
             >>> u, v = next(iter(solver.edges))   # doctest: +SKIP
             >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}    # doctest: +SKIP
@@ -275,7 +275,7 @@ class Future(object):
             True
             >>> print(computation[2].done())   # doctest: +SKIP
             True
-            >>> client.close()
+            >>> client.close()         # doctest: +SKIP
 
         """
         if min_done is None:
@@ -355,7 +355,7 @@ class Future(object):
             yields timing information for each job as it completes.
 
             >>> import dwave.cloud as dc
-            >>> client = dc.Client.from_config()
+            >>> client = dc.Client.from_config()   # doctest: +SKIP
             >>> solver = client.get_solver()       # doctest: +SKIP
             >>> u, v = next(iter(solver.edges))    # doctest: +SKIP
             >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}    # doctest: +SKIP
@@ -369,7 +369,7 @@ class Future(object):
             {'total_real_time': 10816, ... 'qpu_readout_time_per_sample': 123}
             {'total_real_time': 26285, ... 'qpu_readout_time_per_sample': 123}
             ...
-            >>> client.close()
+            >>> client.close()       # doctest: +SKIP
 
         """
         not_done = fs
@@ -400,7 +400,7 @@ class Future(object):
             waiting for 10 seconds for sampling to complete.
 
             >>> from dwave.cloud import Client
-            >>> client = Client.from_config()
+            >>> client = Client.from_config()         # doctest: +SKIP
             >>> solver = client.get_solver()          # doctest: +SKIP
             >>> u, v = next(iter(solver.edges))       # doctest: +SKIP
             >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}  # doctest: +SKIP
@@ -413,7 +413,7 @@ class Future(object):
             True
             >>> computation.remote_status       # doctest: +SKIP
             'COMPLETED'
-            >>> client.close()
+            >>> client.close()         # doctest: +SKIP
         """
         return self._results_ready_event.wait(timeout)
 
@@ -433,16 +433,16 @@ class Future(object):
             couple of times whether sampling is completed.
 
             >>> from dwave.cloud import Client
-            >>> client = Client.from_config()
+            >>> client = Client.from_config()       # doctest: +SKIP
             >>> solver = client.get_solver()        # doctest: +SKIP
             >>> u, v = next(iter(solver.edges))     # doctest: +SKIP
-            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}    # doctest: +SKIP
+            >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}   # doctest: +SKIP
             >>> computation = solver.sample_qubo(Q, num_reads=100)   # doctest: +SKIP
             >>> computation.done()  # doctest: +SKIP
             False
             >>> computation.done()   # doctest: +SKIP
             True
-            >>> client.close()
+            >>> client.close()       # doctest: +SKIP
         """
         return self._results_ready_event.is_set()
 
@@ -459,7 +459,7 @@ class Future(object):
             (and in this case succeeds) to cancel it.
 
             >>> from dwave.cloud import Client
-            >>> client = Client.from_config()
+            >>> client = Client.from_config()         # doctest: +SKIP
             >>> solver = client.get_solver()          # doctest: +SKIP
             >>> u, v = next(iter(solver.edges))       # doctest: +SKIP
             >>> Q = {(u, u): -1, (u, v): 0, (v, u): 2, (v, v): -1}   # doctest: +SKIP
@@ -469,7 +469,7 @@ class Future(object):
             True
             >>> computation.remote_status    # doctest: +SKIP
             u'CANCELLED'
-            >>> client.close()
+            >>> client.close()      # doctest: +SKIP
 
         """
         # Don't need to cancel something already finished

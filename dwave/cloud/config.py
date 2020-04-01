@@ -96,9 +96,9 @@ Examples:
     to the instantiated client an unrecognized key-value pair my_param=`my_value`.
 
     >>> from dwave.cloud import Client
-    >>> client = Client.from_config(my_param="my_value")
+    >>> client = Client.from_config(my_param="my_value")    # doctest: +SKIP
     >>> # code that uses client
-    >>> client.close()
+    >>> client.close()      # doctest: +SKIP
 
     This third example instantiates two clients, for managing both QPU and software
     solvers. Common key-value pairs are taken from the defaults section of a shared
@@ -158,7 +158,7 @@ Examples:
         token = DEF-987654321987654321987654321
 
     >>> from dwave.cloud import Client
-    >>> client = Client.from_config()
+    >>> client = Client.from_config()  # doctest: +SKIP
     >>> client.default_solver   # doctest: +SKIP
     u'EXAMPLE_2000Q_SYSTEM_A'
     >>> client.endpoint  # doctest: +SKIP
@@ -745,7 +745,7 @@ def load_config(config_file=None, profile=None, client=None,
          'solver': 'EXAMPLE_2000Q_SYSTEM_A',
          'token': 'DEF-987654321987654321987654321',
          'headers': None}
-        >>> See which configuration file was loaded
+        ... # See which configuration file was loaded
         >>> config.get_configfile_paths()             # doctest: +SKIP
         ['C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf']
 
@@ -878,10 +878,10 @@ def legacy_load_config(profile=None, endpoint=None, token=None, solver=None,
         The following examples specify a profile and/or token.
 
         >>> # Explicitly specify a profile
-        >>> client = dwave.cloud.Client.from_config(profile='profile-b')
-        >>> # Will try to connect with the url `https://two.com` and the token `token-two`.
-        >>> client = dwave.cloud.Client.from_config(profile='profile-b', token='new-token')
-        >>> # Will try to connect with the url `https://two.com` and the token `new-token`.
+        >>> client = dwave.cloud.Client.from_config(profile='profile-b')  # doctest: +SKIP
+        ... # Will try to connect with the url `https://two.com` and the token `token-two`.
+        >>> client = dwave.cloud.Client.from_config(profile='profile-b', token='new-token')    # doctest: +SKIP
+        ... # Will try to connect with the url `https://two.com` and the token `new-token`.
 
     """
 

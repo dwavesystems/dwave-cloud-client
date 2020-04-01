@@ -133,9 +133,9 @@ class Client(object):
         a value for `token`.
 
         >>> from dwave.cloud import Client
-        >>> client = Client(token='secret')
+        >>> client = Client(token='secret')     # doctest: +SKIP
         >>> # code that uses client
-        >>> client.close()
+        >>> client.close()       # doctest: +SKIP
 
 
     """
@@ -311,7 +311,7 @@ class Client(object):
             >>> from dwave.cloud import Client
             >>> client = Client.from_config(config_file='~/jane/my_path_to_config/my_cloud_conf.conf')  # doctest: +SKIP
             >>> # code that uses client
-            >>> client.close()
+            >>> client.close()     # doctest: +SKIP
 
         """
 
@@ -535,9 +535,9 @@ class Client(object):
             some code (represented by a placeholder comment), and then closes the client.
 
             >>> from dwave.cloud import Client
-            >>> client = Client.from_config()
+            >>> client = Client.from_config()    # doctest: +SKIP
             >>> # code that uses client
-            >>> client.close()
+            >>> client.close()    # doctest: +SKIP
 
         """
         # Finish all the work that requires the connection
@@ -657,14 +657,14 @@ class Client(object):
 
     def retrieve_answer(self, id_):
         """Retrieve a problem by id.
-        
+
         Args:
             id_ (str):
                 As returned by :attr:`Future.id`.
 
         Returns:
             :class:`Future`
-        
+
         """
         future = Future(None, id_)
         self._load(future)
@@ -1050,7 +1050,7 @@ class Client(object):
             uses the default solver, the second explicitly selects another solver.
 
             >>> from dwave.cloud import Client
-            >>> client = Client.from_config()
+            >>> client = Client.from_config()    # doctest: +SKIP
             >>> client.get_solvers()   # doctest: +SKIP
             [Solver(id='2000Q_ONLINE_SOLVER1'), Solver(id='2000Q_ONLINE_SOLVER2')]
             >>> solver1 = client.get_solver()    # doctest: +SKIP
