@@ -656,9 +656,14 @@ class StructuredSolver(BaseSolver):
             raise RuntimeError("Can't sample from 'bqm' without dimod. "
                                "Re-install the library with 'bqm' support.")
 
-        ising = bqm.spin
-        return self._sample('ising', ising.linear, ising.quadratic, params,
-                            undirected_biases=True)
+        if bqm.vartype is dimod.SPIN:
+            return self._sample('ising', bqm.linear, bqm.quadratic, params,
+                                undirected_biases=True)
+        elif bqm.vartype is dimod.BINARY:
+            return self._sample('qubo', bqm.linear, bqm.quadratic, params,
+                                undirected_biases=True)
+        else:
+            raise TypeError("unknown/unsupported vartype")
 
     def _sample(self, type_, linear, quadratic, params, undirected_biases=False):
         """Internal method for `sample_ising`, `sample_qubo` and `sample_bqm`.
