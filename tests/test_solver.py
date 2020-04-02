@@ -190,23 +190,46 @@ class Submission(_QueryTest):
             self._submit_and_check(solver, linear, quad)
 
     @unittest.skipUnless(dimod, "dimod required for 'Solver.sample_bqm'")
-    def test_submit_bqm_problem(self):
-        """Submit a problem with all supported coefficients set."""
+    def test_submit_bqm_ising_problem(self):
+        """Submit an Ising BQM with all supported coefficients set."""
 
         with Client(**config) as client:
             solver = client.get_solver()
 
             linear, quad = generate_random_ising_problem(solver)
 
+            # sample ising as bqm
             bqm = dimod.BinaryQuadraticModel.from_ising(linear, quad)
-            results = solver.sample_bqm(bqm, num_reads=100)
+            response = solver.sample_bqm(bqm, num_reads=100)
+            sampleset = response.sampleset
 
             # Did we get the right number of samples?
-            self.assertEqual(100, sum(results.occurrences))
+            self.assertEqual(100, sum(response.occurrences))
 
             # Make sure the number of occurrences and energies are all correct
-            for energy, state in zip(results.energies, results.samples):
-                self.assertAlmostEqual(energy, evaluate_ising(linear, quad, state))
+            numpy.testing.assert_array_almost_equal(
+                bqm.energies(sampleset), sampleset.record.energy)
+
+    @unittest.skipUnless(dimod, "dimod required for 'Solver.sample_bqm'")
+    def test_submit_bqm_qubo_problem(self):
+        """Submit a QUBO BQM with all supported coefficients set."""
+
+        with Client(**config) as client:
+            solver = client.get_solver()
+
+            _, quad = generate_random_ising_problem(solver)
+
+            # sample qubo as bqm
+            bqm = dimod.BinaryQuadraticModel.from_qubo(quad)
+            response = solver.sample_bqm(bqm, num_reads=100)
+            sampleset = response.sampleset
+
+            # Did we get the right number of samples?
+            self.assertEqual(100, sum(response.occurrences))
+
+            # Make sure the number of occurrences and energies are all correct
+            numpy.testing.assert_array_almost_equal(
+                bqm.energies(sampleset), sampleset.record.energy)
 
     def test_reverse_annealing(self):
         with Client(**config) as client:
