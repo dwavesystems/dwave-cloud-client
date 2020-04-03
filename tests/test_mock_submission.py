@@ -36,6 +36,11 @@ try:
 except ImportError:
     dimod = None
 
+try:
+    import dimod
+except ImportError:
+    dimod = None
+
 from dwave.cloud.utils import evaluate_ising, generate_const_ising_problem
 from dwave.cloud.client import Client, Solver
 from dwave.cloud.computation import Future
@@ -907,6 +912,22 @@ class TestComputationID(unittest.TestCase):
                 # verify the id is now available
                 self.assertEqual(future.wait_id(), submission_id)
 
+    @unittest.skipUnless(dimod, "dimod required for 'Solver.sample_bqm'")
+    def test_sampleset_id(self):
+        f = Future(solver=None, id_=None)
+
+        # f.id should be None
+        self.assertIsNone(f.id)
+        with self.assertRaises(TimeoutError):
+            f.sampleset.wait_id(timeout=1)
+
+        # set it
+        submission_id = 'test-id'
+        f.id = submission_id
+
+        # validate it's available
+        self.assertEqual(f.sampleset.wait_id(), submission_id)
+        self.assertEqual(f.sampleset.wait_id(timeout=1), submission_id)
 
 @mock.patch('time.sleep', lambda *x: None)
 class TestOffsetHandling(_QueryTest):

@@ -825,6 +825,10 @@ class Future(object):
             energy=self.energies, num_occurrences=self.num_occurrences,
             info=info, sort_labels=True)
 
+        # the id is stored in the info field, but to be consistent with
+        # the samplesets constructed .from_future, we add the method as well
+        sampleset.wait_id = self.wait_id
+
         # this means that samplesets retrieved BEFORE this function are called
         # are not the same object as after, but it is a simpler implementation
         self._result['sampleset'] = self._sampleset = sampleset
@@ -833,7 +837,11 @@ class Future(object):
 
     @property
     def sampleset(self):
-        """Return :class:`~dimod.SampleSet` representation of the results."""
+        """Return :class:`~dimod.SampleSet` representation of the results.
+
+        Adds a `.wait_id` method to retrieve the id before the sampleset is
+        resolved.
+        """
 
         try:
             return self._sampleset
@@ -848,6 +856,9 @@ class Future(object):
 
         self._sampleset = sampleset = dimod.SampleSet.from_future(
             self, lambda f: f.wait_sampleset())
+
+        # propagate id to sampleset as well
+        sampleset.wait_id = self.wait_id
 
         return sampleset
 
