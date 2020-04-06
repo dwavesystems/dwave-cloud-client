@@ -217,17 +217,20 @@ class BaseSolver(object):
 
     @property
     def is_qpu(self):
-        warnings.warn("'is_qpu' property is deprecated in favor of 'qpu'.", DeprecationWarning)
+        warnings.warn("'is_qpu' property is deprecated in favor of 'qpu'."
+                      "It will be removed in 0.8.0.", DeprecationWarning)
         return self.qpu
 
     @property
     def is_software(self):
-        warnings.warn("'is_software' property is deprecated in favor of 'software'.", DeprecationWarning)
+        warnings.warn("'is_software' property is deprecated in favor of 'software'."
+                      "It will be removed in 0.8.0.", DeprecationWarning)
         return self.software
 
     @property
     def is_online(self):
-        warnings.warn("'is_online' property is deprecated in favor of 'online'.", DeprecationWarning)
+        warnings.warn("'is_online' property is deprecated in favor of 'online'."
+                      "It will be removed in 0.8.0.", DeprecationWarning)
         return self.online
 
 
