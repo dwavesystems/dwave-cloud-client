@@ -730,8 +730,8 @@ class Client(object):
         Feature `<name>` can be:
 
         1) a derived solver property, available as an identically named
-           :class:`Solver`'s property (`name`, `qpu`, `software`, `online`,
-           `num_active_qubits`, `avg_load`)
+           :class:`Solver`'s property (`name`, `qpu`, `hybrid`, `software`,
+           `online`, `num_active_qubits`, `avg_load`)
         2) a solver parameter, available in :obj:`Solver.parameters`
         3) a solver property, available in :obj:`Solver.properties`
         4) a path describing a property in nested dictionaries

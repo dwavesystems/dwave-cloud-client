@@ -133,7 +133,7 @@ class BaseSolver(object):
 
         # Derived solver properties (not present in solver data properties dict)
         self.derived_properties = {
-            'qpu', 'software', 'online', 'avg_load', 'name'
+            'qpu', 'hybrid', 'software', 'online', 'avg_load', 'name'
         }
 
     def __repr__(self):
