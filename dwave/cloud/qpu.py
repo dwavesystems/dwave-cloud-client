@@ -38,35 +38,37 @@ from dwave.cloud.computation import Future
 __all__ = ['Client']
 
 class Client(BaseClient):
-    """D-Wave API client specialized to work with QPU solvers.
+    """D-Wave API client specialized to work only with QPU solvers.
 
-    This class is instantiated by default, or explicitly when `client=qpu`, with the
-    typical base client instantiation :code:`with Client.from_config() as client:` of
-    a client. (You should not instantiate this class with `client=sw` or use it with 
-    solver feature constraint `software=True`.)
+    This class can be instantiated explicitly, or via (base) Client's factory
+    method, :meth:`~dwave.cloud.client.Client.from_config` by supplying
+    ``"qpu"`` for ``client``.
 
     Examples:
-        This example explicitly instantiates a :class:`dwave.cloud.qpu.client` based
-        on the local system`s default D-Wave Cloud Client configuration file to sample
-        a random Ising problem tailored to fit the client`s default solver`s graph.
+        This example explicitly instantiates a :class:`dwave.cloud.qpu.Client`.
+        :meth:`~dwave.cloud.client.Client.get_solver` is guaranteed to return a
+        QPU solver.
 
         .. code-block:: python
 
-            import random
             from dwave.cloud.qpu import Client
 
-            # Use context manager to ensure resources (thread pools used by Client) are released
-            with Client.from_config() as client:
-
+            with Client(token='...') as client:
                 solver = client.get_solver()
+                response = solver.sample_ising(...)
 
-                # Build problem to exactly fit the solver graph
-                linear = {index: random.choice([-1, 1]) for index in solver.nodes}
-                quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
+        The following example instantiates a QPU client indirectly. Again,
+        :meth:`~dwave.cloud.client.Client.get_solver`/
+        :meth:`~dwave.cloud.client.Client.get_solvers` are guaranteed to return
+        only QPU solver(s).
 
-                # Sample 100 times and print out the first sample
-                computation = solver.sample_ising(linear, quad, num_reads=100)
-                print(computation.samples[0])
+        .. code-block:: python
+
+            from dwave.cloud import Client
+
+            with Client.from_config(client='qpu') as client:
+                solver = client.get_solver()
+                response = solver.sample_ising(...)
 
     """
 
@@ -74,20 +76,7 @@ class Client(BaseClient):
     def is_solver_handled(solver):
         """Determine if the specified solver should be handled by this client.
 
-        This predicate function overrides superclass to filter out any non-QPU solvers.
-
-        Current implementation filters out D-Wave software clients with solver IDs
-        prefixed with `c4-sw`. If needed, update this method to suit your solver
-        naming scheme.
-
-        Examples:
-            This example filters solvers for those prefixed 2000Q.
-
-            .. code:: python
-
-                @staticmethod
-                def is_solver_handled(solver):
-                    return solver and solver.id.startswith('2000Q')
-
+        This predicate function (used from the base class) allows only remote
+        QPU solvers.
         """
         return solver and solver.qpu

@@ -29,36 +29,38 @@ __all__ = ['Client']
 
 
 class Client(BaseClient):
-    """D-Wave API client specialized to work with remote software solvers
+    """D-Wave API client specialized to work only with remote software solvers
     (samplers).
 
-    This class is instantiated by default, or explicitly when `client=sw`, with the
-    typical base client instantiation :code:`with Client.from_config() as client:` of
-    a client. (You should not instantiate this class with `client=qpu` or use it with
-    solver feature constraint `qpu=True`.)
+    This class can be instantiated explicitly, or via (base) Client's factory
+    method, :meth:`~dwave.cloud.client.Client.from_config` by supplying ``"sw"``
+    for ``client``.
 
     Examples:
-        This example indirectly instantiates a :class:`dwave.cloud.sw.client` based
-        on the local system`s default D-Wave Cloud Client configuration file to sample
-        a random Ising problem tailored to fit the client`s default solver`s graph.
+        This example explicitly instantiates a :class:`dwave.cloud.sw.Client`.
+        :meth:`~dwave.cloud.client.Client.get_solver` is guaranteed to return a
+        software solver.
 
         .. code-block:: python
 
-            import random
+            from dwave.cloud.sw import Client
+
+            with Client(token='...') as client:
+                solver = client.get_solver()
+                response = solver.sample_ising(...)
+
+        The following example instantiates a software-solver-only client
+        indirectly. Again, :meth:`~dwave.cloud.client.Client.get_solver`/
+        :meth:`~dwave.cloud.client.Client.get_solvers` are guaranteed to return
+        only software solver(s).
+
+        .. code-block:: python
+
             from dwave.cloud import Client
 
-            # Use context manager to ensure resources (thread pools used by Client) are released
-            with Client.from_config(solver={"software": True}) as client:
-
+            with Client.from_config(client='sw') as client:
                 solver = client.get_solver()
-
-                # Build problem to exactly fit the solver graph
-                linear = {index: random.choice([-1, 1]) for index in solver.nodes}
-                quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
-
-                # Sample 100 times and print out the first sample
-                computation = solver.sample_ising(linear, quad, num_reads=100)
-                print(computation.samples[0])
+                response = solver.sample_ising(...)
 
     """
 
@@ -66,20 +68,7 @@ class Client(BaseClient):
     def is_solver_handled(solver):
         """Determine if the specified solver should be handled by this client.
 
-        This predicate function overrides superclass to allow only remote software solvers.
-
-        Current implementation allows only D-Wave software clients with solver IDs
-        prefixed with `c4-sw`. If needed, update this method to suit your solver
-        naming scheme.
-
-        Examples:
-            This example filters solvers for those prefixed My_SW_Solver.
-
-            .. code:: python
-
-                @staticmethod
-                def is_solver_handled(solver):
-                    return solver and solver.id.startswith('My_SW_Solver')
-
+        This predicate function (used from the base class) allows only remote
+        software solvers.
         """
         return solver and solver.software
