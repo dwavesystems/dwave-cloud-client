@@ -131,20 +131,33 @@ class SolverLoading(unittest.TestCase):
             self.assertTrue(client.get_solver(software=True).software)
 
     def test_get_solver_no_defaults(self):
-        from dwave.cloud import qpu, sw
-        with qpu.Client(endpoint=config['endpoint'], token=config['token']) as client:
-            solvers = client.get_solvers(qpu=True)
-            if solvers:
-                self.assertEqual(client.get_solver(), solvers[0])
-            else:
-                self.assertRaises(SolverError, client.get_solver)
+        """Specialized client returns the correct solver by default."""
+        from dwave.cloud import qpu, sw, hybrid
 
-        with sw.Client(endpoint=config['endpoint'], token=config['token']) as client:
-            solvers = client.get_solvers(software=True)
-            if solvers:
-                self.assertEqual(client.get_solver(), solvers[0])
-            else:
-                self.assertRaises(SolverError, client.get_solver)
+        conf = dict(endpoint=config['endpoint'], token=config['token'])
+
+        with Client(**conf) as base_client:
+
+            with qpu.Client(**conf) as client:
+                solvers = base_client.get_solvers(qpu=True)
+                if solvers:
+                    self.assertEqual(client.get_solver().id, solvers[0].id)
+                else:
+                    self.assertRaises(SolverError, client.get_solver)
+
+            with sw.Client(**conf) as client:
+                solvers = base_client.get_solvers(software=True)
+                if solvers:
+                    self.assertEqual(client.get_solver().id, solvers[0].id)
+                else:
+                    self.assertRaises(SolverError, client.get_solver)
+
+            with hybrid.Client(**conf) as client:
+                solvers = base_client.get_solvers(hybrid=True)
+                if solvers:
+                    self.assertEqual(client.get_solver().id, solvers[0].id)
+                else:
+                    self.assertRaises(SolverError, client.get_solver)
 
 
 class ClientFactory(unittest.TestCase):
@@ -159,6 +172,7 @@ class ClientFactory(unittest.TestCase):
                 self.assertIsInstance(client, dwave.cloud.client.Client)
                 self.assertNotIsInstance(client, dwave.cloud.sw.Client)
                 self.assertNotIsInstance(client, dwave.cloud.qpu.Client)
+                self.assertNotIsInstance(client, dwave.cloud.hybrid.Client)
 
     def test_client_type(self):
         conf = {k: k for k in 'endpoint token'.split()}
@@ -179,11 +193,20 @@ class ClientFactory(unittest.TestCase):
             with dwave.cloud.sw.Client.from_config() as client:
                 self.assertIsInstance(client, dwave.cloud.sw.Client)
 
-            with dwave.cloud.Client.from_config(client='qpu') as client:
-                self.assertIsInstance(client, dwave.cloud.qpu.Client)
+            with dwave.cloud.hybrid.Client.from_config() as client:
+                self.assertIsInstance(client, dwave.cloud.hybrid.Client)
 
             with dwave.cloud.qpu.Client.from_config(client='base') as client:
                 self.assertIsInstance(client, dwave.cloud.client.Client)
+
+            with dwave.cloud.Client.from_config(client='qpu') as client:
+                self.assertIsInstance(client, dwave.cloud.qpu.Client)
+
+            with dwave.cloud.Client.from_config(client='sw') as client:
+                self.assertIsInstance(client, dwave.cloud.sw.Client)
+
+            with dwave.cloud.Client.from_config(client='hybrid') as client:
+                self.assertIsInstance(client, dwave.cloud.hybrid.Client)
 
     def test_custom_kwargs(self):
         conf = {k: k for k in 'endpoint token'.split()}
