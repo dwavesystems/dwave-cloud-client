@@ -29,8 +29,6 @@ SAPI server workflow is roughly as follows:
 
 """
 
-from __future__ import absolute_import
-
 from dwave.cloud.client import Client as BaseClient
 from dwave.cloud.solver import StructuredSolver as Solver
 from dwave.cloud.computation import Future

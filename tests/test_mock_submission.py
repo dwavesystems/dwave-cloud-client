@@ -14,8 +14,6 @@
 
 """Test problem submission against hard-coded replies with unittest.mock."""
 
-from __future__ import division, absolute_import, print_function, unicode_literals
-
 import time
 import json
 import unittest

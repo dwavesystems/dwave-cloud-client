@@ -19,8 +19,6 @@ Note:
     These are all aggregate tests, not really testing single units.
 """
 
-from __future__ import absolute_import, division
-
 import unittest
 import random
 from datetime import datetime

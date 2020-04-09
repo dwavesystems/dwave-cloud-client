@@ -27,8 +27,6 @@ Some :class:`Future` methods are blocking.
 
 """
 
-from __future__ import division, absolute_import
-
 import threading
 import time
 import six

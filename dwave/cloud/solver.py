@@ -28,8 +28,6 @@ You can list all solvers available to a :class:`~dwave.cloud.client.Client` with
 
 """
 
-from __future__ import division, absolute_import
-
 import json
 import logging
 import warnings

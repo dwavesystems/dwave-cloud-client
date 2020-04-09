@@ -14,8 +14,6 @@
 
 """Try to load solver data from mock servers."""
 
-from __future__ import division, absolute_import, print_function, unicode_literals
-
 import os
 import json
 import unittest

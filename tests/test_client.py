@@ -18,8 +18,6 @@ Tests the ability to connect to the SAPI server with the `dwave.cloud.qpu.Client
 test_mock_solver_loading.py duplicates some of these tests against a mock server.
 """
 
-from __future__ import absolute_import
-
 import json
 import time
 import unittest
