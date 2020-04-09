@@ -4,10 +4,6 @@ python-dateutil>=2.7
 click>=7
 plucky>=0.4.3
 
-# backports
-futures; python_version=="2.7"
-configparser; python_version=="2.7"
-
 # optional bqm support
 dimod>=0.8.15
 numpy>=1.16

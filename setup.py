@@ -24,9 +24,6 @@ extras_require = {
 
     # bqm support
     'bqm': ['dimod>=0.8.15', 'numpy>=1.16'],
-
-    # python2 backports
-    ':python_version == "2.7"': ['futures', 'configparser']
 }
 
 # Packages provided. Only include packages under the 'dwave' namespace.
