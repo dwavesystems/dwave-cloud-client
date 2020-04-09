@@ -31,6 +31,7 @@ import threading
 import time
 import six
 import functools
+import warnings
 from concurrent.futures import TimeoutError
 
 from dateutil.parser import parse
@@ -145,9 +146,9 @@ class Future(object):
         #: Status flag most recently returned by the server
         self.remote_status = None
 
-        # Data from the server after it is parsed (either data or an error)
+        # Data from the server after it's parsed
         self._result = None
-        self.error = None
+        self._exception = None
 
         # Event(s) to signal when the results are ready
         self._results_ready_event = threading.Event()
@@ -155,6 +156,10 @@ class Future(object):
 
         # current poll back-off interval, in seconds
         self._poll_backoff = None
+
+    @property
+    def error(self):
+        return self._exception
 
     # make Future ordered
 
@@ -173,20 +178,20 @@ class Future(object):
         The message from the server may actually be an error.
 
         Args:
-            message (dict): Data from the server from trying to complete query.
+            message (dict):
+                Data from the server from trying to complete query.
         """
         self._message = message
         self._signal_ready()
 
-    def _set_error(self, error, exc_info=None):
-        """Complete the future with an error.
+    def _set_exception(self, exception):
+        """Complete the future with an exception.
 
         Args:
-            error: An error string or exception object.
-            exc_info: Stack trace info from sys module for re-raising exceptions nicely.
+            exception (Exception):
+                Exception that caused the failure.
         """
-        self.error = error
-        self._exc_info = exc_info
+        self._exception = exception
         self._signal_ready()
 
     def _signal_ready(self):
@@ -581,6 +586,10 @@ class Future(object):
         self._load_result()
         return self._result
 
+    def exception(self):
+        if self._exception is not None:
+            raise self._exception
+
     @property
     def energies(self):
         """Energy buffer for the submitted job.
@@ -847,12 +856,8 @@ class Future(object):
             self.wait(timeout=None)
 
             # Check for other error conditions
-            if self.error is not None:
-                if self._exc_info is not None:
-                    six.reraise(*self._exc_info)
-                if isinstance(self.error, Exception):
-                    raise self.error
-                raise RuntimeError(self.error)
+            if self._exception is not None:
+                raise self._exception
 
             # If someone else took care of this while we were waiting
             if self._result is not None:

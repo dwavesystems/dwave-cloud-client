@@ -211,7 +211,7 @@ class MockSubmission(_QueryTest):
                 linear, quadratic = test_problem(solver)
                 results = solver.sample_ising(linear, quadratic, num_reads=100)
 
-                with self.assertRaises(ValueError):
+                with self.assertRaises(IOError):
                     results.samples
 
     def test_submit_ok_reply(self):

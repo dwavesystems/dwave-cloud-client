@@ -1117,7 +1117,7 @@ class Client(object):
                     # encoding failed, submit should fail as well
                     logger.info("Problem encoding prior to submit "
                                 "failed with: %r", exc)
-                    item.future._set_error(exc)
+                    item.future._set_exception(exc)
                     task_done()
 
                 else:
@@ -1179,7 +1179,7 @@ class Client(object):
                         exception = IOError(exception)
 
                     for mess in ready_problems:
-                        mess.future._set_error(exception, sys.exc_info())
+                        mess.future._set_exception(exception)
                         task_done()
                     continue
 
@@ -1289,10 +1289,10 @@ class Client(object):
                 else:
                     raise SolverFailureError(errmsg)
 
-        except Exception as error:
+        except Exception as exc:
             # If there were any unhandled errors we need to release the
             # lock in the future, otherwise deadlock occurs.
-            future._set_error(error, sys.exc_info())
+            future._set_exception(exc)
 
     def _cancel(self, id_, future):
         """Enqueue a problem to be canceled.
@@ -1334,10 +1334,10 @@ class Client(object):
                     except requests.exceptions.Timeout:
                         raise RequestTimeout
 
-                except Exception as err:
+                except Exception as exc:
                     for _, future in item_list:
                         if future is not None:
-                            future._set_error(err, sys.exc_info())
+                            future._set_exception(exc)
 
                 # Mark all the ids as processed regardless of success or failure.
                 [self._cancel_queue.task_done() for _ in item_list]
@@ -1499,7 +1499,7 @@ class Client(object):
                         exception = IOError(exception)
 
                     for id_ in frame_futures.keys():
-                        frame_futures[id_]._set_error(IOError(exception), sys.exc_info())
+                        frame_futures[id_]._set_exception(exception)
 
                 for id_ in frame_futures.keys():
                     task_done()
@@ -1558,7 +1558,7 @@ class Client(object):
                     if not isinstance(exception, SolverAuthenticationError):
                         exception = IOError(exception)
 
-                    future._set_error(IOError(exception), sys.exc_info())
+                    future._set_exception(exception)
                     continue
 
                 # Dispatch the results, mark the task complete
