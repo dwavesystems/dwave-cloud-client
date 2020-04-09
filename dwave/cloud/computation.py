@@ -157,8 +157,18 @@ class Future(object):
         # current poll back-off interval, in seconds
         self._poll_backoff = None
 
+    # TODO: remove in 0.9.0
     @property
     def error(self):
+        """Deprecated in favor of Future._exception and Future.exception().
+
+        Scheduled for removal in 0.9.0.
+        """
+        warnings.warn(
+            "'Future.error' is deprecated, and it will be removed "
+            "in 0.9.0. please convert your code to use 'Future.exception()'",
+            DeprecationWarning)
+
         return self._exception
 
     # make Future ordered
