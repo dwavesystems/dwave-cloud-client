@@ -13,7 +13,8 @@
 # limitations under the License.
 
 """
-Interface to hybrid :term:`sampler`s available through the D-Wave API.
+Interface to hybrid :term:`sampler`\ s available through the D-Wave Solver API
+(SAPI).
 """
 
 from __future__ import absolute_import
@@ -26,8 +27,8 @@ __all__ = ['Client']
 
 
 class Client(BaseClient):
-    """D-Wave API client specialized to work only with remote hybrid
-    quantum-classical solvers (samplers).
+    """D-Wave Solver API client specialized to work only with remote hybrid
+    quantum-classical solvers.
 
     This class can be instantiated explicitly, or via (base) Client's factory
     method, :meth:`~dwave.cloud.client.Client.from_config` by supplying

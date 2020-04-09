@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-An implementation of the REST API for D-Wave Solver API (SAPI) servers.
+An implementation of the REST client for D-Wave Solver API (SAPI) service.
 
 SAPI servers provide authentication, queuing, and scheduling services,
 and provide a network interface to :term:`solver`\ s. This API enables you submit
@@ -38,7 +38,7 @@ from dwave.cloud.computation import Future
 __all__ = ['Client']
 
 class Client(BaseClient):
-    """D-Wave API client specialized to work only with QPU solvers.
+    """D-Wave Solver API client specialized to work only with QPU solvers.
 
     This class can be instantiated explicitly, or via (base) Client's factory
     method, :meth:`~dwave.cloud.client.Client.from_config` by supplying
