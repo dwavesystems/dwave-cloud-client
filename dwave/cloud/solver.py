@@ -33,8 +33,6 @@ import logging
 import warnings
 from collections import Mapping
 
-import six
-
 from dwave.cloud.exceptions import *
 from dwave.cloud.coders import (
     encode_problem_as_qp, encode_problem_as_bq,
@@ -326,7 +324,7 @@ class UnstructuredSolver(BaseSolver):
 
         """
 
-        if isinstance(problem, six.string_types):
+        if isinstance(problem, str):
             problem_id = problem
         else:
             logger.debug("To encode the problem for submit via 'bqm-ref', "

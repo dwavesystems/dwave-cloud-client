@@ -69,9 +69,9 @@ class TestSimpleUtils(unittest.TestCase):
 
     def test_default_text_input(self):
         val = "value"
-        with mock.patch("six.moves.input", side_effect=[val], create=True):
+        with mock.patch("dwave.cloud.utils.input", side_effect=[val]):
             self.assertEqual(default_text_input("prompt", val), val)
-        with mock.patch("six.moves.input", side_effect=[val], create=True):
+        with mock.patch("dwave.cloud.utils.input", side_effect=[val]):
             self.assertEqual(default_text_input("prompt", val+val), val)
 
     def test_generate_random_ising_problem(self):

@@ -26,8 +26,6 @@ try:
 except ImportError:     # pragma: no cover
     import collections as abc
 
-import six
-
 __all__ = ['ChunkedData']
 
 logger = logging.getLogger(__name__)
@@ -353,7 +351,7 @@ class ChunkedData(object):
             raise ValueError("positive integer required for chunk size")
 
         # convenience string handler
-        if isinstance(data, six.string_types) and not isinstance(data, six.binary_type):
+        if isinstance(data, str) and not isinstance(data, bytes):
             data = data.encode('ascii')
 
         if isinstance(data, (bytes, bytearray)):

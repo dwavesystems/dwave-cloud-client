@@ -384,14 +384,14 @@ class DecodingMethod(_QueryTest):
 
     def setUp(self):
         """Reload the future module to undo any changes."""
-        from six.moves import reload_module
-        reload_module(dwave.cloud.computation)
+        from importlib import reload
+        reload(dwave.cloud.computation)
 
     @classmethod
     def tearDownClass(cls):
         """Reload the future module to undo any changes."""
-        from six.moves import reload_module
-        reload_module(dwave.cloud.computation)
+        from importlib import reload
+        reload(dwave.cloud.computation)
 
     def test_request_matrix_with_no_numpy(self):
         """Submit a problem using a dict for the linear terms."""

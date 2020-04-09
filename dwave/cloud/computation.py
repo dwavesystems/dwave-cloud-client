@@ -29,7 +29,6 @@ Some :class:`Future` methods are blocking.
 
 import threading
 import time
-import six
 import functools
 import warnings
 from concurrent.futures import TimeoutError

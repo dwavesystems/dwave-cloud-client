@@ -49,6 +49,7 @@ import requests
 import warnings
 import operator
 import collections
+import queue
 
 import base64
 import hashlib
@@ -61,8 +62,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 from dateutil.parser import parse as parse_datetime
 from plucky import pluck
-from six.moves import queue, range
-import six
 
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
@@ -394,7 +393,7 @@ class Client(object):
             solver_def = {}
         elif isinstance(solver, collections.Mapping):
             solver_def = solver
-        elif isinstance(solver, six.string_types):
+        elif isinstance(solver, str):
             # support features dict encoded as JSON in our config INI file
             # TODO: push this decoding to the config module, once we switch to a
             #       richer config format (JSON or YAML)
@@ -415,7 +414,7 @@ class Client(object):
             headers_dict = {}
         elif isinstance(headers, collections.Mapping):
             headers_dict = headers
-        elif isinstance(headers, six.string_types):
+        elif isinstance(headers, str):
             try:
                 # valid  headers = "Field-1: value-1\nField-2: value-2"
                 headers_dict = {key.strip(): val.strip()
@@ -961,7 +960,7 @@ class Client(object):
         sort_reverse = False
         if not order_by:
             sort_key = None
-        elif isinstance(order_by, six.string_types):
+        elif isinstance(order_by, str):
             if order_by[0] == '-':
                 sort_reverse = True
                 order_by = order_by[1:]

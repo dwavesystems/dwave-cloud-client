@@ -44,7 +44,7 @@ class TestCli(unittest.TestCase):
         with runner.isolated_filesystem():
             # create config file through simulated user input in `dwave configure`
             touch(config_file)
-            with mock.patch("six.moves.input", side_effect=values, create=True):
+            with mock.patch("dwave.cloud.utils.input", side_effect=values):
                 result = runner.invoke(cli, [
                     'config', 'create', '--config-file', config_file, '--profile', profile
                 ], input='\n'.join(values))

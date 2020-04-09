@@ -15,7 +15,7 @@ except SyntaxError:
 
 
 # Package requirements, minimal pinning
-install_requires = ['requests[socks]>=2.18', 'six>=1.10', 'homebase>=1.0',
+install_requires = ['requests[socks]>=2.18', 'homebase>=1.0',
                     'click>=7.0', 'python-dateutil>=2.7', 'plucky>=0.4.3']
 
 # Package extras requirements

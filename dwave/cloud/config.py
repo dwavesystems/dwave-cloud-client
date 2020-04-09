@@ -214,7 +214,6 @@ import os
 import configparser
 from collections import OrderedDict
 
-import six
 import homebase
 
 from dwave.cloud.utils import uniform_get
@@ -771,7 +770,7 @@ def load_config(config_file=None, profile=None, client=None,
         # handle ''/None/str/[str] for `config_file` (after env)
         filenames = None
         if config_file:
-            if isinstance(config_file, six.string_types):
+            if isinstance(config_file, str):
                 filenames = [config_file]
             else:
                 filenames = config_file
