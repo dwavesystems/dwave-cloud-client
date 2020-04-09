@@ -248,9 +248,10 @@ class Client(object):
                    section is promoted and selected.
 
             client (str, default=None):
-                Client type used for accessing the API. Supported values are ``qpu``
-                for :class:`dwave.cloud.qpu.Client` and ``sw`` for
-                :class:`dwave.cloud.sw.Client`.
+                Client type used for accessing the API. Supported values are
+                ``qpu`` for :class:`dwave.cloud.qpu.Client`, ``sw`` for
+                :class:`dwave.cloud.sw.Client` and ``hybrid`` for
+                :class:`dwave.cloud.hybrid.Client`.
 
             endpoint (str, default=None):
                 API endpoint URL.
@@ -292,8 +293,8 @@ class Client(object):
                 configuration file.
 
         Returns:
-            :class:`~dwave.cloud.client.Client` (:class:`dwave.cloud.qpu.Client` or :class:`dwave.cloud.sw.Client`, default=:class:`dwave.cloud.qpu.Client`):
-                Appropriate instance of a QPU or software client.
+            :class:`~dwave.cloud.client.Client` subclass:
+                Appropriate instance of a QPU/software/hybrid client.
 
         Raises:
             :exc:`~dwave.cloud.exceptions.ConfigFileReadError`:
@@ -339,8 +340,13 @@ class Client(object):
         # manual override of other (client-custom) arguments
         config.update(kwargs)
 
-        from dwave.cloud import qpu, sw
-        _clients = {'qpu': qpu.Client, 'sw': sw.Client, 'base': cls}
+        from dwave.cloud import qpu, sw, hybrid
+        _clients = {
+            'base': cls,
+            'qpu': qpu.Client,
+            'sw': sw.Client,
+            'hybrid': hybrid.Client,
+        }
         _client = config.pop('client', None) or 'base'
 
         logger.debug("Final config used for %s.Client(): %r", _client, config)
@@ -730,8 +736,8 @@ class Client(object):
         Feature `<name>` can be:
 
         1) a derived solver property, available as an identically named
-           :class:`Solver`'s property (`name`, `qpu`, `software`, `online`,
-           `num_active_qubits`, `avg_load`)
+           :class:`Solver`'s property (`name`, `qpu`, `hybrid`, `software`,
+           `online`, `num_active_qubits`, `avg_load`)
         2) a solver parameter, available in :obj:`Solver.parameters`
         3) a solver property, available in :obj:`Solver.properties`
         4) a path describing a property in nested dictionaries
@@ -823,9 +829,9 @@ class Client(object):
 
         Note:
             Client subclasses (e.g. :class:`dwave.cloud.qpu.Client` or
-            :class:`dwave.cloud.sw.Client`) already filter solvers by resource
-            type, so for `qpu` and `software` filters to have effect, call :meth:`.get_solvers`
-            on base class :class:`~dwave.cloud.client.Client`.
+            :class:`dwave.cloud.hybrid.Client`) already filter solvers by resource
+            type, so for `qpu` and `hybrid` filters to have effect, call :meth:`.get_solvers`
+            on base :class:`~dwave.cloud.client.Client` class.
 
         Examples::
 

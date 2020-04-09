@@ -1,4 +1,4 @@
-# Copyright 2017 D-Wave Systems Inc.
+# Copyright 2020 D-Wave Systems Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,62 +13,52 @@
 # limitations under the License.
 
 """
-An implementation of the REST client for D-Wave Solver API (SAPI) service.
-
-SAPI servers provide authentication, queuing, and scheduling services,
-and provide a network interface to :term:`solver`\ s. This API enables you submit
-a binary quadratic (:term:`Ising` or :term:`QUBO`) model
-and receive samples from a distribution over the model as defined by a
-selected solver.
-
-SAPI server workflow is roughly as follows:
-
- 1. Submitted problems enter an input queue. Each user has an input queue per solver.
- 2. Drawing from all input queues for a solver, problems are scheduled.
- 3. Results are cached for retrieval by the client.
-
+Interface to hybrid :term:`sampler`\ s available through the D-Wave Solver API
+(SAPI).
 """
 
 from __future__ import absolute_import
 
 from dwave.cloud.client import Client as BaseClient
-from dwave.cloud.solver import StructuredSolver as Solver
+from dwave.cloud.solver import UnstructuredSolver as Solver
 from dwave.cloud.computation import Future
 
 __all__ = ['Client']
 
+
 class Client(BaseClient):
-    """D-Wave Solver API client specialized to work only with QPU solvers.
+    """D-Wave Solver API client specialized to work only with remote hybrid
+    quantum-classical solvers.
 
     This class can be instantiated explicitly, or via (base) Client's factory
     method, :meth:`~dwave.cloud.client.Client.from_config` by supplying
-    ``"qpu"`` for ``client``.
+    ``"hybrid"`` for ``client``.
 
     Examples:
-        This example explicitly instantiates a :class:`dwave.cloud.qpu.Client`.
+        This example explicitly instantiates a :class:`dwave.cloud.hybrid.Client`.
         :meth:`~dwave.cloud.client.Client.get_solver` is guaranteed to return a
-        QPU solver.
+        hybrid quantum-classical solver.
 
         .. code-block:: python
 
-            from dwave.cloud.qpu import Client
+            from dwave.cloud.hybrid import Client
 
             with Client(token='...') as client:
                 solver = client.get_solver()
-                response = solver.sample_ising(...)
+                response = solver.sample_bqm(...)
 
-        The following example instantiates a QPU client indirectly. Again,
+        The following example instantiates a hybrid client indirectly. Again,
         :meth:`~dwave.cloud.client.Client.get_solver`/
         :meth:`~dwave.cloud.client.Client.get_solvers` are guaranteed to return
-        only QPU solver(s).
+        only hybrid solver(s).
 
         .. code-block:: python
 
             from dwave.cloud import Client
 
-            with Client.from_config(client='qpu') as client:
+            with Client.from_config(client='hybrid') as client:
                 solver = client.get_solver()
-                response = solver.sample_ising(...)
+                response = solver.sample_bqm(...)
 
     """
 
@@ -77,6 +67,6 @@ class Client(BaseClient):
         """Determine if the specified solver should be handled by this client.
 
         This predicate function (used from the base class) allows only remote
-        QPU solvers.
+        hybrid quantum-classical solvers.
         """
-        return solver and solver.qpu
+        return solver and solver.hybrid

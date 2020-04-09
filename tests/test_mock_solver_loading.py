@@ -212,24 +212,33 @@ class MockSolverLoading(unittest.TestCase):
         # base client
         self.assertTrue(Client.is_solver_handled(solver_object('test', 'qpu')))
         self.assertTrue(Client.is_solver_handled(solver_object('test', 'software')))
+        self.assertTrue(Client.is_solver_handled(solver_object('test', 'hybrid')))
         self.assertTrue(Client.is_solver_handled(solver_object('test', 'whatever')))
         self.assertTrue(Client.is_solver_handled(None))
         # qpu client
         self.assertTrue(QPUClient.is_solver_handled(solver_object('test', 'qpu')))
         self.assertFalse(QPUClient.is_solver_handled(solver_object('test', 'software')))
+        self.assertFalse(QPUClient.is_solver_handled(solver_object('test', 'hybrid')))
         self.assertFalse(QPUClient.is_solver_handled(solver_object('test', 'whatever')))
         self.assertFalse(QPUClient.is_solver_handled(None))
         # sw client
         self.assertFalse(SoftwareClient.is_solver_handled(solver_object('test', 'qpu')))
         self.assertTrue(SoftwareClient.is_solver_handled(solver_object('test', 'software')))
+        self.assertFalse(SoftwareClient.is_solver_handled(solver_object('test', 'hybrid')))
         self.assertFalse(SoftwareClient.is_solver_handled(solver_object('test', 'whatever')))
         self.assertFalse(SoftwareClient.is_solver_handled(None))
 
     def test_solver_feature_properties(self):
         self.assertTrue(solver_object('solver', 'qpu').qpu)
+        self.assertTrue(solver_object('solver', 'QPU').qpu)
         self.assertFalse(solver_object('solver', 'qpu').software)
+        self.assertFalse(solver_object('solver', 'qpu').hybrid)
         self.assertFalse(solver_object('solver', 'software').qpu)
         self.assertTrue(solver_object('solver', 'software').software)
+        self.assertFalse(solver_object('solver', 'software').hybrid)
+        self.assertTrue(solver_object('solver', 'hybrid').hybrid)
+        self.assertFalse(solver_object('solver', 'hybrid').qpu)
+        self.assertFalse(solver_object('solver', 'hybrid').software)
 
         self.assertFalse(solver_object('solver').is_vfyc)
         self.assertEqual(solver_object('solver').num_qubits, 3)

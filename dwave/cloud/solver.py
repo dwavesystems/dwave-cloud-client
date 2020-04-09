@@ -133,7 +133,7 @@ class BaseSolver(object):
 
         # Derived solver properties (not present in solver data properties dict)
         self.derived_properties = {
-            'qpu', 'software', 'online', 'avg_load', 'name'
+            'qpu', 'hybrid', 'software', 'online', 'avg_load', 'name'
         }
 
     def __repr__(self):
@@ -216,18 +216,26 @@ class BaseSolver(object):
         return self.properties.get('category', '').lower() == 'software'
 
     @property
+    def hybrid(self):
+        "Is this a hybrid quantum-classical solver?"
+        return self.properties.get('category', '').lower() == 'hybrid'
+
+    @property
     def is_qpu(self):
-        warnings.warn("'is_qpu' property is deprecated in favor of 'qpu'.", DeprecationWarning)
+        warnings.warn("'is_qpu' property is deprecated in favor of 'qpu'."
+                      "It will be removed in 0.8.0.", DeprecationWarning)
         return self.qpu
 
     @property
     def is_software(self):
-        warnings.warn("'is_software' property is deprecated in favor of 'software'.", DeprecationWarning)
+        warnings.warn("'is_software' property is deprecated in favor of 'software'."
+                      "It will be removed in 0.8.0.", DeprecationWarning)
         return self.software
 
     @property
     def is_online(self):
-        warnings.warn("'is_online' property is deprecated in favor of 'online'.", DeprecationWarning)
+        warnings.warn("'is_online' property is deprecated in favor of 'online'."
+                      "It will be removed in 0.8.0.", DeprecationWarning)
         return self.online
 
 
