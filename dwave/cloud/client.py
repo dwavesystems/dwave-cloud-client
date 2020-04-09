@@ -857,6 +857,7 @@ class Client(object):
                 name__regex='.*2000.*',             # partial/regex-based solver name match
                 chip_id__regex='DW_.*',             # chip ID prefix must be DW_
                 topology__type__eq="chimera"        # topology.type must be chimera
+                topology__type="chimera"            # same as above, `eq` implied even for nested properties
             )
         """
 
