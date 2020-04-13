@@ -16,13 +16,13 @@
 
 import json
 import unittest
+from unittest import mock
 
 import dimod
 import numpy
 
 from dwave.cloud.client import Client
 from dwave.cloud.solver import UnstructuredSolver
-from dwave.cloud.testing import mock
 from dwave.cloud.concurrency import Present
 
 

@@ -16,10 +16,11 @@ import os
 import sys
 import unittest
 import configparser
+from unittest import mock
 from functools import partial
 
 from dwave.cloud.exceptions import ConfigFileParseError, ConfigFileReadError
-from dwave.cloud.testing import mock, iterable_mock_open
+from dwave.cloud.testing import iterable_mock_open
 from dwave.cloud.config import (
     get_configfile_paths, load_config_from_files, load_config)
 

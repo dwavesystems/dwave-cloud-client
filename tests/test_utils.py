@@ -14,6 +14,7 @@
 
 import logging
 import unittest
+from unittest import mock
 from collections import OrderedDict
 from itertools import count
 from datetime import datetime
@@ -22,7 +23,6 @@ from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_head, strip_tail,
     active_qubits, generate_random_ising_problem,
     default_text_input, utcnow, cached, retried, parse_loglevel)
-from dwave.cloud.testing import mock
 
 
 class TestSimpleUtils(unittest.TestCase):

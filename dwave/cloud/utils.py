@@ -20,25 +20,12 @@ import platform
 import itertools
 import numbers
 
-try:
-    import collections.abc as abc
-    from urllib.parse import urljoin
-except ImportError:     # pragma: no cover
-    # python 2
-    import collections as abc
-    from urlparse import urljoin
-
-try:
-    perf_counter = time.perf_counter
-except AttributeError:  # pragma: no cover
-    # python 2
-    perf_counter = time.time
-
+from collections import abc, OrderedDict
+from urllib.parse import urljoin
 from datetime import datetime
 from dateutil.tz import UTC
 from functools import wraps
 from pkg_resources import iter_entry_points
-from collections import OrderedDict
 
 import click
 import requests
@@ -482,11 +469,11 @@ class tictoc(object):
     """Timer as a context manager."""
 
     def __enter__(self):
-        self.tick = perf_counter()
+        self.tick = time.perf_counter()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.dt = perf_counter() - self.tick
+        self.dt = time.perf_counter() - self.tick
 
 
 def parse_loglevel(level_name, default=logging.NOTSET):

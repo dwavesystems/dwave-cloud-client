@@ -12,16 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-import tempfile
 import os
 import json
+import tempfile
+import unittest
+from unittest import mock
 
 from click.testing import CliRunner
 
 from dwave.cloud.cli import cli
 from dwave.cloud.config import load_config
-from dwave.cloud.testing import mock, isolated_environ
+from dwave.cloud.testing import isolated_environ
 
 from tests import config, test_config_path, test_config_profile
 from tests.test_mock_solver_loading import solver_object

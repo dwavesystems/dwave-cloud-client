@@ -35,6 +35,7 @@ from dwave.cloud.computation import Future
 
 __all__ = ['Client']
 
+
 class Client(BaseClient):
     """D-Wave Solver API client specialized to work only with QPU solvers.
 

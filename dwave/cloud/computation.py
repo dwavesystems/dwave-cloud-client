@@ -31,9 +31,9 @@ import threading
 import time
 import functools
 import warnings
-from concurrent.futures import TimeoutError
 
 from dateutil.parser import parse
+from concurrent.futures import TimeoutError
 
 from dwave.cloud.utils import utcnow, datetime_to_timestamp
 from dwave.cloud.exceptions import InvalidAPIResponseError

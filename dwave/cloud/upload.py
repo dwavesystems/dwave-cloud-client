@@ -21,17 +21,14 @@ import logging
 import threading
 
 from abc import abstractmethod
-try:
-    import collections.abc as abc
-except ImportError:     # pragma: no cover
-    import collections as abc
+from collections.abc import Sized
 
 __all__ = ['ChunkedData']
 
 logger = logging.getLogger(__name__)
 
 
-class Gettable(abc.Sized):
+class Gettable(Sized):
     """Abstract base class for objects that implement standard and efficient
     item getters.
 

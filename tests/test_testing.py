@@ -15,8 +15,9 @@
 import os
 import uuid
 import unittest
+from unittest import mock
 
-from dwave.cloud.testing import isolated_environ, mock, iterable_mock_open
+from dwave.cloud.testing import isolated_environ, iterable_mock_open
 
 
 @mock.patch.dict(os.environ)

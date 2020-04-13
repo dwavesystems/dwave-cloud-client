@@ -21,6 +21,7 @@ import itertools
 import threading
 import collections
 
+from unittest import mock
 from datetime import datetime, timedelta
 from dateutil.tz import UTC
 from dateutil.parser import parse as parse_datetime
@@ -32,7 +33,6 @@ from dwave.cloud.utils import evaluate_ising, generate_const_ising_problem
 from dwave.cloud.client import Client, Solver
 from dwave.cloud.computation import Future
 from dwave.cloud.exceptions import SolverFailureError, CanceledFutureError
-from dwave.cloud.testing import mock
 
 
 def test_problem(solver):
