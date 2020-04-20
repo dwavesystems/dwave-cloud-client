@@ -574,7 +574,6 @@ def _is_pip_package_installed(requirement):
     assert len(reqs) == 1
     req = reqs[0]
 
-    # NOTE: py35+ required
     res = subprocess.run(
         [sys.executable, "-m", "pip", "show", req.name],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -619,7 +618,6 @@ def _install_contrib_package(name, verbose=False, prompt=True):
     click.echo('Installing: {}'.format(title))
     for req in pkg['requirements']:
 
-        # NOTE: py35+ required
         res = subprocess.run(
             [sys.executable, "-m", "pip", "install", req,
              "--extra-index", dwave_contrib_repo],

@@ -130,9 +130,9 @@ Examples:
     >>> client_qpu1 = Client.from_config(profile='backup-qpu')    # doctest: +SKIP
     >>> client_sw1 = Client.from_config(profile='sw-solver')   # doctest: +SKIP
     >>> client_qpu1.default_solver   # doctest: +SKIP
-    u'EXAMPLE_2000Q_SYSTEM_A'
+    'EXAMPLE_2000Q_SYSTEM_A'
     >>> client_qpu2.endpoint   # doctest: +SKIP
-    u'https://url.of.some.dwavesystem.com/sapi'
+    'https://url.of.some.dwavesystem.com/sapi'
     >>> # code that uses client
     >>> client_qpu1.close() # doctest: +SKIP
     >>> client_qpu2.close() # doctest: +SKIP
@@ -160,11 +160,11 @@ Examples:
     >>> from dwave.cloud import Client
     >>> client = Client.from_config()  # doctest: +SKIP
     >>> client.default_solver   # doctest: +SKIP
-    u'EXAMPLE_2000Q_SYSTEM_A'
+    'EXAMPLE_2000Q_SYSTEM_A'
     >>> client.endpoint  # doctest: +SKIP
-    u'https://int.se.dwavesystems.com/sapi'
+    'https://int.se.dwavesystems.com/sapi'
     >>> client.token  # doctest: +SKIP
-    u'DEF-987654321987654321987654321'
+    'DEF-987654321987654321987654321'
     >>> # code that uses client
     >>> client.close() # doctest: +SKIP
 
@@ -194,19 +194,19 @@ Examples:
     >>> import os
     >>> os.environ['DWAVE_API_SOLVER'] = 'EXAMPLE_2000Q_SYSTEM'   # doctest: +SKIP
     >>> dc.config.load_config("./dwave_c.conf")   # doctest: +SKIP
-    {'client': u'sw',
-     'endpoint': u'https://url.of.some.dwavesystem.com/sapi',
+    {'client': 'sw',
+     'endpoint': 'https://url.of.some.dwavesystem.com/sapi',
      'proxy': None,
      'headers': None,
      'solver': 'EXAMPLE_2000Q_SYSTEM',
-     'token': u'ABC-123456789123456789123456789'}
+     'token': 'ABC-123456789123456789123456789'}
     >>> dc.config.load_config("./dwave_c.conf", profile='dw2000b', solver='Solver3')   # doctest: +SKIP
-    {'client': u'qpu',
-     'endpoint': u'https://url.of.some.dwavesystem.com/sapi',
+    {'client': 'qpu',
+     'endpoint': 'https://url.of.some.dwavesystem.com/sapi',
      'proxy': None,
      'headers': None,
      'solver': 'Solver3',
-     'token': u'DEF-987654321987654321987654321'}
+     'token': 'DEF-987654321987654321987654321'}
 
 """
 
@@ -273,12 +273,12 @@ def get_configfile_paths(system=True, user=True, local=True, only_existing=True)
         >>> import dwave.cloud as dc
         >>> # Display paths
         >>> dc.config.get_configfile_paths(only_existing=False)   # doctest: +SKIP
-        [u'C:\\ProgramData\\dwavesystem\\dwave\\dwave.conf',
-         u'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf',
+        ['C:\\ProgramData\\dwavesystem\\dwave\\dwave.conf',
+         'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf',
          '.\\dwave.conf']
         >>> # Find existing files
         >>> dc.config.get_configfile_paths()   # doctest: +SKIP
-        [u'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf']
+        ['C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf']
 
     """
 
@@ -324,12 +324,12 @@ def get_configfile_path():
         >>> import dwave.cloud as dc
         >>> # Display paths
         >>> dc.config.get_configfile_paths(only_existing=False)   # doctest: +SKIP
-        [u'C:\\ProgramData\\dwavesystem\\dwave\\dwave.conf',
-         u'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf',
+        ['C:\\ProgramData\\dwavesystem\\dwave\\dwave.conf',
+         'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf',
          '.\\dwave.conf']
         >>> # Find highest-priority local configuration file
         >>> dc.config.get_configfile_path()   # doctest: +SKIP
-        u'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf'
+        'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf'
 
     """
     paths = get_configfile_paths()

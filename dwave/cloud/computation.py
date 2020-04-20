@@ -90,7 +90,7 @@ class Future(object):
         >>> computation.done()  # doctest: +SKIP
         False
         >>> computation.id   # doctest: +SKIP
-        u'1cefeb6d-ebd5-4592-87c0-4cc43ec03e27'
+        '1cefeb6d-ebd5-4592-87c0-4cc43ec03e27'
         >>> computation.done()   # doctest: +SKIP
         True
         >>> client.close()       # doctest: +SKIP
@@ -480,7 +480,7 @@ class Future(object):
             >>> computation.done()   # doctest: +SKIP
             True
             >>> computation.remote_status    # doctest: +SKIP
-            u'CANCELLED'
+            'CANCELLED'
             >>> client.close()      # doctest: +SKIP
 
         """
