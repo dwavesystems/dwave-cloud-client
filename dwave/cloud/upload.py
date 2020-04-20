@@ -14,8 +14,6 @@
 
 """Multipart upload helpers."""
 
-from __future__ import division
-
 import io
 import os
 import math
@@ -23,19 +21,14 @@ import logging
 import threading
 
 from abc import abstractmethod
-try:
-    import collections.abc as abc
-except ImportError:     # pragma: no cover
-    import collections as abc
-
-import six
+from collections.abc import Sized
 
 __all__ = ['ChunkedData']
 
 logger = logging.getLogger(__name__)
 
 
-class Gettable(abc.Sized):
+class Gettable(Sized):
     """Abstract base class for objects that implement standard and efficient
     item getters.
 
@@ -355,7 +348,7 @@ class ChunkedData(object):
             raise ValueError("positive integer required for chunk size")
 
         # convenience string handler
-        if isinstance(data, six.string_types) and not isinstance(data, six.binary_type):
+        if isinstance(data, str) and not isinstance(data, bytes):
             data = data.encode('ascii')
 
         if isinstance(data, (bytes, bytearray)):

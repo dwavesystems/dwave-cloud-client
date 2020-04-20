@@ -16,9 +16,9 @@
 
 import os
 import contextlib
+from unittest import mock
 
-__all__ = ['mock', 'iterable_mock_open', 'configparser_open_namespace',
-           'isolated_environ']
+__all__ = ['mock', 'iterable_mock_open', 'isolated_environ']
 
 
 def iterable_mock_open(read_data):
@@ -49,33 +49,10 @@ def iterable_mock_open(read_data):
             2
             3
     """
-    # python version specific
-    raise NotImplementedError
-
-
-# py2/3 mock support
-try:
-    # python 3
-    from unittest import mock
-
-    def iterable_mock_open(read_data):
-        m = mock.mock_open(read_data=read_data)
-        m.return_value.__iter__ = lambda self: self
-        m.return_value.__next__ = lambda self: next(iter(self.readline, ''))
-        return m
-
-    configparser_open_namespace = "configparser.open"
-
-except ImportError:  # pragma: no cover
-    # python 2
-    import mock
-
-    def iterable_mock_open(read_data):
-        m = mock.mock_open(read_data=read_data)
-        m.return_value.__iter__ = lambda self: iter(self.readline, '')
-        return m
-
-    configparser_open_namespace = "backports.configparser.open"
+    m = mock.mock_open(read_data=read_data)
+    m.return_value.__iter__ = lambda self: self
+    m.return_value.__next__ = lambda self: next(iter(self.readline, ''))
+    return m
 
 
 @contextlib.contextmanager

@@ -28,14 +28,10 @@ You can list all solvers available to a :class:`~dwave.cloud.client.Client` with
 
 """
 
-from __future__ import division, absolute_import
-
 import json
 import logging
 import warnings
-from collections import Mapping
-
-import six
+from collections import abc
 
 from dwave.cloud.exceptions import *
 from dwave.cloud.coders import (
@@ -328,7 +324,7 @@ class UnstructuredSolver(BaseSolver):
 
         """
 
-        if isinstance(problem, six.string_types):
+        if isinstance(problem, str):
             problem_id = problem
         else:
             logger.debug("To encode the problem for submit via 'bqm-ref', "
@@ -741,7 +737,7 @@ class StructuredSolver(BaseSolver):
             # that they match because lin can be either a list or a dict. In the future it would be
             # good to check.
             initial_state = params['initial_state']
-            if isinstance(initial_state, Mapping):
+            if isinstance(initial_state, abc.Mapping):
 
                 initial_state_list = [3]*self.properties['num_qubits']
 

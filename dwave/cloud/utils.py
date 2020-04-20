@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import division, absolute_import
-
 import sys
 import time
 import random
@@ -22,27 +20,13 @@ import platform
 import itertools
 import numbers
 
-try:
-    import collections.abc as abc
-    from urllib.parse import urljoin
-except ImportError:     # pragma: no cover
-    # python 2
-    import collections as abc
-    from urlparse import urljoin
-
-try:
-    perf_counter = time.perf_counter
-except AttributeError:  # pragma: no cover
-    # python 2
-    perf_counter = time.time
-
+from collections import abc, OrderedDict
+from urllib.parse import urljoin
 from datetime import datetime
 from dateutil.tz import UTC
 from functools import wraps
 from pkg_resources import iter_entry_points
-from collections import OrderedDict
 
-import six
 import click
 import requests
 
@@ -80,7 +64,7 @@ def evaluate_ising(linear, quad, state):
     energy = 0.0
     for index, value in uniform_iterator(linear):
         energy += state[index] * value
-    for (index_a, index_b), value in six.iteritems(quad):
+    for (index_a, index_b), value in quad.items():
         energy += value * state[index_a] * state[index_b]
     return energy
 
@@ -102,7 +86,7 @@ def active_qubits(linear, quadratic):
     """
 
     active = {idx for idx,bias in uniform_iterator(linear)}
-    for edge, _ in six.iteritems(quadratic):
+    for edge, _ in quadratic.items():
         active.update(edge)
     return active
 
@@ -133,7 +117,7 @@ def uniform_iterator(sequence):
     or (idx, value) on a `list`."""
 
     if isinstance(sequence, abc.Mapping):
-        return six.iteritems(sequence)
+        return sequence.items()
     else:
         return enumerate(sequence)
 
@@ -161,8 +145,8 @@ def reformat_qubo_as_ising(qubo):
 
     """
 
-    lin = {u: bias for (u, v), bias in six.iteritems(qubo) if u == v}
-    quad = {(u, v): bias for (u, v), bias in six.iteritems(qubo) if u != v}
+    lin = {u: bias for (u, v), bias in qubo.items() if u == v}
+    quad = {(u, v): bias for (u, v), bias in qubo.items() if u != v}
 
     return lin, quad
 
@@ -181,7 +165,7 @@ def strip_tail(sequence, values):
 def input_with_default(prompt, default, optional):
     line = ''
     while not line:
-        line = six.moves.input(prompt)
+        line = input(prompt)
         if not line:
             line = default
         if not line:
@@ -485,11 +469,11 @@ class tictoc(object):
     """Timer as a context manager."""
 
     def __enter__(self):
-        self.tick = perf_counter()
+        self.tick = time.perf_counter()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.dt = perf_counter() - self.tick
+        self.dt = time.perf_counter() - self.tick
 
 
 def parse_loglevel(level_name, default=logging.NOTSET):

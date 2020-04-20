@@ -39,8 +39,6 @@ Examples:
 
 """
 
-from __future__ import division, absolute_import
-
 import re
 import sys
 import time
@@ -51,6 +49,7 @@ import requests
 import warnings
 import operator
 import collections
+import queue
 
 import base64
 import hashlib
@@ -63,8 +62,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 from dateutil.parser import parse as parse_datetime
 from plucky import pluck
-from six.moves import queue, range
-import six
 
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
@@ -396,7 +393,7 @@ class Client(object):
             solver_def = {}
         elif isinstance(solver, collections.Mapping):
             solver_def = solver
-        elif isinstance(solver, six.string_types):
+        elif isinstance(solver, str):
             # support features dict encoded as JSON in our config INI file
             # TODO: push this decoding to the config module, once we switch to a
             #       richer config format (JSON or YAML)
@@ -417,7 +414,7 @@ class Client(object):
             headers_dict = {}
         elif isinstance(headers, collections.Mapping):
             headers_dict = headers
-        elif isinstance(headers, six.string_types):
+        elif isinstance(headers, str):
             try:
                 # valid  headers = "Field-1: value-1\nField-2: value-2"
                 headers_dict = {key.strip(): val.strip()
@@ -857,6 +854,7 @@ class Client(object):
                 name__regex='.*2000.*',             # partial/regex-based solver name match
                 chip_id__regex='DW_.*',             # chip ID prefix must be DW_
                 topology__type__eq="chimera"        # topology.type must be chimera
+                topology__type="chimera"            # same as above, `eq` implied even for nested properties
             )
         """
 
@@ -962,7 +960,7 @@ class Client(object):
         sort_reverse = False
         if not order_by:
             sort_key = None
-        elif isinstance(order_by, six.string_types):
+        elif isinstance(order_by, str):
             if order_by[0] == '-':
                 sort_reverse = True
                 order_by = order_by[1:]
@@ -1118,7 +1116,7 @@ class Client(object):
                     # encoding failed, submit should fail as well
                     logger.info("Problem encoding prior to submit "
                                 "failed with: %r", exc)
-                    item.future._set_error(exc)
+                    item.future._set_exception(exc)
                     task_done()
 
                 else:
@@ -1180,7 +1178,7 @@ class Client(object):
                         exception = IOError(exception)
 
                     for mess in ready_problems:
-                        mess.future._set_error(exception, sys.exc_info())
+                        mess.future._set_exception(exception)
                         task_done()
                     continue
 
@@ -1290,10 +1288,10 @@ class Client(object):
                 else:
                     raise SolverFailureError(errmsg)
 
-        except Exception as error:
+        except Exception as exc:
             # If there were any unhandled errors we need to release the
             # lock in the future, otherwise deadlock occurs.
-            future._set_error(error, sys.exc_info())
+            future._set_exception(exc)
 
     def _cancel(self, id_, future):
         """Enqueue a problem to be canceled.
@@ -1335,10 +1333,10 @@ class Client(object):
                     except requests.exceptions.Timeout:
                         raise RequestTimeout
 
-                except Exception as err:
+                except Exception as exc:
                     for _, future in item_list:
                         if future is not None:
-                            future._set_error(err, sys.exc_info())
+                            future._set_exception(exc)
 
                 # Mark all the ids as processed regardless of success or failure.
                 [self._cancel_queue.task_done() for _ in item_list]
@@ -1500,7 +1498,7 @@ class Client(object):
                         exception = IOError(exception)
 
                     for id_ in frame_futures.keys():
-                        frame_futures[id_]._set_error(IOError(exception), sys.exc_info())
+                        frame_futures[id_]._set_exception(exception)
 
                 for id_ in frame_futures.keys():
                     task_done()
@@ -1559,7 +1557,7 @@ class Client(object):
                     if not isinstance(exception, SolverAuthenticationError):
                         exception = IOError(exception)
 
-                    future._set_error(IOError(exception), sys.exc_info())
+                    future._set_exception(exception)
                     continue
 
                 # Dispatch the results, mark the task complete

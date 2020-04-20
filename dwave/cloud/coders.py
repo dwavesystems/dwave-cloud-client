@@ -12,15 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import division, absolute_import
-
 import zlib
 import json
 import struct
 import base64
 import codecs
-
-import six
 
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_tail, active_qubits)
@@ -267,7 +263,7 @@ def decode_qp_numpy(msg, return_matrix=True):
 
 
 def _encode_problem_as_bq_ref(problem):
-    assert isinstance(problem, six.string_types)
+    assert isinstance(problem, str)
 
     return problem
 
@@ -295,7 +291,7 @@ def encode_problem_as_bq(problem, compress=False):
         encoded submission dictionary
     """
 
-    if isinstance(problem, six.string_types):
+    if isinstance(problem, str):
         return {
             'format': 'bqm-ref',
             'data': _encode_problem_as_bq_ref(problem)

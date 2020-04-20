@@ -14,7 +14,6 @@
 
 import unittest
 
-from dwave.cloud.testing import mock
 from dwave.cloud.client import Client
 from dwave.cloud.solver import Solver
 from dwave.cloud.events import add_handler

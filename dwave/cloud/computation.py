@@ -27,15 +27,13 @@ Some :class:`Future` methods are blocking.
 
 """
 
-from __future__ import division, absolute_import
-
 import threading
 import time
-import six
 import functools
-from concurrent.futures import TimeoutError
+import warnings
 
 from dateutil.parser import parse
+from concurrent.futures import TimeoutError
 
 from dwave.cloud.utils import utcnow, datetime_to_timestamp
 from dwave.cloud.exceptions import InvalidAPIResponseError
@@ -92,7 +90,7 @@ class Future(object):
         >>> computation.done()  # doctest: +SKIP
         False
         >>> computation.id   # doctest: +SKIP
-        u'1cefeb6d-ebd5-4592-87c0-4cc43ec03e27'
+        '1cefeb6d-ebd5-4592-87c0-4cc43ec03e27'
         >>> computation.done()   # doctest: +SKIP
         True
         >>> client.close()       # doctest: +SKIP
@@ -147,9 +145,9 @@ class Future(object):
         #: Status flag most recently returned by the server
         self.remote_status = None
 
-        # Data from the server after it is parsed (either data or an error)
+        # Data from the server after it's parsed
         self._result = None
-        self.error = None
+        self._exception = None
 
         # Event(s) to signal when the results are ready
         self._results_ready_event = threading.Event()
@@ -157,6 +155,20 @@ class Future(object):
 
         # current poll back-off interval, in seconds
         self._poll_backoff = None
+
+    # TODO: remove in 0.9.0
+    @property
+    def error(self):
+        """Deprecated in favor of Future._exception and Future.exception().
+
+        Scheduled for removal in 0.9.0.
+        """
+        warnings.warn(
+            "'Future.error' is deprecated, and it will be removed "
+            "in 0.9.0. please convert your code to use 'Future.exception()'",
+            DeprecationWarning)
+
+        return self._exception
 
     # make Future ordered
 
@@ -175,20 +187,20 @@ class Future(object):
         The message from the server may actually be an error.
 
         Args:
-            message (dict): Data from the server from trying to complete query.
+            message (dict):
+                Data from the server from trying to complete query.
         """
         self._message = message
         self._signal_ready()
 
-    def _set_error(self, error, exc_info=None):
-        """Complete the future with an error.
+    def _set_exception(self, exception):
+        """Complete the future with an exception.
 
         Args:
-            error: An error string or exception object.
-            exc_info: Stack trace info from sys module for re-raising exceptions nicely.
+            exception (Exception):
+                Exception that caused the failure.
         """
-        self.error = error
-        self._exc_info = exc_info
+        self._exception = exception
         self._signal_ready()
 
     def _signal_ready(self):
@@ -468,7 +480,7 @@ class Future(object):
             >>> computation.done()   # doctest: +SKIP
             True
             >>> computation.remote_status    # doctest: +SKIP
-            u'CANCELLED'
+            'CANCELLED'
             >>> client.close()      # doctest: +SKIP
 
         """
@@ -582,6 +594,10 @@ class Future(object):
         """
         self._load_result()
         return self._result
+
+    def exception(self):
+        if self._exception is not None:
+            raise self._exception
 
     @property
     def energies(self):
@@ -849,12 +865,8 @@ class Future(object):
             self.wait(timeout=None)
 
             # Check for other error conditions
-            if self.error is not None:
-                if self._exc_info is not None:
-                    six.reraise(*self._exc_info)
-                if isinstance(self.error, Exception):
-                    raise self.error
-                raise RuntimeError(self.error)
+            if self._exception is not None:
+                raise self._exception
 
             # If someone else took care of this while we were waiting
             if self._result is not None:

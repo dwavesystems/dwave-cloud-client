@@ -19,13 +19,13 @@ import json
 import unittest
 import tempfile
 import collections
+from unittest import mock
 from concurrent.futures import ThreadPoolExecutor, wait
 
 from requests.exceptions import HTTPError
 
 from dwave.cloud.utils import tictoc
 from dwave.cloud.client import Client
-from dwave.cloud.testing import mock
 from dwave.cloud.exceptions import ProblemUploadError
 from dwave.cloud.upload import (
     Gettable, GettableFile, GettableMemory, FileView, ChunkedData)

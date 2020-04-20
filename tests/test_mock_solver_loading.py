@@ -14,11 +14,10 @@
 
 """Try to load solver data from mock servers."""
 
-from __future__ import division, absolute_import, print_function, unicode_literals
-
 import os
 import json
 import unittest
+from unittest import mock
 
 import requests
 import requests_mock
@@ -30,7 +29,7 @@ from dwave.cloud.exceptions import (
     SolverPropertyMissingError, ConfigFileReadError, ConfigFileParseError,
     SolverError, SolverNotFoundError)
 from dwave.cloud.config import legacy_load_config, load_config
-from dwave.cloud.testing import mock, iterable_mock_open
+from dwave.cloud.testing import iterable_mock_open
 
 
 url = 'https://dwavesys.com'

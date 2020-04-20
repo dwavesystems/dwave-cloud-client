@@ -17,12 +17,7 @@
 import sys
 import functools
 import concurrent.futures
-
-try:
-    import queue
-except ImportError:     # pragma: no cover
-    # python 2
-    import Queue as queue
+import queue
 
 __all__ = ['PriorityThreadPoolExecutor']
 
@@ -83,12 +78,10 @@ class _PrioritizingQueue(queue.PriorityQueue):
         else:
             item = _PriorityOrderedItem(item)
 
-        # in python 2, `queue.PriorityQueue` is an old-style class!
-        queue.PriorityQueue.put(self, item, *args, **kwargs)
+        super(queue.PriorityQueue, self).put(item, *args, **kwargs)
 
     def get(self, *args, **kwargs):
-        # in python 2, `queue.PriorityQueue` is an old-style class!
-        prioritized_item = queue.PriorityQueue.get(self, *args, **kwargs)
+        prioritized_item = super(queue.PriorityQueue, self).get(*args, **kwargs)
         return prioritized_item.item
 
 

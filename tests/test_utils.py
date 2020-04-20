@@ -14,6 +14,7 @@
 
 import logging
 import unittest
+from unittest import mock
 from collections import OrderedDict
 from itertools import count
 from datetime import datetime
@@ -22,7 +23,6 @@ from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_head, strip_tail,
     active_qubits, generate_random_ising_problem,
     default_text_input, utcnow, cached, retried, parse_loglevel)
-from dwave.cloud.testing import mock
 
 
 class TestSimpleUtils(unittest.TestCase):
@@ -69,9 +69,9 @@ class TestSimpleUtils(unittest.TestCase):
 
     def test_default_text_input(self):
         val = "value"
-        with mock.patch("six.moves.input", side_effect=[val], create=True):
+        with mock.patch("dwave.cloud.utils.input", side_effect=[val]):
             self.assertEqual(default_text_input("prompt", val), val)
-        with mock.patch("six.moves.input", side_effect=[val], create=True):
+        with mock.patch("dwave.cloud.utils.input", side_effect=[val]):
             self.assertEqual(default_text_input("prompt", val+val), val)
 
     def test_generate_random_ising_problem(self):
