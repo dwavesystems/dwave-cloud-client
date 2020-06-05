@@ -311,7 +311,7 @@ class ClientFactory(unittest.TestCase):
 
         # single file with cert+key
         client_cert = crt
-        conf = dict(client_cert=crt)
+        conf = dict(token='token', client_cert=crt)
 
         with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
             with dwave.cloud.Client.from_config() as client:
@@ -322,7 +322,7 @@ class ClientFactory(unittest.TestCase):
 
         # separate cert and key files
         client_cert = (crt, key)
-        conf = dict(client_cert=crt, client_cert_key=key)
+        conf = dict(token='token', client_cert=crt, client_cert_key=key)
 
         with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
             with dwave.cloud.Client.from_config() as client:
@@ -331,23 +331,19 @@ class ClientFactory(unittest.TestCase):
                 session = client.create_session()
                 self.assertEqual(session.cert, client_cert)
 
-        # single file with cert+key, with token
-        client_cert = crt
-        conf = dict(token='token', client_cert=crt)
-
-        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
-            with dwave.cloud.Client.from_config() as client:
-                self.assertEqual(client.client_cert, client_cert)
-
     def test_client_cert_from_kwargs(self):
         crt = '/path/to/crt'
         key = '/path/to/key'
+
+        def load_config(**kwargs):
+            file_conf = dict(token='token')
+            return merge(kwargs, file_conf, op=lambda a, b: a or b)
 
         # single file with cert+key
         client_cert = crt
         conf = dict(client_cert=crt)
 
-        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: {}):
+        with mock.patch("dwave.cloud.client.load_config", load_config):
             with dwave.cloud.Client.from_config(**conf) as client:
                 self.assertEqual(client.client_cert, client_cert)
 
@@ -355,7 +351,7 @@ class ClientFactory(unittest.TestCase):
         client_cert = (crt, key)
         conf = dict(client_cert=crt, client_cert_key=key)
 
-        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: {}):
+        with mock.patch("dwave.cloud.client.load_config", load_config):
             with dwave.cloud.Client.from_config(**conf) as client:
                 self.assertEqual(client.client_cert, client_cert)
 
@@ -363,7 +359,7 @@ class ClientFactory(unittest.TestCase):
         client_cert = (crt, key)
         conf = dict(client_cert=client_cert)
 
-        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: {}):
+        with mock.patch("dwave.cloud.client.load_config", load_config):
             with dwave.cloud.Client.from_config(**conf) as client:
                 self.assertEqual(client.client_cert, client_cert)
 

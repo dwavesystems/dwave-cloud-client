@@ -376,7 +376,10 @@ class Client(object):
         if not endpoint:
             endpoint = self.DEFAULT_API_ENDPOINT
 
-        # read optional client certificate
+        if not token:
+            raise ValueError("API token not defined")
+
+        # parse optional client certificate
         client_cert = kwargs.pop('client_cert', None)
         client_cert_key = kwargs.pop('client_cert_key', None)
         if client_cert_key is not None:
@@ -385,10 +388,6 @@ class Client(object):
             else:
                 raise ValueError(
                     "Client certificate key given, but the cert is missing")
-
-        # fail without token only if client cert is not used
-        if not client_cert and not token:
-            raise ValueError("API token not defined")
 
         logger.debug(
             "Creating a client for (endpoint=%r, token=%r, solver=%r, proxy=%r, "
