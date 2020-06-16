@@ -631,6 +631,8 @@ def _install_contrib_package(name, verbose=False, prompt=True):
 
         if res.returncode or verbose:
             click.echo(res.stdout)
+            click.echo('Failed to install {}.\n'.format(title))
+            return
 
     click.echo('Successfully installed {}.\n'.format(title))
 
