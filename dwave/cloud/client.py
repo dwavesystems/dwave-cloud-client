@@ -48,7 +48,6 @@ import threading
 import requests
 import warnings
 import operator
-import collections
 import queue
 
 import base64
@@ -58,6 +57,7 @@ import concurrent.futures
 
 from itertools import chain
 from functools import partial, wraps
+from collections import abc, namedtuple, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 
 from dateutil.parser import parse as parse_datetime
@@ -401,7 +401,7 @@ class Client(object):
         # parse solver
         if not solver:
             solver_def = {}
-        elif isinstance(solver, collections.Mapping):
+        elif isinstance(solver, abc.Mapping):
             solver_def = solver
         elif isinstance(solver, str):
             # support features dict encoded as JSON in our config INI file
@@ -422,7 +422,7 @@ class Client(object):
         # parse headers
         if not headers:
             headers_dict = {}
-        elif isinstance(headers, collections.Mapping):
+        elif isinstance(headers, abc.Mapping):
             headers_dict = headers
         elif isinstance(headers, str):
             try:
@@ -1108,7 +1108,7 @@ class Client(object):
         This method is thread safe.
         """
         self._submission_queue.put(self._submit.Message(body, future))
-    _submit.Message = collections.namedtuple('Message', ['body', 'future'])
+    _submit.Message = namedtuple('Message', ['body', 'future'])
 
     def _do_submit_problems(self):
         """Pull problems from the submission queue and submit them.
