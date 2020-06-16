@@ -547,7 +547,10 @@ def install(list_all, install_all, accept_license, verbose, packages):
                 click.echo()
         else:
             # concise list of available packages
-            click.echo("Available packages: {}.".format(', '.join(contrib.keys())))
+            if contrib:
+                click.echo("Available packages: {}.".format(', '.join(contrib.keys())))
+            else:
+                click.echo("No available packages.")
         return
 
     if install_all:
