@@ -524,12 +524,14 @@ def upload(config_file, profile, problem_id, format, input_file):
               help='List available contrib (non-OSS) packages')
 @click.option('--all', '-a', 'install_all', default=False, is_flag=True,
               help='Install all contrib (non-OSS) packages')
+@click.option('--update', '-u', 'update_all', default=False, is_flag=True,
+              help='Reinstall all installed contrib packages')
 @click.option('--accept-license', '--yes', '-y', default=False, is_flag=True,
               help='Accept license(s) without prompting')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Increase output verbosity')
 @click.argument('packages', nargs=-1)
-def install(list_all, install_all, accept_license, verbose, packages):
+def install(list_all, install_all, update_all, accept_license, verbose, packages):
     """Install optional non-open-source Ocean packages."""
 
     contrib = get_contrib_packages()
@@ -556,6 +558,9 @@ def install(list_all, install_all, accept_license, verbose, packages):
     if install_all:
         packages = list(contrib)
 
+    if update_all:
+        packages = list(filter(_contrib_package_maybe_installed, contrib))
+
     if not packages:
         click.echo('Nothing to do. Try "dwave install --help".')
         return
@@ -578,6 +583,27 @@ def _get_dist(dist_spec):
     return pkg_resources.get_distribution(dist_spec)
 
 
+def _contrib_package_maybe_installed(name):
+    """Check if contrib package `name` is installed (even partially)."""
+
+    contrib = get_contrib_packages()
+    pkg = contrib[name]
+
+    maybe_installed = False
+    for req in pkg['requirements']:
+        try:
+            _get_dist(req)
+            maybe_installed = True
+        except pkg_resources.VersionConflict:
+            # dependency installed, but wrong version
+            maybe_installed = True
+        except pkg_resources.DistributionNotFound:
+            # dependency not installed
+            pass
+
+    return maybe_installed
+
+
 def _install_contrib_package(name, verbose=False, prompt=True):
     """pip install non-oss package `name` from dwave's pypi repo."""
 
@@ -589,12 +615,12 @@ def _install_contrib_package(name, verbose=False, prompt=True):
     title = pkg['title']
 
     # check if `name` package is already installed
-    # right now the only way to check that is to check if all dependants from
+    # right now the only way to check that is to check if all dependencies from
     # requirements are installed
     reinstall = False
     try:
         if all(_get_dist(req) for req in pkg['requirements']):
-            click.echo("{} already installed.\n".format(title))
+            click.echo("{} installed and up to date.\n".format(title))
             return
     except pkg_resources.VersionConflict:
         click.echo("{} dependency version mismatch.\n".format(title))
