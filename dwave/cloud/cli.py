@@ -567,18 +567,12 @@ def install(list_all, install_all, accept_license, verbose, packages):
         _install_contrib_package(pkg, verbose=verbose, prompt=not accept_license)
 
 
-def _is_pip_package_installed(requirement):
-    """Checks if a pip `requirement` is installed."""
-
-    reqs = list(pkg_resources.parse_requirements(requirement))
-    assert len(reqs) == 1
-    req = reqs[0]
-
-    res = subprocess.run(
-        [sys.executable, "-m", "pip", "show", req.name],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
-    return res.returncode == 0
+def _get_dist(dist_spec):
+    """Returns `pkg_resources.Distribution` object for matching `dist_spec`,
+    which can be given as `pkg_resources.Requirement`, or an unparsed string
+    requirement.
+    """
+    return pkg_resources.get_distribution(dist_spec)
 
 
 def _install_contrib_package(name, verbose=False, prompt=True):
@@ -591,13 +585,21 @@ def _install_contrib_package(name, verbose=False, prompt=True):
     pkg = contrib[name]
     title = pkg['title']
 
-    # check is `name` package is already installed
+    # check if `name` package is already installed
     # right now the only way to check that is to check if all dependants from
     # requirements are installed
-    # NOTE: currently we do not check if versions match!
-    if all(_is_pip_package_installed(req) for req in pkg['requirements']):
-        click.echo("{} already installed.\n".format(title))
-        return
+    reinstall = False
+    try:
+        if all(_get_dist(req) for req in pkg['requirements']):
+            click.echo("{} already installed.\n".format(title))
+            return
+    except pkg_resources.VersionConflict:
+        click.echo("{} dependency version mismatch.\n".format(title))
+        reinstall = True
+    except pkg_resources.DistributionNotFound:
+        pass    # dependency not installed, proceed with install
+
+    action = 'Reinstall' if reinstall else 'Install'
 
     # basic pkg info
     click.echo(title)
@@ -610,12 +612,13 @@ def _install_contrib_package(name, verbose=False, prompt=True):
     click.echo(msgtpl.format(name=license['name'], url=license['url']))
 
     if prompt:
-        val = default_text_input('Install (y/n)?', default='y', optional=False)
+        val = default_text_input('{} (y/n)?'.format(action),
+                                 default='y', optional=False)
         if val.lower() != 'y':
             click.echo('Skipping: {}.\n'.format(title))
             return
 
-    click.echo('Installing: {}'.format(title))
+    click.echo('{}ing: {}'.format(action, title))
     for req in pkg['requirements']:
 
         res = subprocess.run(
