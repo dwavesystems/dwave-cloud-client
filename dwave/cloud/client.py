@@ -379,13 +379,23 @@ class Client(object):
         if not token:
             raise ValueError("API token not defined")
 
+        # parse optional client certificate
+        client_cert = kwargs.pop('client_cert', None)
+        client_cert_key = kwargs.pop('client_cert_key', None)
+        if client_cert_key is not None:
+            if client_cert is not None:
+                client_cert = (client_cert, client_cert_key)
+            else:
+                raise ValueError(
+                    "Client certificate key given, but the cert is missing")
+
         logger.debug(
             "Creating a client for (endpoint=%r, token=%r, solver=%r, proxy=%r, "
             "permissive_ssl=%r, request_timeout=%r, polling_timeout=%r, "
-            "connection_close=%r, headers=%r, **kwargs=%r)",
+            "connection_close=%r, headers=%r, client_cert=%r, **kwargs=%r)",
             endpoint, token, solver, proxy,
             permissive_ssl, request_timeout, polling_timeout,
-            connection_close, headers, kwargs
+            connection_close, headers, client_cert, kwargs
         )
 
         # parse solver
@@ -432,6 +442,7 @@ class Client(object):
         self.default_solver = solver_def
 
         self.token = token
+        self.client_cert = client_cert
         self.request_timeout = parse_float(request_timeout)
         self.polling_timeout = parse_float(polling_timeout)
 
@@ -507,10 +518,15 @@ class Client(object):
         session = BaseUrlSession(base_url=endpoint)
         session.mount('http://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
         session.mount('https://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
+
+        session.headers.update({'User-Agent': user_agent(__packagename__, __version__)})
         if self.headers:
             session.headers.update(self.headers)
-        session.headers.update({'X-Auth-Token': self.token,
-                                'User-Agent': user_agent(__packagename__, __version__)})
+        if self.token:
+            session.headers.update({'X-Auth-Token': self.token})
+        if self.client_cert:
+            session.cert = self.client_cert
+
         session.proxies = {'http': self.proxy, 'https': self.proxy}
         if self.permissive_ssl:
             session.verify = False

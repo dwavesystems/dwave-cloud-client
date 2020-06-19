@@ -305,6 +305,64 @@ class ClientFactory(unittest.TestCase):
             with dwave.cloud.Client.from_config(headers=headers_str) as client:
                 self.assertDictEqual(client.headers, headers_dict)
 
+    def test_client_cert_from_config(self):
+        crt = '/path/to/crt'
+        key = '/path/to/key'
+
+        # single file with cert+key
+        client_cert = crt
+        conf = dict(token='token', client_cert=crt)
+
+        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+            with dwave.cloud.Client.from_config() as client:
+                self.assertEqual(client.client_cert, client_cert)
+
+                session = client.create_session()
+                self.assertEqual(session.cert, client_cert)
+
+        # separate cert and key files
+        client_cert = (crt, key)
+        conf = dict(token='token', client_cert=crt, client_cert_key=key)
+
+        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+            with dwave.cloud.Client.from_config() as client:
+                self.assertEqual(client.client_cert, client_cert)
+
+                session = client.create_session()
+                self.assertEqual(session.cert, client_cert)
+
+    def test_client_cert_from_kwargs(self):
+        crt = '/path/to/crt'
+        key = '/path/to/key'
+
+        def load_config(**kwargs):
+            file_conf = dict(token='token')
+            return merge(kwargs, file_conf, op=lambda a, b: a or b)
+
+        # single file with cert+key
+        client_cert = crt
+        conf = dict(client_cert=crt)
+
+        with mock.patch("dwave.cloud.client.load_config", load_config):
+            with dwave.cloud.Client.from_config(**conf) as client:
+                self.assertEqual(client.client_cert, client_cert)
+
+        # separate cert and key files
+        client_cert = (crt, key)
+        conf = dict(client_cert=crt, client_cert_key=key)
+
+        with mock.patch("dwave.cloud.client.load_config", load_config):
+            with dwave.cloud.Client.from_config(**conf) as client:
+                self.assertEqual(client.client_cert, client_cert)
+
+        # client_cert as tuple (direct `requests` format)
+        client_cert = (crt, key)
+        conf = dict(client_cert=client_cert)
+
+        with mock.patch("dwave.cloud.client.load_config", load_config):
+            with dwave.cloud.Client.from_config(**conf) as client:
+                self.assertEqual(client.client_cert, client_cert)
+
 
 class FeatureBasedSolverSelection(unittest.TestCase):
     """Test Client.get_solvers(**filters)."""
