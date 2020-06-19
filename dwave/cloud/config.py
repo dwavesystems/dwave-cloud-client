@@ -462,6 +462,7 @@ def load_config_from_files(filenames=None):
     config = configparser.ConfigParser(default_section="defaults")
     for filename in filenames:
         try:
+            filename = os.path.expandvars(os.path.expanduser(filename))
             with open(filename, 'r') as f:
                 config.read_file(f, filename)
         except (IOError, OSError):

@@ -125,9 +125,9 @@ class TestConfig(unittest.TestCase):
     def test_config_file_path_expansion(self):
         """Home dir and env vars are expanded when resolving config path."""
 
-        env = {"HOME": "/home/user", "var": "val"}
+        env = {"var": "val"}
         config_file = "~/path/${var}/to/$var/my.conf"
-        expected_path = "/home/user/path/val/to/val/my.conf"
+        expected_path = os.path.expanduser("~/path/val/to/val/my.conf")
         profile = "profile"
 
         conf_content = """
