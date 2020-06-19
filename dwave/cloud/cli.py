@@ -524,12 +524,14 @@ def upload(config_file, profile, problem_id, format, input_file):
               help='List available contrib (non-OSS) packages')
 @click.option('--all', '-a', 'install_all', default=False, is_flag=True,
               help='Install all contrib (non-OSS) packages')
+@click.option('--update', '-u', 'update_all', default=False, is_flag=True,
+              help='Reinstall all installed contrib packages')
 @click.option('--accept-license', '--yes', '-y', default=False, is_flag=True,
               help='Accept license(s) without prompting')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Increase output verbosity')
 @click.argument('packages', nargs=-1)
-def install(list_all, install_all, accept_license, verbose, packages):
+def install(list_all, install_all, update_all, accept_license, verbose, packages):
     """Install optional non-open-source Ocean packages."""
 
     contrib = get_contrib_packages()
@@ -547,11 +549,17 @@ def install(list_all, install_all, accept_license, verbose, packages):
                 click.echo()
         else:
             # concise list of available packages
-            click.echo("Available packages: {}.".format(', '.join(contrib.keys())))
+            if contrib:
+                click.echo("Available packages: {}.".format(', '.join(contrib.keys())))
+            else:
+                click.echo("No available packages.")
         return
 
     if install_all:
         packages = list(contrib)
+
+    if update_all:
+        packages = list(filter(_contrib_package_maybe_installed, contrib))
 
     if not packages:
         click.echo('Nothing to do. Try "dwave install --help".')
@@ -567,18 +575,33 @@ def install(list_all, install_all, accept_license, verbose, packages):
         _install_contrib_package(pkg, verbose=verbose, prompt=not accept_license)
 
 
-def _is_pip_package_installed(requirement):
-    """Checks if a pip `requirement` is installed."""
+def _get_dist(dist_spec):
+    """Returns `pkg_resources.Distribution` object for matching `dist_spec`,
+    which can be given as `pkg_resources.Requirement`, or an unparsed string
+    requirement.
+    """
+    return pkg_resources.get_distribution(dist_spec)
 
-    reqs = list(pkg_resources.parse_requirements(requirement))
-    assert len(reqs) == 1
-    req = reqs[0]
 
-    res = subprocess.run(
-        [sys.executable, "-m", "pip", "show", req.name],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+def _contrib_package_maybe_installed(name):
+    """Check if contrib package `name` is installed (even partially)."""
 
-    return res.returncode == 0
+    contrib = get_contrib_packages()
+    pkg = contrib[name]
+
+    maybe_installed = False
+    for req in pkg['requirements']:
+        try:
+            _get_dist(req)
+            maybe_installed = True
+        except pkg_resources.VersionConflict:
+            # dependency installed, but wrong version
+            maybe_installed = True
+        except pkg_resources.DistributionNotFound:
+            # dependency not installed
+            pass
+
+    return maybe_installed
 
 
 def _install_contrib_package(name, verbose=False, prompt=True):
@@ -591,13 +614,21 @@ def _install_contrib_package(name, verbose=False, prompt=True):
     pkg = contrib[name]
     title = pkg['title']
 
-    # check is `name` package is already installed
-    # right now the only way to check that is to check if all dependants from
+    # check if `name` package is already installed
+    # right now the only way to check that is to check if all dependencies from
     # requirements are installed
-    # NOTE: currently we do not check if versions match!
-    if all(_is_pip_package_installed(req) for req in pkg['requirements']):
-        click.echo("{} already installed.\n".format(title))
-        return
+    reinstall = False
+    try:
+        if all(_get_dist(req) for req in pkg['requirements']):
+            click.echo("{} installed and up to date.\n".format(title))
+            return
+    except pkg_resources.VersionConflict:
+        click.echo("{} dependency version mismatch.\n".format(title))
+        reinstall = True
+    except pkg_resources.DistributionNotFound:
+        pass    # dependency not installed, proceed with install
+
+    action = 'Reinstall' if reinstall else 'Install'
 
     # basic pkg info
     click.echo(title)
@@ -610,12 +641,13 @@ def _install_contrib_package(name, verbose=False, prompt=True):
     click.echo(msgtpl.format(name=license['name'], url=license['url']))
 
     if prompt:
-        val = default_text_input('Install (y/n)?', default='y', optional=False)
+        val = default_text_input('{} (y/n)?'.format(action),
+                                 default='y', optional=False)
         if val.lower() != 'y':
             click.echo('Skipping: {}.\n'.format(title))
             return
 
-    click.echo('Installing: {}'.format(title))
+    click.echo('{}ing: {}'.format(action, title))
     for req in pkg['requirements']:
 
         res = subprocess.run(
@@ -625,6 +657,8 @@ def _install_contrib_package(name, verbose=False, prompt=True):
 
         if res.returncode or verbose:
             click.echo(res.stdout)
+            click.echo('Failed to install {}.\n'.format(title))
+            return
 
     click.echo('Successfully installed {}.\n'.format(title))
 
