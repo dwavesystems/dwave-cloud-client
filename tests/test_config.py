@@ -27,7 +27,7 @@ from dwave.cloud.config import (
 
 class TestConfig(unittest.TestCase):
 
-    config_body = u"""
+    config_body = """
         [defaults]
         endpoint = https://cloud.dwavesys.com/sapi
         client = qpu
@@ -72,7 +72,7 @@ class TestConfig(unittest.TestCase):
     def test_config_load_from_file__invalid_format__duplicate_sections(self):
         """Config loading should fail with ``ConfigFileParseError`` for invalid
         config files."""
-        myconfig = u"""
+        myconfig = """
             [section]
             key = val
             [section]
@@ -122,6 +122,34 @@ class TestConfig(unittest.TestCase):
         with mock.patch("os.path.exists", lambda path: False):
             self.assertEqual(get_configfile_paths(), [])
 
+    def test_config_file_path_expansion(self):
+        """Home dir and env vars are expanded when resolving config path."""
+
+        env = {"var": "val"}
+        config_file = "~/path/${var}/to/$var/my.conf"
+        expected_path = os.path.expanduser("~/path/val/to/val/my.conf")
+        profile = "profile"
+
+        conf_content = """
+            [{}]
+            valid = yes
+        """.format(profile)
+
+        def mock_open(filename, *pa, **kw):
+            self.assertEqual(filename, expected_path)
+            return iterable_mock_open(conf_content)()
+
+        # config file via kwarg
+        with mock.patch.dict(os.environ, env):
+            with mock.patch('dwave.cloud.config.open', mock_open) as m:
+                conf = load_config(config_file=config_file, profile=profile)
+                self.assertEqual(conf['valid'], 'yes')
+
+        # config file via env var
+        with mock.patch.dict(os.environ, env, DWAVE_CONFIG_FILE=config_file):
+            with mock.patch('dwave.cloud.config.open', mock_open) as m:
+                conf = load_config(profile=profile)
+                self.assertEqual(conf['valid'], 'yes')
 
     def _assert_config_valid(self, config):
         # profile 'alpha' is loaded
@@ -238,7 +266,7 @@ class TestConfig(unittest.TestCase):
         """load_config should load the first section for profile, if profile
         is nowhere else specified.
         """
-        myconfig = u"""
+        myconfig = """
             [first]
             solver = DW_2000Q_1
         """
@@ -254,7 +282,7 @@ class TestConfig(unittest.TestCase):
         is nowhere else specified *and* not even a single non-[defaults] section
         exists.
         """
-        myconfig = u"""
+        myconfig = """
             [defaults]
             solver = DW_2000Q_1
         """
@@ -269,7 +297,7 @@ class TestConfig(unittest.TestCase):
         """load_config should fail if the profile specified in the defaults
         section is non-existing.
         """
-        myconfig = u"""
+        myconfig = """
             [defaults]
             profile = nonexisting
 
@@ -285,12 +313,12 @@ class TestConfig(unittest.TestCase):
         """Test more specific config overrides less specific one,
         on a key by key basis, in a list of auto-detected config files."""
 
-        config_system = u"""
+        config_system = """
             [alpha]
             endpoint = alpha
             solver = DW_2000Q_1
         """
-        config_user = u"""
+        config_user = """
             [alpha]
             solver = DW_2000Q_2
             [beta]
@@ -302,16 +330,16 @@ class TestConfig(unittest.TestCase):
 
             # test per-key override
             with mock.patch('dwave.cloud.config.open', create=True) as m:
-                m.side_effect=[iterable_mock_open(config_system)(),
-                               iterable_mock_open(config_user)()]
+                m.side_effect = [iterable_mock_open(config_system)(),
+                                 iterable_mock_open(config_user)()]
                 section = load_config(profile='alpha')
                 self.assertEqual(section['endpoint'], 'alpha')
                 self.assertEqual(section['solver'], 'DW_2000Q_2')
 
             # test per-section override (section addition)
             with mock.patch('dwave.cloud.config.open', create=True) as m:
-                m.side_effect=[iterable_mock_open(config_system)(),
-                               iterable_mock_open(config_user)()]
+                m.side_effect = [iterable_mock_open(config_system)(),
+                                 iterable_mock_open(config_user)()]
                 section = load_config(profile='beta')
                 self.assertEqual(section['endpoint'], 'beta')
 
@@ -319,12 +347,12 @@ class TestConfig(unittest.TestCase):
         """Test more specific config overrides less specific one,
         on a key by key basis, in a list of explicitly given files."""
 
-        file1 = u"""
+        file1 = """
             [alpha]
             endpoint = alpha
             solver = DW_2000Q_1
         """
-        file2 = u"""
+        file2 = """
             [alpha]
             solver = DW_2000Q_2
         """
@@ -339,7 +367,7 @@ class TestConfig(unittest.TestCase):
 
     def test_config_load_env_override(self):
         with mock.patch("dwave.cloud.config.load_config_from_files",
-                        partial(self._load_config_from_files, data=u"", provided=['myfile'])):
+                        partial(self._load_config_from_files, data="", provided=['myfile'])):
 
             with mock.patch.dict(os.environ, {'DWAVE_API_CLIENT': 'test'}):
                 self.assertEqual(load_config(config_file='myfile')['client'], 'test')
