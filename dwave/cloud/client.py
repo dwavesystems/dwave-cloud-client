@@ -66,7 +66,7 @@ from plucky import pluck
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
 from dwave.cloud.computation import Future
-from dwave.cloud.config import load_config, legacy_load_config, parse_float
+from dwave.cloud.config import load_config, parse_float
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.upload import ChunkedData
@@ -186,7 +186,7 @@ class Client(object):
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None,
                     endpoint=None, token=None, solver=None, proxy=None,
-                    headers=None, legacy_config_fallback=False, **kwargs):
+                    headers=None, **kwargs):
         """Client factory method to instantiate a client instance from configuration.
 
         Configuration values can be specified in multiple ways, ranked in the following
@@ -277,10 +277,6 @@ class Client(object):
                 Newline-separated additional HTTP headers to include with each
                 API request, or a dictionary of (key, value) pairs.
 
-            legacy_config_fallback (bool, default=False):
-                If True and loading from a standard D-Wave Cloud Client configuration
-                file (``dwave.conf``) fails, tries loading a legacy configuration file (``~/.dwrc``).
-
         Other Parameters:
             Unrecognized keys (str):
                 All unrecognized keys are passed through to the appropriate client class constructor
@@ -320,19 +316,6 @@ class Client(object):
             endpoint=endpoint, token=token, solver=solver, proxy=proxy,
             headers=headers)
         logger.debug("Config loaded: %r", config)
-
-        # fallback to legacy `.dwrc` if key variables missing
-        if legacy_config_fallback:
-            warnings.warn(
-                "'legacy_config_fallback' is deprecated, and it will be removed "
-                "in 0.7.0. please convert your legacy .dwrc file to the new "
-                "config format.", DeprecationWarning)
-
-            if not config.get('token'):
-                config = legacy_load_config(
-                    profile=profile, client=client, endpoint=endpoint,
-                    token=token, solver=solver, proxy=proxy, headers=headers)
-                logger.debug("Legacy config loaded: %r", config)
 
         # manual override of other (client-custom) arguments
         config.update(kwargs)
