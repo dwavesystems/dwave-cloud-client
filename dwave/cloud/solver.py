@@ -378,19 +378,21 @@ class UnstructuredSolver(BaseSolver):
         # XXX: temporary until something like dwavesystems/dimod#599 is implemented.
 
         try:
+            import dimod
             from dimod.serialization.fileview import FileView as BQMFileView
-            from dimod import AdjVectorBQM
         except ImportError: # pragma: no cover
             return
 
         if isinstance(bqm, BQMFileView):
             return bqm
 
-        try:
-            if not isinstance(bqm, AdjVectorBQM):
+        # test explicitly to avoid copy on cast if possible
+        fileviewable = (dimod.AdjArrayBQM, dimod.AdjVectorBQM, dimod.AdjMapBQM)
+        if not isinstance(bqm, fileviewable):
+            try:
                 bqm = AdjVectorBQM(bqm)
-        except:
-            return
+            except:
+                return
 
         try:
             return BQMFileView(bqm)
