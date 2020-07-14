@@ -23,6 +23,7 @@ import time
 import warnings
 import unittest
 from unittest import mock
+from contextlib import contextmanager
 
 import requests.exceptions
 from plucky import merge
@@ -479,13 +480,37 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.get_solvers(online=True), self.solvers)
         self.assertSolvers(self.client.get_solvers(online=False), [])
 
-    def test_qpu_hybrid_software(self):
+    def test_derived_category_properties(self):
         self.assertSolvers(self.client.get_solvers(qpu=True), self.qpu_solvers)
         self.assertSolvers(self.client.get_solvers(qpu=False), self.software_solvers + self.hybrid_solvers)
         self.assertSolvers(self.client.get_solvers(software=True), self.software_solvers)
         self.assertSolvers(self.client.get_solvers(software=False), self.qpu_solvers + self.hybrid_solvers)
         self.assertSolvers(self.client.get_solvers(hybrid=True), self.hybrid_solvers)
         self.assertSolvers(self.client.get_solvers(hybrid=False), self.qpu_solvers + self.software_solvers)
+
+    # Test fallback for legacy solvers without the `category` property
+    # TODO: remove when all production solvers are updated
+    def test_derived_category_properties_without_category(self):
+        "Category-based filtering works without explicit `category` property."
+
+        @contextmanager
+        def multi_solver_properties_patch(solvers, update):
+            """Update properties for all `solvers` at once."""
+            patchers = [mock.patch.dict(s.properties, update) for s in solvers]
+            try:
+                yield (p.start() for p in patchers)
+            finally:
+                return (p.stop() for p in patchers)
+
+        with mock.patch.object(self.software, 'id', 'c4-sw_solver3'):
+            # patch categories and re-run the category-based filtering test
+            with multi_solver_properties_patch(self.solvers, {'category': ''}):
+                self.test_derived_category_properties()
+
+            # verify patching
+            with multi_solver_properties_patch(self.solvers, {'category': 'x'}):
+                with self.assertRaises(AssertionError):
+                    self.test_derived_category_properties()
 
     def test_category(self):
         self.assertSolvers(self.client.get_solvers(category='qpu'), self.qpu_solvers)

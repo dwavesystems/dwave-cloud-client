@@ -275,6 +275,25 @@ class MockSolverLoading(unittest.TestCase):
         del data['status']
         self.assertTrue(Solver(None, data).online)
 
+    # Test fallback for legacy solvers without the `category` property
+    # TODO: remove when all production solvers are updated
+    def test_solver_with_category_missing(self):
+
+        # client type filtering support
+        self.assertTrue(QPUClient.is_solver_handled(solver_object('solver', cat='')))
+        self.assertTrue(SoftwareClient.is_solver_handled(solver_object('c4-sw_x', cat='')))
+
+        # derived properties are correct
+        self.assertTrue(solver_object('solver', cat='').qpu)
+        self.assertFalse(solver_object('solver', cat='').software)
+        self.assertFalse(solver_object('solver', cat='').hybrid)
+        self.assertFalse(solver_object('c4-sw_x', cat='').qpu)
+        self.assertTrue(solver_object('c4-sw_x', cat='').software)
+        self.assertFalse(solver_object('c4-sw_x', cat='').hybrid)
+        self.assertFalse(solver_object('hybrid_x', cat='').qpu)
+        self.assertFalse(solver_object('hybrid_x', cat='').software)
+        self.assertTrue(solver_object('hybrid_x', cat='').hybrid)
+
 
 class RequestEvent(Exception):
     """Throws exception when mocked client submits an HTTP request."""
