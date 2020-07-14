@@ -25,6 +25,7 @@ import requests_mock
 from dwave.cloud.client import Client, Solver
 from dwave.cloud.qpu import Client as QPUClient
 from dwave.cloud.sw import Client as SoftwareClient
+from dwave.cloud.hybrid import Client as HybridClient
 from dwave.cloud.exceptions import (
     SolverPropertyMissingError, ConfigFileReadError, ConfigFileParseError,
     SolverError, SolverNotFoundError)
@@ -226,6 +227,12 @@ class MockSolverLoading(unittest.TestCase):
         self.assertFalse(SoftwareClient.is_solver_handled(solver_object('test', 'hybrid')))
         self.assertFalse(SoftwareClient.is_solver_handled(solver_object('test', 'whatever')))
         self.assertFalse(SoftwareClient.is_solver_handled(None))
+        # hybrid client
+        self.assertFalse(HybridClient.is_solver_handled(solver_object('test', 'qpu')))
+        self.assertFalse(HybridClient.is_solver_handled(solver_object('test', 'software')))
+        self.assertTrue(HybridClient.is_solver_handled(solver_object('test', 'hybrid')))
+        self.assertFalse(HybridClient.is_solver_handled(solver_object('test', 'whatever')))
+        self.assertFalse(HybridClient.is_solver_handled(None))
 
     def test_solver_feature_properties(self):
         self.assertTrue(solver_object('solver', 'qpu').qpu)
@@ -282,6 +289,7 @@ class MockSolverLoading(unittest.TestCase):
         # client type filtering support
         self.assertTrue(QPUClient.is_solver_handled(solver_object('solver', cat='')))
         self.assertTrue(SoftwareClient.is_solver_handled(solver_object('c4-sw_x', cat='')))
+        self.assertTrue(HybridClient.is_solver_handled(solver_object('hybrid_x', cat='')))
 
         # derived properties are correct
         self.assertTrue(solver_object('solver', cat='').qpu)
