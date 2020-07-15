@@ -113,7 +113,7 @@ class Submission(_QueryTest):
     def test_result_structure(self):
         with Client(**config) as client:
             solver = client.get_solver()
-            computation = solver.sample_ising({}, {})
+            computation = solver.sample_ising({}, {}, answer_mode='histogram')
             result = computation.result()
             self.assertIn('solutions', result)
             self.assertIn('energies', result)
