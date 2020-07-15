@@ -204,17 +204,35 @@ class BaseSolver(object):
     @property
     def qpu(self):
         "Is this a QPU-based solver?"
-        return self.properties.get('category', '').lower() == 'qpu'
+        category = self.properties.get('category', '').lower()
+        if category:
+            return category == 'qpu'
+        else:
+            # fallback for legacy solvers without the `category` property
+            # TODO: remove when all production solvers are updated
+            return not (self.software or self.hybrid)
 
     @property
     def software(self):
         "Is this a software-based solver?"
-        return self.properties.get('category', '').lower() == 'software'
+        category = self.properties.get('category', '').lower()
+        if category:
+            return category == 'software'
+        else:
+            # fallback for legacy solvers without the `category` property
+            # TODO: remove when all production solvers are updated
+            return self.id.startswith('c4-sw_')
 
     @property
     def hybrid(self):
         "Is this a hybrid quantum-classical solver?"
-        return self.properties.get('category', '').lower() == 'hybrid'
+        category = self.properties.get('category', '').lower()
+        if category:
+            return category == 'hybrid'
+        else:
+            # fallback for legacy solvers without the `category` property
+            # TODO: remove when all production solvers are updated
+            return self.id.startswith('hybrid')
 
     @property
     def is_qpu(self):
