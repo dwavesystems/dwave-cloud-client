@@ -6,12 +6,6 @@ matrix:
   include:
     - os: linux
       sudo: required
-      python: "nightly"
-      env: TOXENV=pynightly
-      deploy:
-
-    - os: linux
-      sudo: required
       python: "3.8"
       env: TOXENV=py38
       deploy:
@@ -42,9 +36,6 @@ matrix:
         - virtualenv env -p python3
         - source env/bin/activate
       deploy:
-
-  allow_failures:
-    - python: "nightly"
 
 install:
   - pip install --upgrade setuptools
