@@ -324,6 +324,9 @@ def user_agent(name, version):
         ("platform", platform.platform() or 'unknown'),
     ]
 
+    # add platform-specific tags
+    tags.extend(get_platform_tags())
+
     return ' '.join("{}/{}".format(name, version) for name, version in tags)
 
 
@@ -517,6 +520,7 @@ def get_contrib_config():
     contrib = [ep.load() for ep in iter_entry_points('dwave_contrib')]
     return contrib
 
+
 def get_contrib_packages():
     """Combine all contrib packages in an ordered dict. Assumes package names
     are unique.
@@ -530,3 +534,11 @@ def get_contrib_packages():
             packages[pkg['name']] = pkg
 
     return packages
+
+
+def get_platform_tags():
+    """Return a list of platform tags generated from registered entry points."""
+
+    fs = [ep.load() for ep in iter_entry_points('dwave.common.platform.tags')]
+    tags = list(filter(None, [f() for f in fs]))
+    return tags
