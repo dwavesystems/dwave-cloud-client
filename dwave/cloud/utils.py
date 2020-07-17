@@ -301,7 +301,7 @@ class BaseUrlSession(requests.Session):
         return urljoin(self.base_url, url)
 
 
-def user_agent(name, version):
+def user_agent(name=None, version=None):
     """Return User-Agent ~ "name/version language/version interpreter/version os/version"."""
 
     def _interpreter():
@@ -315,8 +315,12 @@ def user_agent(name, version):
             full_version.append(bitness)
         return name, "-".join(full_version)
 
+    tags = []
+
+    if name and version:
+        tags.append((name, version))
+
     tags = [
-        (name, version),
         ("python", platform.python_version()),
         _interpreter(),
         ("machine", platform.machine() or 'unknown'),
