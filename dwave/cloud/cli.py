@@ -534,8 +534,8 @@ def upload(config_file, profile, problem_id, format, input_file):
               help='Reinstall all installed contrib packages')
 @click.option('--accept-license', '--yes', '-y', default=False, is_flag=True,
               help='Accept license(s) without prompting')
-@click.option('--verbose', '-v', default=False, is_flag=True,
-              help='Increase output verbosity')
+@click.option('--verbose', '-v', count=True,
+              help='Increase output verbosity (additive, up to 4 times)')
 @click.argument('packages', nargs=-1)
 def install(list_all, install_all, update_all, accept_license, verbose, packages):
     """Install optional non-open-source Ocean packages."""
@@ -610,7 +610,7 @@ def _contrib_package_maybe_installed(name):
     return maybe_installed
 
 
-def _install_contrib_package(name, verbose=False, prompt=True):
+def _install_contrib_package(name, verbose=0, prompt=True):
     """pip install non-oss package `name` from dwave's pypi repo."""
 
     contrib = get_contrib_packages()
@@ -656,13 +656,19 @@ def _install_contrib_package(name, verbose=False, prompt=True):
     click.echo('{}ing: {}'.format(action, title))
     for req in pkg['requirements']:
 
-        res = subprocess.run(
-            [sys.executable, "-m", "pip", "install", req,
-             "--extra-index-url", dwave_contrib_repo],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        cmd = [sys.executable, "-m", "pip", "install", req,
+               "--extra-index-url", dwave_contrib_repo]
+        if verbose > 1:
+            cmd.append("-{}".format('v' * (verbose - 1)))
+
+        res = subprocess.run(cmd,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT)
 
         if res.returncode or verbose:
             click.echo(res.stdout)
+
+        if res.returncode:
             click.echo('Failed to install {}.\n'.format(title))
             return
 
@@ -673,8 +679,8 @@ def _install_contrib_package(name, verbose=False, prompt=True):
 @click.option('--install-all', '--all', '-a', default=False, is_flag=True,
               help='Install all non-open-source packages '\
                    'available and accept licenses without prompting')
-@click.option('--verbose', '-v', default=False, is_flag=True,
-              help='Increase output verbosity')
+@click.option('--verbose', '-v', count=True,
+              help='Increase output verbosity (additive, up to 4 times)')
 def setup(install_all, verbose):
     """Setup optional Ocean packages and configuration file(s)."""
 
