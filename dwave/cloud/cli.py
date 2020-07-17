@@ -30,7 +30,7 @@ from dwave.cloud import Client
 from dwave.cloud.utils import (
     default_text_input, click_info_switch, generate_random_ising_problem,
     datetime_to_timestamp, utcnow, strtrunc, CLIError, set_loglevel,
-    get_contrib_packages)
+    get_contrib_packages, user_agent)
 from dwave.cloud.coders import encode_problem_as_bq
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
@@ -51,6 +51,10 @@ def enable_loglevel(ctx, param, value):
     if value and not ctx.resilient_parsing:
         set_loglevel(dwave.cloud.logger, value)
 
+def show_platform(ctx, param, value):
+    if value and not ctx.resilient_parsing:
+        click.echo(user_agent())
+        sys.exit()
 
 @click.group()
 @click.version_option(prog_name=__title__, version=__version__)
@@ -60,7 +64,9 @@ def enable_loglevel(ctx, param, value):
               help='Enable trace-level debug logging.')
 @click.option('--log', 'loglevel', metavar='LEVEL', callback=enable_loglevel,
               help='Set custom numeric or symbolic log level.')
-def cli(debug=False, trace=False, loglevel=None):
+@click.option('--platform', is_flag=True, callback=show_platform,
+              help='Show the platform tags and exit.')
+def cli(debug=False, trace=False, loglevel=None, platform=False):
     """D-Wave Cloud Client interactive configuration tool."""
 
 
@@ -652,7 +658,7 @@ def _install_contrib_package(name, verbose=False, prompt=True):
 
         res = subprocess.run(
             [sys.executable, "-m", "pip", "install", req,
-             "--extra-index", dwave_contrib_repo],
+             "--extra-index-url", dwave_contrib_repo],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
         if res.returncode or verbose:
