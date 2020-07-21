@@ -620,7 +620,6 @@ class TestMockedMultipartUpload(unittest.TestCase):
 
             def put(path, data, headers, seq=iter(range(Client._UPLOAD_PART_RETRIES+1))):
                 body = data.read()
-                data.seek(0)
                 headers = json.dumps(sorted(headers.items()))
                 keys = [
                     (
