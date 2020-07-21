@@ -1035,7 +1035,7 @@ class Client(object):
         warnings.warn("'solvers' is deprecated in favor of 'get_solvers'.", DeprecationWarning)
         return self.get_solvers(refresh=refresh, **filters)
 
-    def get_solver(self, name=None, refresh=False, **filters):
+    def get_solver(self, name=None, refresh=False, order_by='avg_load', **filters):
         """Load the configuration for a single solver.
 
         Makes a blocking web call to `{endpoint}/solvers/remote/{solver_name}/`, where `{endpoint}`
@@ -1098,7 +1098,7 @@ class Client(object):
         # get the first solver that satisfies all filters
         try:
             logger.debug("Fetching solvers according to filters=%r", filters)
-            return self.get_solvers(refresh=refresh, **filters)[0]
+            return self.get_solvers(refresh=refresh, order_by=order_by, **filters)[0]
         except IndexError:
             raise SolverNotFoundError("Solver with the requested features not available")
 
