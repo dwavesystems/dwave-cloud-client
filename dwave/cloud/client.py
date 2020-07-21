@@ -1668,7 +1668,7 @@ class Client(object):
 
     @staticmethod
     @retried(_UPLOAD_PART_RETRIES, backoff=_UPLOAD_RETRIES_BACKOFF)
-    def _upload_multipart_part(session, problem_id, part_id, part_stream,
+    def _upload_multipart_part(session, problem_id, part_id, part_generator,
                                uploaded_part_checksum=None):
         """Upload one problem part. Sync http request.
 
@@ -1679,8 +1679,9 @@ class Client(object):
                 Problem id.
             part_id (int):
                 Part number/id.
-            part_stream (:class:`io.BufferedIOBase`/binary-stream-like):
-                Problem part data container that supports `read` operation.
+            part_generator (generator of :class:`io.BufferedIOBase`/binary-stream-like):
+                Callable that produces problem part data container that supports
+                `read` and `seek` operations.
             uploaded_part_checksum (str/None):
                 Checksum of previously uploaded part. Optional, but if specified
                 checksum is verified, and part is uploaded only if checksums
@@ -1691,6 +1692,9 @@ class Client(object):
         """
 
         logger.debug("Uploading part_id=%r of problem_id=%r", part_id, problem_id)
+
+        # generate the mutable part stream from immutable stream generator
+        part_stream = part_generator()
 
         # TODO: work-around to get a checksum of a binary stream (avoid 2x read)
         data = part_stream.read()
@@ -1808,12 +1812,12 @@ class Client(object):
                 uploaded_parts[part_no] = checksum
         return uploaded_parts
 
-    def _upload_part_worker(self, problem_id, part_no, chunk_stream,
+    def _upload_part_worker(self, problem_id, part_no, chunk_generator,
                             uploaded_part_checksum=None):
 
         with self.create_session() as session:
             part_checksum = self._upload_multipart_part(
-                session, problem_id, part_id=part_no, part_stream=chunk_stream,
+                session, problem_id, part_id=part_no, part_generator=chunk_generator,
                 uploaded_part_checksum=uploaded_part_checksum)
 
             return part_no, part_checksum
@@ -1859,12 +1863,11 @@ class Client(object):
 
             # enqueue all parts, worker skips if checksum matches
             parts = {}
-            streams = collections.OrderedDict(enumerate(chunks))
-            for chunk_no, chunk_stream in streams.items():
+            for chunk_no, chunk_generator in enumerate(chunks.generators()):
                 part_no = chunk_no + 1
                 part_future = self._upload_part_executor.submit(
                     self._upload_part_worker,
-                    problem_id, part_no, chunk_stream,
+                    problem_id, part_no, chunk_generator,
                     uploaded_part_checksum=uploaded_parts.get(part_no))
 
                 parts[part_no] = part_future
