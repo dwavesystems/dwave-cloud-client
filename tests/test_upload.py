@@ -358,6 +358,12 @@ class TestChunkedData(unittest.TestCase):
         chunks_expected = [self.data]
         self.verify_chunking(cd, chunks_expected)
 
+    def test_chunk_generators(self):
+        cd = ChunkedData(self.data, chunk_size=3)
+        chunks_expected = [b'012', b'345', b'678', b'9']
+        chunks_generated = [g().read() for g in cd.generators()]
+        self.assertListEqual(chunks_expected, chunks_generated)
+
 
 @unittest.skipUnless(config, "No live server configuration available.")
 class TestMultipartUpload(unittest.TestCase):

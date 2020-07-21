@@ -22,6 +22,7 @@ import threading
 
 from abc import abstractmethod
 from collections.abc import Sized
+from functools import partial
 
 __all__ = ['ChunkedData']
 
@@ -400,3 +401,9 @@ class ChunkedData(object):
     def __iter__(self):
         for idx in range(len(self)):
             yield self.chunk(idx)
+
+    def generators(self):
+        """Iterator of (immutable) chunk generators."""
+
+        for idx in range(len(self)):
+            yield partial(self.chunk, idx=idx)
