@@ -717,6 +717,19 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         with self.assertRaises(TypeError):
             self.client.get_solvers(order_by=list)
 
+    def test_order_by_respects_default_solver(self):
+        """order_by used in isolation should not affect default_solver filters (issue #401)"""
+
+        with Client('endpoint', 'token', solver=dict(name='qpu2')) as client:
+            # mock the network call to fetch all solvers
+            client._fetch_solvers = lambda **kw: self.solvers
+
+            # the default solver is set on client
+            self.assertEqual(client.get_solver(), self.qpu2)
+
+            # the default solver should not change when we add order_by
+            self.assertEqual(client.get_solver(order_by='id'), self.qpu2)
+
     def test_order_by_string(self):
         # sort by Solver inferred properties
         self.assertEqual(self.client.get_solvers(order_by='id'), [self.hybrid, self.qpu1, self.qpu2, self.software])
