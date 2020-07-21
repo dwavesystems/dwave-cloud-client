@@ -697,10 +697,10 @@ class Client(object):
                 Force refresh of cached list of solvers/properties.
 
             order_by (callable/str/None, default='avg_load'):
-                Solver sorting key function (or :class:`Solver` attribute/item
-                dot-separated path). By default, solvers are sorted by average
-                load. To explicitly not sort the solvers (and use the API-returned
-                order), set ``order_by=None``.
+                Solver sorting key function (or :class:`~dwave.cloud.solver.Solver`
+                attribute/item dot-separated path). By default, solvers are sorted
+                by average load. To explicitly not sort the solvers (and use the
+                API-returned order), set ``order_by=None``.
 
                 Signature of the `key` `callable` is::
 
@@ -1052,13 +1052,15 @@ class Client(object):
                 Dictionary of filters over features this solver has to have. For a list of
                 feature names and values, see: :meth:`~dwave.cloud.client.Client.get_solvers`.
 
-            order_by (callable/str, default='id'):
-                Solver sorting key function (or :class:`Solver` attribute name).
-                By default, solvers are sorted by ID/name.
+            order_by (callable/str/None, default='avg_load'):
+                Solver sorting key function (or :class:`~dwave.cloud.solver.Solver`
+                attribute/item dot-separated path). By default, solvers are sorted by average
+                load. For details, see :meth:`~dwave.cloud.client.Client.get_solvers`.
 
             refresh (bool):
-                Return solver from cache (if cached with ``get_solvers()``),
-                unless set to ``True``.
+                Return solver from cache (if cached with
+                :meth:`~dwave.cloud.client.Client.get_solvers`), unless set to
+                ``True``.
 
         Returns:
             :class:`.Solver`
