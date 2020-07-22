@@ -1576,6 +1576,7 @@ class Client(object):
                         exception = IOError(exception)
 
                     future._set_exception(exception)
+                    self._load_queue.task_done()
                     continue
 
                 # Dispatch the results, mark the task complete
