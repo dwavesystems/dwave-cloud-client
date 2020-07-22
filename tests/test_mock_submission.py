@@ -303,6 +303,30 @@ class MockSubmission(_QueryTest):
                 with self.assertRaises(CanceledFutureError):
                     results.samples
 
+    def test_answer_load_error(self):
+        """Answer load error is propagated as exception."""
+
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda a, _: choose_reply(a, {
+                'problems/': '[%s]' % complete_no_answer_reply(
+                    '123', 'abc123')})
+            session.get = lambda a: choose_reply(a, {
+                'problems/123/': 'Problem not found'}, statuses=[404])
+            return session
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+
+                linear, quadratic = test_problem(solver)
+                future = solver.sample_ising(linear, quadratic, num_reads=100)
+
+                with self.assertRaises(Exception):
+                    future.result()
+
     def test_submit_continue_then_ok_reply(self):
         """Handle polling for a complete problem."""
 
