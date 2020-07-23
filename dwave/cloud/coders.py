@@ -262,11 +262,6 @@ def decode_qp_numpy(msg, return_matrix=True):
     return result
 
 
-def _encode_problem_as_bq_ref(problem):
-    assert isinstance(problem, str)
-
-    return problem
-
 def _encode_problem_as_bq_json(problem):
     assert hasattr(problem, 'to_serializable')
 
@@ -293,8 +288,8 @@ def encode_problem_as_bq(problem, compress=False):
 
     if isinstance(problem, str):
         return {
-            'format': 'bqm-ref',
-            'data': _encode_problem_as_bq_ref(problem)
+            'format': 'ref',
+            'data': problem
         }
 
     if compress:

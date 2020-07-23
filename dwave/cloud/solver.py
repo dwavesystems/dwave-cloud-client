@@ -307,8 +307,8 @@ class UnstructuredSolver(BaseSolver):
         bqm = dimod.BinaryQuadraticModel.from_qubo(qubo)
         return self.sample_bqm(bqm, **params)
 
-    def _encode_any_problem_as_bqm_ref(self, problem, params):
-        """Encode `problem` for submitting in `bqm-ref` format. Upload the
+    def _encode_any_problem_as_ref(self, problem, params):
+        """Encode `problem` for submitting in `ref` format. Upload the
         problem if it's not already uploaded.
 
         Args:
@@ -327,7 +327,7 @@ class UnstructuredSolver(BaseSolver):
         if isinstance(problem, str):
             problem_id = problem
         else:
-            logger.debug("To encode the problem for submit via 'bqm-ref', "
+            logger.debug("To encode the problem for submit in the 'ref' format, "
                          "we need to upload it first.")
             problem_id = self.upload_bqm(problem).result()
 
@@ -361,7 +361,7 @@ class UnstructuredSolver(BaseSolver):
 
         # encode the request (body as future)
         body = self.client._encode_problem_executor.submit(
-            self._encode_any_problem_as_bqm_ref,
+            self._encode_any_problem_as_ref,
             problem=bqm, params=params)
 
         # computation future holds a reference to the remote job
