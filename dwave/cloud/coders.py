@@ -262,19 +262,7 @@ def decode_qp_numpy(msg, return_matrix=True):
     return result
 
 
-def _encode_problem_as_bq_json(problem):
-    assert hasattr(problem, 'to_serializable')
-
-    return problem.to_serializable(use_bytes=False)
-
-def _encode_problem_as_bq_json_zlib(problem):
-    assert hasattr(problem, 'to_serializable')
-
-    bqm_dict = _encode_problem_as_bq_json(problem)
-    return zlib.compress(codecs.encode(json.dumps(bqm_dict), "ascii"))
-
-
-def encode_problem_as_bq(problem, compress=False):
+def encode_problem_as_bq(problem):
     """Encode the binary quadratic problem for submission in the `bq` data
     format.
 
@@ -292,17 +280,14 @@ def encode_problem_as_bq(problem, compress=False):
             'data': problem
         }
 
-    if compress:
-        return {
-            'format': 'bq-zlib',
-            'data': _encode_problem_as_bq_json_zlib(problem)
-        }
-
-    else:
+    # NOTE: semi-deprecated format; see `bqm_as_file`.
+    if hasattr(problem, 'to_serializable'):
         return {
             'format': 'bq',
-            'data': _encode_problem_as_bq_json(problem)
+            'data': problem.to_serializable(use_bytes=False)
         }
+
+    raise TypeError("unsupported problem type")
 
 
 def decode_bq(msg):
@@ -325,3 +310,40 @@ def decode_bq(msg):
     result['problem_type'] = 'bqm'
 
     return result
+
+
+def bqm_as_file(bqm, **options):
+    """Encode in-memory BQM as DIMODBQM binary file format.
+
+    Args:
+        bqm (:class:`~dimod.BQM`):
+            Binary quadratic model.
+
+        **options (dict):
+            :class:`~dimod.serialization.fileview.FileView` options.
+
+    Returns:
+        file-like:
+            Binary stream with BQM encoded in DIMODBQM format.
+    """
+    # This now the preferred way of BQM binary serialization.
+
+    # XXX: temporary implemented here, until something like
+    # dwavesystems/dimod#599 is available.
+
+    try:
+        import dimod
+        from dimod.serialization.fileview import FileView as BQMFileView
+    except ImportError: # pragma: no cover
+        raise RuntimeError("Can't encode BQM without 'dimod'. "
+                           "Re-install the library with 'bqm' support.")
+
+    if isinstance(bqm, BQMFileView):
+        return bqm
+
+    # test explicitly to avoid copy on cast if possible
+    fileviewable = (dimod.AdjArrayBQM, dimod.AdjVectorBQM, dimod.AdjMapBQM)
+    if not isinstance(bqm, fileviewable):
+        bqm = AdjVectorBQM(bqm)
+
+    return BQMFileView(bqm, **options)

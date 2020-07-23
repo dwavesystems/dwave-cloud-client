@@ -36,7 +36,7 @@ from collections import abc
 from dwave.cloud.exceptions import *
 from dwave.cloud.coders import (
     encode_problem_as_qp, encode_problem_as_bq,
-    decode_qp_numpy, decode_qp, decode_bq)
+    decode_qp_numpy, decode_qp, decode_bq, bqm_as_file)
 from dwave.cloud.utils import uniform_iterator, reformat_qubo_as_ising
 from dwave.cloud.computation import Future
 from dwave.cloud.concurrency import Present
@@ -307,7 +307,7 @@ class UnstructuredSolver(BaseSolver):
         bqm = dimod.BinaryQuadraticModel.from_qubo(qubo)
         return self.sample_bqm(bqm, **params)
 
-    def _encode_any_problem_as_ref(self, problem, params):
+    def _encode_problem_as_ref(self, problem, params):
         """Encode `problem` for submitting in `ref` format. Upload the
         problem if it's not already uploaded.
 
@@ -361,7 +361,7 @@ class UnstructuredSolver(BaseSolver):
 
         # encode the request (body as future)
         body = self.client._encode_problem_executor.submit(
-            self._encode_any_problem_as_ref,
+            self._encode_problem_as_ref,
             problem=bqm, params=params)
 
         # computation future holds a reference to the remote job
@@ -371,33 +371,6 @@ class UnstructuredSolver(BaseSolver):
         self.client._submit(body, computation)
 
         return computation
-
-    @staticmethod
-    def _bqm_as_fileview(bqm):
-        # New preferred BQM binary serialization.
-        # XXX: temporary until something like dwavesystems/dimod#599 is implemented.
-
-        try:
-            import dimod
-            from dimod.serialization.fileview import FileView as BQMFileView
-        except ImportError: # pragma: no cover
-            return
-
-        if isinstance(bqm, BQMFileView):
-            return bqm
-
-        # test explicitly to avoid copy on cast if possible
-        fileviewable = (dimod.AdjArrayBQM, dimod.AdjVectorBQM, dimod.AdjMapBQM)
-        if not isinstance(bqm, fileviewable):
-            try:
-                bqm = AdjVectorBQM(bqm)
-            except:
-                return
-
-        try:
-            return BQMFileView(bqm)
-        except:
-            return
 
     def upload_bqm(self, bqm):
         """Upload the specified :term:`BQM` to SAPI, returning a Problem ID
@@ -420,14 +393,13 @@ class UnstructuredSolver(BaseSolver):
             To use this method, dimod package has to be installed.
         """
 
-        data = self._bqm_as_fileview(bqm)
-        if data is None:
-            if hasattr(bqm, 'to_serializable'):
-                # soon to be deprecated
-                data = encode_problem_as_bq(bqm, compress=True)['data']
-            else:
-                # raw data (ready for upload) in `bqm`
-                data = bqm
+        try:
+            data = bqm_as_file(bqm)
+        except Exception as e:
+            logger.debug("BQM conversion to file failed with %r, "
+                         "assuming data already encoded.", e)
+            # assume `bqm` given as file, ready for upload
+            data = bqm
 
         return self.client.upload_problem_encoded(data)
 
