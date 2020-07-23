@@ -21,7 +21,12 @@ import codecs
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_tail, active_qubits)
 
-__all__ = ['encode_problem_as_qp', 'decode_qp', 'decode_qp_numpy']
+__all__ = [
+    'encode_problem_as_qp', 'decode_qp', 'decode_qp_numpy',
+    'encode_problem_as_bq', 'decode_bq',
+    'encode_problem_as_ref',
+    'bqm_as_file',
+]
 
 
 def encode_problem_as_qp(solver, linear, quadratic, undirected_biases=False):
@@ -262,32 +267,52 @@ def decode_qp_numpy(msg, return_matrix=True):
     return result
 
 
-def encode_problem_as_bq(problem):
-    """Encode the binary quadratic problem for submission in the `bq` data
+def encode_problem_as_ref(problem):
+    """Encode the problem given via reference for submission in the `ref` data
     format.
 
     Args:
-        problem (:class:`~dimod.BinaryQuadraticModel`/str):
-            A binary quadratic model, or a reference to one (Problem ID).
+        problem (str):
+            A reference to an uploaded problem (Problem ID).
 
     Returns:
         encoded submission dictionary
     """
 
-    if isinstance(problem, str):
-        return {
-            'format': 'ref',
-            'data': problem
-        }
+    if not isinstance(problem, str):
+        raise TypeError("unsupported problem type")
 
+    return {
+        'format': 'ref',
+        'data': problem
+    }
+
+
+def encode_problem_as_bq(problem):
+    """Encode the binary quadratic problem for submission in the `bq` data
+    format.
+
+    Args:
+        problem (:class:`~dimod.BinaryQuadraticModel`):
+            A binary quadratic model.
+
+    Returns:
+        encoded submission dictionary
+
+    Note:
+        The `bq` format assumes the complete BQM is sent embedded in the sample
+        job submit data, something none of the production solvers currently
+        support.
+    """
     # NOTE: semi-deprecated format; see `bqm_as_file`.
-    if hasattr(problem, 'to_serializable'):
-        return {
-            'format': 'bq',
-            'data': problem.to_serializable(use_bytes=False)
-        }
 
-    raise TypeError("unsupported problem type")
+    if not hasattr(problem, 'to_serializable'):
+        raise TypeError("unsupported problem type")
+
+    return {
+        'format': 'bq',
+        'data': problem.to_serializable(use_bytes=False)
+    }
 
 
 def decode_bq(msg):

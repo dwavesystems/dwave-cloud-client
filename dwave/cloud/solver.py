@@ -35,7 +35,7 @@ from collections import abc
 
 from dwave.cloud.exceptions import *
 from dwave.cloud.coders import (
-    encode_problem_as_qp, encode_problem_as_bq,
+    encode_problem_as_qp, encode_problem_as_ref,
     decode_qp_numpy, decode_qp, decode_bq, bqm_as_file)
 from dwave.cloud.utils import uniform_iterator, reformat_qubo_as_ising
 from dwave.cloud.computation import Future
@@ -321,7 +321,6 @@ class UnstructuredSolver(BaseSolver):
         Returns:
             str:
                 JSON-encoded problem submit body
-
         """
 
         if isinstance(problem, str):
@@ -333,7 +332,7 @@ class UnstructuredSolver(BaseSolver):
 
         body = json.dumps({
             'solver': self.id,
-            'data': encode_problem_as_bq(problem_id),
+            'data': encode_problem_as_ref(problem_id),
             'type': 'bqm',
             'params': params
         })
