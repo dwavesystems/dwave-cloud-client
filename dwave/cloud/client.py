@@ -1561,21 +1561,32 @@ class Client(object):
                 # Submit the query
                 query_string = 'problems/{}/'.format(future.id)
                 try:
+                    logger.trace("Executing answer load request")
+
                     try:
                         response = session.get(query_string)
                     except requests.exceptions.Timeout:
                         raise RequestTimeout
 
+                    logger.trace(("Answer load response: "
+                                  "code={r.status_code!r}, "
+                                  "body={r.text!r}").format(r=response))
+
                     if response.status_code == 401:
                         raise SolverAuthenticationError()
+                    if response.status_code == 404:
+                        raise SolverError(response.text)
                     response.raise_for_status()
 
                     message = response.json()
                 except BaseException as exception:
-                    if not isinstance(exception, SolverAuthenticationError):
+                    logger.trace("Answer load request failed with %r", exception)
+
+                    if not isinstance(exception, SolverError):
                         exception = IOError(exception)
 
                     future._set_exception(exception)
+                    self._load_queue.task_done()
                     continue
 
                 # Dispatch the results, mark the task complete

@@ -32,7 +32,8 @@ from concurrent.futures import TimeoutError
 from dwave.cloud.utils import evaluate_ising, generate_const_ising_problem
 from dwave.cloud.client import Client, Solver
 from dwave.cloud.computation import Future
-from dwave.cloud.exceptions import SolverFailureError, CanceledFutureError
+from dwave.cloud.exceptions import (
+    SolverFailureError, CanceledFutureError, SolverError)
 
 
 def test_problem(solver):
@@ -166,8 +167,9 @@ def choose_reply(path, replies, statuses=None, date=None):
         date = datetime_in_future(0)
 
     if path in replies:
-        response = mock.Mock(['json', 'raise_for_status', 'headers'])
+        response = mock.Mock(['text', 'json', 'raise_for_status', 'headers'])
         response.status_code = next(statuses[path])
+        response.text = replies[path]
         response.json.side_effect = lambda: json.loads(replies[path])
         response.headers = CaseInsensitiveDict({'Date': date.isoformat()})
         def raise_for_status():
@@ -302,6 +304,39 @@ class MockSubmission(_QueryTest):
 
                 with self.assertRaises(CanceledFutureError):
                     results.samples
+
+    def test_answer_load_error(self):
+        """Answer load error is propagated as exception."""
+
+        error_code = 404
+        error_message = 'Problem not found'
+
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda path, _: choose_reply(path, {
+                'problems/': '[%s]' % complete_no_answer_reply(
+                    '123', 'abc123')})
+            session.get = lambda path: choose_reply(
+                path, replies={
+                    'problems/123/': error_message
+                }, statuses={
+                    'problems/123/': iter([error_code])
+                })
+            return session
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+
+                linear, quadratic = test_problem(solver)
+                future = solver.sample_ising(linear, quadratic)
+
+                with self.assertRaises(SolverError) as exc:
+                    future.result()
+
+                self.assertEqual(str(exc.exception), error_message)
 
     def test_submit_continue_then_ok_reply(self):
         """Handle polling for a complete problem."""

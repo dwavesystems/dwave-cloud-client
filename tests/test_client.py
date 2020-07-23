@@ -82,7 +82,10 @@ class TestTimeouts(unittest.TestCase):
 @unittest.skipUnless(config, "No live server configuration available.")
 class TestRetrieveAnswer(unittest.TestCase):
     """Test loading a problem from its id"""
+
     def test_retrieve_answer(self):
+        """Answer retrieved based on problem_id in a new client."""
+
         with Client(**config) as client:
             solver = client.get_solver()
 
@@ -102,6 +105,13 @@ class TestRetrieveAnswer(unittest.TestCase):
 
             self.assertIn('solutions', f2.result())
 
+    def test_retrieve_invalid_answer_id(self):
+        """Loading result fails when problem_id invalid."""
+
+        with Client(**config) as client:
+            f = client.retrieve_answer('invalid_id')
+            with self.assertRaises(SolverError):
+                f.result()
 
 @unittest.skipUnless(config, "No live server configuration available.")
 class SolverLoading(unittest.TestCase):
