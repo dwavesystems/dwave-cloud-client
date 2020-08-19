@@ -529,7 +529,7 @@ class MockSubmission(_QueryTest):
 
                 def assert_no_delay(s):
                     s and self.assertTrue(
-                        abs(s - client.poll_backoff_min) < client.poll_backoff_min / 10.0)
+                        abs(s - client.poll_backoff_min) < client._DEFAULT_POLL_BACKOFF_MIN)
 
                 with mock.patch('time.sleep', assert_no_delay):
                     future = solver.sample_qubo({})
@@ -558,7 +558,7 @@ class MockSubmission(_QueryTest):
 
                 def assert_no_delay(s):
                     s and self.assertTrue(
-                        abs(s - client.poll_backoff_min) < client.poll_backoff_min / 10.0)
+                        abs(s - client.poll_backoff_min) < client._DEFAULT_POLL_BACKOFF_MIN)
 
                 with mock.patch('time.sleep', assert_no_delay):
                     future = solver.sample_qubo({})
@@ -588,7 +588,7 @@ class MockSubmission(_QueryTest):
 
                 def assert_no_delay(s):
                     s and self.assertTrue(
-                        abs(s - client.poll_backoff_min) < client.poll_backoff_min / 10.0)
+                        abs(s - client.poll_backoff_min) < client._DEFAULT_POLL_BACKOFF_MIN)
 
                 with mock.patch('time.sleep', assert_no_delay):
                     future = solver.sample_qubo({})

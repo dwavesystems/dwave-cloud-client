@@ -165,7 +165,7 @@ class Client(object):
     _LOAD_THREAD_COUNT = 5
 
     # Poll back-off schedule defaults [sec]
-    _DEFAULT_POLL_BACKOFF_MIN = 1
+    _DEFAULT_POLL_BACKOFF_MIN = 0.05
     _DEFAULT_POLL_BACKOFF_MAX = 60
 
     # Tolerance for server-client clocks difference (approx) [sec]
