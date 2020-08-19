@@ -374,6 +374,35 @@ class ClientFactory(unittest.TestCase):
             with dwave.cloud.Client.from_config(**conf) as client:
                 self.assertEqual(client.client_cert, client_cert)
 
+    def test_polling_params_from_config(self):
+        poll_conf = {"poll_backoff_min": "0.1", "poll_backoff_max": "1"}
+        conf = dict(token='token', **poll_conf)
+
+        # polling params from config file propagated to client object
+        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+            with dwave.cloud.Client.from_config() as client:
+                self.assertEqual(client.poll_backoff_min, 0.1)
+                self.assertEqual(client.poll_backoff_max, 1.0)
+
+        # test defaults
+        conf = dict(token='token')
+        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+            with dwave.cloud.Client.from_config() as client:
+                self.assertEqual(client.poll_backoff_min, Client._DEFAULT_POLL_BACKOFF_MIN)
+                self.assertEqual(client.poll_backoff_max, Client._DEFAULT_POLL_BACKOFF_MAX)
+
+    def test_polling_params_from_kwargs(self):
+        poll_conf = {"poll_backoff_min": "0.1", "poll_backoff_max": "1"}
+        conf = dict(token='token', **poll_conf)
+
+        def load_config(**kwargs):
+            return merge(kwargs, conf, op=lambda a, b: a or b)
+
+        with mock.patch("dwave.cloud.client.load_config", load_config):
+            with dwave.cloud.Client.from_config(poll_backoff_min=0.5) as client:
+                self.assertEqual(client.poll_backoff_min, 0.5)
+                self.assertEqual(client.poll_backoff_max, 1.0)
+
 
 class FeatureBasedSolverSelection(unittest.TestCase):
     """Test Client.get_solvers(**filters)."""
