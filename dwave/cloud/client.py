@@ -164,9 +164,9 @@ class Client(object):
     _POLL_THREAD_COUNT = 2
     _LOAD_THREAD_COUNT = 5
 
-    # Poll back-off interval [sec]
-    _POLL_BACKOFF_MIN = 1
-    _POLL_BACKOFF_MAX = 60
+    # Poll back-off schedule defaults [sec]
+    _DEFAULT_POLL_BACKOFF_MIN = 1
+    _DEFAULT_POLL_BACKOFF_MAX = 60
 
     # Tolerance for server-client clocks difference (approx) [sec]
     _CLOCK_DIFF_MAX = 1
@@ -453,6 +453,12 @@ class Client(object):
 
         # Create session for main thread only
         self.session = self.create_session()
+
+        # store optional config parameters
+        self.poll_backoff_min = parse_float(
+            kwargs.get('poll_backoff_min'), self._DEFAULT_POLL_BACKOFF_MIN)
+        self.poll_backoff_max = parse_float(
+            kwargs.get('poll_backoff_max'), self._DEFAULT_POLL_BACKOFF_MAX)
 
         # Build the problem submission queue, start its workers
         self._submission_queue = queue.Queue()
@@ -1383,12 +1389,12 @@ class Client(object):
 
         if future._poll_backoff is None:
             # on first poll, start with minimal back-off
-            future._poll_backoff = self._POLL_BACKOFF_MIN
+            future._poll_backoff = self.poll_backoff_min
         else:
             # on subsequent polls, do exponential back-off, clipped to a range
             future._poll_backoff = \
-                max(self._POLL_BACKOFF_MIN,
-                    min(future._poll_backoff * 2, self._POLL_BACKOFF_MAX))
+                max(self.poll_backoff_min,
+                    min(future._poll_backoff * 2, self.poll_backoff_max))
 
         # for poll priority we use timestamp of next scheduled poll
         at = time.time() + future._poll_backoff

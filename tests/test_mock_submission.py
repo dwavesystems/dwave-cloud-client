@@ -500,7 +500,7 @@ class MockSubmission(_QueryTest):
                 future.result()
 
                 # after third poll, back-off interval should be 4 x initial back-off
-                self.assertEqual(future._poll_backoff, Client._POLL_BACKOFF_MIN * 2**2)
+                self.assertEqual(future._poll_backoff, client.poll_backoff_min * 2**2)
 
     def test_eta_min_is_ignored_on_first_poll(self):
         "eta_min/earliest_estimated_completion should not be used anymore"
@@ -529,7 +529,7 @@ class MockSubmission(_QueryTest):
 
                 def assert_no_delay(s):
                     s and self.assertTrue(
-                        abs(s - client._POLL_BACKOFF_MIN) < client._POLL_BACKOFF_MIN / 10.0)
+                        abs(s - client.poll_backoff_min) < client.poll_backoff_min / 10.0)
 
                 with mock.patch('time.sleep', assert_no_delay):
                     future = solver.sample_qubo({})
@@ -558,7 +558,7 @@ class MockSubmission(_QueryTest):
 
                 def assert_no_delay(s):
                     s and self.assertTrue(
-                        abs(s - client._POLL_BACKOFF_MIN) < client._POLL_BACKOFF_MIN / 10.0)
+                        abs(s - client.poll_backoff_min) < client.poll_backoff_min / 10.0)
 
                 with mock.patch('time.sleep', assert_no_delay):
                     future = solver.sample_qubo({})
@@ -588,7 +588,7 @@ class MockSubmission(_QueryTest):
 
                 def assert_no_delay(s):
                     s and self.assertTrue(
-                        abs(s - client._POLL_BACKOFF_MIN) < client._POLL_BACKOFF_MIN / 10.0)
+                        abs(s - client.poll_backoff_min) < client.poll_backoff_min / 10.0)
 
                 with mock.patch('time.sleep', assert_no_delay):
                     future = solver.sample_qubo({})
@@ -639,7 +639,7 @@ class MockSubmission(_QueryTest):
                 future.result()
 
                 # after third poll, back-off interval should be 4 x initial back-off
-                self.assertEqual(future._poll_backoff, Client._POLL_BACKOFF_MIN * 2**2)
+                self.assertEqual(future._poll_backoff, client.poll_backoff_min * 2**2)
 
 
 class DeleteEvent(Exception):
