@@ -156,6 +156,9 @@ class Future(object):
         # current poll back-off interval, in seconds
         self._poll_backoff = None
 
+        # XXX: energy offset carried via Future, until implemented in SAPI
+        self._offset = 0
+
     # TODO: remove in 0.9.0
     @property
     def error(self):
@@ -878,9 +881,20 @@ class Future(object):
 
         return self._result
 
+    def _patch_offset(self):
+        # XXX: This is a temporary fix, until SAPI starts returning the offset
+        # in answer (for structured solvers only).
+        # It will patch `self._message` to include the offset as set in
+        # `self._offset`.
+        msg = self._message
+        fmt = msg.get('answer', {}).get('format')
+        if fmt == 'qp':
+            msg['answer']['offset'] = self._offset
+
     def _decode(self):
         """Decode answer data from the response."""
         start = time.time()
+        self._patch_offset()
         self._result = self.solver.decode_response(self._message)
         self.parse_time = time.time() - start
         return self._result
