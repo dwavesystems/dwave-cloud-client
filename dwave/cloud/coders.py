@@ -24,7 +24,8 @@ from dwave.cloud.utils import (
 __all__ = ['encode_problem_as_qp', 'decode_qp', 'decode_qp_numpy']
 
 
-def encode_problem_as_qp(solver, linear, quadratic, undirected_biases=False):
+def encode_problem_as_qp(solver, linear, quadratic, offset=0,
+                         undirected_biases=False):
     """Encode the binary quadratic problem for submission to a given solver,
     using the `qp` format for data.
 
@@ -37,6 +38,9 @@ def encode_problem_as_qp(solver, linear, quadratic, undirected_biases=False):
 
         quadratic (dict[(variable, variable), bias]):
             Quadratic terms of the model.
+
+        offset (number, default=0):
+            Constant offset applied to the model.
 
         undirected_biases (boolean, default=False):
             Are (quadratic) biases specified on undirected edges?
@@ -79,7 +83,8 @@ def encode_problem_as_qp(solver, linear, quadratic, undirected_biases=False):
     return {
         'format': 'qp',
         'lin': lin.decode('utf-8'),
-        'quad': quad.decode('utf-8')
+        'quad': quad.decode('utf-8'),
+        'offset': offset
     }
 
 
@@ -98,6 +103,11 @@ def decode_qp(msg):
     if 'num_occurrences' in result:
         result['num_occurrences'] = _decode_ints(result['num_occurrences'])
     result['energies'] = _decode_doubles(result['energies'])
+
+    # adjust energies by offset (in future this might be handled by SAPI)
+    offset = result.setdefault('offset', 0)
+    if offset:
+        result['energies'] = [en + offset for en in result['energies']]
 
     # Measure out the size of the binary solution data
     num_solutions = len(result['energies'])
@@ -207,6 +217,12 @@ def decode_qp_numpy(msg, return_matrix=True):
     # Decode the simple buffers
     result['energies'] = np.frombuffer(base64.b64decode(result['energies']),
                                        dtype=double_type)
+
+    # adjust energies by offset (in future this might be handled by SAPI)
+    offset = result.setdefault('offset', 0)
+    if offset:
+        # we need to make a copy because frombuffer returns read-only array
+        result['energies'] = result['energies'] + offset
 
     if 'num_occurrences' in result:
         result['num_occurrences'] = \
