@@ -278,6 +278,16 @@ class UnstructuredSolver(BaseSolver):
         """Sample from the specified :term:`Ising` model.
 
         Args:
+            linear (dict/list):
+                Linear biases of the Ising problem. If a dict, should be of the
+                form `{v: bias, ...}` where v is a spin-valued variable and `bias`
+                is its associated bias. If a list, it is treated as a list of
+                biases where the indices are the variable labels.
+
+            quadratic (dict[(variable, variable), bias]):
+                Quadratic terms of the model (J), stored in a dict. With keys
+                that are 2-tuples of variables and values are quadratic biases
+                associated with the pair of variables (the interaction).
 
             offset (optional, default=0):
                 Constant offset applied to the model.
@@ -306,7 +316,9 @@ class UnstructuredSolver(BaseSolver):
         Args:
             qubo (dict):
                 Coefficients of a quadratic unconstrained binary optimization
-                (QUBO) model.
+                (QUBO) problem. Should be a dict of the form `{(u, v): bias, ...}`
+                where `u`, `v`, are binary-valued variables and `bias` is their
+                associated coefficient.
 
             offset (optional, default=0):
                 Constant offset applied to the model.
@@ -580,8 +592,11 @@ class StructuredSolver(BaseSolver):
         """Sample from the specified :term:`Ising` model.
 
         Args:
-            linear (list/dict):
-                Linear terms of the model (h).
+            linear (dict/list):
+                Linear biases of the Ising problem. If a dict, should be of the
+                form `{v: bias, ...}` where v is a spin-valued variable and `bias`
+                is its associated bias. If a list, it is treated as a list of
+                biases where the indices are the variable labels.
 
             quadratic (dict[(int, int), float]):
                 Quadratic terms of the model (J), stored in a dict. With keys
@@ -629,7 +644,9 @@ class StructuredSolver(BaseSolver):
         Args:
             qubo (dict[(int, int), float]):
                 Coefficients of a quadratic unconstrained binary optimization
-                (QUBO) model.
+                (QUBO) problem. Should be a dict of the form `{(u, v): bias, ...}`
+                where `u`, `v`, are binary-valued variables and `bias` is their
+                associated coefficient.
 
             offset (optional, default=0):
                 Constant offset applied to the model.
