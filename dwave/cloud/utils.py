@@ -132,7 +132,7 @@ def uniform_get(sequence, index, default=None):
         return sequence[index] if index < len(sequence) else default
 
 
-def reformat_qubo_as_ising(qubo):
+def reformat_qubo_as_ising(qubo, offset=0):
     """Split QUBO coefficients into linear and quadratic terms (the Ising form).
 
     Args:
@@ -140,15 +140,18 @@ def reformat_qubo_as_ising(qubo):
             Coefficients of a quadratic unconstrained binary optimization
             (QUBO) model.
 
+        offset (optional, default=0):
+            Constant offset applied to the model.
+
     Returns:
-        (dict[int, float], dict[(int, int), float])
+        (dict[int, float], dict[(int, int), float], float)
 
     """
 
     lin = {u: bias for (u, v), bias in qubo.items() if u == v}
     quad = {(u, v): bias for (u, v), bias in qubo.items() if u != v}
 
-    return lin, quad
+    return lin, quad, offset
 
 
 def strip_head(sequence, values):

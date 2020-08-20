@@ -274,12 +274,13 @@ class UnstructuredSolver(BaseSolver):
     _handled_problem_types = {"bqm"}
     _handled_encoding_formats = {"bq"}
 
-    def sample_ising(self, linear, quadratic, **params):
-        """Sample from the specified :term:`BQM`.
+    def sample_ising(self, linear, quadratic, offset=0, **params):
+        """Sample from the specified :term:`Ising` model.
 
         Args:
-            bqm (:class:`~dimod.BinaryQuadraticModel`):
-                A binary quadratic model.
+
+            offset (optional, default=0):
+                Constant offset applied to the model.
 
             **params:
                 Parameters for the sampling method, solver-specific.
@@ -296,16 +297,19 @@ class UnstructuredSolver(BaseSolver):
             raise RuntimeError("Can't use solver of type 'bqm' without dimod. "
                                "Re-install the library with 'bqm' support.")
 
-        bqm = dimod.BinaryQuadraticModel.from_ising(linear, quadratic)
+        bqm = dimod.BinaryQuadraticModel.from_ising(linear, quadratic, offset)
         return self.sample_bqm(bqm, **params)
 
-    def sample_qubo(self, qubo, **params):
+    def sample_qubo(self, qubo, offset=0, **params):
         """Sample from the specified :term:`QUBO`.
 
         Args:
-            qubo (dict[(int, int), float]):
+            qubo (dict):
                 Coefficients of a quadratic unconstrained binary optimization
                 (QUBO) model.
+
+            offset (optional, default=0):
+                Constant offset applied to the model.
 
             **params:
                 Parameters for the sampling method, solver-specific.
@@ -322,7 +326,7 @@ class UnstructuredSolver(BaseSolver):
             raise RuntimeError("Can't use solver of type 'bqm' without dimod. "
                                "Re-install the library with 'bqm' support.")
 
-        bqm = dimod.BinaryQuadraticModel.from_qubo(qubo)
+        bqm = dimod.BinaryQuadraticModel.from_qubo(qubo, offset)
         return self.sample_bqm(bqm, **params)
 
     def _encode_any_problem_as_bqm_ref(self, problem, params):
@@ -572,7 +576,7 @@ class StructuredSolver(BaseSolver):
 
     # Sampling methods
 
-    def sample_ising(self, linear, quadratic, **params):
+    def sample_ising(self, linear, quadratic, offset=0, **params):
         """Sample from the specified :term:`Ising` model.
 
         Args:
@@ -583,6 +587,9 @@ class StructuredSolver(BaseSolver):
                 Quadratic terms of the model (J), stored in a dict. With keys
                 that are 2-tuples of variables and values are quadratic biases
                 associated with the pair of variables (the interaction).
+
+            offset (optional, default=0):
+                Constant offset applied to the model.
 
             **params:
                 Parameters for the sampling method, solver-specific.
@@ -614,15 +621,18 @@ class StructuredSolver(BaseSolver):
         """
         # Our linear and quadratic objective terms are already separated in an
         # ising model so we can just directly call `_sample`.
-        return self._sample('ising', linear, quadratic, params)
+        return self._sample('ising', linear, quadratic, offset, params)
 
-    def sample_qubo(self, qubo, **params):
+    def sample_qubo(self, qubo, offset=0, **params):
         """Sample from the specified :term:`QUBO`.
 
         Args:
             qubo (dict[(int, int), float]):
                 Coefficients of a quadratic unconstrained binary optimization
                 (QUBO) model.
+
+            offset (optional, default=0):
+                Constant offset applied to the model.
 
             **params:
                 Parameters for the sampling method, solver-specific.
@@ -653,8 +663,8 @@ class StructuredSolver(BaseSolver):
             (1, 0)
 
         """
-        linear, quadratic = reformat_qubo_as_ising(qubo)
-        return self._sample('qubo', linear, quadratic, params)
+        linear, quadratic, offset = reformat_qubo_as_ising(qubo, offset)
+        return self._sample('qubo', linear, quadratic, offset, params)
 
     def sample_bqm(self, bqm, **params):
         """Sample from the specified :term:`BQM`.
@@ -679,15 +689,16 @@ class StructuredSolver(BaseSolver):
                                "Re-install the library with 'bqm' support.")
 
         if bqm.vartype is dimod.SPIN:
-            return self._sample('ising', bqm.linear, bqm.quadratic, params,
-                                undirected_biases=True)
+            return self._sample('ising', bqm.linear, bqm.quadratic, bqm.offset,
+                                params, undirected_biases=True)
         elif bqm.vartype is dimod.BINARY:
-            return self._sample('qubo', bqm.linear, bqm.quadratic, params,
-                                undirected_biases=True)
+            return self._sample('qubo', bqm.linear, bqm.quadratic, bqm.offset,
+                                params, undirected_biases=True)
         else:
             raise TypeError("unknown/unsupported vartype")
 
-    def _sample(self, type_, linear, quadratic, params, undirected_biases=False):
+    def _sample(self, type_, linear, quadratic, offset, params,
+                undirected_biases=False):
         """Internal method for `sample_ising`, `sample_qubo` and `sample_bqm`.
 
         Args:
@@ -696,6 +707,9 @@ class StructuredSolver(BaseSolver):
 
             quadratic (dict[(int, int), float]):
                 Quadratic terms of the model.
+
+            offset (number):
+                Constant offset applied to the model.
 
             params (dict):
                 Parameters for the sampling method, solver-specific.
@@ -709,7 +723,9 @@ class StructuredSolver(BaseSolver):
             :class:`Future`
         """
 
-        args = dict(type_=type_, linear=linear, quadratic=quadratic, params=params)
+        args = dict(type_=type_, linear=linear, quadratic=quadratic,
+                    offset=offset, params=params,
+                    undirected_biases=undirected_biases)
         dispatch_event('before_sample', obj=self, args=args)
 
         # Check the problem
@@ -730,7 +746,7 @@ class StructuredSolver(BaseSolver):
 
         body_data = json.dumps({
             'solver': self.id,
-            'data': encode_problem_as_qp(self, linear, quadratic,
+            'data': encode_problem_as_qp(self, linear, quadratic, offset,
                                          undirected_biases=undirected_biases),
             'type': type_,
             'params': combined_params
@@ -739,6 +755,9 @@ class StructuredSolver(BaseSolver):
 
         body = Present(result=body_data)
         computation = Future(solver=self, id_=None, return_matrix=self.return_matrix)
+
+        # XXX: offset is carried on Future until implemented in SAPI
+        computation._offset = offset
 
         logger.debug("Submitting new problem to: %s", self.id)
         self.client._submit(body, computation)
