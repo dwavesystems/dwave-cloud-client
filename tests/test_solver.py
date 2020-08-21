@@ -93,15 +93,19 @@ class PropertyLoading(unittest.TestCase):
 
 
 class _QueryTest(unittest.TestCase):
-    def _submit_and_check(self, solver, linear, quad, **param):
-        results = solver.sample_ising(linear, quad, num_reads=100, **param)
+    def _submit_and_check(self, solver, linear, quad, **kwargs):
+        results = solver.sample_ising(linear, quad, num_reads=100, **kwargs)
 
         # Did we get the right number of samples?
         self.assertEqual(100, sum(results.occurrences))
 
+        # offset is optional
+        offset = kwargs.get('offset', 0)
+
         # Make sure the number of occurrences and energies are all correct
         for energy, state in zip(results.energies, results.samples):
-            self.assertAlmostEqual(energy, evaluate_ising(linear, quad, state))
+            self.assertAlmostEqual(
+                energy, evaluate_ising(linear, quad, state, offset=offset))
 
         return results
 
@@ -161,6 +165,14 @@ class Submission(_QueryTest):
             linear, quad = generate_random_ising_problem(solver)
             self._submit_and_check(solver, linear, quad)
 
+    def test_submit_full_ising_problem_with_offset(self):
+        """Submit a problem with all supported coefficients set, including energy offset."""
+
+        with Client(**config) as client:
+            solver = client.get_solver()
+            linear, quad = generate_random_ising_problem(solver)
+            self._submit_and_check(solver, linear, quad, offset=3)
+
     def test_submit_list_problem(self):
         """Submit a problem using a list for the linear terms."""
 
@@ -195,9 +207,10 @@ class Submission(_QueryTest):
             solver = client.get_solver()
 
             linear, quad = generate_random_ising_problem(solver)
+            offset = 3
 
             # sample ising as bqm
-            bqm = dimod.BinaryQuadraticModel.from_ising(linear, quad)
+            bqm = dimod.BinaryQuadraticModel.from_ising(linear, quad, offset)
             response = solver.sample_bqm(bqm, num_reads=100)
             sampleset = response.sampleset
 
@@ -216,9 +229,10 @@ class Submission(_QueryTest):
             solver = client.get_solver()
 
             _, quad = generate_random_ising_problem(solver)
+            offset = 5
 
             # sample qubo as bqm
-            bqm = dimod.BinaryQuadraticModel.from_qubo(quad)
+            bqm = dimod.BinaryQuadraticModel.from_qubo(quad, offset)
             response = solver.sample_bqm(bqm, num_reads=100)
             sampleset = response.sampleset
 
