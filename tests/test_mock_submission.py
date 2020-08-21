@@ -61,15 +61,15 @@ def solver_data(id_, incomplete=False):
     return obj
 
 
-def complete_reply(id_, solver_name):
+def complete_reply(id_, solver_name, answer=None):
     """Reply with solutions for the test problem."""
-    return json.dumps({
+    body = {
         "status": "COMPLETED",
         "solved_on": "2013-01-18T10:26:00.020954",
         "solver": solver_name,
         "submitted_on": "2013-01-18T10:25:59.941674",
         "answer": {
-            'format': 'qp',
+            "format": "qp",
             "num_variables": 5,
             "energies": 'AAAAAAAALsA=',
             "num_occurrences": 'ZAAAAA==',
@@ -79,7 +79,13 @@ def complete_reply(id_, solver_name):
         },
         "type": "ising",
         "id": id_
-    })
+    }
+
+    # optional answer fields override
+    if answer:
+        body['answer'].update(answer)
+
+    return json.dumps(body)
 
 
 def complete_no_answer_reply(id_, solver_name):
@@ -182,13 +188,25 @@ def choose_reply(path, replies, statuses=None, date=None):
 
 
 class _QueryTest(unittest.TestCase):
-    def _check(self, results, linear, quad, num):
+    def _check(self, results, linear, quad, offset=0, num_reads=1):
         # Did we get the right number of samples?
-        self.assertTrue(100 == sum(results.occurrences))
+        self.assertEqual(num_reads, sum(results.occurrences))
 
-        # Make sure the number of occurrences and energies are all correct
+        # Make sure energies are correct in raw results
         for energy, state in zip(results.energies, results.samples):
-            self.assertTrue(energy == evaluate_ising(linear, quad, state))
+            self.assertEqual(energy, evaluate_ising(linear, quad, state, offset=offset))
+
+        # Make sure the sampleset matches raw results
+        for record, energy, num_occurrences, state in \
+                zip(results.sampleset.record,
+                    results['energies'],
+                    results['num_occurrences'],
+                    results['solutions']):
+            recalc_energy = evaluate_ising(linear, quad, state, offset=offset)
+            self.assertEqual(energy, recalc_energy)
+            self.assertEqual(energy, float(record.energy))
+            self.assertEqual(num_occurrences, int(record.num_occurrences))
+            self.assertEqual(state, list(record.sample))
 
 
 @mock.patch('time.sleep', lambda *x: None)
@@ -211,7 +229,7 @@ class MockSubmission(_QueryTest):
                 solver = Solver(client, solver_data('abc123'))
 
                 linear, quadratic = test_problem(solver)
-                results = solver.sample_ising(linear, quadratic, num_reads=100)
+                results = solver.sample_ising(linear, quadratic)
 
                 with self.assertRaises(IOError):
                     results.samples
@@ -236,9 +254,10 @@ class MockSubmission(_QueryTest):
                 solver = Solver(client, solver_data('abc123'))
 
                 linear, quadratic = test_problem(solver)
-                results = solver.sample_ising(linear, quadratic, num_reads=100)
+                params = dict(num_reads=100)
+                results = solver.sample_ising(linear, quadratic, **params)
 
-                self._check(results, linear, quadratic, 100)
+                self._check(results, linear, quadratic, **params)
 
     def test_submit_error_reply(self):
         """Handle an error on problem submission."""
@@ -257,7 +276,7 @@ class MockSubmission(_QueryTest):
                 solver = Solver(client, solver_data('abc123'))
 
                 linear, quadratic = test_problem(solver)
-                results = solver.sample_ising(linear, quadratic, num_reads=100)
+                results = solver.sample_ising(linear, quadratic)
 
                 with self.assertRaises(SolverFailureError):
                     results.samples
@@ -300,7 +319,7 @@ class MockSubmission(_QueryTest):
                 solver = Solver(client, solver_data('abc123'))
 
                 linear, quadratic = test_problem(solver)
-                results = solver.sample_ising(linear, quadratic, num_reads=100)
+                results = solver.sample_ising(linear, quadratic)
 
                 with self.assertRaises(CanceledFutureError):
                     results.samples
@@ -365,9 +384,10 @@ class MockSubmission(_QueryTest):
                 solver = Solver(client, solver_data('abc123'))
 
                 linear, quadratic = test_problem(solver)
-                results = solver.sample_ising(linear, quadratic, num_reads=100)
+                params = dict(num_reads=100)
+                results = solver.sample_ising(linear, quadratic, **params)
 
-                self._check(results, linear, quadratic, 100)
+                self._check(results, linear, quadratic, **params)
 
                 # test future has eta_min and eta_max parsed correctly
                 self.assertEqual(results.eta_min, eta_min)
@@ -393,10 +413,11 @@ class MockSubmission(_QueryTest):
                 solver = Solver(client, solver_data('abc123'))
 
                 linear, quadratic = test_problem(solver)
-                results = solver.sample_ising(linear, quadratic, num_reads=100)
+                params = dict(num_reads=100)
+                results = solver.sample_ising(linear, quadratic, **params)
 
                 with self.assertRaises(SolverFailureError):
-                    self._check(results, linear, quadratic, 100)
+                    self._check(results, linear, quadratic, **params)
 
     def test_submit_continue_then_ok_and_error_reply(self):
         """Handle polling for the status of multiple problems."""
@@ -451,13 +472,14 @@ class MockSubmission(_QueryTest):
                 solver = Solver(client, solver_data('abc123'))
 
                 linear, quadratic = test_problem(solver)
+                params = dict(num_reads=100)
 
-                results1 = solver.sample_ising(linear, quadratic, num_reads=100)
-                results2 = solver.sample_ising(linear, quadratic, num_reads=100)
+                results1 = solver.sample_ising(linear, quadratic, **params)
+                results2 = solver.sample_ising(linear, quadratic, **params)
 
                 with self.assertRaises(SolverFailureError):
-                    self._check(results1, linear, quadratic, 100)
-                self._check(results2, linear, quadratic, 100)
+                    self._check(results1, linear, quadratic, **params)
+                self._check(results2, linear, quadratic, **params)
 
     def test_exponential_backoff_polling(self):
         "After each poll, back-off should double"
@@ -799,3 +821,96 @@ class TestComputationID(unittest.TestCase):
 
                 # verify the id is now available
                 self.assertEqual(future.wait_id(), submission_id)
+
+
+@mock.patch('time.sleep', lambda *x: None)
+class TestOffsetHandling(_QueryTest):
+
+    def test_submit_offset_answer_includes_it(self):
+        """Handle a normal query with offset and response that includes it."""
+
+        # ising problem energy offset
+        offset = 3
+
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda a, _: choose_reply(a, {
+                'problems/': '[%s]' % complete_no_answer_reply(
+                    '123', 'abc123')})
+            session.get = lambda a: choose_reply(a, {
+                'problems/123/': complete_reply(
+                    '123', 'abc123', answer=dict(offset=offset))})
+            return session
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+
+                linear, quadratic = test_problem(solver)
+                params = dict(num_reads=100)
+                results = solver.sample_ising(linear, quadratic, offset, **params)
+
+                self._check(results, linear, quadratic, offset=offset, **params)
+
+    def test_submit_offset_answer_does_not_include_it(self):
+        """Handle a normal query with offset and response that doesn't include it."""
+
+        # ising problem energy offset
+        offset = 3
+
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda a, _: choose_reply(a, {
+                'problems/': '[%s]' % complete_no_answer_reply(
+                    '123', 'abc123')})
+            session.get = lambda a: choose_reply(a, {
+                'problems/123/': complete_reply(
+                    '123', 'abc123')})
+            return session
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+
+                linear, quadratic = test_problem(solver)
+                params = dict(num_reads=100)
+                results = solver.sample_ising(linear, quadratic, offset, **params)
+
+                # although SAPI response doesn't include offset, Future should patch it on-the-fly
+                self._check(results, linear, quadratic, offset=offset, **params)
+
+    def test_submit_offset_wrong_offset_in_answer(self):
+        """Energy levels don't match because offset in answer is respected, even if wrong"""
+
+        # ising problem energy offset
+        offset = 3
+        answer_offset = 2 * offset      # make it wrong
+
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda a, _: choose_reply(a, {
+                'problems/': '[%s]' % complete_no_answer_reply(
+                    '123', 'abc123')})
+            session.get = lambda a: choose_reply(a, {
+                'problems/123/': complete_reply(
+                    '123', 'abc123', answer=dict(offset=answer_offset))})
+            return session
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+
+                linear, quadratic = test_problem(solver)
+                params = dict(num_reads=100)
+                results = solver.sample_ising(linear, quadratic, offset, **params)
+
+                # since SAPI response includes offset, Future shouldn't patch it;
+                # but because the offset in answer is wrong, energies are off
+                with self.assertRaises(AssertionError):
+                    self._check(results, linear, quadratic, offset=offset, **params)
