@@ -1,6 +1,8 @@
--r ../requirements.txt
--r ../docs/requirements.txt
 mock
 requests_mock
 coverage
 coveralls
+
+# optional bqm support
+dimod>=0.8.15
+numpy>=1.16
