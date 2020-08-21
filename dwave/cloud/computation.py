@@ -885,11 +885,12 @@ class Future(object):
         # XXX: This is a temporary fix, until SAPI starts returning the offset
         # in answer (for structured solvers only).
         # It will patch `self._message` to include the offset as set in
-        # `self._offset`.
+        # `self._offset`, but only if SAPI answer does not contain offset already.
         msg = self._message
         fmt = msg.get('answer', {}).get('format')
         if fmt == 'qp':
-            msg['answer']['offset'] = self._offset
+            if 'offset' not in msg['answer']:
+                msg['answer']['offset'] = self._offset
 
     def _decode(self):
         """Decode answer data from the response."""
