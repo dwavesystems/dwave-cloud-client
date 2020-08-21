@@ -29,6 +29,11 @@ from requests.structures import CaseInsensitiveDict
 from requests.exceptions import HTTPError
 from concurrent.futures import TimeoutError
 
+try:
+    import dimod
+except ImportError:
+    dimod = None
+
 from dwave.cloud.utils import evaluate_ising, generate_const_ising_problem
 from dwave.cloud.client import Client, Solver
 from dwave.cloud.computation import Future
@@ -61,9 +66,9 @@ def solver_data(id_, incomplete=False):
     return obj
 
 
-def complete_reply(id_, solver_name, answer=None):
+def complete_reply(id_, solver_name, answer=None, msg=None):
     """Reply with solutions for the test problem."""
-    body = {
+    response = {
         "status": "COMPLETED",
         "solved_on": "2013-01-18T10:26:00.020954",
         "solver": solver_name,
@@ -83,9 +88,13 @@ def complete_reply(id_, solver_name, answer=None):
 
     # optional answer fields override
     if answer:
-        body['answer'].update(answer)
+        response['answer'].update(answer)
 
-    return json.dumps(body)
+    # optional msg, top-level override
+    if msg:
+        response.update(msg)
+
+    return json.dumps(response)
 
 
 def complete_no_answer_reply(id_, solver_name):
@@ -234,7 +243,7 @@ class MockSubmission(_QueryTest):
                 with self.assertRaises(IOError):
                     results.samples
 
-    def test_submit_ok_reply(self):
+    def test_submit_ising_ok_reply(self):
         """Handle a normal query and response."""
 
         # each thread can have its instance of a session because
@@ -258,6 +267,107 @@ class MockSubmission(_QueryTest):
                 results = solver.sample_ising(linear, quadratic, **params)
 
                 self._check(results, linear, quadratic, **params)
+
+    @unittest.skipUnless(dimod, "dimod required for 'Solver.sample_bqm'")
+    def test_submit_bqm_ising_ok_reply(self):
+        """Handle a normal query and response."""
+
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda a, _: choose_reply(a, {
+                'problems/': '[%s]' % complete_no_answer_reply(
+                    '123', 'abc123')})
+            session.get = lambda a: choose_reply(a, {
+                'problems/123/': complete_reply(
+                    '123', 'abc123')})
+            return session
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+
+                h, J = test_problem(solver)
+                bqm = dimod.BinaryQuadraticModel.from_ising(h, J)
+
+                params = dict(num_reads=100)
+                results = solver.sample_bqm(bqm, **params)
+
+                self._check(results, h, J, **params)
+
+    def test_submit_qubo_ok_reply(self):
+        """Handle a normal query and response."""
+
+        qubo_msg_diff = dict(type="qubo")
+        qubo_answer_diff = {
+            'energies': 'AAAAAAAAAAA=',
+            'solutions': 'AA==',
+            'active_variables': 'AAAAAAQAAAA='
+        }
+
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda a, _: choose_reply(a, {
+                'problems/': '[%s]' % complete_no_answer_reply(
+                    '123', 'abc123')})
+            session.get = lambda a: choose_reply(a, {
+                'problems/123/': complete_reply(
+                    '123', 'abc123', answer=qubo_answer_diff, msg=qubo_msg_diff)})
+            return session
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+
+                qubo = {(0, 0): 4.0, (0, 4): -4, (4, 4): 4.0}
+                offset = -2.0
+                params = dict(num_reads=100)
+
+                results = solver.sample_qubo(qubo, offset, **params)
+
+                # make sure energies are correct in raw results
+                for energy, sample in zip(results.energies, results.samples):
+                    self.assertEqual(energy, evaluate_ising({}, qubo, sample, offset=offset))
+
+    @unittest.skipUnless(dimod, "dimod required for 'Solver.sample_bqm'")
+    def test_submit_bqm_qubo_ok_reply(self):
+        """Handle a normal query and response."""
+
+        qubo_msg_diff = dict(type="qubo")
+        qubo_answer_diff = {
+            'energies': 'AAAAAAAAAAA=',
+            'solutions': 'AA==',
+            'active_variables': 'AAAAAAQAAAA='
+        }
+
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda a, _: choose_reply(a, {
+                'problems/': '[%s]' % complete_no_answer_reply(
+                    '123', 'abc123')})
+            session.get = lambda a: choose_reply(a, {
+                'problems/123/': complete_reply(
+                    '123', 'abc123', answer=qubo_answer_diff, msg=qubo_msg_diff)})
+            return session
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+
+                qubo = {(0, 0): 4.0, (0, 4): -4, (4, 4): 4.0}
+                offset = -2.0
+                params = dict(num_reads=100)
+
+                results = solver.sample_qubo(qubo, offset, **params)
+
+                # make sure energies are correct in raw results
+                for energy, sample in zip(results.energies, results.samples):
+                    self.assertEqual(energy, evaluate_ising({}, qubo, sample, offset=offset))
 
     def test_submit_error_reply(self):
         """Handle an error on problem submission."""

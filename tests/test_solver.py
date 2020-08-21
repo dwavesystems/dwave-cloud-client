@@ -243,6 +243,46 @@ class Submission(_QueryTest):
             numpy.testing.assert_array_almost_equal(
                 bqm.energies(sampleset), sampleset.record.energy)
 
+    @unittest.skipUnless(dimod, "dimod required for 'Solver.sample_bqm'")
+    def test_all_sampling_methods_are_consistent(self):
+        """Submit Ising/QUBO/BQM and verify the results are consistent."""
+
+        with Client(**config) as client:
+            solver = client.get_solver()
+
+            # simple problem with a large energy gap
+            # (ground state: [-1, -1] @ -2.0)
+            h = {0: 1, 4: 1}
+            J = {(0, 4): -1}
+            offset = 1.0
+
+            bqm = dimod.BinaryQuadraticModel.from_ising(h, J, offset)
+            params = dict(num_reads=100)
+
+            # sample_ising
+            response = solver.sample_ising(h, J, offset, **params)
+            ss_ising = response.sampleset
+
+            # sample_qubo
+            qubo = bqm.to_qubo()
+            response = solver.sample_qubo(*qubo, **params)
+            ss_qubo = response.sampleset
+
+            # sample_bqm
+            response = solver.sample_bqm(bqm, **params)
+            ss_bqm = response.sampleset
+
+            # this simple problem should always be solved to optimality
+            self.assertTrue(len(ss_ising) == len(ss_qubo) == len(ss_bqm) == 1)
+
+            # make sure all energies are correct
+            numpy.testing.assert_array_almost_equal(
+                bqm.energies(ss_ising), ss_ising.record.energy)
+            numpy.testing.assert_array_almost_equal(
+                ss_ising.record.energy, ss_qubo.record.energy)
+            numpy.testing.assert_array_almost_equal(
+                ss_qubo.record.energy, ss_bqm.record.energy)
+
     def test_reverse_annealing(self):
         with Client(**config) as client:
             solver = client.get_solver()
