@@ -44,12 +44,13 @@ __all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
 logger = logging.getLogger(__name__)
 
 
-def evaluate_ising(linear, quad, state):
+def evaluate_ising(linear, quad, state, offset=0):
     """Calculate the energy of a state given the Hamiltonian.
 
     Args:
         linear: Linear Hamiltonian terms.
         quad: Quadratic Hamiltonian terms.
+        offset: Energy offset.
         state: Vector of spins describing the system state.
 
     Returns:
@@ -58,10 +59,10 @@ def evaluate_ising(linear, quad, state):
 
     # If we were given a numpy array cast to list
     if _numpy and isinstance(state, np.ndarray):
-        return evaluate_ising(linear, quad, state.tolist())
+        return evaluate_ising(linear, quad, state.tolist(), offset=offset)
 
     # Accumulate the linear and quadratic values
-    energy = 0.0
+    energy = offset
     for index, value in uniform_iterator(linear):
         energy += state[index] * value
     for (index_a, index_b), value in quad.items():
@@ -132,7 +133,7 @@ def uniform_get(sequence, index, default=None):
         return sequence[index] if index < len(sequence) else default
 
 
-def reformat_qubo_as_ising(qubo):
+def reformat_qubo_as_ising(qubo, offset=0.0):
     """Split QUBO coefficients into linear and quadratic terms (the Ising form).
 
     Args:
@@ -140,15 +141,18 @@ def reformat_qubo_as_ising(qubo):
             Coefficients of a quadratic unconstrained binary optimization
             (QUBO) model.
 
+        offset (optional, default=0):
+            Constant offset applied to the model.
+
     Returns:
-        (dict[int, float], dict[(int, int), float])
+        (dict[int, float], dict[(int, int), float], float)
 
     """
 
     lin = {u: bias for (u, v), bias in qubo.items() if u == v}
     quad = {(u, v): bias for (u, v), bias in qubo.items() if u != v}
 
-    return lin, quad
+    return lin, quad, float(offset)
 
 
 def strip_head(sequence, values):

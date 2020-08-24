@@ -129,12 +129,15 @@ class TestEventDispatch(unittest.TestCase):
         # sample
         lin = {0: 1}
         quad = {(0, 1): 1}
+        offset = 2
         params = dict(num_reads=100)
-        future = self.solver.sample_ising(lin, quad, **params)
+        future = self.solver.sample_ising(lin, quad, offset, **params)
 
         # test entry values
         before = memo['before_sample']
-        args = dict(type_='ising', linear=lin, quadratic=quad, params=params)
+        args = dict(type_='ising', linear=lin, quadratic=quad,
+                    offset=offset, params=params,
+                    undirected_biases=False)
         self.assertEqual(before['obj'], self.solver)
         self.assertDictEqual(before['args'], args)
 
