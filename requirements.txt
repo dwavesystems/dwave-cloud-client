@@ -3,3 +3,7 @@ homebase>=1.0.0
 python-dateutil>=2.7
 click>=7
 plucky>=0.4.3
+
+# optional bqm support
+dimod>=0.8.15
+numpy>=1.16
