@@ -33,8 +33,8 @@ This package provides a minimal Python interface to that layer without
 compromising the quality of interactions and workflow.
 
 The example below instantiates a D-Wave Cloud Client and solver based on the local
-system`s auto-detected default configuration file and samples a random Ising problem
-tailored to fit the solver`s graph.
+system's auto-detected default configuration file and samples a random Ising problem
+tailored to fit the solver's graph.
 
 .. code-block:: python
 
@@ -65,7 +65,7 @@ Installation
 
 .. installation-start-marker
 
-Tested on Python 3.5+ (Python 2 support is not guaranteed):
+Requires Python 3.5+:
 
 .. code-block:: bash
 
