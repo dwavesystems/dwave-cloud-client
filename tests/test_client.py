@@ -763,11 +763,44 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             # mock the network call to fetch all solvers
             client._fetch_solvers = lambda **kw: self.solvers
 
-            # the default solver is set on client
+            # the default solver was set on client init
             self.assertEqual(client.get_solver(), self.qpu2)
 
             # the default solver should not change when we add order_by
             self.assertEqual(client.get_solver(order_by='id'), self.qpu2)
+
+        with Client('endpoint', 'token', solver=dict(category='qpu')) as client:
+            # mock the network call to fetch all solvers
+            client._fetch_solvers = lambda **kw: self.solvers
+
+            # test default order_by is avg_load
+            self.assertEqual(client.get_solver(), self.qpu1)
+
+            # but we can change it, without affecting solver filters
+            self.assertEqual(client.get_solver(order_by='-avg_load'), self.qpu2)
+
+    def test_order_by_in_default_solver(self):
+        """order_by can be specified as part of default_solver filters (issue #407)"""
+
+        with Client('endpoint', 'token', solver=dict(order_by='id')) as client:
+            # mock the network call to fetch all solvers
+            client._fetch_solvers = lambda **kw: self.solvers
+
+            # the default solver was set on client init
+            self.assertEqual(client.get_solver(), self.hybrid)
+
+            # the default solver can be overridden
+            self.assertEqual(client.get_solver(order_by='-id'), self.software)
+
+        with Client('endpoint', 'token', solver=dict(qpu=True, order_by='-num_active_qubits')) as client:
+            # mock the network call to fetch all solvers
+            client._fetch_solvers = lambda **kw: self.solvers
+
+            # the default solver was set on client init
+            self.assertEqual(client.get_solver(), self.qpu2)
+
+            # adding order_by doesn't change other default solver features
+            self.assertEqual(client.get_solver(order_by='num_active_qubits'), self.qpu1)
 
     def test_order_by_string(self):
         # sort by Solver inferred properties
