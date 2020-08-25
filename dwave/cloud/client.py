@@ -1041,7 +1041,7 @@ class Client(object):
         warnings.warn("'solvers' is deprecated in favor of 'get_solvers'.", DeprecationWarning)
         return self.get_solvers(refresh=refresh, **filters)
 
-    def get_solver(self, name=None, refresh=False, order_by='avg_load', **filters):
+    def get_solver(self, name=None, refresh=False, **filters):
         """Load the configuration for a single solver.
 
         Makes a blocking web call to `{endpoint}/solvers/remote/{solver_name}/`, where `{endpoint}`
@@ -1097,13 +1097,21 @@ class Client(object):
         if name is not None:
             filters.setdefault('name', name)
 
+        # allow `order_by` to be specified as part of solver features dict
+        order_by = filters.pop('order_by', None)
+
         # in absence of other filters, config/env solver filters/name are used
         if not filters and self.default_solver:
             filters = self.default_solver
 
+        # allow `order_by` from default config/init override
+        if order_by is None:
+            order_by = filters.pop('order_by', 'avg_load')
+
         # get the first solver that satisfies all filters
         try:
-            logger.debug("Fetching solvers according to filters=%r", filters)
+            logger.debug("Fetching solvers according to filters=%r, order_by=%r",
+                         filters, order_by)
             return self.get_solvers(refresh=refresh, order_by=order_by, **filters)[0]
         except IndexError:
             raise SolverNotFoundError("Solver with the requested features not available")
