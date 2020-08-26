@@ -429,7 +429,8 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             },
             "id": "qpu1",
             "description": "QPU Chimera solver",
-            "status": "online"
+            "status": "online",
+            "avg_load": 0.1
         })
         self.qpu2 = StructuredSolver(client=None, data={
             "properties": {
@@ -451,7 +452,8 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "vfyc": True
             },
             "id": "qpu2",
-            "description": "QPU Pegasus solver"
+            "description": "QPU Pegasus solver",
+            "avg_load": 0.2
         })
         self.software = StructuredSolver(client=None, data={
             "properties": {
@@ -618,14 +620,14 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.get_solvers(num_qubits__lt=7), [self.qpu1, self.qpu2])
 
         # skip solver if LHS value not defined (None)
-        self.assertSolvers(self.client.get_solvers(avg_load__gt=0), [self.software])
-        self.assertSolvers(self.client.get_solvers(avg_load__gte=0), [self.software])
-        self.assertSolvers(self.client.get_solvers(avg_load__lt=1), [self.software])
-        self.assertSolvers(self.client.get_solvers(avg_load__lte=1), [self.software])
+        self.assertSolvers(self.client.get_solvers(avg_load__gt=0), [self.qpu1, self.qpu2, self.software])
+        self.assertSolvers(self.client.get_solvers(avg_load__gte=0), [self.qpu1, self.qpu2, self.software])
+        self.assertSolvers(self.client.get_solvers(avg_load__lt=1), [self.qpu1, self.qpu2, self.software])
+        self.assertSolvers(self.client.get_solvers(avg_load__lte=1), [self.qpu1, self.qpu2, self.software])
         self.assertSolvers(self.client.get_solvers(avg_load=0.7), [self.software])
         self.assertSolvers(self.client.get_solvers(avg_load__eq=0.7), [self.software])
-        self.assertSolvers(self.client.get_solvers(avg_load=None), [self.qpu1, self.qpu2, self.hybrid])
-        self.assertSolvers(self.client.get_solvers(avg_load__eq=None), [self.qpu1, self.qpu2, self.hybrid])
+        self.assertSolvers(self.client.get_solvers(avg_load=None), [self.hybrid])
+        self.assertSolvers(self.client.get_solvers(avg_load__eq=None), [self.hybrid])
 
     def test_range_ops(self):
         # value within range
@@ -671,8 +673,8 @@ class FeatureBasedSolverSelection(unittest.TestCase):
 
         # invalid LHS
         self.assertSolvers(self.client.get_solvers(some_set__contains=1), [self.software])
-        self.assertSolvers(self.client.get_solvers(avg_load__in=[None]), [self.qpu1, self.qpu2, self.hybrid])
-        self.assertSolvers(self.client.get_solvers(avg_load__in=[None, 0.7]), self.solvers)
+        self.assertSolvers(self.client.get_solvers(avg_load__in=[None]), [self.hybrid])
+        self.assertSolvers(self.client.get_solvers(avg_load__in=[None, 0.1, 0.2, 0.7]), self.solvers)
 
     def test_set_ops(self):
         # property issubset
@@ -740,7 +742,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
 
     def test_order_by_edgecases(self):
         # default: sort by avg_load
-        self.assertEqual(self.client.get_solvers(), [self.software, self.qpu1, self.qpu2, self.hybrid])
+        self.assertEqual(self.client.get_solvers(), [self.qpu1, self.qpu2, self.software, self.hybrid])
 
         # explicit no sort
         self.assertEqual(self.client.get_solvers(order_by=None), self.solvers)
@@ -763,11 +765,44 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             # mock the network call to fetch all solvers
             client._fetch_solvers = lambda **kw: self.solvers
 
-            # the default solver is set on client
+            # the default solver was set on client init
             self.assertEqual(client.get_solver(), self.qpu2)
 
             # the default solver should not change when we add order_by
             self.assertEqual(client.get_solver(order_by='id'), self.qpu2)
+
+        with Client('endpoint', 'token', solver=dict(category='qpu')) as client:
+            # mock the network call to fetch all solvers
+            client._fetch_solvers = lambda **kw: self.solvers
+
+            # test default order_by is avg_load
+            self.assertEqual(client.get_solver(), self.qpu1)
+
+            # but we can change it, without affecting solver filters
+            self.assertEqual(client.get_solver(order_by='-avg_load'), self.qpu2)
+
+    def test_order_by_in_default_solver(self):
+        """order_by can be specified as part of default_solver filters (issue #407)"""
+
+        with Client('endpoint', 'token', solver=dict(order_by='id')) as client:
+            # mock the network call to fetch all solvers
+            client._fetch_solvers = lambda **kw: self.solvers
+
+            # the default solver was set on client init
+            self.assertEqual(client.get_solver(), self.hybrid)
+
+            # the default solver can be overridden
+            self.assertEqual(client.get_solver(order_by='-id'), self.software)
+
+        with Client('endpoint', 'token', solver=dict(qpu=True, order_by='-num_active_qubits')) as client:
+            # mock the network call to fetch all solvers
+            client._fetch_solvers = lambda **kw: self.solvers
+
+            # the default solver was set on client init
+            self.assertEqual(client.get_solver(), self.qpu2)
+
+            # adding order_by doesn't change other default solver features
+            self.assertEqual(client.get_solver(order_by='num_active_qubits'), self.qpu1)
 
     def test_order_by_string(self):
         # sort by Solver inferred properties
@@ -794,7 +829,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
     def test_order_by_callable(self):
         # sort by Solver inferred properties
         self.assertEqual(self.client.get_solvers(order_by=lambda solver: solver.id), [self.hybrid, self.qpu1, self.qpu2, self.software])
-        self.assertEqual(self.client.get_solvers(order_by=lambda solver: solver.avg_load), [self.software, self.qpu1, self.qpu2, self.hybrid])
+        self.assertEqual(self.client.get_solvers(order_by=lambda solver: solver.avg_load), [self.qpu1, self.qpu2, self.software, self.hybrid])
 
         # sort by solver property
         self.assertEqual(self.client.get_solvers(order_by=lambda solver: solver.properties.get('num_qubits')), self.solvers)
