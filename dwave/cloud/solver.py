@@ -680,7 +680,7 @@ class StructuredSolver(BaseSolver):
             (1, 0)
 
         """
-        linear, quadratic, offset = reformat_qubo_as_ising(qubo, offset)
+        linear, quadratic = reformat_qubo_as_ising(qubo)
         return self._sample('qubo', linear, quadratic, offset, params)
 
     def sample_bqm(self, bqm, **params):
