@@ -321,13 +321,13 @@ def user_agent(name=None, version=None):
     if name and version:
         tags.append((name, version))
 
-    tags = [
+    tags.extend([
         ("python", platform.python_version()),
         _interpreter(),
         ("machine", platform.machine() or 'unknown'),
         ("system", platform.system() or 'unknown'),
         ("platform", platform.platform() or 'unknown'),
-    ]
+    ])
 
     # add platform-specific tags
     tags.extend(get_platform_tags())
