@@ -22,7 +22,8 @@ from datetime import datetime
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_head, strip_tail,
     active_qubits, generate_random_ising_problem,
-    default_text_input, utcnow, cached, retried, parse_loglevel)
+    default_text_input, utcnow, cached, retried, parse_loglevel,
+    user_agent)
 
 
 class TestSimpleUtils(unittest.TestCase):
@@ -137,6 +138,14 @@ class TestSimpleUtils(unittest.TestCase):
         self.assertEqual(parse_loglevel(logging.INFO), logging.INFO)
         self.assertEqual(parse_loglevel(str(logging.INFO)), logging.INFO)
         self.assertEqual(parse_loglevel('  %d  ' % logging.INFO), logging.INFO)
+
+    def test_user_agent(self):
+        from dwave.cloud.package_info import __packagename__, __version__
+        ua = user_agent(__packagename__, __version__)
+
+        required = [__packagename__, 'python', 'machine', 'system', 'platform']
+        for key in required:
+            self.assertIn(key, ua)
 
 
 class TestCachedDecorator(unittest.TestCase):
