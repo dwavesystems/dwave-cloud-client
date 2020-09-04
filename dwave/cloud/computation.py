@@ -27,15 +27,16 @@ Some :class:`Future` methods are blocking.
 
 """
 
-import threading
 import time
+import threading
 import functools
+import operator
 import warnings
 
 from dateutil.parser import parse
 from concurrent.futures import TimeoutError
 
-from dwave.cloud.utils import utcnow, datetime_to_timestamp
+from dwave.cloud.utils import utcnow, datetime_to_timestamp, aliasdict
 from dwave.cloud.exceptions import InvalidAPIResponseError
 
 # Use numpy if available for fast decoding
@@ -922,10 +923,11 @@ class Future(object):
         if not self._result:
             return
 
-        aliases = {'samples': 'solutions',
-                   'occurrences': 'num_occurrences'}
-        for alias, original in aliases.items():
-            if original in self._result and alias not in self._result:
-                self._result[alias] = self._result[original]
+        aliases = dict(
+            samples=operator.itemgetter('solutions'),
+            occurrences=operator.itemgetter('num_occurrences'))
+
+        self._result = aliasdict(self._result)
+        self._result.alias(aliases)
 
         return self._result
