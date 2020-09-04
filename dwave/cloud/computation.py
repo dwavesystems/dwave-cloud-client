@@ -30,13 +30,14 @@ Some :class:`Future` methods are blocking.
 import time
 import threading
 import functools
-import operator
 import warnings
 
+from operator import itemgetter
 from dateutil.parser import parse
 from concurrent.futures import TimeoutError
 
-from dwave.cloud.utils import utcnow, datetime_to_timestamp, aliasdict
+from dwave.cloud.utils import (
+    utcnow, datetime_to_timestamp, aliasdict, deprecated)
 from dwave.cloud.exceptions import InvalidAPIResponseError
 
 # Use numpy if available for fast decoding
@@ -751,6 +752,7 @@ class Future(object):
         else:
             return [1] * len(result['solutions'])
 
+    # TODO: remove in 0.10.0+
     @property
     def occurrences(self):
         """Deprecated in favor of Future.num_occurrences property.
@@ -759,8 +761,7 @@ class Future(object):
         """
         warnings.warn(
             "'Future.occurrences' is deprecated, and it will be removed "
-            "in 0.10.0, or in 1.0.0 at latest. Please convert your code to use "
-            "'Future.num_occurrences'",
+            "in 0.10.0+. Please convert your code to use 'Future.num_occurrences'",
             DeprecationWarning)
 
         return self.num_occurrences
@@ -914,18 +915,22 @@ class Future(object):
         self.parse_time = time.time() - start
         return self._result
 
+    # TODO: schedule for removal
     def _alias_result(self):
-        """Create aliases for some of the keys in the results dict. Eventually,
-        those will be renamed on the server side.
+        """Alias `solutions` and `num_occurrences`.
 
-        Deprecated since version 0.6.0. Will be removed in 0.7.0.
+        Deprecated in version 0.8.0.
         """
         if not self._result:
             return
 
+        msg = "'{}' alias has been deprecated in favor of '{}'"
+        samples_msg = msg.format('samples', 'solutions')
+        occurrences_msg = msg.format('occurrences', 'num_occurrences')
+
         aliases = dict(
-            samples=operator.itemgetter('solutions'),
-            occurrences=operator.itemgetter('num_occurrences'))
+            samples=deprecated(samples_msg)(itemgetter('solutions')),
+            occurrences=deprecated(occurrences_msg)(itemgetter('num_occurrences')))
 
         self._result = aliasdict(self._result)
         self._result.alias(aliases)
