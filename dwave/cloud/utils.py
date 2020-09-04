@@ -19,6 +19,7 @@ import logging
 import platform
 import itertools
 import numbers
+import warnings
 
 from collections import abc, OrderedDict
 from urllib.parse import urljoin
@@ -482,6 +483,31 @@ class tictoc(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.dt = time.perf_counter() - self.tick
+
+
+class deprecated(object):
+    """Decorator that issues a deprecation message on each call of the
+    decorated function.
+    """
+
+    def __init__(self, msg=None):
+        self.msg = msg
+
+    def __call__(self, fn):
+        if not callable(fn):
+            raise TypeError("decorated object must be callable")
+
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            msg = self.msg
+            if not msg:
+                fn_name = getattr(fn, '__name__', 'unnamed')
+                msg = "{}() has been deprecated".format(fn_name)
+            warnings.warn(msg, DeprecationWarning)
+
+            return fn(*args, **kwargs)
+
+        return wrapped
 
 
 def parse_loglevel(level_name, default=logging.NOTSET):

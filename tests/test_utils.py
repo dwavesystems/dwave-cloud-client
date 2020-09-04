@@ -16,6 +16,7 @@ import copy
 import uuid
 import logging
 import unittest
+import warnings
 from unittest import mock
 from collections import OrderedDict
 from itertools import count
@@ -24,7 +25,7 @@ from datetime import datetime
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_head, strip_tail,
     active_qubits, generate_random_ising_problem,
-    default_text_input, utcnow, cached, retried, aliasdict,
+    default_text_input, utcnow, cached, retried, deprecated, aliasdict,
     parse_loglevel, user_agent)
 
 
@@ -342,6 +343,49 @@ class TestRetriedDecorator(unittest.TestCase):
 
             calls = [mock.call(backoff(1)), mock.call(backoff(2)), mock.call(backoff(3))]
             sleep.assert_has_calls(calls)
+
+
+class TestDeprecatedDecorator(unittest.TestCase):
+
+    def test_func_called(self):
+        """Wrapped function is called with correct arguments."""
+
+        @deprecated()
+        def f(a, b):
+            return a, b
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+
+            self.assertEqual(f(1, b=2), (1, 2))
+
+    def test_warning_raised(self):
+        """Correct deprecation message is raised."""
+
+        msg = "deprecation message"
+
+        @deprecated(msg)
+        def f():
+            return
+
+        with self.assertWarns(DeprecationWarning, msg=msg):
+            f()
+
+    def test_warning_raised_automsg(self):
+        """Deprecation message is auto-generated and raised."""
+
+        @deprecated()
+        def f():
+            return
+
+        automsg_regex = r'f\(\) has been deprecated'
+
+        with self.assertWarnsRegex(DeprecationWarning, automsg_regex):
+            f()
+
+    def test_decorator(self):
+        with self.assertRaises(TypeError):
+            deprecated()("not-a-function")
 
 
 class TestAliasdict(unittest.TestCase):
