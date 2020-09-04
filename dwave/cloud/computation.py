@@ -568,7 +568,7 @@ class Future(object):
             them anymore, on client side. For QPU solvers, please replace
             `'samples'` with `'solutions'` and `'occurrences'` with
             `'num_occurrences'`. Better yet, use :meth:`Future.samples` and
-            :meth:`Future.occurrences` instead.
+            :meth:`Future.num_occurrences` instead.
 
         Examples:
             This example creates a solver using the local system's default
@@ -695,18 +695,17 @@ class Future(object):
 
         raise InvalidAPIResponseError("Active variables not present in the response")
 
-    # XXX: rename to num_occurrences, alias as occurrences, but deprecate it
     @property
-    def occurrences(self):
-        """Occurrences buffer for the submitted job.
+    def num_occurrences(self):
+        """Number of sample occurrences buffer for the submitted job.
 
         First calls to access data of a :class:`Future` object are blocking;
         subsequent access to this property is non-blocking.
 
         Returns:
-            list or NumPy matrix of doubles: Occurrences. When returned results
-            are ordered in a histogram, `occurrences` indicates the number of
-            times a particular solution recurred.
+            list or NumPy matrix of doubles: number of occurrences. When
+            returned results are ordered in a histogram, `num_occurrences`
+            indicates the number of times a particular solution recurred.
 
         Examples:
             This example creates a solver using the local system's default
@@ -721,10 +720,10 @@ class Future(object):
             ...     solver = client.get_solver()
             ...     quad = {(16, 20): -1, (17, 20): 1, (16, 21): 1, (17, 21): 1}
             ...     computation = solver.sample_ising({}, quad, num_reads=500, answer_mode='histogram')
-            ...     for i in range(len(computation.occurrences)):
+            ...     for i in range(len(computation.num_occurrences)):
             ...         print(computation.samples[i][16], computation.samples[i][17],
             ...               computation.samples[i][20], computation.samples[i][21],
-                              ' --> ', computation.energies[i], computation.occurrences[i])
+            ...               ' --> ', computation.energies[i], computation.num_occurrences[i])
             ...
             (-1, 1, -1, -1, ' --> ', -2.0, 41)
             (-1, -1, -1, 1, ' --> ', -2.0, 53)
@@ -750,6 +749,20 @@ class Future(object):
             return np.ones((len(result['solutions']),))
         else:
             return [1] * len(result['solutions'])
+
+    @property
+    def occurrences(self):
+        """Deprecated in favor of Future.num_occurrences property.
+
+        Scheduled for removal in 0.10.0.
+        """
+        warnings.warn(
+            "'Future.occurrences' is deprecated, and it will be removed "
+            "in 0.10.0, or in 1.0.0 at latest. Please convert your code to use "
+            "'Future.num_occurrences'",
+            DeprecationWarning)
+
+        return self.num_occurrences
 
     def wait_sampleset(self):
         """Blocking sampleset getter."""
@@ -779,7 +792,7 @@ class Future(object):
 
         sampleset = dimod.SampleSet.from_samples(
             (samples, variables), vartype=vartype,
-            energy=self.energies, num_occurrences=self.occurrences,
+            energy=self.energies, num_occurrences=self.num_occurrences,
             info=info, sort_labels=True)
 
         # this means that samplesets retrieved BEFORE this function are called

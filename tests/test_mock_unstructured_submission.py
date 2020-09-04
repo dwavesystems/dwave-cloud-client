@@ -95,14 +95,14 @@ class TestUnstructuredSolver(unittest.TestCase):
                     numpy.testing.assert_array_equal(fut.sampleset, ss)
                     numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
                     numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
-                    numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)
+                    numpy.testing.assert_array_equal(fut.num_occurrences, ss.record.num_occurrences)
 
                     # submit of pre-uploaded bqm problem
                     fut = solver.sample_bqm(mock_problem_id)
                     numpy.testing.assert_array_equal(fut.sampleset, ss)
                     numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
                     numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
-                    numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)
+                    numpy.testing.assert_array_equal(fut.num_occurrences, ss.record.num_occurrences)
 
                     # ising sampling
                     lin, quad, _ = bqm.to_ising()
@@ -114,7 +114,7 @@ class TestUnstructuredSolver(unittest.TestCase):
                     numpy.testing.assert_array_equal(fut.sampleset, ss)
                     numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
                     numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
-                    numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)
+                    numpy.testing.assert_array_equal(fut.num_occurrences, ss.record.num_occurrences)
 
                     # qubo sampling
                     qubo, _ = bqm.to_qubo()
@@ -126,7 +126,7 @@ class TestUnstructuredSolver(unittest.TestCase):
                     numpy.testing.assert_array_equal(fut.sampleset, ss)
                     numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
                     numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
-                    numpy.testing.assert_array_equal(fut.occurrences, ss.record.num_occurrences)
+                    numpy.testing.assert_array_equal(fut.num_occurrences, ss.record.num_occurrences)
 
     def test_upload_failure(self):
         """Submit should gracefully fail if upload as part of submit fails."""

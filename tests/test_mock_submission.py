@@ -19,6 +19,7 @@ import json
 import unittest
 import itertools
 import threading
+import warnings
 import collections
 
 from unittest import mock
@@ -199,7 +200,12 @@ def choose_reply(path, replies, statuses=None, date=None):
 class _QueryTest(unittest.TestCase):
     def _check(self, results, linear, quad, offset=0, num_reads=1):
         # Did we get the right number of samples?
-        self.assertEqual(num_reads, sum(results.occurrences))
+        self.assertEqual(num_reads, sum(results.num_occurrences))
+
+        # verify .occurrences property still works, although is deprecated
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.assertEqual(100, sum(results.occurrences))
 
         # Make sure energies are correct in raw results
         for energy, state in zip(results.energies, results.samples):

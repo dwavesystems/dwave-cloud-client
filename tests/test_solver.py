@@ -21,6 +21,7 @@ Note:
 
 import unittest
 import random
+import warnings
 from datetime import datetime
 
 import numpy
@@ -97,7 +98,12 @@ class _QueryTest(unittest.TestCase):
         results = solver.sample_ising(linear, quad, num_reads=100, **kwargs)
 
         # Did we get the right number of samples?
-        self.assertEqual(100, sum(results.occurrences))
+        self.assertEqual(100, sum(results.num_occurrences))
+
+        # verify .occurrences property still works, although is deprecated
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.assertEqual(100, sum(results.occurrences))
 
         # offset is optional
         offset = kwargs.get('offset', 0)
@@ -215,7 +221,7 @@ class Submission(_QueryTest):
             sampleset = response.sampleset
 
             # Did we get the right number of samples?
-            self.assertEqual(100, sum(response.occurrences))
+            self.assertEqual(100, sum(response.num_occurrences))
 
             # Make sure the number of occurrences and energies are all correct
             numpy.testing.assert_array_almost_equal(
@@ -237,7 +243,7 @@ class Submission(_QueryTest):
             sampleset = response.sampleset
 
             # Did we get the right number of samples?
-            self.assertEqual(100, sum(response.occurrences))
+            self.assertEqual(100, sum(response.num_occurrences))
 
             # Make sure the number of occurrences and energies are all correct
             numpy.testing.assert_array_almost_equal(
@@ -346,7 +352,7 @@ class Submission(_QueryTest):
 
             for results, linear, quad in result_list:
                 # Did we get the right number of samples?
-                self.assertEqual(10, sum(results.occurrences))
+                self.assertEqual(10, sum(results.num_occurrences))
 
                 # Make sure the number of occurrences and energies are all correct
                 for energy, state in zip(results.energies, results.samples):
@@ -373,7 +379,7 @@ class Submission(_QueryTest):
                 # Responses must be canceled or correct
                 try:
                     # Did we get the right number of samples?
-                    self.assertEqual(max_num_reads, sum(results.occurrences))
+                    self.assertEqual(max_num_reads, sum(results.num_occurrences))
 
                     # Make sure the number of occurrences and energies are all correct
                     for energy, state in zip(results.energies, results.samples):
@@ -402,7 +408,7 @@ class Submission(_QueryTest):
 
             for results, linear, quad in result_list:
                 # Did we get the right number of samples?
-                self.assertEqual(40, sum(results.occurrences))
+                self.assertEqual(40, sum(results.num_occurrences))
 
                 # Make sure the number of occurrences and energies are all correct
                 for energy, state in zip(results.energies, results.samples):
@@ -423,7 +429,7 @@ class Submission(_QueryTest):
             # Go over computations, one by one, as they're done and check they're OK
             for computation in dwave.cloud.computation.Future.as_completed(computations):
                 self.assertTrue(computation.done())
-                self.assertEqual(40, sum(computation.occurrences))
+                self.assertEqual(40, sum(computation.num_occurrences))
                 for energy, state in zip(computation.energies, computation.samples):
                     self.assertAlmostEqual(energy, evaluate_ising(linear, quad, state))
 
@@ -479,7 +485,7 @@ class DecodingMethod(_QueryTest):
             result = self._submit_and_check(solver, linear, quad)
             self.assertIsInstance(result.samples, numpy.ndarray)
             self.assertIsInstance(result.energies, numpy.ndarray)
-            self.assertIsInstance(result.occurrences, numpy.ndarray)
+            self.assertIsInstance(result.num_occurrences, numpy.ndarray)
 
     def test_request_list_with_no_numpy(self):
         """Submit a problem using a dict for the linear terms."""
@@ -543,7 +549,7 @@ class DecodingMethod(_QueryTest):
             result = self._submit_and_check(solver, linear, quad, answer_mode='raw')
             self.assertIsInstance(result.samples, numpy.ndarray)
             self.assertIsInstance(result.energies, numpy.ndarray)
-            self.assertIsInstance(result.occurrences, numpy.ndarray)
+            self.assertIsInstance(result.num_occurrences, numpy.ndarray)
 
     def test_request_raw_list_with_no_numpy(self):
         """Submit a problem using a dict for the linear terms."""
