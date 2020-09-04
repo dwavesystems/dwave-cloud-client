@@ -1030,3 +1030,42 @@ class TestOffsetHandling(_QueryTest):
                 # but because the offset in answer is wrong, energies are off
                 with self.assertRaises(AssertionError):
                     self._check(results, linear, quadratic, offset=offset, **params)
+
+
+@mock.patch('time.sleep', lambda *x: None)
+class TestComputationDeprecations(_QueryTest):
+
+    def test_deprecations(self):
+        """Proper deprecation warnings are raised."""
+
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda a, _: choose_reply(a, {
+                'problems/': '[%s]' % complete_no_answer_reply(
+                    '123', 'abc123')})
+            session.get = lambda a: choose_reply(a, {
+                'problems/123/': complete_reply(
+                    '123', 'abc123')})
+            return session
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+
+                linear, quadratic = test_problem(solver)
+                params = dict(num_reads=100)
+                results = solver.sample_ising(linear, quadratic, **params)
+
+                # aliased keys are deprecated in 0.8.0
+                with self.assertWarns(DeprecationWarning):
+                    results['samples']
+                with self.assertWarns(DeprecationWarning):
+                    results['occurrences']
+
+                # .error is deprecated in 0.7.x, scheduled for removal in 0.9.0
+                with self.assertWarns(DeprecationWarning):
+                    results.error
+
+                # .occurrences is deprecated in 0.8.0, scheduled for removal in 0.10.0+
+                with self.assertWarns(DeprecationWarning):
+                    results.occurrences
