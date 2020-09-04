@@ -1,5 +1,3 @@
--r ../requirements.txt
--r ../docs/requirements.txt
 mock
 requests_mock
 coverage

@@ -44,12 +44,13 @@ __all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
 logger = logging.getLogger(__name__)
 
 
-def evaluate_ising(linear, quad, state):
+def evaluate_ising(linear, quad, state, offset=0):
     """Calculate the energy of a state given the Hamiltonian.
 
     Args:
         linear: Linear Hamiltonian terms.
         quad: Quadratic Hamiltonian terms.
+        offset: Energy offset.
         state: Vector of spins describing the system state.
 
     Returns:
@@ -58,10 +59,10 @@ def evaluate_ising(linear, quad, state):
 
     # If we were given a numpy array cast to list
     if _numpy and isinstance(state, np.ndarray):
-        return evaluate_ising(linear, quad, state.tolist())
+        return evaluate_ising(linear, quad, state.tolist(), offset=offset)
 
     # Accumulate the linear and quadratic values
-    energy = 0.0
+    energy = offset
     for index, value in uniform_iterator(linear):
         energy += state[index] * value
     for (index_a, index_b), value in quad.items():
@@ -320,13 +321,13 @@ def user_agent(name=None, version=None):
     if name and version:
         tags.append((name, version))
 
-    tags = [
+    tags.extend([
         ("python", platform.python_version()),
         _interpreter(),
         ("machine", platform.machine() or 'unknown'),
         ("system", platform.system() or 'unknown'),
         ("platform", platform.platform() or 'unknown'),
-    ]
+    ])
 
     # add platform-specific tags
     tags.extend(get_platform_tags())

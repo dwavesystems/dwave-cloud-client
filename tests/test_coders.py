@@ -55,7 +55,7 @@ def get_unstructured_solver():
     return UnstructuredSolver(client=None, data=data)
 
 
-class TestQPCoders(unittest.TestCase):
+class CodersTestBase(unittest.TestCase):
     nan = float('nan')
 
     # response to a 5-qubit problem from a 5 qubit machine
@@ -80,6 +80,9 @@ class TestQPCoders(unittest.TestCase):
     res_energies = (-15.0,)
     res_num_occurrences = (100,)
 
+
+class TestQPCoders(CodersTestBase):
+
     def encode_doubles(self, values):
         return base64.b64encode(struct.pack('<' + ('d' * len(values)), *values)).decode('utf-8')
 
@@ -92,6 +95,21 @@ class TestQPCoders(unittest.TestCase):
         self.assertEqual(request['format'], 'qp')
         self.assertEqual(request['lin'],  self.encode_doubles([1, 1, 1, 1]))
         self.assertEqual(request['quad'], self.encode_doubles([-1, -1, -1, -1]))
+
+    def test_qp_request_encodes_offset(self):
+        """Test `offset` is stored in problem data."""
+
+        solver = get_structured_solver()
+        linear, quadratic = generate_const_ising_problem(solver, h=1, j=-1)
+
+        # default offset is zero
+        request = encode_problem_as_qp(solver, linear, quadratic)
+        self.assertEqual(request['offset'], 0)
+
+        # test explicit offset
+        offset = 2.0
+        request = encode_problem_as_qp(solver, linear, quadratic, offset)
+        self.assertEqual(request['offset'], offset)
 
     def test_qp_request_encoding_sub_qubits(self):
         """Inactive qubits should be encoded as NaNs. Inactive couplers should be omitted."""
@@ -158,6 +176,10 @@ class TestQPCoders(unittest.TestCase):
         # [-1]
         self.assertEqual(request['quad'], self.encode_doubles([-1]))
 
+
+class TestQPDecoders(CodersTestBase):
+    """Test QP decoders correctly decode response data."""
+
     def test_qp_response_decoding(self):
         res = decode_qp(copy.deepcopy(self.res_msg))
 
@@ -189,7 +211,21 @@ class TestQPCoders(unittest.TestCase):
         np.testing.assert_array_equal(res.get('num_occurrences'), np.array(self.res_num_occurrences))
 
 
-class TestBQMCoders(unittest.TestCase):
+class TestQPDecodersWithOffset(TestQPDecoders):
+    """Test decoders correctly apply energy offset."""
+
+    res_offset = 2.0
+
+    def setUp(self):
+        self.res_msg['answer']['offset'] = self.res_offset
+        self.res_energies = [en + self.res_offset for en in self.res_energies]
+
+    def test_offset_present_in_answer(self):
+        res = decode_qp(copy.deepcopy(self.res_msg))
+        self.assertEqual(res.get('offset'), self.res_offset)
+
+
+class TestBQCoders(unittest.TestCase):
 
     def test_bq_encodes_empty_bqm(self):
         """Empty BQM has to be trivially encoded."""

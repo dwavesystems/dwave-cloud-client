@@ -227,14 +227,14 @@ CONF_AUTHOR = "dwavesystem"
 CONF_FILENAME = "dwave.conf"
 
 
-def parse_float(s):
+def parse_float(s, default=None):
     """Parse value as returned by ConfigParse as float.
 
     NB: we need this instead of ``ConfigParser.getfloat`` when we're parsing
     values downstream."""
 
     if s is None or s == '':
-        return None
+        return default
     return float(s)
 
 

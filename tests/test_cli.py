@@ -348,6 +348,19 @@ class TestCli(unittest.TestCase):
 
         self.assertEqual(result.exit_code, 0)
 
+    def test_platform(self):
+        runner = CliRunner()
+        result = runner.invoke(cli, ['--platform'])
+
+        # verify exit code and stdout printout
+        self.assertEqual(result.exit_code, 0)
+
+        from dwave.cloud.package_info import __packagename__, __version__
+        self.assertNotIn(__packagename__, result.output)
+        required = ['python', 'machine', 'system', 'platform']
+        for key in required:
+            self.assertIn(key, result.output)
+
 
 if __name__ == '__main__':
     unittest.main()
