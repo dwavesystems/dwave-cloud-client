@@ -322,7 +322,7 @@ def encode_problem_as_bq(problem):
             A binary quadratic model.
 
     Returns:
-        Encoded submission dictionary
+        Encoded submission dictionary.
 
     Note:
         The `bq` format assumes the complete BQM is sent embedded in the sample
