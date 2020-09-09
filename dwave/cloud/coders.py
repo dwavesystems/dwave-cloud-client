@@ -51,7 +51,7 @@ def encode_problem_as_qp(solver, linear, quadratic, offset=0,
             Are (quadratic) biases specified on undirected edges?
 
     Returns:
-        encoded submission dictionary
+        Encoded submission dictionary.
     """
     active = active_qubits(linear, quadratic)
 
@@ -162,10 +162,11 @@ def _decode_byte(byte):
     """Helper for decode_qp, turns a single byte into a list of bits.
 
     Args:
-        byte: byte to be decoded
+        byte (int):
+            Byte to be decoded.
 
     Returns:
-        list of bits corresponding to byte
+        List of bits corresponding to byte.
     """
     bits = []
     for _ in range(8):
@@ -180,6 +181,13 @@ def _decode_ints(message):
     The int array is stored as little endian 32 bit integers.
     The array has then been base64 encoded. Since we are decoding we do these
     steps in reverse.
+
+    Args:
+        message (str):
+            The int array, base-64 encoded.
+
+    Returns:
+        Decoded double array.
     """
     binary = base64.b64decode(message)
     return struct.unpack('<' + ('i' * (len(binary) // 4)), binary)
@@ -193,10 +201,11 @@ def _decode_doubles(message):
     steps in reverse.
 
     Args:
-        message: the double array
+        message (str):
+            The double array, base-64 encoded.
 
     Returns:
-        decoded double array
+        Decoded double array.
     """
     binary = base64.b64decode(message)
     return struct.unpack('<' + ('d' * (len(binary) // 8)), binary)
@@ -289,14 +298,14 @@ def encode_problem_as_ref(problem):
 
     Args:
         problem (str):
-            A reference to an uploaded problem (Problem ID).
+            A reference to an uploaded problem (problem ID).
 
     Returns:
-        encoded submission dictionary
+        Encoded submission dictionary.
     """
 
     if not isinstance(problem, str):
-        raise TypeError("unsupported problem type")
+        raise TypeError("unsupported problem reference type")
 
     return {
         'format': 'ref',
@@ -313,7 +322,7 @@ def encode_problem_as_bq(problem):
             A binary quadratic model.
 
     Returns:
-        encoded submission dictionary
+        Encoded submission dictionary
 
     Note:
         The `bq` format assumes the complete BQM is sent embedded in the sample

@@ -612,7 +612,7 @@ class aliasdict(dict):
         self.aliases = {}
 
     def alias(self, *args, **kwargs):
-        """Update aliases dictionary with the key/value pairs from other,
+        """Update aliases dictionary with the key/value pairs from ``other``,
         overwriting existing keys.
 
         Args:
