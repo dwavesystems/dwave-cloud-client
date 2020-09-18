@@ -27,15 +27,17 @@ Some :class:`Future` methods are blocking.
 
 """
 
-import threading
 import time
+import threading
 import functools
 import warnings
 
+from operator import itemgetter
 from dateutil.parser import parse
 from concurrent.futures import TimeoutError
 
-from dwave.cloud.utils import utcnow, datetime_to_timestamp
+from dwave.cloud.utils import (
+    utcnow, datetime_to_timestamp, aliasdict, deprecated)
 from dwave.cloud.exceptions import InvalidAPIResponseError
 
 # Use numpy if available for fast decoding
@@ -568,7 +570,7 @@ class Future(object):
             them anymore, on client side. For QPU solvers, please replace
             `'samples'` with `'solutions'` and `'occurrences'` with
             `'num_occurrences'`. Better yet, use :meth:`Future.samples` and
-            :meth:`Future.occurrences` instead.
+            :meth:`Future.num_occurrences` instead.
 
         Examples:
             This example creates a solver using the local system's default
@@ -695,18 +697,17 @@ class Future(object):
 
         raise InvalidAPIResponseError("Active variables not present in the response")
 
-    # XXX: rename to num_occurrences, alias as occurrences, but deprecate it
     @property
-    def occurrences(self):
-        """Occurrences buffer for the submitted job.
+    def num_occurrences(self):
+        """Number of sample occurrences buffer for the submitted job.
 
         First calls to access data of a :class:`Future` object are blocking;
         subsequent access to this property is non-blocking.
 
         Returns:
-            list or NumPy matrix of doubles: Occurrences. When returned results
-            are ordered in a histogram, `occurrences` indicates the number of
-            times a particular solution recurred.
+            list or NumPy matrix of doubles: number of occurrences. When
+            returned results are ordered in a histogram, `num_occurrences`
+            indicates the number of times a particular solution recurred.
 
         Examples:
             This example creates a solver using the local system's default
@@ -721,10 +722,10 @@ class Future(object):
             ...     solver = client.get_solver()
             ...     quad = {(16, 20): -1, (17, 20): 1, (16, 21): 1, (17, 21): 1}
             ...     computation = solver.sample_ising({}, quad, num_reads=500, answer_mode='histogram')
-            ...     for i in range(len(computation.occurrences)):
+            ...     for i in range(len(computation.num_occurrences)):
             ...         print(computation.samples[i][16], computation.samples[i][17],
             ...               computation.samples[i][20], computation.samples[i][21],
-                              ' --> ', computation.energies[i], computation.occurrences[i])
+            ...               ' --> ', computation.energies[i], computation.num_occurrences[i])
             ...
             (-1, 1, -1, -1, ' --> ', -2.0, 41)
             (-1, -1, -1, 1, ' --> ', -2.0, 53)
@@ -750,6 +751,20 @@ class Future(object):
             return np.ones((len(result['solutions']),))
         else:
             return [1] * len(result['solutions'])
+
+    # TODO: remove in 0.10.0+
+    @property
+    def occurrences(self):
+        """Deprecated in favor of Future.num_occurrences property.
+
+        Scheduled for removal in 0.10.0.
+        """
+        warnings.warn(
+            "'Future.occurrences' is deprecated, and it will be removed "
+            "in 0.10.0+. Please convert your code to use 'Future.num_occurrences'",
+            DeprecationWarning)
+
+        return self.num_occurrences
 
     def wait_sampleset(self):
         """Blocking sampleset getter."""
@@ -779,7 +794,7 @@ class Future(object):
 
         sampleset = dimod.SampleSet.from_samples(
             (samples, variables), vartype=vartype,
-            energy=self.energies, num_occurrences=self.occurrences,
+            energy=self.energies, num_occurrences=self.num_occurrences,
             info=info, sort_labels=True)
 
         # this means that samplesets retrieved BEFORE this function are called
@@ -900,19 +915,24 @@ class Future(object):
         self.parse_time = time.time() - start
         return self._result
 
+    # TODO: schedule for removal
     def _alias_result(self):
-        """Create aliases for some of the keys in the results dict. Eventually,
-        those will be renamed on the server side.
+        """Alias `solutions` and `num_occurrences`.
 
-        Deprecated since version 0.6.0. Will be removed in 0.7.0.
+        Deprecated in version 0.8.0.
         """
         if not self._result:
             return
 
-        aliases = {'samples': 'solutions',
-                   'occurrences': 'num_occurrences'}
-        for alias, original in aliases.items():
-            if original in self._result and alias not in self._result:
-                self._result[alias] = self._result[original]
+        msg = "'{}' alias has been deprecated in favor of '{}'"
+        samples_msg = msg.format('samples', 'solutions')
+        occurrences_msg = msg.format('occurrences', 'num_occurrences')
+
+        aliases = dict(
+            samples=deprecated(samples_msg)(itemgetter('solutions')),
+            occurrences=deprecated(occurrences_msg)(itemgetter('num_occurrences')))
+
+        self._result = aliasdict(self._result)
+        self._result.alias(aliases)
 
         return self._result

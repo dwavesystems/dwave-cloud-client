@@ -102,7 +102,9 @@ InstanceAttributeDocumenter.add_directive_header = iad_add_directive_header
 
 
 # Link to Python standard lib objects
-intersphinx_mapping = {'python': ('https://docs.python.org/3', None),
-    'qbsolv': ('https://docs.ocean.dwavesys.com/projects/qbsolv/en/latest/', None),
-    'oceandocs': ('https://docs.ocean.dwavesys.com/en/latest/', None),
-    'sysdocs_gettingstarted': ('https://docs.dwavesys.com/docs/latest/', None)}
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('https://numpy.org/doc/stable/', None),
+    'oceandocs': ('https://docs.ocean.dwavesys.com/en/stable/', None),
+    'sysdocs_gettingstarted': ('https://docs.dwavesys.com/docs/latest/', None),
+}

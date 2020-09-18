@@ -29,7 +29,7 @@ from dwave.cloud.hybrid import Client as HybridClient
 from dwave.cloud.exceptions import (
     SolverPropertyMissingError, ConfigFileReadError, ConfigFileParseError,
     SolverError, SolverNotFoundError)
-from dwave.cloud.config import legacy_load_config, load_config
+from dwave.cloud.config import load_config
 from dwave.cloud.testing import iterable_mock_open
 
 
@@ -319,11 +319,6 @@ class RequestEvent(Exception):
         raise RequestEvent(method, url, *args, **kwargs)
 
 
-legacy_config_body = """
-prod|file-prod-url,file-prod-token
-alpha|file-alpha-url,file-alpha-token,,alpha-solver
-"""
-
 config_body = """
 [prod]
 endpoint = http://file-prod.url
@@ -341,103 +336,6 @@ permissive_ssl = True
 request_timeout = 15
 polling_timeout = 180
 """
-
-
-# patch the new config loading mechanism, to test only legacy config loading
-@mock.patch("dwave.cloud.config.get_configfile_paths", lambda: [])
-# patch Session.request to raise RequestEvent with the URL requested
-@mock.patch.object(requests.Session, 'request', RequestEvent.request)
-class MockLegacyConfiguration(unittest.TestCase):
-    """Ensure that the precedence of configuration sources is followed."""
-
-    endpoint = "http://custom-endpoint.url"
-
-    def setUp(self):
-        # clear `config_load`-relevant environment variables before testing, so
-        # we only need to patch the ones that we are currently testing
-        for key in frozenset(os.environ.keys()):
-            if key.startswith("DWAVE_") or key.startswith("DW_INTERNAL__"):
-                os.environ.pop(key, None)
-
-    def test_explicit_only(self):
-        """Specify information only through function arguments."""
-        with Client.from_config(endpoint=self.endpoint, token='arg-token') as client:
-            try:
-                client.get_solver('arg-solver')
-            except RequestEvent as event:
-                self.assertTrue(event.url.startswith(self.endpoint))
-                return
-        self.fail()
-
-    def test_nonexisting_file(self):
-        """With no values set, we should get an error when trying to create Client."""
-        with self.assertRaises(ConfigFileReadError):
-            with Client.from_config(config_file='nonexisting', legacy_config_fallback=False) as client:
-                pass
-
-    def test_explicit_with_file(self):
-        """With arguments and a config file, the config file should be ignored."""
-        with mock.patch("dwave.cloud.config.open", iterable_mock_open(config_body), create=True):
-            with Client.from_config(endpoint=self.endpoint, token='arg-token') as client:
-                try:
-                    client.get_solver('arg-solver')
-                except RequestEvent as event:
-                    self.assertTrue(event.url.startswith(self.endpoint))
-                    return
-                self.fail()
-
-    def test_only_file(self):
-        """With no arguments or environment variables, the default connection from the config file should be used."""
-        with mock.patch("dwave.cloud.config.open", iterable_mock_open(config_body), create=True):
-            with Client.from_config('config_file') as client:
-                try:
-                    client.get_solver('arg-solver')
-                except RequestEvent as event:
-                    self.assertTrue(event.url.startswith('http://file-prod.url/'))
-                    return
-                self.fail()
-
-    def test_only_file_key(self):
-        """If give a name from the config file the proper URL should be loaded."""
-        with mock.patch("dwave.cloud.config.open", iterable_mock_open(config_body), create=True):
-            with mock.patch("dwave.cloud.config.get_configfile_paths", lambda *x: ['file']):
-                with Client.from_config(profile='alpha') as client:
-                    try:
-                        client.get_solver('arg-solver')
-                    except RequestEvent as event:
-                        self.assertTrue(event.url.startswith('http://file-alpha.url/'))
-                        return
-                    self.fail()
-
-    def test_env_with_file_set(self):
-        """With environment variables and a config file, the config file should be ignored."""
-        with mock.patch("dwave.cloud.config.open", iterable_mock_open(legacy_config_body), create=True):
-            with mock.patch.dict(os.environ, {'DW_INTERNAL__HTTPLINK': 'http://env.url', 'DW_INTERNAL__TOKEN': 'env-token'}):
-                with Client.from_config(config_file=False, legacy_config_fallback=True) as client:
-                    try:
-                        client.get_solver('arg-solver')
-                    except RequestEvent as event:
-                        self.assertTrue(event.url.startswith('http://env.url/'))
-                        return
-                    self.fail()
-
-    def test_env_args_set(self):
-        """With arguments and environment variables, the environment variables should be ignored."""
-        with mock.patch.dict(os.environ, {'DW_INTERNAL__HTTPLINK': 'http://env.url', 'DW_INTERNAL__TOKEN': 'env-token'}):
-            with Client.from_config(endpoint=self.endpoint, token='args-token') as client:
-                try:
-                    client.get_solver('arg-solver')
-                except RequestEvent as event:
-                    self.assertTrue(event.url.startswith(self.endpoint))
-                    return
-                self.fail()
-
-    def test_file_read_error(self):
-        """On config file read error, we should fail with `ConfigFileReadError`,
-        but only if .dwrc actually exists on disk."""
-        with mock.patch("dwave.cloud.config.open", side_effect=OSError, create=True):
-            with mock.patch("os.path.exists", lambda fn: True):
-                self.assertRaises(ConfigFileReadError, legacy_load_config)
 
 
 class MockConfiguration(unittest.TestCase):

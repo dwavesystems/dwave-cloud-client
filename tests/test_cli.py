@@ -318,7 +318,7 @@ class TestCli(unittest.TestCase):
     def test_upload(self):
         config_file = 'dwave.conf'
         profile = 'profile'
-        format = 'bq-zlib'
+        format = 'dimodbqm'
         problem_id = 'prob:lem:id'
         filename = 'filename'
 

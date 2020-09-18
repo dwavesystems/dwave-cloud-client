@@ -35,8 +35,8 @@ from collections import abc
 
 from dwave.cloud.exceptions import *
 from dwave.cloud.coders import (
-    encode_problem_as_qp, encode_problem_as_bq,
-    decode_qp_numpy, decode_qp, decode_bq)
+    encode_problem_as_qp, encode_problem_as_ref,
+    decode_qp_numpy, decode_qp, decode_bq, bqm_as_file)
 from dwave.cloud.utils import uniform_iterator, reformat_qubo_as_ising
 from dwave.cloud.computation import Future
 from dwave.cloud.concurrency import Present
@@ -234,24 +234,6 @@ class BaseSolver(object):
             # TODO: remove when all production solvers are updated
             return self.id.startswith('hybrid')
 
-    @property
-    def is_qpu(self):
-        warnings.warn("'is_qpu' property is deprecated in favor of 'qpu'."
-                      "It will be removed in 0.8.0.", DeprecationWarning)
-        return self.qpu
-
-    @property
-    def is_software(self):
-        warnings.warn("'is_software' property is deprecated in favor of 'software'."
-                      "It will be removed in 0.8.0.", DeprecationWarning)
-        return self.software
-
-    @property
-    def is_online(self):
-        warnings.warn("'is_online' property is deprecated in favor of 'online'."
-                      "It will be removed in 0.8.0.", DeprecationWarning)
-        return self.online
-
 
 class UnstructuredSolver(BaseSolver):
     """Class for D-Wave unstructured solvers.
@@ -341,8 +323,8 @@ class UnstructuredSolver(BaseSolver):
         bqm = dimod.BinaryQuadraticModel.from_qubo(qubo, offset)
         return self.sample_bqm(bqm, **params)
 
-    def _encode_any_problem_as_bqm_ref(self, problem, params):
-        """Encode `problem` for submitting in `bqm-ref` format. Upload the
+    def _encode_problem_as_ref(self, problem, params):
+        """Encode `problem` for submitting in `ref` format. Upload the
         problem if it's not already uploaded.
 
         Args:
@@ -355,19 +337,18 @@ class UnstructuredSolver(BaseSolver):
         Returns:
             str:
                 JSON-encoded problem submit body
-
         """
 
         if isinstance(problem, str):
             problem_id = problem
         else:
-            logger.debug("To encode the problem for submit via 'bqm-ref', "
+            logger.debug("To encode the problem for submit in the 'ref' format, "
                          "we need to upload it first.")
             problem_id = self.upload_bqm(problem).result()
 
         body = json.dumps({
             'solver': self.id,
-            'data': encode_problem_as_bq(problem_id),
+            'data': encode_problem_as_ref(problem_id),
             'type': 'bqm',
             'params': params
         })
@@ -395,7 +376,7 @@ class UnstructuredSolver(BaseSolver):
 
         # encode the request (body as future)
         body = self.client._encode_problem_executor.submit(
-            self._encode_any_problem_as_bqm_ref,
+            self._encode_problem_as_ref,
             problem=bqm, params=params)
 
         # computation future holds a reference to the remote job
@@ -405,31 +386,6 @@ class UnstructuredSolver(BaseSolver):
         self.client._submit(body, computation)
 
         return computation
-
-    @staticmethod
-    def _bqm_as_fileview(bqm):
-        # New preferred BQM binary serialization.
-        # XXX: temporary until something like dwavesystems/dimod#599 is implemented.
-
-        try:
-            from dimod.serialization.fileview import FileView as BQMFileView
-            from dimod import AdjVectorBQM
-        except ImportError: # pragma: no cover
-            return
-
-        if isinstance(bqm, BQMFileView):
-            return bqm
-
-        try:
-            if not isinstance(bqm, AdjVectorBQM):
-                bqm = AdjVectorBQM(bqm)
-        except:
-            return
-
-        try:
-            return BQMFileView(bqm)
-        except:
-            return
 
     def upload_bqm(self, bqm):
         """Upload the specified :term:`BQM` to SAPI, returning a Problem ID
@@ -452,14 +408,13 @@ class UnstructuredSolver(BaseSolver):
             To use this method, dimod package has to be installed.
         """
 
-        data = self._bqm_as_fileview(bqm)
-        if data is None:
-            if hasattr(bqm, 'to_serializable'):
-                # soon to be deprecated
-                data = encode_problem_as_bq(bqm, compress=True)['data']
-            else:
-                # raw data (ready for upload) in `bqm`
-                data = bqm
+        try:
+            data = bqm_as_file(bqm)
+        except Exception as e:
+            logger.debug("BQM conversion to file failed with %r, "
+                         "assuming data already encoded.", e)
+            # assume `bqm` given as file, ready for upload
+            data = bqm
 
         return self.client.upload_problem_encoded(data)
 

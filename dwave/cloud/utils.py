@@ -19,6 +19,7 @@ import logging
 import platform
 import itertools
 import numbers
+import warnings
 
 from collections import abc, OrderedDict
 from urllib.parse import urljoin
@@ -484,6 +485,31 @@ class tictoc(object):
         self.dt = time.perf_counter() - self.tick
 
 
+class deprecated(object):
+    """Decorator that issues a deprecation message on each call of the
+    decorated function.
+    """
+
+    def __init__(self, msg=None):
+        self.msg = msg
+
+    def __call__(self, fn):
+        if not callable(fn):
+            raise TypeError("decorated object must be callable")
+
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            msg = self.msg
+            if not msg:
+                fn_name = getattr(fn, '__name__', 'unnamed')
+                msg = "{}() has been deprecated".format(fn_name)
+            warnings.warn(msg, DeprecationWarning)
+
+            return fn(*args, **kwargs)
+
+        return wrapped
+
+
 def parse_loglevel(level_name, default=logging.NOTSET):
     """Resolve numeric and symbolic log level names to numeric levels."""
 
@@ -547,3 +573,99 @@ def get_platform_tags():
     fs = [ep.load() for ep in iter_entry_points('dwave.common.platform.tags')]
     tags = list(filter(None, [f() for f in fs]))
     return tags
+
+
+class aliasdict(dict):
+    """A dict subclass with support for item aliasing -- when you want to allow
+    explicit access to some keys, but not to store them in the dict.
+
+    :class:`aliasdict` can be used as a stand-in replacement for :class:`dict`.
+    If no aliases are added, behavior is identical to :class:`dict`.
+
+    Alias items added can be explicitly accessed, but they are not visible
+    otherwise via the dict interface. Aliases shadow original keys, and their
+    values can be computed on access only.
+
+    Aliases are added with :meth:`.alias`, and they are stored in the
+    :attr:`.aliases` class instance dictionary.
+
+    Example:
+        >>> from operator import itemgetter
+        >>> from dwave.cloud.utils import aliasdict
+
+        >>> d = aliasdict(a=1, b=2)
+        >>> d.alias(c=itemgetter('a'))
+        >>> d
+        {'a': 1, 'b': 2}
+        >>> 'c' in d
+        True
+        >>> d['c']
+        1
+
+    """
+    __slots__ = ('aliases', )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # keep alias keys and reference values separate from the base dict
+        self.aliases = {}
+
+    def alias(self, *args, **kwargs):
+        """Update aliases dictionary with the key/value pairs from ``other``,
+        overwriting existing keys.
+
+        Args:
+            other (dict/Iterable[(key,value)]):
+                Either another dictionary object or an iterable of key/value
+                pairs (as tuples or other iterables of length two). If keyword
+                arguments are specified, the dictionary is then updated with
+                those key/value pairs ``d.alias(red=1, blue=2)``.
+
+        Note:
+            Alias key will become available via item getter, but it will not
+            be listed in the container.
+
+            Alias value can be a concrete value for the alias key, or it can be
+            a callable that is evaluated on the aliasdict instance, on each
+            access.
+
+        """
+        self.aliases.update(*args, **kwargs)
+
+    def _alias_value(self, key):
+        value = self.aliases[key]
+        if callable(value):
+            value = value(self)
+        return value
+
+    def __getitem__(self, key):
+        if key in self.aliases:
+            return self._alias_value(key)
+        return super().__getitem__(key)
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def __setitem__(self, key, value):
+        if key in self.aliases:
+            return self.aliases.__setitem__(key, value)
+        return super().__setitem__(key, value)
+
+    def __delitem__(self, key):
+        if key in self.aliases:
+            return self.aliases.__delitem__(key)
+        return super().__delitem__(key)
+
+    def __contains__(self, key):
+        if key in self.aliases:
+            return True
+        return super().__contains__(key)
+
+    def copy(self):
+        new = type(self)(self)
+        new.alias(self.aliases)
+        return new

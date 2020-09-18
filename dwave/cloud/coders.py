@@ -21,7 +21,12 @@ import codecs
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_tail, active_qubits)
 
-__all__ = ['encode_problem_as_qp', 'decode_qp', 'decode_qp_numpy']
+__all__ = [
+    'encode_problem_as_qp', 'decode_qp', 'decode_qp_numpy',
+    'encode_problem_as_bq', 'decode_bq',
+    'encode_problem_as_ref',
+    'bqm_as_file',
+]
 
 
 def encode_problem_as_qp(solver, linear, quadratic, offset=0,
@@ -46,7 +51,7 @@ def encode_problem_as_qp(solver, linear, quadratic, offset=0,
             Are (quadratic) biases specified on undirected edges?
 
     Returns:
-        encoded submission dictionary
+        Encoded submission dictionary.
     """
     active = active_qubits(linear, quadratic)
 
@@ -157,10 +162,11 @@ def _decode_byte(byte):
     """Helper for decode_qp, turns a single byte into a list of bits.
 
     Args:
-        byte: byte to be decoded
+        byte (int):
+            Byte to be decoded.
 
     Returns:
-        list of bits corresponding to byte
+        List of bits corresponding to byte.
     """
     bits = []
     for _ in range(8):
@@ -175,6 +181,13 @@ def _decode_ints(message):
     The int array is stored as little endian 32 bit integers.
     The array has then been base64 encoded. Since we are decoding we do these
     steps in reverse.
+
+    Args:
+        message (str):
+            The int array, base-64 encoded.
+
+    Returns:
+        Decoded double array.
     """
     binary = base64.b64decode(message)
     return struct.unpack('<' + ('i' * (len(binary) // 4)), binary)
@@ -188,10 +201,11 @@ def _decode_doubles(message):
     steps in reverse.
 
     Args:
-        message: the double array
+        message (str):
+            The double array, base-64 encoded.
 
     Returns:
-        decoded double array
+        Decoded double array.
     """
     binary = base64.b64decode(message)
     return struct.unpack('<' + ('d' * (len(binary) // 8)), binary)
@@ -278,52 +292,52 @@ def decode_qp_numpy(msg, return_matrix=True):
     return result
 
 
-def _encode_problem_as_bq_ref(problem):
-    assert isinstance(problem, str)
+def encode_problem_as_ref(problem):
+    """Encode the problem given via reference for submission in the `ref` data
+    format.
 
-    return problem
+    Args:
+        problem (str):
+            A reference to an uploaded problem (problem ID).
 
-def _encode_problem_as_bq_json(problem):
-    assert hasattr(problem, 'to_serializable')
+    Returns:
+        Encoded submission dictionary.
+    """
 
-    return problem.to_serializable(use_bytes=False)
+    if not isinstance(problem, str):
+        raise TypeError("unsupported problem reference type")
 
-def _encode_problem_as_bq_json_zlib(problem):
-    assert hasattr(problem, 'to_serializable')
+    return {
+        'format': 'ref',
+        'data': problem
+    }
 
-    bqm_dict = _encode_problem_as_bq_json(problem)
-    return zlib.compress(codecs.encode(json.dumps(bqm_dict), "ascii"))
 
-
-def encode_problem_as_bq(problem, compress=False):
+def encode_problem_as_bq(problem):
     """Encode the binary quadratic problem for submission in the `bq` data
     format.
 
     Args:
-        problem (:class:`~dimod.BinaryQuadraticModel`/str):
-            A binary quadratic model, or a reference to one (Problem ID).
+        problem (:class:`~dimod.BinaryQuadraticModel`):
+            A binary quadratic model.
 
     Returns:
-        encoded submission dictionary
+        Encoded submission dictionary.
+
+    Note:
+        The `bq` format assumes the complete BQM is sent embedded in the sample
+        job submit data, something none of the production solvers currently
+        support.
     """
+    # NOTE: semi-deprecated format; see `bqm_as_file`.
 
-    if isinstance(problem, str):
-        return {
-            'format': 'bqm-ref',
-            'data': _encode_problem_as_bq_ref(problem)
-        }
+    if not hasattr(problem, 'to_serializable'):
+        raise TypeError("unsupported problem type")
 
-    if compress:
-        return {
-            'format': 'bq-zlib',
-            'data': _encode_problem_as_bq_json_zlib(problem)
-        }
-
-    else:
-        return {
-            'format': 'bq',
-            'data': _encode_problem_as_bq_json(problem)
-        }
+    return {
+        'format': 'bq',
+        'data': problem.to_serializable(use_bytes=False)
+    }
 
 
 def decode_bq(msg):
@@ -346,3 +360,40 @@ def decode_bq(msg):
     result['problem_type'] = 'bqm'
 
     return result
+
+
+def bqm_as_file(bqm, **options):
+    """Encode in-memory BQM as DIMODBQM binary file format.
+
+    Args:
+        bqm (:class:`~dimod.BQM`):
+            Binary quadratic model.
+
+        **options (dict):
+            :class:`~dimod.serialization.fileview.FileView` options.
+
+    Returns:
+        file-like:
+            Binary stream with BQM encoded in DIMODBQM format.
+    """
+    # This now the preferred way of BQM binary serialization.
+
+    # XXX: temporary implemented here, until something like
+    # dwavesystems/dimod#599 is available.
+
+    try:
+        import dimod
+        from dimod.serialization.fileview import FileView as BQMFileView
+    except ImportError: # pragma: no cover
+        raise RuntimeError("Can't encode BQM without 'dimod'. "
+                           "Re-install the library with 'bqm' support.")
+
+    if isinstance(bqm, BQMFileView):
+        return bqm
+
+    # test explicitly to avoid copy on cast if possible
+    fileviewable = (dimod.AdjArrayBQM, dimod.AdjVectorBQM, dimod.AdjMapBQM)
+    if not isinstance(bqm, fileviewable):
+        bqm = AdjVectorBQM(bqm)
+
+    return BQMFileView(bqm, **options)

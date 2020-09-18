@@ -24,7 +24,7 @@ from plucky import pluck
 
 from dwave.cloud.coders import (
     encode_problem_as_qp, decode_qp, decode_qp_numpy,
-    encode_problem_as_bq, decode_bq)
+    encode_problem_as_bq, decode_bq, encode_problem_as_ref)
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
 from dwave.cloud.utils import generate_const_ising_problem
 
@@ -227,7 +227,7 @@ class TestQPDecodersWithOffset(TestQPDecoders):
 
 class TestBQCoders(unittest.TestCase):
 
-    def test_bq_request_encoding_empty_bqm(self):
+    def test_bq_encodes_empty_bqm(self):
         """Empty BQM has to be trivially encoded."""
 
         bqm = dimod.BQM.from_qubo({})
@@ -238,7 +238,7 @@ class TestBQCoders(unittest.TestCase):
         self.assertEqual(pluck(req, 'data.num_variables'), 0)
         self.assertEqual(pluck(req, 'data.num_interactions'), 0)
 
-    def test_bq_request_encoding_ising_bqm(self):
+    def test_bq_encodes_ising_bqm(self):
         """Simple Ising BQM properly encoded."""
 
         bqm = dimod.BQM.from_ising({0: 1}, {(0, 1): 1})
@@ -250,7 +250,7 @@ class TestBQCoders(unittest.TestCase):
         self.assertEqual(pluck(req, 'data.num_variables'), 2)
         self.assertEqual(pluck(req, 'data.num_interactions'), 1)
 
-    def test_bq_request_encoding_qubo_bqm(self):
+    def test_bq_encodes_qubo_bqm(self):
         """Simple Qubo BQM properly encoded."""
 
         bqm = dimod.BQM.from_qubo({(0, 1): 1})
@@ -262,7 +262,7 @@ class TestBQCoders(unittest.TestCase):
         self.assertEqual(pluck(req, 'data.num_variables'), 2)
         self.assertEqual(pluck(req, 'data.num_interactions'), 1)
 
-    def test_bq_request_encoding_bqm_named_vars(self):
+    def test_bq_encodes_bqm_with_named_vars(self):
         """BQM with named variable properly encoded."""
 
         bqm = dimod.BQM.from_ising({}, {'ab': 1, 'bc': 1, 'ca': 1})
@@ -274,6 +274,23 @@ class TestBQCoders(unittest.TestCase):
         self.assertEqual(pluck(req, 'data.num_variables'), 3)
         self.assertEqual(pluck(req, 'data.num_interactions'), 3)
         self.assertEqual(pluck(req, 'data.variable_labels'), list('abc'))
+
+    def test_ref_encoder(self):
+        problem_id = '123'
+
+        req = encode_problem_as_ref(problem_id)
+
+        self.assertEqual(req.get('format'), 'ref')
+        self.assertEqual(req.get('data'), problem_id)
+
+    def test_bq_ref_input_validation(self):
+        problem_id = '123'
+        with self.assertRaises(TypeError):
+            encode_problem_as_bq(problem_id)
+
+        bqm = dimod.BQM.from_qubo({})
+        with self.assertRaises(TypeError):
+            encode_problem_as_ref(bqm)
 
     def test_bq_response_decoding(self):
         """Answer to simple problem properly decoded."""

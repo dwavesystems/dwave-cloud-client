@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
+import uuid
 import logging
 import unittest
+import warnings
 from unittest import mock
 from collections import OrderedDict
 from itertools import count
@@ -22,8 +25,8 @@ from datetime import datetime
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_head, strip_tail,
     active_qubits, generate_random_ising_problem,
-    default_text_input, utcnow, cached, retried, parse_loglevel,
-    user_agent)
+    default_text_input, utcnow, cached, retried, deprecated, aliasdict,
+    parse_loglevel, user_agent)
 
 
 class TestSimpleUtils(unittest.TestCase):
@@ -340,6 +343,210 @@ class TestRetriedDecorator(unittest.TestCase):
 
             calls = [mock.call(backoff(1)), mock.call(backoff(2)), mock.call(backoff(3))]
             sleep.assert_has_calls(calls)
+
+
+class TestDeprecatedDecorator(unittest.TestCase):
+
+    def test_func_called(self):
+        """Wrapped function is called with correct arguments."""
+
+        @deprecated()
+        def f(a, b):
+            return a, b
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+
+            self.assertEqual(f(1, b=2), (1, 2))
+
+    def test_warning_raised(self):
+        """Correct deprecation message is raised."""
+
+        msg = "deprecation message"
+
+        @deprecated(msg)
+        def f():
+            return
+
+        with self.assertWarns(DeprecationWarning, msg=msg):
+            f()
+
+    def test_warning_raised_automsg(self):
+        """Deprecation message is auto-generated and raised."""
+
+        @deprecated()
+        def f():
+            return
+
+        automsg_regex = r'f\(\) has been deprecated'
+
+        with self.assertWarnsRegex(DeprecationWarning, automsg_regex):
+            f()
+
+    def test_decorator(self):
+        with self.assertRaises(TypeError):
+            deprecated()("not-a-function")
+
+
+class TestAliasdict(unittest.TestCase):
+
+    def assert_dict_interface(self, aliased, origin):
+        "Assert `aliased` behaves exactly as `origin` dict."
+
+        self.assertIsInstance(aliased, dict)
+        self.assertDictEqual(aliased, origin)
+
+        self.assertEqual(len(aliased), len(origin))
+        self.assertSetEqual(set(aliased), set(origin))
+        self.assertSetEqual(set(aliased.keys()), set(origin.keys()))
+        self.assertSetEqual(set(aliased.items()), set(origin.items()))
+        self.assertListEqual(list(aliased.values()), list(origin.values()))
+        for k in origin:
+            self.assertIn(k, aliased)
+        stranger = "unique-{}".format(''.join(origin))
+        self.assertNotIn(stranger, aliased)
+
+        self.assertSetEqual(set(iter(aliased)), set(origin))
+
+        # copy
+        new = aliased.copy()
+        self.assertIsNot(new, aliased)
+        self.assertDictEqual(new, aliased)
+
+        # dict copy constructor on aliasdict
+        new = dict(aliased)
+        self.assertDictEqual(new, origin)
+
+        # pop on copy
+        key = next(iter(origin))
+        new.pop(key)
+        self.assertSetEqual(set(new), set(origin).difference(key))
+        self.assertDictEqual(aliased, origin)
+
+        # get
+        self.assertEqual(aliased[key], origin[key])
+        self.assertEqual(aliased.get(key), origin.get(key))
+
+        # set
+        new = aliased.copy()
+        ref = origin.copy()
+        new[stranger] = 4
+        ref[stranger] = 4
+        self.assertDictEqual(new, ref)
+
+        # del
+        del new[stranger]
+        self.assertDictEqual(new, origin)
+
+    def test_construction(self):
+        # aliasdict can be constructed from a mapping/dict
+        src = dict(a=1)
+        ad = aliasdict(src)
+        self.assert_dict_interface(ad, src)
+
+        # aliasdict can be updated, without affecting the source dict
+        ad.update(b=2)
+        self.assertDictEqual(ad, dict(a=1, b=2))
+        self.assertDictEqual(src, dict(a=1))
+
+        # source dict can be updated without affecting the aliased dict
+        src.update(c=3)
+        self.assertDictEqual(ad, dict(a=1, b=2))
+        self.assertDictEqual(src, dict(a=1, c=3))
+
+    def test_dict_interface(self):
+        src = dict(a=1, b=2)
+        ad = aliasdict(**src)
+        self.assert_dict_interface(ad, src)
+
+    def test_alias_concrete(self):
+        src = dict(a=1)
+
+        ad = aliasdict(src)
+        ad.alias(b=2)
+
+        self.assert_dict_interface(ad, src)
+        self.assertEqual(ad['b'], 2)
+
+    def test_alias_callable(self):
+        src = dict(a=1)
+
+        ad = aliasdict(src)
+        ad.alias(b=lambda d: d.get('a'))
+
+        self.assert_dict_interface(ad, src)
+
+        # 'b' equals 'a'
+        self.assertEqual(ad['b'], ad['a'])
+        self.assertEqual(ad['b'], src['a'])
+        self.assertEqual(ad['b'], 1)
+
+        # it's dynamic, works also when 'a' changes
+        ad['a'] = 2
+        self.assertEqual(ad['b'], ad['a'])
+        self.assertNotEqual(ad['b'], src['a'])
+        self.assertEqual(ad['b'], 2)
+
+    def test_alias_get_set_del(self):
+        src = dict(a=1)
+        ad = aliasdict(src)
+
+        # getitem and get on alias
+        ad.alias(b=2)
+        self.assertEqual(ad['b'], 2)
+        self.assertEqual(ad.get('b'), 2)
+        self.assertEqual(ad.aliases['b'], 2)
+
+        # get with a default
+        randomkey = str(uuid.uuid4())
+        self.assertEqual(ad.get(randomkey), None)
+        self.assertEqual(ad.get(randomkey, 1), 1)
+
+        # set alias
+        ad['b'] = 3
+        self.assertEqual(ad['b'], 3)
+        self.assertEqual(ad.aliases['b'], 3)
+
+        # update alias
+        ad.alias(b=4)
+        self.assertEqual(ad['b'], 4)
+        self.assertEqual(ad.aliases['b'], 4)
+
+        # delete alias
+        del ad['b']
+        self.assertEqual(ad.get('b'), None)
+
+    def test_shadowing(self):
+        "Alias keys take precedence."
+
+        ad = aliasdict(a=1)
+        ad.alias(a=2)
+
+        self.assertEqual(ad['a'], 2)
+
+        self.assertEqual(dict.__getitem__(ad, 'a'), 1)
+
+    def test_copy(self):
+        src = dict(a=1)
+        aliases = dict(b=2)
+
+        ad = aliasdict(src)
+        ad.alias(**aliases)
+
+        self.assertDictEqual(ad, src)
+        self.assertDictEqual(ad.aliases, aliases)
+
+        new = ad.copy()
+        self.assertIsInstance(new, aliasdict)
+        self.assertIsNot(new, ad)
+        self.assertDictEqual(new, src)
+        self.assertDictEqual(new.aliases, aliases)
+
+        new = copy.deepcopy(ad)
+        self.assertIsInstance(new, aliasdict)
+        self.assertIsNot(new, ad)
+        self.assertDictEqual(new, src)
+        self.assertDictEqual(new.aliases, aliases)
 
 
 if __name__ == '__main__':
