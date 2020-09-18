@@ -43,6 +43,7 @@ import re
 import sys
 import time
 import json
+import copy
 import logging
 import threading
 import requests
@@ -144,12 +145,32 @@ class Client(object):
     STATUS_FAILED = 'FAILED'
     STATUS_CANCELLED = 'CANCELLED'
 
-    # Default API endpoint
-    DEFAULT_API_ENDPOINT = 'https://cloud.dwavesys.com/sapi/'
-
     # Cases when multiple status flags qualify
     ANY_STATUS_ONGOING = [STATUS_IN_PROGRESS, STATUS_PENDING]
     ANY_STATUS_NO_RESULT = [STATUS_FAILED, STATUS_CANCELLED]
+
+    # Default API endpoint
+    DEFAULT_API_ENDPOINT = 'https://cloud.dwavesys.com/sapi/'
+
+    # Class-level defaults for all constructor and factory arguments
+    DEFAULTS = {
+        # factory only
+        'config_file': None,
+        'profile': None,
+        'client': 'base',
+        # constructor and factory
+        'endpoint': DEFAULT_API_ENDPOINT,
+        'token': None,
+        'solver': None,
+        'proxy': None,
+        'permissive_ssl': False,
+        'request_timeout': 60,
+        'polling_timeout': None,
+        'connection_close': False,
+        'headers': None,
+        'client_cert': None,
+        'client_cert_key': None,
+    }
 
     # Number of problems to include in a submit/status query
     _SUBMIT_BATCH_SIZE = 20
@@ -309,8 +330,7 @@ class Client(object):
 
         """
 
-        # try loading configuration from a preferred new config subsystem
-        # (`./dwave.conf`, `~/.config/dwave/dwave.conf`, etc)
+        # try loading configuration from config file(s)
         config = load_config(
             config_file=config_file, profile=profile, client=client,
             endpoint=endpoint, token=token, solver=solver, proxy=proxy,
@@ -329,42 +349,43 @@ class Client(object):
         }
         _client = config.pop('client', None) or 'base'
 
-        logger.debug("Final config used for %s.Client(): %r", _client, config)
+        logger.debug("Creating %s.Client() with: %r", _client, config)
         return _clients[_client](**config)
 
-    def __init__(self, endpoint=None, token=None, solver=None, proxy=None,
-                 permissive_ssl=False, request_timeout=60, polling_timeout=None,
-                 connection_close=False, headers=None, **kwargs):
-        """To setup the connection a pipeline of queues/workers is constructed.
+    def __init__(self, endpoint=None, token=None, solver=None, **kwargs):
+        # for (reasonable) backwards compatibility, accept only the first few
+        # positional args.
+        # TODO: deprecate the use of positional args
+        if endpoint is not None:
+            kwargs.setdefault('endpoint', endpoint)
+        if token is not None:
+            kwargs.setdefault('token', token)
+        if solver is not None:
+            kwargs.setdefault('solver', solver)
 
-        There are five interactions with the server the connection manages:
-        1. Downloading solver information.
-        2. Submitting problem data.
-        3. Polling problem status.
-        4. Downloading problem results.
-        5. Canceling problems
+        dispatched_args = kwargs.copy()
+        dispatch_event('before_client_init', obj=self, args=dispatched_args)
 
-        Loading solver information is done synchronously. The other four tasks
-        are performed by asynchronously workers. For 2, 3, and 5 the workers
-        gather tasks in batches.
-        """
+        logger.debug("%s create called with: %r", type(self).__name__, kwargs)
 
-        args = dict(
-            endpoint=endpoint, token=token, solver=solver, proxy=proxy,
-            permissive_ssl=permissive_ssl, request_timeout=request_timeout,
-            polling_timeout=polling_timeout, connection_close=connection_close,
-            headers=headers, kwargs=kwargs)
-        dispatch_event('before_client_init', obj=self, args=args)
+        # derive instance-level defaults from class defaults and init defaults
+        defaults = kwargs.pop('defaults', None)
+        if defaults is None:
+            defaults = {}
+        self.defaults = copy.deepcopy(self.DEFAULTS)
+        self.defaults.update(**defaults)
 
+        endpoint = kwargs.get('endpoint') or self.defaults['endpoint']
         if not endpoint:
-            endpoint = self.DEFAULT_API_ENDPOINT
+            raise ValueError("invalid API endpoint")
 
+        token = kwargs.get('token') or self.defaults['token']
         if not token:
             raise ValueError("API token not defined")
 
         # parse optional client certificate
-        client_cert = kwargs.pop('client_cert', None)
-        client_cert_key = kwargs.pop('client_cert_key', None)
+        client_cert = kwargs.get('client_cert', self.defaults['client_cert'])
+        client_cert_key = kwargs.get('client_cert_key', self.defaults['client_cert_key'])
         if client_cert_key is not None:
             if client_cert is not None:
                 client_cert = (client_cert, client_cert_key)
@@ -372,16 +393,8 @@ class Client(object):
                 raise ValueError(
                     "Client certificate key given, but the cert is missing")
 
-        logger.debug(
-            "Creating a client for (endpoint=%r, token=%r, solver=%r, proxy=%r, "
-            "permissive_ssl=%r, request_timeout=%r, polling_timeout=%r, "
-            "connection_close=%r, headers=%r, client_cert=%r, **kwargs=%r)",
-            endpoint, token, solver, proxy,
-            permissive_ssl, request_timeout, polling_timeout,
-            connection_close, headers, client_cert, kwargs
-        )
-
         # parse solver
+        solver = kwargs.get('solver', self.defaults['solver'])
         if not solver:
             solver_def = {}
         elif isinstance(solver, abc.Mapping):
@@ -403,6 +416,7 @@ class Client(object):
         logger.debug("Parsed solver=%r", solver_def)
 
         # parse headers
+        headers = kwargs.get('headers', self.defaults['headers'])
         if not headers:
             headers_dict = {}
         elif isinstance(headers, abc.Mapping):
@@ -420,11 +434,17 @@ class Client(object):
             raise ValueError("HTTP headers expected in a dict, or a string")
         logger.debug("Parsed headers=%r", headers_dict)
 
+        proxy = kwargs.get('proxy') or self.defaults['proxy']
+        request_timeout = kwargs.get('request_timeout') or self.defaults['request_timeout']
+        polling_timeout = kwargs.get('polling_timeout') or self.defaults['polling_timeout']
+        permissive_ssl = kwargs.get('permissive_ssl') or self.defaults['permissive_ssl']
+        connection_close = kwargs.get('connection_close') or self.defaults['connection_close']
+
         # Store connection/session parameters
         self.endpoint = endpoint
+        self.token = token
         self.default_solver = solver_def
 
-        self.token = token
         self.client_cert = client_cert
         self.request_timeout = parse_float(request_timeout)
         self.polling_timeout = parse_float(polling_timeout)
@@ -442,6 +462,16 @@ class Client(object):
             kwargs.get('poll_backoff_min'), self._DEFAULT_POLL_BACKOFF_MIN)
         self.poll_backoff_max = parse_float(
             kwargs.get('poll_backoff_max'), self._DEFAULT_POLL_BACKOFF_MAX)
+
+        logger.debug(
+            "Client initialized with ("
+            "endpoint=%r, token=%r, default_solver=%r, proxy=%r, "
+            "permissive_ssl=%r, request_timeout=%r, polling_timeout=%r, "
+            "connection_close=%r, headers_dict=%r, client_cert=%r)",
+            endpoint, token, solver_def, proxy,
+            permissive_ssl, request_timeout, polling_timeout,
+            connection_close, headers_dict, client_cert
+        )
 
         # Build the problem submission queue, start its workers
         self._submission_queue = queue.Queue()
@@ -490,7 +520,7 @@ class Client(object):
             ThreadPoolExecutor(self._ENCODE_PROBLEM_THREAD_COUNT)
 
         dispatch_event(
-            'after_client_init', obj=self, args=args, return_value=None)
+            'after_client_init', obj=self, args=dispatched_args, return_value=None)
 
     def create_session(self):
         """Create a new requests session based on client's (self) params.
