@@ -188,9 +188,6 @@ class Client(object):
     _POLL_THREAD_COUNT = 2
     _LOAD_THREAD_COUNT = 5
 
-    # Tolerance for server-client clocks difference (approx) [sec]
-    _CLOCK_DIFF_MAX = 1
-
     # Poll grouping time frame; two scheduled polls are grouped if closer than [sec]:
     _POLL_GROUP_TIMEFRAME = 2
 
@@ -1396,16 +1393,6 @@ class Client(object):
 
         finally:
             session.close()
-
-    def _is_clock_diff_acceptable(self, future):
-        if not future or future.clock_diff is None:
-            return False
-
-        logger.debug("Detected (server,client) clock offset: approx. %.2f sec. "
-                     "Acceptable offset is: %.2f sec",
-                     future.clock_diff, self._CLOCK_DIFF_MAX)
-
-        return future.clock_diff <= self._CLOCK_DIFF_MAX
 
     def _poll(self, future):
         """Enqueue a problem to poll the server for status."""
