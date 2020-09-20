@@ -362,7 +362,7 @@ class Client(object):
         dispatched_args = kwargs.copy()
         dispatch_event('before_client_init', obj=self, args=dispatched_args)
 
-        logger.debug("%s create called with: %r", type(self).__name__, kwargs)
+        logger.debug("Client init called with: %r", kwargs)
 
         # derive instance-level defaults from class defaults and init defaults
         defaults = kwargs.pop('defaults', None)
@@ -371,17 +371,25 @@ class Client(object):
         self.defaults = copy.deepcopy(self.DEFAULTS)
         self.defaults.update(**defaults)
 
-        endpoint = kwargs.get('endpoint') or self.defaults['endpoint']
-        if not endpoint:
-            raise ValueError("invalid API endpoint")
+        # combine instance-level defaults with file/env/kwarg option values
+        # note: treat empty string values (e.g. from file/env) as undefined/None
+        options = {}
+        for k, v in self.defaults.items():
+            options[k] = kwargs.get(k) or v
 
-        token = kwargs.get('token') or self.defaults['token']
+        logger.debug("Client options with defaults: %r", options)
+
+        endpoint = options['endpoint']
+        if not endpoint:
+            raise ValueError("API endpoint not defined")
+
+        token = options['token']
         if not token:
             raise ValueError("API token not defined")
 
         # parse optional client certificate
-        client_cert = kwargs.get('client_cert', self.defaults['client_cert'])
-        client_cert_key = kwargs.get('client_cert_key', self.defaults['client_cert_key'])
+        client_cert = options['client_cert']
+        client_cert_key = options['client_cert_key']
         if client_cert_key is not None:
             if client_cert is not None:
                 client_cert = (client_cert, client_cert_key)
@@ -390,7 +398,7 @@ class Client(object):
                     "Client certificate key given, but the cert is missing")
 
         # parse solver
-        solver = kwargs.get('solver', self.defaults['solver'])
+        solver = options['solver']
         if not solver:
             solver_def = {}
         elif isinstance(solver, abc.Mapping):
@@ -412,7 +420,7 @@ class Client(object):
         logger.debug("Parsed solver=%r", solver_def)
 
         # parse headers
-        headers = kwargs.get('headers', self.defaults['headers'])
+        headers = options['headers']
         if not headers:
             headers_dict = {}
         elif isinstance(headers, abc.Mapping):
@@ -430,25 +438,19 @@ class Client(object):
             raise ValueError("HTTP headers expected in a dict, or a string")
         logger.debug("Parsed headers=%r", headers_dict)
 
-        proxy = kwargs.get('proxy') or self.defaults['proxy']
-        request_timeout = kwargs.get('request_timeout') or self.defaults['request_timeout']
-        polling_timeout = kwargs.get('polling_timeout') or self.defaults['polling_timeout']
-        permissive_ssl = kwargs.get('permissive_ssl') or self.defaults['permissive_ssl']
-        connection_close = kwargs.get('connection_close') or self.defaults['connection_close']
-
         # Store connection/session parameters
         self.endpoint = endpoint
         self.token = token
         self.default_solver = solver_def
 
         self.client_cert = client_cert
-        self.request_timeout = parse_float(request_timeout)
-        self.polling_timeout = parse_float(polling_timeout)
+        self.request_timeout = parse_float(options['request_timeout'])
+        self.polling_timeout = parse_float(options['polling_timeout'])
 
-        self.proxy = proxy
+        self.proxy = options['proxy']
         self.headers = headers_dict
-        self.permissive_ssl = permissive_ssl
-        self.connection_close = connection_close
+        self.permissive_ssl = options['permissive_ssl']
+        self.connection_close = options['connection_close']
 
         # Create session for main thread only
         self.session = self.create_session()
@@ -463,10 +465,10 @@ class Client(object):
             "Client initialized with ("
             "endpoint=%r, token=%r, default_solver=%r, proxy=%r, "
             "permissive_ssl=%r, request_timeout=%r, polling_timeout=%r, "
-            "connection_close=%r, headers_dict=%r, client_cert=%r)",
-            endpoint, token, solver_def, proxy,
-            permissive_ssl, request_timeout, polling_timeout,
-            connection_close, headers_dict, client_cert
+            "connection_close=%r, headers=%r, client_cert=%r)",
+            self.endpoint, self.token, self.default_solver, self.proxy,
+            self.permissive_ssl, self.request_timeout, self.polling_timeout,
+            self.connection_close, self.headers, self.client_cert
         )
 
         # Build the problem submission queue, start its workers
