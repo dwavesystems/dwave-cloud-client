@@ -22,7 +22,8 @@ from functools import partial
 from dwave.cloud.exceptions import ConfigFileParseError, ConfigFileReadError
 from dwave.cloud.testing import iterable_mock_open
 from dwave.cloud.config import (
-    get_configfile_paths, load_config_from_files, load_config)
+    get_configfile_paths, load_config_from_files, load_config,
+    parse_float, parse_boolean)
 
 
 class TestConfig(unittest.TestCase):
@@ -386,3 +387,40 @@ class TestConfig(unittest.TestCase):
 
             with mock.patch.dict(os.environ, {'DWAVE_API_HEADERS': 'test'}):
                 self.assertEqual(load_config(config_file='myfile')['headers'], 'test')
+
+
+class TestConfigUtils(unittest.TestCase):
+
+    def test_parse_float(self):
+        self.assertEqual(parse_float(None), None)
+        self.assertEqual(parse_float(''), None)
+        self.assertEqual(parse_float('', default=1), 1)
+
+        self.assertEqual(parse_float('1.5'), 1.5)
+        self.assertEqual(parse_float(1.5), 1.5)
+        self.assertEqual(parse_float(1), 1.0)
+
+    def test_parse_boolean(self):
+        self.assertEqual(parse_boolean(None), None)
+        self.assertEqual(parse_boolean(''), None)
+        self.assertEqual(parse_boolean('', default=1), 1)
+
+        self.assertEqual(parse_boolean(True), True)
+        self.assertEqual(parse_boolean('on'), True)
+        self.assertEqual(parse_boolean('On'), True)
+        self.assertEqual(parse_boolean('true'), True)
+        self.assertEqual(parse_boolean('True'), True)
+        self.assertEqual(parse_boolean('1'), True)
+        self.assertEqual(parse_boolean('123'), True)
+        self.assertEqual(parse_boolean('{"a": 1}'), True)
+
+        self.assertEqual(parse_boolean(False), False)
+        self.assertEqual(parse_boolean('off'), False)
+        self.assertEqual(parse_boolean('Off'), False)
+        self.assertEqual(parse_boolean('false'), False)
+        self.assertEqual(parse_boolean('False'), False)
+        self.assertEqual(parse_boolean('0'), False)
+        self.assertEqual(parse_boolean('{}'), False)
+
+        with self.assertRaises(ValueError):
+            parse_boolean('x')

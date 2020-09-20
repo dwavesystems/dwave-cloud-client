@@ -67,7 +67,7 @@ from plucky import pluck
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
 from dwave.cloud.computation import Future
-from dwave.cloud.config import load_config, parse_float
+from dwave.cloud.config import load_config, parse_float, parse_boolean
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.upload import ChunkedData
@@ -445,8 +445,8 @@ class Client(object):
 
         self.proxy = options['proxy']
         self.headers = headers_dict
-        self.permissive_ssl = options['permissive_ssl']
-        self.connection_close = options['connection_close']
+        self.permissive_ssl = parse_boolean(options['permissive_ssl'])
+        self.connection_close = parse_boolean(options['connection_close'])
 
         self.poll_backoff_min = parse_float(options['poll_backoff_min'])
         self.poll_backoff_max = parse_float(options['poll_backoff_max'])

@@ -211,6 +211,7 @@ Examples:
 """
 
 import os
+import ast
 import configparser
 from collections import OrderedDict
 
@@ -241,11 +242,42 @@ def parse_float(s, default=None):
     """Parse value as returned by ConfigParse as float.
 
     NB: we need this instead of ``ConfigParser.getfloat`` when we're parsing
-    values downstream."""
+    values downstream.
+    """
 
     if s is None or s == '':
         return default
     return float(s)
+
+
+def parse_boolean(s, default=None):
+    """Parse value as returned by ConfigParse as bool.
+
+    Rules::
+
+        0, false, off => False
+        empty/None    => default
+        otherwise     => True
+
+    NB: we need this instead of ``ConfigParser.getboolean`` when we're parsing
+    values downstream, out of ConfigParser context.
+    """
+
+    if s is None or s == '':
+        return default
+
+    if isinstance(s, str):
+        s = s.lower()
+        if s in ['false', 'off']:
+            s = 'False'
+        elif s in ['true', 'on']:
+            s = 'True'
+        try:
+            s = ast.literal_eval(s)
+        except:
+            raise ValueError('invalid boolean value: {!r}'.format(s))
+
+    return bool(s)
 
 
 def get_configfile_paths(system=True, user=True, local=True, only_existing=True):

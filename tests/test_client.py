@@ -272,6 +272,14 @@ class ClientFactory(unittest.TestCase):
             with dwave.cloud.Client.from_config(solver='solver') as client:
                 self.assertEqual(client.default_solver, {"name__eq": "solver"})
 
+    def test_boolean_options_parsed_from_config(self):
+        conf = {'connection_close': 'off', 'permissive_ssl': 'true'}
+
+        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+            with dwave.cloud.Client.from_config(token='token') as client:
+                self.assertFalse(client.connection_close)
+                self.assertTrue(client.permissive_ssl)
+
     def test_class_defaults(self):
         token = 'value'
         DEFAULTS = Client.DEFAULTS.copy()
