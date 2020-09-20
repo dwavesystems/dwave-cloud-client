@@ -33,6 +33,9 @@ order (with 1 the highest ranked):
 1. Values specified as keyword arguments
 2. Values specified as environment variables
 3. Values specified in the configuration file
+4. Values specified in :class:`~dwave.cloud.client.Client` instance ``defaults``
+5. Values specified in :class:`~dwave.cloud.client.Client` class
+   :attr:`~dwave.cloud.client.Client.DEFAULTS`.
 
 Configuration files comply with standard Windows INI-like format,
 parsable with Python's :mod:`configparser`. An optional `defaults` section
@@ -49,7 +52,7 @@ Environment variables:
 
     ``DWAVE_PROFILE``: Name of profile (section).
 
-    ``DWAVE_API_CLIENT``: API client class. Supported values are ``qpu`` or ``sw``.
+    ``DWAVE_API_CLIENT``: API client class. Supported values are ``qpu``, ``sw`` and ``hybrid``.
 
     ``DWAVE_API_ENDPOINT``: API endpoint URL.
 
@@ -671,12 +674,18 @@ def load_config(config_file=None, profile=None, **kwargs):
 
     1. Values specified as keyword arguments in :func:`load_config()`. These values replace
        values read from a configuration file, and therefore must be **strings**, including float
-       values for timeouts, boolean flags (tested for "truthiness"), and solver feature
+       values for timeouts, boolean flags, and solver feature
        constraints (a dictionary encoded as JSON).
     2. Values specified as environment variables.
     3. Values specified in the configuration file.
+    4. Values specified as :class:`~dwave.cloud.client.Client` instance defaults
+    5. Values specified in :class:`~dwave.cloud.client.Client` class
+       :attr:`~dwave.cloud.client.Client.DEFAULTS`.
 
     Configuration-file format is described in :mod:`dwave.cloud.config`.
+
+    Available configuration-file options are identical to
+    :class:`~dwave.cloud.client.Client` constructor argument names.
 
     If the location of the configuration file is not specified, auto-detection
     searches for existing configuration files in the standard directories
@@ -724,43 +733,16 @@ def load_config(config_file=None, profile=None, **kwargs):
             3. If no other section is defined besides `[defaults]`, the defaults
                section is promoted and selected.
 
-        client (str, default=None):
-            Client type used for accessing the API. Supported values are `qpu`
-            for :class:`dwave.cloud.qpu.Client` and `sw` for
-            :class:`dwave.cloud.sw.Client`.
-
-        endpoint (str, default=None):
-            API endpoint URL.
-
-        token (str, default=None):
-            API authorization token.
-
-        solver (dict/str, default=None):
-            :term:`solver` features, as a JSON-encoded dictionary of feature constraints,
-            the client should use. See :meth:`~dwave.cloud.client.Client.get_solvers` for
-            semantics of supported feature constraints.
-
-            If undefined, the client uses a solver definition from environment variables,
-            a configuration file, or falls back to the first available online solver.
-
-            For backward compatibility, solver name in string format is accepted and
-            converted to ``{"name": <solver name>}``.
-
-        proxy (str, default=None):
-            URL for proxy to use in connections to D-Wave API. Can include
-            username/password, port, scheme, etc. If undefined, client
-            uses the system-level proxy, if defined, or connects directly to the API.
-
-        headers (dict/str, default=None):
-            Header lines to include in API calls, each line formatted as
-             ``Key: value``, or a parsed dictionary.
+        **kwargs (dict, optional):
+            :class:`~dwave.cloud.client.Client` constructor arguments.
 
     Returns:
         dict:
             Mapping of configuration keys to values for the profile (section),
             as read from the configuration file and optionally overridden by
             environment values and specified keyword arguments. Always contains
-            the `client`, `endpoint`, `token`, `solver`, and `proxy` keys.
+            the `client`, `endpoint`, `token`, `solver`, `proxy` and `headers`
+            keys.
 
     Raises:
         :exc:`ValueError`:

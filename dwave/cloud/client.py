@@ -82,59 +82,85 @@ logger = logging.getLogger(__name__)
 
 
 class Client(object):
-    """
-    Base client class for all D-Wave API clients. Used by QPU and software :term:`sampler`
-    classes.
+    """Base client class for all D-Wave API clients. Used by QPU, software and
+    hybrid :term:`sampler` classes.
 
-    Manages workers and handles thread pools for submitting problems, cancelling tasks,
-    polling problem status, and retrieving results.
+    Manages workers and handles thread pools for submitting problems, cancelling
+    tasks, polling problem status, and retrieving results.
 
     Args:
-        endpoint (str):
+        endpoint (str, optional):
             D-Wave API endpoint URL.
 
         token (str):
             Authentication token for the D-Wave API.
 
-        solver (dict/str):
-            Default solver features (or simply solver name).
+        solver (dict/str, optional):
+            Default solver features (or simply solver name) to use in
+            :meth:`~dwave.cloud.client.Client.get_solver`.
 
-        proxy (str):
+            Defined via dictionary of solver feature constraints
+            (see :meth:`~dwave.cloud.client.Client.get_solvers`).
+            For backward compatibility, a solver name, as a string, is also
+            accepted and converted to ``{"name": <solver name>}``.
+
+            If undefined, :meth:`~dwave.cloud.client.Client.get_solver` uses a
+            solver definition from environment variables, a configuration file,
+            or falls back to the first available online solver.
+
+        proxy (str, optional):
             Proxy URL to be used for accessing the D-Wave API.
 
         permissive_ssl (bool, default=False):
             Disables SSL verification.
 
         request_timeout (float, default=60):
-            Connect and read timeout (in seconds) for all requests to the D-Wave API.
+            Connect and read timeout (in seconds) for all requests to the
+            D-Wave API.
 
-        polling_timeout (float, default=None):
-            Problem status polling timeout (in seconds), after which polling is aborted.
+        polling_timeout (float, optional):
+            Problem status polling timeout (in seconds), after which polling is
+            aborted.
 
         connection_close (bool, default=False):
-            Force HTTP(S) connection close after each request.
+            Force HTTP(S) connection close after each request. Use to prevent
+            intermediate network equipment closing idle connections.
 
-        headers (dict/str):
-            Additional HTTP headers.
+        headers (dict/str, optional):
+            Newline-separated additional HTTP headers to include with each
+            API request, or a dictionary of (key, value) pairs.
 
-    Other Parameters:
-        Unrecognized keys (str):
-            All unrecognized keys are passed through to the appropriate client class constructor
-            as string keyword arguments.
+        client_cert (str, optional):
+            Client certificate file path.
 
-            An explicit key value overrides an identical user-defined key value loaded from a
-            configuration file.
+        client_cert_key (str, optional):
+            Client certificate key file path.
+
+        poll_backoff_min (float, default=0.05):
+            Problem status polling exponential back-off base period, in seconds.
+
+        poll_backoff_max (float, default=60):
+            Problem status polling exponential back-off max period, in seconds.
+
+        defaults (dict, optional):
+            Client instance-level default, overriding class-level
+            :attr:`.DEFAULTS`.
+
+    Note:
+        Default values of all constructor arguments listed above are kept in
+        a class variable :attr:`~dwave.cloud.client.Client.DEFAULTS`.
+
+        Instance-level defaults can be specified via ``defaults`` argument.
 
     Examples:
         This example directly initializes a :class:`~dwave.cloud.client.Client`.
-        Direct initialization uses class constructor arguments, the minimum being
-        a value for `token`.
+        Direct initialization uses class constructor arguments, the minimum
+        being a value for ``token``.
 
         >>> from dwave.cloud import Client
         >>> client = Client(token='secret')     # doctest: +SKIP
         >>> # code that uses client
         >>> client.close()       # doctest: +SKIP
-
 
     """
 
@@ -210,95 +236,32 @@ class Client(object):
         1. Values specified as keyword arguments in :func:`from_config()`
         2. Values specified as environment variables
         3. Values specified in the configuration file
+        4. Values specified as :class:`.Client` instance defaults
+        5. Values specified in :class:`.Client` class :attr:`.Client.DEFAULTS`.
 
-        Configuration-file format is described in :mod:`dwave.cloud.config`.
+        Configuration-file format and environment variables are described in
+        :mod:`dwave.cloud.config`.
 
-        If the location of the configuration file is not specified, auto-detection
-        searches for existing configuration files in the standard directories
-        of :func:`get_configfile_paths`.
-
-        If a configuration file explicitly specified, via an argument or
-        environment variable, does not exist or is unreadable, loading fails with
-        :exc:`~dwave.cloud.exceptions.ConfigFileReadError`. Loading fails
-        with :exc:`~dwave.cloud.exceptions.ConfigFileParseError` if the file is
-        readable but invalid as a configuration file.
-
-        Similarly, if a profile explicitly specified, via an argument or
-        environment variable, is not present in the loaded configuration, loading fails
-        with :exc:`ValueError`. Explicit profile selection also fails if the configuration
-        file is not explicitly specified, detected on the system, or defined via
-        an environment variable.
-
-        Environment variables: ``DWAVE_CONFIG_FILE``, ``DWAVE_PROFILE``,
-        ``DWAVE_API_CLIENT``, ``DWAVE_API_ENDPOINT``, ``DWAVE_API_TOKEN``,
-        ``DWAVE_API_SOLVER``, ``DWAVE_API_PROXY``, ``DWAVE_API_HEADERS``.
-
-        Environment variables are described in :mod:`dwave.cloud.config`.
+        Configuration file and environment variables loading mechanism is
+        described in :func:`~dwave.cloud.config.load_config`.
 
         Args:
             config_file (str/[str]/None/False/True, default=None):
-                Path to configuration file.
-
-                If ``None``, the value is taken from ``DWAVE_CONFIG_FILE`` environment
-                variable if defined. If the environment variable is undefined or empty,
-                auto-detection searches for existing configuration files in the standard
-                directories of :func:`get_configfile_paths`.
-
-                If ``False``, loading from file is skipped; if ``True``, forces auto-detection
-                (regardless of the ``DWAVE_CONFIG_FILE`` environment variable).
+                Path to configuration file. For interpretation, see
+                :func:`~dwave.cloud.config.load_config`.
 
             profile (str, default=None):
-                Profile name (name of the profile section in the configuration file).
-
-                If undefined, inferred from ``DWAVE_PROFILE`` environment variable if
-                defined. If the environment variable is undefined or empty, a profile is
-                selected in the following order:
-
-                1. From the default section if it includes a profile key.
-                2. The first section (after the default section).
-                3. If no other section is defined besides ``[defaults]``, the defaults
-                   section is promoted and selected.
+                Profile name. For interpretation, see
+                :func:`~dwave.cloud.config.load_config`.
 
             client (str, default=None):
                 Client type used for accessing the API. Supported values are
-                ``qpu`` for :class:`dwave.cloud.qpu.Client`, ``sw`` for
-                :class:`dwave.cloud.sw.Client` and ``hybrid`` for
-                :class:`dwave.cloud.hybrid.Client`.
+                ``qpu`` for :class:`dwave.cloud.qpu.Client`,
+                ``sw`` for :class:`dwave.cloud.sw.Client` and
+                ``hybrid`` for :class:`dwave.cloud.hybrid.Client`.
 
-            endpoint (str, default=None):
-                API endpoint URL.
-
-            token (str, default=None):
-                API authorization token.
-
-            solver (dict/str, default=None):
-                Default :term:`solver` features to use in :meth:`~dwave.cloud.client.Client.get_solver`.
-
-                Defined via dictionary of solver feature constraints
-                (see :meth:`~dwave.cloud.client.Client.get_solvers`).
-                For backward compatibility, a solver name, as a string,
-                is also accepted and converted to ``{"name": <solver name>}``.
-
-                If undefined, :meth:`~dwave.cloud.client.Client.get_solver` uses a
-                solver definition from environment variables, a configuration file, or
-                falls back to the first available online solver.
-
-            proxy (str, default=None):
-                URL for proxy to use in connections to D-Wave API. Can include
-                username/password, port, scheme, etc. If undefined, client
-                uses the system-level proxy, if defined, or connects directly to the API.
-
-            headers (dict/str, default=None):
-                Newline-separated additional HTTP headers to include with each
-                API request, or a dictionary of (key, value) pairs.
-
-        Other Parameters:
-            Unrecognized keys (str):
-                All unrecognized keys are passed through to the appropriate client class constructor
-                as string keyword arguments.
-
-                An explicit key value overrides an identical user-defined key value loaded from a
-                configuration file.
+            **kwargs (dict):
+                :class:`.Client` constructor options.
 
         Returns:
             :class:`~dwave.cloud.client.Client` subclass:
@@ -311,16 +274,8 @@ class Client(object):
             :exc:`~dwave.cloud.exceptions.ConfigFileParseError`:
                 Config file parse failed.
 
-        Examples:
-            A variety of examples are given in :mod:`dwave.cloud.config`.
-
-            This example initializes :class:`~dwave.cloud.client.Client` from an
-            explicitly specified configuration file, "~/jane/my_path_to_config/my_cloud_conf.conf"::
-
-            >>> from dwave.cloud import Client
-            >>> client = Client.from_config(config_file='~/jane/my_path_to_config/my_cloud_conf.conf')  # doctest: +SKIP
-            >>> # code that uses client
-            >>> client.close()     # doctest: +SKIP
+            :exc:`ValueError`:
+                Invalid (non-existing) profile name.
 
         """
 
