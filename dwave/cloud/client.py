@@ -170,6 +170,9 @@ class Client(object):
         'headers': None,
         'client_cert': None,
         'client_cert_key': None,
+        # Poll back-off schedule defaults [sec]
+        'poll_backoff_min': 0.05,
+        'poll_backoff_max': 60,
     }
 
     # Number of problems to include in a submit/status query
@@ -184,10 +187,6 @@ class Client(object):
     _CANCEL_THREAD_COUNT = 1
     _POLL_THREAD_COUNT = 2
     _LOAD_THREAD_COUNT = 5
-
-    # Poll back-off schedule defaults [sec]
-    _DEFAULT_POLL_BACKOFF_MIN = 0.05
-    _DEFAULT_POLL_BACKOFF_MAX = 60
 
     # Tolerance for server-client clocks difference (approx) [sec]
     _CLOCK_DIFF_MAX = 1
@@ -452,23 +451,22 @@ class Client(object):
         self.permissive_ssl = options['permissive_ssl']
         self.connection_close = options['connection_close']
 
+        self.poll_backoff_min = parse_float(options['poll_backoff_min'])
+        self.poll_backoff_max = parse_float(options['poll_backoff_max'])
+
         # Create session for main thread only
         self.session = self.create_session()
-
-        # store optional config parameters
-        self.poll_backoff_min = parse_float(
-            kwargs.get('poll_backoff_min'), self._DEFAULT_POLL_BACKOFF_MIN)
-        self.poll_backoff_max = parse_float(
-            kwargs.get('poll_backoff_max'), self._DEFAULT_POLL_BACKOFF_MAX)
 
         logger.debug(
             "Client initialized with ("
             "endpoint=%r, token=%r, default_solver=%r, proxy=%r, "
             "permissive_ssl=%r, request_timeout=%r, polling_timeout=%r, "
-            "connection_close=%r, headers=%r, client_cert=%r)",
+            "connection_close=%r, headers=%r, client_cert=%r, "
+            "poll_backoff_min=%r, poll_backoff_max=%r)",
             self.endpoint, self.token, self.default_solver, self.proxy,
             self.permissive_ssl, self.request_timeout, self.polling_timeout,
-            self.connection_close, self.headers, self.client_cert
+            self.connection_close, self.headers, self.client_cert,
+            self.poll_backoff_min, self.poll_backoff_max
         )
 
         # Build the problem submission queue, start its workers

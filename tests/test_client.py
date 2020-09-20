@@ -421,8 +421,8 @@ class ClientFactory(unittest.TestCase):
         conf = dict(token='token')
         with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
             with dwave.cloud.Client.from_config() as client:
-                self.assertEqual(client.poll_backoff_min, Client._DEFAULT_POLL_BACKOFF_MIN)
-                self.assertEqual(client.poll_backoff_max, Client._DEFAULT_POLL_BACKOFF_MAX)
+                self.assertEqual(client.poll_backoff_min, Client.DEFAULTS['poll_backoff_min'])
+                self.assertEqual(client.poll_backoff_max, Client.DEFAULTS['poll_backoff_max'])
 
     def test_polling_params_from_kwargs(self):
         poll_conf = {"poll_backoff_min": "0.1", "poll_backoff_max": "1"}
