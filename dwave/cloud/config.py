@@ -226,6 +226,16 @@ CONF_APP = "dwave"
 CONF_AUTHOR = "dwavesystem"
 CONF_FILENAME = "dwave.conf"
 
+ENV_OPTION_MAP = {
+    'DWAVE_API_CLIENT': 'client',
+    'DWAVE_API_ENDPOINT': 'endpoint',
+    'DWAVE_API_TOKEN': 'token',
+    'DWAVE_API_SOLVER': 'solver',
+    'DWAVE_API_PROXY': 'proxy',
+    'DWAVE_API_HEADERS': 'headers',
+}
+"""Map of environment variable names to config options."""
+
 
 def parse_float(s, default=None):
     """Parse value as returned by ConfigParse as float.
@@ -601,8 +611,8 @@ def get_default_config():
 
         # Default client is the generic base client which works with all
         # available remote solvers/samplers. It can be specialized for the
-        # QPU resource (QPU sampler), and software samplers.
-        # Possible values: `qpu`, `sw`, `base` (equal to unspecified)
+        # QPU resource (QPU sampler), software, and hybrid samplers.
+        # Possible values: `qpu`, `sw`, `hybrid`, `base` (equal to unspecified)
         #client = base
 
         # Profile name to use if otherwise unspecified.
@@ -621,9 +631,7 @@ def get_default_config():
     return config
 
 
-def load_config(config_file=None, profile=None, client=None,
-                endpoint=None, token=None, solver=None,
-                proxy=None, headers=None):
+def load_config(config_file=None, profile=None, **kwargs):
     """Load D-Wave Cloud Client configuration based on a configuration file.
 
     Configuration values can be specified in multiple ways, ranked in the following
@@ -777,13 +785,24 @@ def load_config(config_file=None, profile=None, client=None,
 
         section = load_profile_from_files(filenames, profile)
 
-    # override a selected subset of values via env or kwargs,
-    # pass-through the rest unmodified
-    section['client'] = client or os.getenv("DWAVE_API_CLIENT", section.get('client'))
-    section['endpoint'] = endpoint or os.getenv("DWAVE_API_ENDPOINT", section.get('endpoint'))
-    section['token'] = token or os.getenv("DWAVE_API_TOKEN", section.get('token'))
-    section['solver'] = solver or os.getenv("DWAVE_API_SOLVER", section.get('solver'))
-    section['proxy'] = proxy or os.getenv("DWAVE_API_PROXY", section.get('proxy'))
-    section['headers'] = headers or os.getenv("DWAVE_API_HEADERS", section.get('headers'))
+    # override with env
+    update_config_from_environment(section)
+
+    # override with supplied kwarg options
+    # NOTE: for backward compatibility only
+    section.update(kwargs)
+
+    return section
+
+
+def update_config_from_environment(section):
+    """Update config profile/``section`` with values from environment variables.
+
+    Supported environment variables are listed as keys in
+    :attr:`.ENV_OPTION_MAP`, with corresponding config option names as values.
+    """
+
+    for env, option in ENV_OPTION_MAP.items():
+        section[option] = os.getenv(env, section.get(option))
 
     return section

@@ -158,7 +158,7 @@ class Client(object):
         'config_file': None,
         'profile': None,
         'client': 'base',
-        # constructor and factory
+        # constructor (and factory)
         'endpoint': DEFAULT_API_ENDPOINT,
         'token': None,
         'solver': None,
@@ -205,9 +205,7 @@ class Client(object):
     _UPLOAD_RETRIES_BACKOFF = lambda retry: 2 ** retry
 
     @classmethod
-    def from_config(cls, config_file=None, profile=None, client=None,
-                    endpoint=None, token=None, solver=None, proxy=None,
-                    headers=None, **kwargs):
+    def from_config(cls, config_file=None, profile=None, client=None, **kwargs):
         """Client factory method to instantiate a client instance from configuration.
 
         Configuration values can be specified in multiple ways, ranked in the following
@@ -330,15 +328,13 @@ class Client(object):
 
         """
 
-        # try loading configuration from config file(s)
-        config = load_config(
-            config_file=config_file, profile=profile, client=client,
-            endpoint=endpoint, token=token, solver=solver, proxy=proxy,
-            headers=headers)
-        logger.debug("Config loaded: %r", config)
+        # load configuration from config file(s) and environment
+        config = load_config(config_file=config_file, profile=profile)
+        logger.debug("File/env config loaded: %r", config)
 
-        # manual override of other (client-custom) arguments
-        config.update(kwargs)
+        # manual config override with client constructor options
+        config.update(client=client, **kwargs)
+        logger.debug("Code config loaded: %r", config)
 
         from dwave.cloud import qpu, sw, hybrid
         _clients = {
