@@ -27,31 +27,40 @@ that it later explicitly closes.
 Typically you use the :class:`~dwave.cloud.client.Client` class. By default, it instantiates
 a QPU client. You can also use the specialized QPU and CPU/GPU clients directly.
 
+
 Client (Base Client)
 ====================
 
 .. automodule:: dwave.cloud.client
+.. currentmodule:: dwave.cloud.client
 
 Class
 -----
 
-.. autoclass:: dwave.cloud.client.Client
+.. autoclass:: Client
 
-Methods
--------
-
-.. currentmodule:: dwave.cloud
+Properties
+----------
 
 .. autosummary::
    :toctree: generated
 
-   client.Client.from_config
-   client.Client.solvers
-   client.Client.retrieve_answer
-   client.Client.get_solver
-   client.Client.get_solvers
-   client.Client.is_solver_handled
-   client.Client.close
+   Client.DEFAULTS
+
+Methods
+-------
+
+.. autosummary::
+   :toctree: generated
+
+   Client.from_config
+   Client.get_solver
+   Client.get_solvers
+   Client.solvers
+   Client.is_solver_handled
+   Client.retrieve_answer
+   Client.close
+
 
 Specialized Clients
 ===================
@@ -62,42 +71,34 @@ a QPU client. You can also instantiate a QPU or CPU/GPU client directly.
 QPU Client
 ----------
 
+.. automodule:: dwave.cloud.qpu
 .. currentmodule:: dwave.cloud.qpu
 
-.. automodule:: dwave.cloud.qpu
-
 Class
------
+~~~~~
 
 .. autoclass:: dwave.cloud.qpu.Client
 
-Methods
--------
 
-.. currentmodule:: dwave.cloud
+Hybrid-Samplers Client
+------------------------
 
-.. autosummary::
-   :toctree: generated
+.. automodule:: dwave.cloud.hybrid
+.. currentmodule:: dwave.cloud.hybrid
 
-   qpu.Client.is_solver_handled
+Class
+~~~~~
+
+.. autoclass:: dwave.cloud.hybrid.Client
+
 
 Software-Samplers Client
 ------------------------
 
+.. automodule:: dwave.cloud.sw
 .. currentmodule:: dwave.cloud.sw
 
-
 Class
------
+~~~~~
 
 .. autoclass:: dwave.cloud.sw.Client
-
-Methods
--------
-
-.. currentmodule:: dwave.cloud
-
-.. autosummary::
-   :toctree: generated
-
-   sw.Client.is_solver_handled

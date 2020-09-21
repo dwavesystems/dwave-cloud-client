@@ -272,6 +272,62 @@ class ClientFactory(unittest.TestCase):
             with dwave.cloud.Client.from_config(solver='solver') as client:
                 self.assertEqual(client.default_solver, {"name__eq": "solver"})
 
+    def test_boolean_options_parsed_from_config(self):
+        conf = {'connection_close': 'off', 'permissive_ssl': 'true'}
+
+        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+            with dwave.cloud.Client.from_config(token='token') as client:
+                self.assertFalse(client.connection_close)
+                self.assertTrue(client.permissive_ssl)
+
+    def test_class_defaults(self):
+        token = 'value'
+        DEFAULTS = Client.DEFAULTS.copy()
+        DEFAULTS.update(token=token)
+
+        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: {}):
+            with mock.patch.multiple("dwave.cloud.Client", DEFAULTS=DEFAULTS):
+                with dwave.cloud.Client.from_config() as client:
+                    self.assertEqual(client.token, token)
+
+    def test_defaults_as_kwarg(self):
+        token = 'value'
+        defaults = dict(token=token)
+
+        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: {}):
+            with dwave.cloud.Client.from_config(defaults=defaults) as client:
+                self.assertEqual(client.token, token)
+
+    def test_defaults_partial_update(self):
+        """Some options come from DEFAULTS, some from defaults, some from config, and some from kwargs"""
+
+        token = 'value'
+        solver = {'feature': 'value'}
+
+        DEFAULTS = Client.DEFAULTS.copy()
+        DEFAULTS.update(token='wrong')
+
+        defaults = dict(solver='wrong')
+
+        conf = dict(solver=solver)
+        def load_config(**kwargs):
+            return merge(kwargs, conf, op=lambda a, b: a or b)
+
+        kwargs = dict(token=token, defaults=defaults)
+
+        with mock.patch("dwave.cloud.client.load_config", load_config):
+            with mock.patch.multiple("dwave.cloud.Client", DEFAULTS=DEFAULTS):
+                with dwave.cloud.Client.from_config(**kwargs) as client:
+
+                    # token: set on DEFAULTS, overwritten in kwargs
+                    self.assertEqual(client.token, token)
+
+                    # solver: set in defaults, overwritten in file conf
+                    self.assertEqual(client.default_solver, solver)
+
+                    # endpoint: used from class defaults
+                    self.assertEqual(client.endpoint, DEFAULTS['endpoint'])
+
     def test_headers_from_config(self):
         headers_dict = {"key-1": "value-1", "key-2": "value-2"}
         headers_str = """  key-1:value-1
@@ -373,8 +429,8 @@ class ClientFactory(unittest.TestCase):
         conf = dict(token='token')
         with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
             with dwave.cloud.Client.from_config() as client:
-                self.assertEqual(client.poll_backoff_min, Client._DEFAULT_POLL_BACKOFF_MIN)
-                self.assertEqual(client.poll_backoff_max, Client._DEFAULT_POLL_BACKOFF_MAX)
+                self.assertEqual(client.poll_backoff_min, Client.DEFAULTS['poll_backoff_min'])
+                self.assertEqual(client.poll_backoff_max, Client.DEFAULTS['poll_backoff_max'])
 
     def test_polling_params_from_kwargs(self):
         poll_conf = {"poll_backoff_min": "0.1", "poll_backoff_max": "1"}

@@ -30,9 +30,12 @@ the :func:`~dwave.cloud.client.Client.from_config` classmethod.
 Configuration values can be specified in multiple ways, ranked in the following
 order (with 1 the highest ranked):
 
-1. Values specified as keyword arguments
-2. Values specified as environment variables
-3. Values specified in the configuration file
+1. Values specified as keyword arguments.
+2. Values specified as environment variables.
+3. Values specified in the configuration file.
+4. Values specified in :class:`~dwave.cloud.client.Client` instance ``defaults``.
+5. Values specified in :class:`~dwave.cloud.client.Client` class
+   :attr:`~dwave.cloud.client.Client.DEFAULTS`.
 
 Configuration files comply with standard Windows INI-like format,
 parsable with Python's :mod:`configparser`. An optional `defaults` section
@@ -49,7 +52,7 @@ Environment variables:
 
     ``DWAVE_PROFILE``: Name of profile (section).
 
-    ``DWAVE_API_CLIENT``: API client class. Supported values are ``qpu`` or ``sw``.
+    ``DWAVE_API_CLIENT``: API client class. Supported values are ``qpu``, ``sw`` and ``hybrid``.
 
     ``DWAVE_API_ENDPOINT``: API endpoint URL.
 
@@ -211,6 +214,7 @@ Examples:
 """
 
 import os
+import ast
 import configparser
 from collections import OrderedDict
 
@@ -226,16 +230,57 @@ CONF_APP = "dwave"
 CONF_AUTHOR = "dwavesystem"
 CONF_FILENAME = "dwave.conf"
 
+ENV_OPTION_MAP = {
+    'DWAVE_API_CLIENT': 'client',
+    'DWAVE_API_ENDPOINT': 'endpoint',
+    'DWAVE_API_TOKEN': 'token',
+    'DWAVE_API_SOLVER': 'solver',
+    'DWAVE_API_PROXY': 'proxy',
+    'DWAVE_API_HEADERS': 'headers',
+}
+"""Map of environment variable names to config options."""
+
 
 def parse_float(s, default=None):
     """Parse value as returned by ConfigParse as float.
 
     NB: we need this instead of ``ConfigParser.getfloat`` when we're parsing
-    values downstream."""
+    values downstream.
+    """
 
     if s is None or s == '':
         return default
     return float(s)
+
+
+def parse_boolean(s, default=None):
+    """Parse value as returned by ConfigParse as bool.
+
+    Rules::
+
+        0, false, off => False
+        empty/None    => default
+        otherwise     => True
+
+    NB: we need this instead of ``ConfigParser.getboolean`` when we're parsing
+    values downstream, out of ConfigParser context.
+    """
+
+    if s is None or s == '':
+        return default
+
+    if isinstance(s, str):
+        s = s.lower()
+        if s in ['false', 'off']:
+            s = 'False'
+        elif s in ['true', 'on']:
+            s = 'True'
+        try:
+            s = ast.literal_eval(s)
+        except:
+            raise ValueError('invalid boolean value: {!r}'.format(s))
+
+    return bool(s)
 
 
 def get_configfile_paths(system=True, user=True, local=True, only_existing=True):
@@ -601,8 +646,8 @@ def get_default_config():
 
         # Default client is the generic base client which works with all
         # available remote solvers/samplers. It can be specialized for the
-        # QPU resource (QPU sampler), and software samplers.
-        # Possible values: `qpu`, `sw`, `base` (equal to unspecified)
+        # QPU resource (QPU sampler), software, and hybrid samplers.
+        # Possible values: `qpu`, `sw`, `hybrid`, `base` (equal to unspecified)
         #client = base
 
         # Profile name to use if otherwise unspecified.
@@ -621,9 +666,7 @@ def get_default_config():
     return config
 
 
-def load_config(config_file=None, profile=None, client=None,
-                endpoint=None, token=None, solver=None,
-                proxy=None, headers=None):
+def load_config(config_file=None, profile=None, **kwargs):
     """Load D-Wave Cloud Client configuration based on a configuration file.
 
     Configuration values can be specified in multiple ways, ranked in the following
@@ -631,12 +674,18 @@ def load_config(config_file=None, profile=None, client=None,
 
     1. Values specified as keyword arguments in :func:`load_config()`. These values replace
        values read from a configuration file, and therefore must be **strings**, including float
-       values for timeouts, boolean flags (tested for "truthiness"), and solver feature
+       values for timeouts, boolean flags, and solver feature
        constraints (a dictionary encoded as JSON).
     2. Values specified as environment variables.
     3. Values specified in the configuration file.
+    4. Values specified as :class:`~dwave.cloud.client.Client` instance defaults.
+    5. Values specified in :class:`~dwave.cloud.client.Client` class
+       :attr:`~dwave.cloud.client.Client.DEFAULTS`.
 
     Configuration-file format is described in :mod:`dwave.cloud.config`.
+
+    Available configuration-file options are identical to
+    :class:`~dwave.cloud.client.Client` constructor argument names.
 
     If the location of the configuration file is not specified, auto-detection
     searches for existing configuration files in the standard directories
@@ -684,43 +733,16 @@ def load_config(config_file=None, profile=None, client=None,
             3. If no other section is defined besides `[defaults]`, the defaults
                section is promoted and selected.
 
-        client (str, default=None):
-            Client type used for accessing the API. Supported values are `qpu`
-            for :class:`dwave.cloud.qpu.Client` and `sw` for
-            :class:`dwave.cloud.sw.Client`.
-
-        endpoint (str, default=None):
-            API endpoint URL.
-
-        token (str, default=None):
-            API authorization token.
-
-        solver (dict/str, default=None):
-            :term:`solver` features, as a JSON-encoded dictionary of feature constraints,
-            the client should use. See :meth:`~dwave.cloud.client.Client.get_solvers` for
-            semantics of supported feature constraints.
-
-            If undefined, the client uses a solver definition from environment variables,
-            a configuration file, or falls back to the first available online solver.
-
-            For backward compatibility, solver name in string format is accepted and
-            converted to ``{"name": <solver name>}``.
-
-        proxy (str, default=None):
-            URL for proxy to use in connections to D-Wave API. Can include
-            username/password, port, scheme, etc. If undefined, client
-            uses the system-level proxy, if defined, or connects directly to the API.
-
-        headers (dict/str, default=None):
-            Header lines to include in API calls, each line formatted as
-             ``Key: value``, or a parsed dictionary.
+        **kwargs (dict, optional):
+            :class:`~dwave.cloud.client.Client` constructor arguments.
 
     Returns:
         dict:
             Mapping of configuration keys to values for the profile (section),
             as read from the configuration file and optionally overridden by
             environment values and specified keyword arguments. Always contains
-            the `client`, `endpoint`, `token`, `solver`, and `proxy` keys.
+            the `client`, `endpoint`, `token`, `solver`, `proxy` and `headers`
+            keys.
 
     Raises:
         :exc:`ValueError`:
@@ -777,13 +799,24 @@ def load_config(config_file=None, profile=None, client=None,
 
         section = load_profile_from_files(filenames, profile)
 
-    # override a selected subset of values via env or kwargs,
-    # pass-through the rest unmodified
-    section['client'] = client or os.getenv("DWAVE_API_CLIENT", section.get('client'))
-    section['endpoint'] = endpoint or os.getenv("DWAVE_API_ENDPOINT", section.get('endpoint'))
-    section['token'] = token or os.getenv("DWAVE_API_TOKEN", section.get('token'))
-    section['solver'] = solver or os.getenv("DWAVE_API_SOLVER", section.get('solver'))
-    section['proxy'] = proxy or os.getenv("DWAVE_API_PROXY", section.get('proxy'))
-    section['headers'] = headers or os.getenv("DWAVE_API_HEADERS", section.get('headers'))
+    # override with env
+    update_config_from_environment(section)
+
+    # override with supplied kwarg options
+    # NOTE: for backward compatibility only
+    section.update(kwargs)
+
+    return section
+
+
+def update_config_from_environment(section):
+    """Update config profile/``section`` with values from environment variables.
+
+    Supported environment variables are listed as keys in
+    :attr:`.ENV_OPTION_MAP`, with corresponding config option names as values.
+    """
+
+    for env, option in ENV_OPTION_MAP.items():
+        section[option] = os.getenv(env, section.get(option))
 
     return section

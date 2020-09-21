@@ -43,6 +43,7 @@ import re
 import sys
 import time
 import json
+import copy
 import logging
 import threading
 import requests
@@ -66,7 +67,7 @@ from plucky import pluck
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
 from dwave.cloud.computation import Future
-from dwave.cloud.config import load_config, parse_float
+from dwave.cloud.config import load_config, parse_float, parse_boolean
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.upload import ChunkedData
@@ -81,59 +82,84 @@ logger = logging.getLogger(__name__)
 
 
 class Client(object):
-    """
-    Base client class for all D-Wave API clients. Used by QPU and software :term:`sampler`
-    classes.
+    """Base client class for all D-Wave API clients. Used by QPU, software and
+    hybrid :term:`sampler` classes.
 
-    Manages workers and handles thread pools for submitting problems, cancelling tasks,
-    polling problem status, and retrieving results.
+    Manages workers and handles thread pools for submitting problems, cancelling
+    tasks, polling problem status, and retrieving results.
 
     Args:
-        endpoint (str):
+        endpoint (str, optional):
             D-Wave API endpoint URL.
 
         token (str):
             Authentication token for the D-Wave API.
 
-        solver (dict/str):
-            Default solver features (or simply solver name).
+        solver (dict/str, optional):
+            Default solver features (or simply solver name) to use in
+            :meth:`~dwave.cloud.client.Client.get_solver`.
 
-        proxy (str):
+            Defined via dictionary of solver feature constraints
+            (see :meth:`~dwave.cloud.client.Client.get_solvers`).
+            For backward compatibility, a solver name, as a string, is also
+            accepted and converted to ``{"name": <solver name>}``.
+
+        proxy (str, optional):
             Proxy URL to be used for accessing the D-Wave API.
 
         permissive_ssl (bool, default=False):
             Disables SSL verification.
 
         request_timeout (float, default=60):
-            Connect and read timeout (in seconds) for all requests to the D-Wave API.
+            Connect and read timeout, in seconds, for all requests to the
+            D-Wave API.
 
-        polling_timeout (float, default=None):
-            Problem status polling timeout (in seconds), after which polling is aborted.
+        polling_timeout (float, optional):
+            Problem status polling timeout, in seconds, after which polling is
+            aborted.
 
         connection_close (bool, default=False):
-            Force HTTP(S) connection close after each request.
+            Force HTTP(S) connection close after each request. Set to ``True``
+            to prevent intermediate network equipment closing idle connections.
 
-        headers (dict/str):
-            Additional HTTP headers.
+        headers (dict/str, optional):
+            Newline-separated additional HTTP headers to include with each
+            API request, or a dictionary of (key, value) pairs.
 
-    Other Parameters:
-        Unrecognized keys (str):
-            All unrecognized keys are passed through to the appropriate client class constructor
-            as string keyword arguments.
+        client_cert (str, optional):
+            Path to client side certificate file.
 
-            An explicit key value overrides an identical user-defined key value loaded from a
-            configuration file.
+        client_cert_key (str, optional):
+            Path to client side certificate key file.
+
+        poll_backoff_min (float, default=0.05):
+            Problem status is polled with exponential back-off schedule.
+            Duration of the first interval (between first and second poll) is
+            set to ``poll_backoff_min`` seconds.
+
+        poll_backoff_max (float, default=60):
+            Problem status is polled with exponential back-off schedule.
+            Maximum back-off period is limited to ``poll_backoff_max`` seconds.
+
+        defaults (dict, optional):
+            Defaults for the client instance that override the class
+            :attr:`.DEFAULTS`.
+
+    Note:
+        Default values of all constructor arguments listed above are kept in
+        a class variable :attr:`~dwave.cloud.client.Client.DEFAULTS`.
+
+        Instance-level defaults can be specified via ``defaults`` argument.
 
     Examples:
         This example directly initializes a :class:`~dwave.cloud.client.Client`.
-        Direct initialization uses class constructor arguments, the minimum being
-        a value for `token`.
+        Direct initialization uses class constructor arguments, the minimum
+        being a value for ``token``.
 
         >>> from dwave.cloud import Client
         >>> client = Client(token='secret')     # doctest: +SKIP
         >>> # code that uses client
         >>> client.close()       # doctest: +SKIP
-
 
     """
 
@@ -144,12 +170,35 @@ class Client(object):
     STATUS_FAILED = 'FAILED'
     STATUS_CANCELLED = 'CANCELLED'
 
-    # Default API endpoint
-    DEFAULT_API_ENDPOINT = 'https://cloud.dwavesys.com/sapi/'
-
     # Cases when multiple status flags qualify
     ANY_STATUS_ONGOING = [STATUS_IN_PROGRESS, STATUS_PENDING]
     ANY_STATUS_NO_RESULT = [STATUS_FAILED, STATUS_CANCELLED]
+
+    # Default API endpoint
+    DEFAULT_API_ENDPOINT = 'https://cloud.dwavesys.com/sapi/'
+
+    # Class-level defaults for all constructor and factory arguments
+    DEFAULTS = {
+        # factory only
+        'config_file': None,
+        'profile': None,
+        'client': 'base',
+        # constructor (and factory)
+        'endpoint': DEFAULT_API_ENDPOINT,
+        'token': None,
+        'solver': None,
+        'proxy': None,
+        'permissive_ssl': False,
+        'request_timeout': 60,
+        'polling_timeout': None,
+        'connection_close': False,
+        'headers': None,
+        'client_cert': None,
+        'client_cert_key': None,
+        # poll back-off schedule defaults [sec]
+        'poll_backoff_min': 0.05,
+        'poll_backoff_max': 60,
+    }
 
     # Number of problems to include in a submit/status query
     _SUBMIT_BATCH_SIZE = 20
@@ -164,13 +213,6 @@ class Client(object):
     _POLL_THREAD_COUNT = 2
     _LOAD_THREAD_COUNT = 5
 
-    # Poll back-off schedule defaults [sec]
-    _DEFAULT_POLL_BACKOFF_MIN = 0.05
-    _DEFAULT_POLL_BACKOFF_MAX = 60
-
-    # Tolerance for server-client clocks difference (approx) [sec]
-    _CLOCK_DIFF_MAX = 1
-
     # Poll grouping time frame; two scheduled polls are grouped if closer than [sec]:
     _POLL_GROUP_TIMEFRAME = 2
 
@@ -184,9 +226,7 @@ class Client(object):
     _UPLOAD_RETRIES_BACKOFF = lambda retry: 2 ** retry
 
     @classmethod
-    def from_config(cls, config_file=None, profile=None, client=None,
-                    endpoint=None, token=None, solver=None, proxy=None,
-                    headers=None, **kwargs):
+    def from_config(cls, config_file=None, profile=None, client=None, **kwargs):
         """Client factory method to instantiate a client instance from configuration.
 
         Configuration values can be specified in multiple ways, ranked in the following
@@ -195,95 +235,32 @@ class Client(object):
         1. Values specified as keyword arguments in :func:`from_config()`
         2. Values specified as environment variables
         3. Values specified in the configuration file
+        4. Values specified as :class:`.Client` instance defaults
+        5. Values specified in :class:`.Client` class :attr:`.Client.DEFAULTS`
 
-        Configuration-file format is described in :mod:`dwave.cloud.config`.
+        Configuration-file format and environment variables are described in
+        :mod:`dwave.cloud.config`.
 
-        If the location of the configuration file is not specified, auto-detection
-        searches for existing configuration files in the standard directories
-        of :func:`get_configfile_paths`.
-
-        If a configuration file explicitly specified, via an argument or
-        environment variable, does not exist or is unreadable, loading fails with
-        :exc:`~dwave.cloud.exceptions.ConfigFileReadError`. Loading fails
-        with :exc:`~dwave.cloud.exceptions.ConfigFileParseError` if the file is
-        readable but invalid as a configuration file.
-
-        Similarly, if a profile explicitly specified, via an argument or
-        environment variable, is not present in the loaded configuration, loading fails
-        with :exc:`ValueError`. Explicit profile selection also fails if the configuration
-        file is not explicitly specified, detected on the system, or defined via
-        an environment variable.
-
-        Environment variables: ``DWAVE_CONFIG_FILE``, ``DWAVE_PROFILE``,
-        ``DWAVE_API_CLIENT``, ``DWAVE_API_ENDPOINT``, ``DWAVE_API_TOKEN``,
-        ``DWAVE_API_SOLVER``, ``DWAVE_API_PROXY``, ``DWAVE_API_HEADERS``.
-
-        Environment variables are described in :mod:`dwave.cloud.config`.
+        File/environment configuration loading mechanism is described in
+        :func:`~dwave.cloud.config.load_config`.
 
         Args:
             config_file (str/[str]/None/False/True, default=None):
-                Path to configuration file.
-
-                If ``None``, the value is taken from ``DWAVE_CONFIG_FILE`` environment
-                variable if defined. If the environment variable is undefined or empty,
-                auto-detection searches for existing configuration files in the standard
-                directories of :func:`get_configfile_paths`.
-
-                If ``False``, loading from file is skipped; if ``True``, forces auto-detection
-                (regardless of the ``DWAVE_CONFIG_FILE`` environment variable).
+                Path to configuration file. For interpretation, see
+                :func:`~dwave.cloud.config.load_config`.
 
             profile (str, default=None):
-                Profile name (name of the profile section in the configuration file).
-
-                If undefined, inferred from ``DWAVE_PROFILE`` environment variable if
-                defined. If the environment variable is undefined or empty, a profile is
-                selected in the following order:
-
-                1. From the default section if it includes a profile key.
-                2. The first section (after the default section).
-                3. If no other section is defined besides ``[defaults]``, the defaults
-                   section is promoted and selected.
+                Profile name. For interpretation, see
+                :func:`~dwave.cloud.config.load_config`.
 
             client (str, default=None):
                 Client type used for accessing the API. Supported values are
-                ``qpu`` for :class:`dwave.cloud.qpu.Client`, ``sw`` for
-                :class:`dwave.cloud.sw.Client` and ``hybrid`` for
-                :class:`dwave.cloud.hybrid.Client`.
+                ``qpu`` for :class:`dwave.cloud.qpu.Client`,
+                ``sw`` for :class:`dwave.cloud.sw.Client` and
+                ``hybrid`` for :class:`dwave.cloud.hybrid.Client`.
 
-            endpoint (str, default=None):
-                API endpoint URL.
-
-            token (str, default=None):
-                API authorization token.
-
-            solver (dict/str, default=None):
-                Default :term:`solver` features to use in :meth:`~dwave.cloud.client.Client.get_solver`.
-
-                Defined via dictionary of solver feature constraints
-                (see :meth:`~dwave.cloud.client.Client.get_solvers`).
-                For backward compatibility, a solver name, as a string,
-                is also accepted and converted to ``{"name": <solver name>}``.
-
-                If undefined, :meth:`~dwave.cloud.client.Client.get_solver` uses a
-                solver definition from environment variables, a configuration file, or
-                falls back to the first available online solver.
-
-            proxy (str, default=None):
-                URL for proxy to use in connections to D-Wave API. Can include
-                username/password, port, scheme, etc. If undefined, client
-                uses the system-level proxy, if defined, or connects directly to the API.
-
-            headers (dict/str, default=None):
-                Newline-separated additional HTTP headers to include with each
-                API request, or a dictionary of (key, value) pairs.
-
-        Other Parameters:
-            Unrecognized keys (str):
-                All unrecognized keys are passed through to the appropriate client class constructor
-                as string keyword arguments.
-
-                An explicit key value overrides an identical user-defined key value loaded from a
-                configuration file.
+            **kwargs (dict):
+                :class:`.Client` constructor options.
 
         Returns:
             :class:`~dwave.cloud.client.Client` subclass:
@@ -296,29 +273,18 @@ class Client(object):
             :exc:`~dwave.cloud.exceptions.ConfigFileParseError`:
                 Config file parse failed.
 
-        Examples:
-            A variety of examples are given in :mod:`dwave.cloud.config`.
-
-            This example initializes :class:`~dwave.cloud.client.Client` from an
-            explicitly specified configuration file, "~/jane/my_path_to_config/my_cloud_conf.conf"::
-
-            >>> from dwave.cloud import Client
-            >>> client = Client.from_config(config_file='~/jane/my_path_to_config/my_cloud_conf.conf')  # doctest: +SKIP
-            >>> # code that uses client
-            >>> client.close()     # doctest: +SKIP
+            :exc:`ValueError`:
+                Invalid (non-existing) profile name.
 
         """
 
-        # try loading configuration from a preferred new config subsystem
-        # (`./dwave.conf`, `~/.config/dwave/dwave.conf`, etc)
-        config = load_config(
-            config_file=config_file, profile=profile, client=client,
-            endpoint=endpoint, token=token, solver=solver, proxy=proxy,
-            headers=headers)
-        logger.debug("Config loaded: %r", config)
+        # load configuration from config file(s) and environment
+        config = load_config(config_file=config_file, profile=profile)
+        logger.debug("File/env config loaded: %r", config)
 
-        # manual override of other (client-custom) arguments
-        config.update(kwargs)
+        # manual config override with client constructor options
+        config.update(client=client, **kwargs)
+        logger.debug("Code config loaded: %r", config)
 
         from dwave.cloud import qpu, sw, hybrid
         _clients = {
@@ -329,42 +295,51 @@ class Client(object):
         }
         _client = config.pop('client', None) or 'base'
 
-        logger.debug("Final config used for %s.Client(): %r", _client, config)
+        logger.debug("Creating %s.Client() with: %r", _client, config)
         return _clients[_client](**config)
 
-    def __init__(self, endpoint=None, token=None, solver=None, proxy=None,
-                 permissive_ssl=False, request_timeout=60, polling_timeout=None,
-                 connection_close=False, headers=None, **kwargs):
-        """To setup the connection a pipeline of queues/workers is constructed.
+    def __init__(self, endpoint=None, token=None, solver=None, **kwargs):
+        # for (reasonable) backwards compatibility, accept only the first few
+        # positional args.
+        # TODO: deprecate the use of positional args
+        if endpoint is not None:
+            kwargs.setdefault('endpoint', endpoint)
+        if token is not None:
+            kwargs.setdefault('token', token)
+        if solver is not None:
+            kwargs.setdefault('solver', solver)
 
-        There are five interactions with the server the connection manages:
-        1. Downloading solver information.
-        2. Submitting problem data.
-        3. Polling problem status.
-        4. Downloading problem results.
-        5. Canceling problems
+        dispatched_args = kwargs.copy()
+        dispatch_event('before_client_init', obj=self, args=dispatched_args)
 
-        Loading solver information is done synchronously. The other four tasks
-        are performed by asynchronously workers. For 2, 3, and 5 the workers
-        gather tasks in batches.
-        """
+        logger.debug("Client init called with: %r", kwargs)
 
-        args = dict(
-            endpoint=endpoint, token=token, solver=solver, proxy=proxy,
-            permissive_ssl=permissive_ssl, request_timeout=request_timeout,
-            polling_timeout=polling_timeout, connection_close=connection_close,
-            headers=headers, kwargs=kwargs)
-        dispatch_event('before_client_init', obj=self, args=args)
+        # derive instance-level defaults from class defaults and init defaults
+        defaults = kwargs.pop('defaults', None)
+        if defaults is None:
+            defaults = {}
+        self.defaults = copy.deepcopy(self.DEFAULTS)
+        self.defaults.update(**defaults)
 
+        # combine instance-level defaults with file/env/kwarg option values
+        # note: treat empty string values (e.g. from file/env) as undefined/None
+        options = {}
+        for k, v in self.defaults.items():
+            options[k] = kwargs.get(k) or v
+
+        logger.debug("Client options with defaults: %r", options)
+
+        endpoint = options['endpoint']
         if not endpoint:
-            endpoint = self.DEFAULT_API_ENDPOINT
+            raise ValueError("API endpoint not defined")
 
+        token = options['token']
         if not token:
             raise ValueError("API token not defined")
 
         # parse optional client certificate
-        client_cert = kwargs.pop('client_cert', None)
-        client_cert_key = kwargs.pop('client_cert_key', None)
+        client_cert = options['client_cert']
+        client_cert_key = options['client_cert_key']
         if client_cert_key is not None:
             if client_cert is not None:
                 client_cert = (client_cert, client_cert_key)
@@ -372,16 +347,8 @@ class Client(object):
                 raise ValueError(
                     "Client certificate key given, but the cert is missing")
 
-        logger.debug(
-            "Creating a client for (endpoint=%r, token=%r, solver=%r, proxy=%r, "
-            "permissive_ssl=%r, request_timeout=%r, polling_timeout=%r, "
-            "connection_close=%r, headers=%r, client_cert=%r, **kwargs=%r)",
-            endpoint, token, solver, proxy,
-            permissive_ssl, request_timeout, polling_timeout,
-            connection_close, headers, client_cert, kwargs
-        )
-
         # parse solver
+        solver = options['solver']
         if not solver:
             solver_def = {}
         elif isinstance(solver, abc.Mapping):
@@ -403,6 +370,7 @@ class Client(object):
         logger.debug("Parsed solver=%r", solver_def)
 
         # parse headers
+        headers = options['headers']
         if not headers:
             headers_dict = {}
         elif isinstance(headers, abc.Mapping):
@@ -422,26 +390,35 @@ class Client(object):
 
         # Store connection/session parameters
         self.endpoint = endpoint
+        self.token = token
         self.default_solver = solver_def
 
-        self.token = token
         self.client_cert = client_cert
-        self.request_timeout = parse_float(request_timeout)
-        self.polling_timeout = parse_float(polling_timeout)
+        self.request_timeout = parse_float(options['request_timeout'])
+        self.polling_timeout = parse_float(options['polling_timeout'])
 
-        self.proxy = proxy
+        self.proxy = options['proxy']
         self.headers = headers_dict
-        self.permissive_ssl = permissive_ssl
-        self.connection_close = connection_close
+        self.permissive_ssl = parse_boolean(options['permissive_ssl'])
+        self.connection_close = parse_boolean(options['connection_close'])
+
+        self.poll_backoff_min = parse_float(options['poll_backoff_min'])
+        self.poll_backoff_max = parse_float(options['poll_backoff_max'])
 
         # Create session for main thread only
         self.session = self.create_session()
 
-        # store optional config parameters
-        self.poll_backoff_min = parse_float(
-            kwargs.get('poll_backoff_min'), self._DEFAULT_POLL_BACKOFF_MIN)
-        self.poll_backoff_max = parse_float(
-            kwargs.get('poll_backoff_max'), self._DEFAULT_POLL_BACKOFF_MAX)
+        logger.debug(
+            "Client initialized with ("
+            "endpoint=%r, token=%r, default_solver=%r, proxy=%r, "
+            "permissive_ssl=%r, request_timeout=%r, polling_timeout=%r, "
+            "connection_close=%r, headers=%r, client_cert=%r, "
+            "poll_backoff_min=%r, poll_backoff_max=%r)",
+            self.endpoint, self.token, self.default_solver, self.proxy,
+            self.permissive_ssl, self.request_timeout, self.polling_timeout,
+            self.connection_close, self.headers, self.client_cert,
+            self.poll_backoff_min, self.poll_backoff_max
+        )
 
         # Build the problem submission queue, start its workers
         self._submission_queue = queue.Queue()
@@ -490,7 +467,7 @@ class Client(object):
             ThreadPoolExecutor(self._ENCODE_PROBLEM_THREAD_COUNT)
 
         dispatch_event(
-            'after_client_init', obj=self, args=args, return_value=None)
+            'after_client_init', obj=self, args=dispatched_args, return_value=None)
 
     def create_session(self):
         """Create a new requests session based on client's (self) params.
@@ -1370,16 +1347,6 @@ class Client(object):
 
         finally:
             session.close()
-
-    def _is_clock_diff_acceptable(self, future):
-        if not future or future.clock_diff is None:
-            return False
-
-        logger.debug("Detected (server,client) clock offset: approx. %.2f sec. "
-                     "Acceptable offset is: %.2f sec",
-                     future.clock_diff, self._CLOCK_DIFF_MAX)
-
-        return future.clock_diff <= self._CLOCK_DIFF_MAX
 
     def _poll(self, future):
         """Enqueue a problem to poll the server for status."""

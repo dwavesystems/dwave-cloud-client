@@ -164,7 +164,7 @@ class Future(object):
     # TODO: remove in 0.9.0
     @property
     def error(self):
-        """Deprecated in favor of Future._exception and Future.exception().
+        """Deprecated in favor of :meth:`.exception`.
 
         Scheduled for removal in 0.9.0.
         """
