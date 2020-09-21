@@ -80,18 +80,6 @@ Class
 .. autoclass:: dwave.cloud.qpu.Client
 
 
-Software-Samplers Client
-------------------------
-
-.. automodule:: dwave.cloud.sw
-.. currentmodule:: dwave.cloud.sw
-
-Class
-~~~~~
-
-.. autoclass:: dwave.cloud.sw.Client
-
-
 Hybrid-Samplers Client
 ------------------------
 
@@ -102,3 +90,15 @@ Class
 ~~~~~
 
 .. autoclass:: dwave.cloud.hybrid.Client
+
+
+Software-Samplers Client
+------------------------
+
+.. automodule:: dwave.cloud.sw
+.. currentmodule:: dwave.cloud.sw
+
+Class
+~~~~~
+
+.. autoclass:: dwave.cloud.sw.Client

@@ -104,10 +104,6 @@ class Client(object):
             For backward compatibility, a solver name, as a string, is also
             accepted and converted to ``{"name": <solver name>}``.
 
-            If undefined, :meth:`~dwave.cloud.client.Client.get_solver` uses a
-            solver definition from environment variables, a configuration file,
-            or falls back to the first available online solver.
-
         proxy (str, optional):
             Proxy URL to be used for accessing the D-Wave API.
 
@@ -115,35 +111,38 @@ class Client(object):
             Disables SSL verification.
 
         request_timeout (float, default=60):
-            Connect and read timeout (in seconds) for all requests to the
+            Connect and read timeout, in seconds, for all requests to the
             D-Wave API.
 
         polling_timeout (float, optional):
-            Problem status polling timeout (in seconds), after which polling is
+            Problem status polling timeout, in seconds, after which polling is
             aborted.
 
         connection_close (bool, default=False):
-            Force HTTP(S) connection close after each request. Use to prevent
-            intermediate network equipment closing idle connections.
+            Force HTTP(S) connection close after each request. Set to ``True``
+            to prevent intermediate network equipment closing idle connections.
 
         headers (dict/str, optional):
             Newline-separated additional HTTP headers to include with each
             API request, or a dictionary of (key, value) pairs.
 
         client_cert (str, optional):
-            Client certificate file path.
+            Path to client side certificate file.
 
         client_cert_key (str, optional):
-            Client certificate key file path.
+            Path to client side certificate key file.
 
         poll_backoff_min (float, default=0.05):
-            Problem status polling exponential back-off base period, in seconds.
+            Problem status is polled with exponential back-off schedule.
+            Duration of the first interval (between first and second poll) is
+            set to ``poll_backoff_min`` seconds.
 
         poll_backoff_max (float, default=60):
-            Problem status polling exponential back-off max period, in seconds.
+            Problem status is polled with exponential back-off schedule.
+            Maximum back-off period is limited to ``poll_backoff_max`` seconds.
 
         defaults (dict, optional):
-            Client instance-level default, overriding class-level
+            Defaults for the client instance that override the class
             :attr:`.DEFAULTS`.
 
     Note:
@@ -196,7 +195,7 @@ class Client(object):
         'headers': None,
         'client_cert': None,
         'client_cert_key': None,
-        # Poll back-off schedule defaults [sec]
+        # poll back-off schedule defaults [sec]
         'poll_backoff_min': 0.05,
         'poll_backoff_max': 60,
     }
@@ -237,13 +236,13 @@ class Client(object):
         2. Values specified as environment variables
         3. Values specified in the configuration file
         4. Values specified as :class:`.Client` instance defaults
-        5. Values specified in :class:`.Client` class :attr:`.Client.DEFAULTS`.
+        5. Values specified in :class:`.Client` class :attr:`.Client.DEFAULTS`
 
         Configuration-file format and environment variables are described in
         :mod:`dwave.cloud.config`.
 
-        Configuration file and environment variables loading mechanism is
-        described in :func:`~dwave.cloud.config.load_config`.
+        File/environment configuration loading mechanism is described in
+        :func:`~dwave.cloud.config.load_config`.
 
         Args:
             config_file (str/[str]/None/False/True, default=None):

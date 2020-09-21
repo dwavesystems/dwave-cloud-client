@@ -30,10 +30,10 @@ the :func:`~dwave.cloud.client.Client.from_config` classmethod.
 Configuration values can be specified in multiple ways, ranked in the following
 order (with 1 the highest ranked):
 
-1. Values specified as keyword arguments
-2. Values specified as environment variables
-3. Values specified in the configuration file
-4. Values specified in :class:`~dwave.cloud.client.Client` instance ``defaults``
+1. Values specified as keyword arguments.
+2. Values specified as environment variables.
+3. Values specified in the configuration file.
+4. Values specified in :class:`~dwave.cloud.client.Client` instance ``defaults``.
 5. Values specified in :class:`~dwave.cloud.client.Client` class
    :attr:`~dwave.cloud.client.Client.DEFAULTS`.
 
@@ -678,7 +678,7 @@ def load_config(config_file=None, profile=None, **kwargs):
        constraints (a dictionary encoded as JSON).
     2. Values specified as environment variables.
     3. Values specified in the configuration file.
-    4. Values specified as :class:`~dwave.cloud.client.Client` instance defaults
+    4. Values specified as :class:`~dwave.cloud.client.Client` instance defaults.
     5. Values specified in :class:`~dwave.cloud.client.Client` class
        :attr:`~dwave.cloud.client.Client.DEFAULTS`.
 
