@@ -25,13 +25,15 @@ Methods
    :toctree: generated
 
    StructuredSolver.check_problem
+   StructuredSolver.max_num_reads
    StructuredSolver.sample_ising
    StructuredSolver.sample_qubo
-   StructuredSolver.max_num_reads
+   StructuredSolver.sample_bqm
 
    UnstructuredSolver.sample_ising
    UnstructuredSolver.sample_qubo
    UnstructuredSolver.sample_bqm
+   UnstructuredSolver.upload_bqm
 
 
 Properties
@@ -41,9 +43,10 @@ Properties
    :toctree: generated
 
    BaseSolver.name
-   BaseSolver.online
    BaseSolver.avg_load
+   BaseSolver.online
    BaseSolver.qpu
+   BaseSolver.hybrid
    BaseSolver.software
 
    StructuredSolver.num_active_qubits

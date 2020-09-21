@@ -189,6 +189,7 @@ class BaseSolver(object):
 
     @property
     def name(self):
+        """Solver name/ID."""
         return self.id
 
     @property

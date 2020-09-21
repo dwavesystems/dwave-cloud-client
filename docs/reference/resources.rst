@@ -54,11 +54,11 @@ Methods
    :toctree: generated
 
    Client.from_config
-   Client.solvers
-   Client.retrieve_answer
    Client.get_solver
    Client.get_solvers
+   Client.solvers
    Client.is_solver_handled
+   Client.retrieve_answer
    Client.close
 
 
@@ -75,7 +75,7 @@ QPU Client
 .. currentmodule:: dwave.cloud.qpu
 
 Class
------
+~~~~~
 
 .. autoclass:: dwave.cloud.qpu.Client
 
@@ -87,7 +87,7 @@ Software-Samplers Client
 .. currentmodule:: dwave.cloud.sw
 
 Class
------
+~~~~~
 
 .. autoclass:: dwave.cloud.sw.Client
 
@@ -99,6 +99,6 @@ Hybrid-Samplers Client
 .. currentmodule:: dwave.cloud.hybrid
 
 Class
------
+~~~~~
 
 .. autoclass:: dwave.cloud.hybrid.Client
