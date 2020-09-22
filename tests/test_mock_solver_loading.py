@@ -208,6 +208,22 @@ class MockSolverLoading(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     client.get_solver(solver_name)
 
+    def test_get_solver_reproducible(self):
+        """get_solver should return same solver (assuming cache hasn't changed)"""
+
+        with requests_mock.mock() as m:
+            setup_server(m)
+
+            # prefer solvers with longer name: that's our second solver
+            defaults = dict(solver=dict(order_by=lambda s: -len(s.id)))
+
+            with Client(url, token, defaults=defaults) as client:
+                solver = client.get_solver()
+                self.assertEqual(solver.id, second_solver_name)
+
+                solver = client.get_solver()
+                self.assertEqual(solver.id, second_solver_name)
+
     def test_solver_filtering_in_client(self):
         # base client
         self.assertTrue(Client.is_solver_handled(solver_object('test', 'qpu')))
