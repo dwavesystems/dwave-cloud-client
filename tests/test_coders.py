@@ -295,12 +295,15 @@ class TestBQCoders(unittest.TestCase):
     def test_bq_response_decoding(self):
         """Answer to simple problem properly decoded."""
 
+        problem_type = 'bqm'
         ss = dimod.SampleSet.from_samples(
             ([[0, 1], [1, 0]], 'ab'), vartype='BINARY', energy=0)
 
-        msg = dict(answer=dict(format='bq', data=ss.to_serializable()))
+        msg = dict(
+            answer=dict(format='bq', data=ss.to_serializable()),
+            type=problem_type)
 
         res = decode_bq(msg)
 
-        self.assertEqual(res.get('problem_type'), 'bqm')
+        self.assertEqual(res.get('problem_type'), problem_type)
         self.assertEqual(res.get('sampleset'), ss)

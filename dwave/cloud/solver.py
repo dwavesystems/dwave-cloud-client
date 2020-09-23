@@ -49,7 +49,10 @@ try:
 except ImportError:
     _numpy = False
 
-__all__ = ['Solver', 'BaseSolver', 'StructuredSolver', 'UnstructuredSolver']
+__all__ = [
+    'Solver', 'BaseSolver', 'StructuredSolver',
+    'BaseUnstructuredSolver', 'BQMSolver', 'DQMSolver', 'UnstructuredSolver',
+]
 
 logger = logging.getLogger(__name__)
 
@@ -236,8 +239,8 @@ class BaseSolver(object):
             return self.id.startswith('hybrid')
 
 
-class UnstructuredSolver(BaseSolver):
-    """Class for D-Wave unstructured solvers.
+class BaseUnstructuredSolver(BaseSolver):
+    """Base class for D-Wave unstructured solvers.
 
     This class provides :term:`Ising`, :term:`QUBO` and :term:`BQM` sampling
     methods and encapsulates the solver description returned from the D-Wave
@@ -253,9 +256,6 @@ class UnstructuredSolver(BaseSolver):
     Note:
         Events are not yet dispatched from unstructured solvers.
     """
-
-    _handled_problem_types = {"bqm"}
-    _handled_encoding_formats = {"bq"}
 
     def sample_ising(self, linear, quadratic, offset=0, **params):
         """Sample from the specified :term:`Ising` model.
@@ -287,8 +287,8 @@ class UnstructuredSolver(BaseSolver):
         try:
             import dimod
         except ImportError: # pragma: no cover
-            raise RuntimeError("Can't use solver of type 'bqm' without dimod. "
-                               "Re-install the library with 'bqm' support.")
+            raise RuntimeError("Can't use unstructured solver without dimod. "
+                               "Re-install the library with 'bqm'/'dqm' support.")
 
         bqm = dimod.BinaryQuadraticModel.from_ising(linear, quadratic, offset)
         return self.sample_bqm(bqm, **params)
@@ -318,19 +318,51 @@ class UnstructuredSolver(BaseSolver):
         try:
             import dimod
         except ImportError: # pragma: no cover
-            raise RuntimeError("Can't use solver of type 'bqm' without dimod. "
-                               "Re-install the library with 'bqm' support.")
+            raise RuntimeError("Can't use unstructured solver without dimod. "
+                               "Re-install the library with 'bqm'/'dqm' support.")
 
         bqm = dimod.BinaryQuadraticModel.from_qubo(qubo, offset)
         return self.sample_bqm(bqm, **params)
 
-    def _encode_problem_as_ref(self, problem, params):
+    def _encode_problem_for_upload(self, problem):
+        """Encode problem for upload to solver.
+
+        Args:
+            problem (dimod-model-like):
+                Problem of type `._handled_problem_types`.
+
+        Returns:
+            file-like:
+                Binary stream ready for reading and seeking.
+        """
+        raise NotImplementedError
+
+    def upload_problem(self, problem):
+        """Encode and upload the problem.
+
+        Args:
+            problem (dimod-model-like):
+                Quadratic model handled by the solver, for example
+                :class:`dimod.BQM` or :class:`dimod.DQM`.
+
+        Returns:
+            :class:`concurrent.futures.Future`[str]:
+                Problem ID in a Future. Problem ID can be used to submit
+                problems by reference.
+        """
+        data = self._encode_problem_for_upload(problem)
+        return self.client.upload_problem_encoded(data)
+
+    def _encode_problem_for_submission(self, problem, problem_type, params):
         """Encode `problem` for submitting in `ref` format. Upload the
         problem if it's not already uploaded.
 
         Args:
-            problem (:class:`~dimod.BinaryQuadraticModel`/str):
-                A binary quadratic model, or a reference to one (Problem ID).
+            problem (dimod-model-like/str):
+                A quadratic model, or a reference to one (Problem ID).
+
+            problem_type (str):
+                Problem type, one of the handled problem types by the solver.
 
             params (dict):
                 Parameters for the sampling method, solver-specific.
@@ -345,17 +377,88 @@ class UnstructuredSolver(BaseSolver):
         else:
             logger.debug("To encode the problem for submit in the 'ref' format, "
                          "we need to upload it first.")
-            problem_id = self.upload_bqm(problem).result()
+            problem_id = self.upload_problem(problem).result()
 
         body = json.dumps({
             'solver': self.id,
             'data': encode_problem_as_ref(problem_id),
-            'type': 'bqm',
+            'type': problem_type,
             'params': params
         })
         logger.trace("Sampling request encoded as: %s", body)
 
         return body
+
+    def sample_problem(self, problem, problem_type=None, **params):
+        """Sample from the specified problem.
+
+        Args:
+            problem (dimod-model-like/str):
+                A quadratic model (e.g. :class:`dimod.BQM`/:class:`dimod.DQM`),
+                or a reference to one (Problem ID returned by
+                :meth:`.upload_problem` method).
+
+            problem_type (str, optional):
+                Problem type, one of the handled problem types by the solver.
+                If not specified, the first handled problem type is used.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
+
+        Returns:
+            :class:`~dwave.cloud.computation.Future`
+        """
+
+        # infer problem_type; for now just the the first handled (always just one)
+        if problem_type is None:
+            problem_type = next(iter(self._handled_problem_types))
+
+        # encode the request (body as future)
+        body = self.client._encode_problem_executor.submit(
+            self._encode_problem_for_submission,
+            problem=problem, problem_type=problem_type, params=params)
+
+        # computation future holds a reference to the remote job
+        computation = Future(
+            solver=self, id_=None, return_matrix=self.return_matrix)
+
+        logger.debug("Submitting new problem to: %s", self.id)
+        self.client._submit(body, computation)
+
+        return computation
+
+
+class BQMSolver(BaseUnstructuredSolver):
+    """Class for D-Wave unstructured binary quadratic model solvers.
+
+    This class provides :term:`Ising`, :term:`QUBO` and :term:`BQM` sampling
+    methods and encapsulates the solver description returned from the D-Wave
+    cloud API.
+
+    Args:
+        client (:class:`~dwave.cloud.client.Client`):
+            Client that manages access to this solver.
+
+        data (`dict`):
+            Data from the server describing this solver.
+
+    Note:
+        Events are not yet dispatched from unstructured solvers.
+    """
+
+    _handled_problem_types = {"bqm"}
+    _handled_encoding_formats = {"bq"}
+
+    def _encode_problem_for_upload(self, bqm):
+        try:
+            data = bqm_as_file(bqm)
+        except Exception as e:
+            logger.debug("BQM conversion to file failed with %r, "
+                         "assuming data already encoded.", e)
+            # assume `bqm` given as file, ready for upload
+            data = bqm
+
+        return data
 
     def sample_bqm(self, bqm, **params):
         """Sample from the specified :term:`BQM`.
@@ -374,19 +477,7 @@ class UnstructuredSolver(BaseSolver):
         Note:
             To use this method, dimod package has to be installed.
         """
-
-        # encode the request (body as future)
-        body = self.client._encode_problem_executor.submit(
-            self._encode_problem_as_ref,
-            problem=bqm, params=params)
-
-        # computation future holds a reference to the remote job
-        computation = Future(solver=self, id_=None, return_matrix=self.return_matrix)
-
-        logger.debug("Submitting new problem to: %s", self.id)
-        self.client._submit(body, computation)
-
-        return computation
+        return self.sample_problem(bqm, **params)
 
     def upload_bqm(self, bqm):
         """Upload the specified :term:`BQM` to SAPI, returning a Problem ID
@@ -408,16 +499,93 @@ class UnstructuredSolver(BaseSolver):
         Note:
             To use this method, dimod package has to be installed.
         """
+        return self.upload_problem(bqm)
 
+
+class DQMSolver(BaseUnstructuredSolver):
+    """Class for D-Wave unstructured discrete quadratic model solvers.
+
+    This class provides a :term:`DQM` sampling
+    method and encapsulates the solver description returned from the D-Wave
+    cloud API.
+
+    Args:
+        client (:class:`~dwave.cloud.client.Client`):
+            Client that manages access to this solver.
+
+        data (`dict`):
+            Data from the server describing this solver.
+
+    Note:
+        Events are not yet dispatched from unstructured solvers.
+    """
+
+    _handled_problem_types = {"dqm"}
+    _handled_encoding_formats = {"bq"}
+
+    def _encode_problem_for_upload(self, dqm):
         try:
-            data = bqm_as_file(bqm)
+            # note: SpooledTemporaryFile currently returned by DQM.to_file
+            # does not implement io.BaseIO interface, so we use the underlying
+            # (and internal) file-like object for now
+            data = dqm.to_file()._file
         except Exception as e:
-            logger.debug("BQM conversion to file failed with %r, "
+            logger.debug("DQM conversion to file failed with %r, "
                          "assuming data already encoded.", e)
-            # assume `bqm` given as file, ready for upload
-            data = bqm
+            # assume `dqm` given as file, ready for upload
+            data = dqm
 
-        return self.client.upload_problem_encoded(data)
+        logger.debug("Problem encoded for upload: %r", data)
+        return data
+
+    def sample_bqm(self, bqm, **params):
+        from dwave.cloud.utils import bqm_to_dqm
+
+        # to sample BQM problems, we need to convert them to DQM
+        dqm = bqm_to_dqm(bqm)
+
+        return self.sample_dqm(dqm, **params)
+
+    def sample_dqm(self, dqm, **params):
+        """Sample from the specified :term:`DQM`.
+
+        Args:
+            dqm (:class:`~dimod.DiscreteQuadraticModel`/str):
+                A discrete quadratic model, or a reference to one
+                (Problem ID returned by `.upload_dqm` method).
+
+            **params:
+                Parameters for the sampling method, solver-specific.
+
+        Returns:
+            :class:`~dwave.cloud.computation.Future`
+
+        Note:
+            To use this method, dimod package has to be installed.
+        """
+        return self.sample_problem(dqm, **params)
+
+    def upload_dqm(self, dqm):
+        """Upload the specified :term:`DQM` to SAPI, returning a Problem ID
+        that can be used to submit the DQM to this solver (i.e. call the
+        `.sample_dqm` method).
+
+        Args:
+            dqm (:class:`~dimod.DiscreteQuadraticModel`/bytes-like/file-like):
+                A discrete quadratic model given either as an in-memory
+                :class:`~dimod.DiscreteQuadraticModel` object, or as raw data
+                (encoded serialized model) in either a file-like or a bytes-like
+                object.
+
+        Returns:
+            :class:`concurrent.futures.Future`[str]:
+                Problem ID in a Future. Problem ID can be used to submit
+                problems by reference.
+
+        Note:
+            To use this method, dimod package has to be installed.
+        """
+        return self.upload_problem(dqm)
 
 
 class StructuredSolver(BaseSolver):
@@ -808,8 +976,8 @@ class StructuredSolver(BaseSolver):
 
 # for backwards compatibility:
 Solver = StructuredSolver
-
+UnstructuredSolver = BQMSolver
 
 # list of all available solvers, ordered according to loading attempt priority
 # (more specific first)
-available_solvers = [StructuredSolver, UnstructuredSolver]
+available_solvers = [StructuredSolver, BQMSolver, DQMSolver]

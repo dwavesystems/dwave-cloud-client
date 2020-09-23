@@ -669,3 +669,27 @@ class aliasdict(dict):
         new = type(self)(self)
         new.alias(self.aliases)
         return new
+
+
+def bqm_to_dqm(bqm):
+    """Represent a :class:`dimod.BQM` as a :class:`dimod.DQM`."""
+    try:
+        from dimod import DiscreteQuadraticModel
+    except ImportError: # pragma: no cover
+        raise RuntimeError(
+            "dimod package with support for DiscreteQuadraticModel required."
+            "Re-install the library with 'dqm' support.")
+
+    dqm = DiscreteQuadraticModel()
+
+    ising = bqm.spin
+
+    for v, bias in ising.linear.items():
+        dqm.add_variable(2, label=v)
+        dqm.set_linear(v, [-bias, bias])
+
+    for (u, v), bias in ising.quadratic.items():
+        biases = np.array([[bias, -bias], [-bias, bias]], dtype=np.float64)
+        dqm.set_quadratic(u, v, biases)
+
+    return dqm

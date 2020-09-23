@@ -357,7 +357,7 @@ def decode_bq(msg):
     result['sampleset'] = dimod.SampleSet.from_serializable(answer['data'])
 
     # include problem type
-    result['problem_type'] = 'bqm'
+    result['problem_type'] = msg['type']
 
     return result
 
@@ -394,6 +394,6 @@ def bqm_as_file(bqm, **options):
     # test explicitly to avoid copy on cast if possible
     fileviewable = (dimod.AdjArrayBQM, dimod.AdjVectorBQM, dimod.AdjMapBQM)
     if not isinstance(bqm, fileviewable):
-        bqm = AdjVectorBQM(bqm)
+        bqm = dimod.AdjVectorBQM(bqm)
 
     return BQMFileView(bqm, **options)

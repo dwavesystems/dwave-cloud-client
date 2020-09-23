@@ -785,7 +785,7 @@ class Future(object):
         samples = [[sample[v] for v in variables] for sample in self.samples]
 
         # infer vartype from problem type
-        # note: KeyError on unknown problem types. BQMs should be handled above.
+        # note: KeyError on unknown problem types. BQM/DQM should be handled above.
         vartype_from_problem_type = {'ising': 'SPIN', 'qubo': 'BINARY'}
         vartype = vartype_from_problem_type[self.problem_type]
 
