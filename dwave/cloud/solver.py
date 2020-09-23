@@ -285,7 +285,7 @@ class BaseUnstructuredSolver(BaseSolver):
             import dimod
         except ImportError: # pragma: no cover
             raise RuntimeError("Can't use unstructured solver without dimod. "
-                               "Re-install the library with 'bqm' support.")
+                               "Re-install the library with 'bqm'/'dqm' support.")
 
         bqm = dimod.BinaryQuadraticModel.from_ising(linear, quadratic, offset)
         return self.sample_bqm(bqm, **params)
@@ -316,7 +316,7 @@ class BaseUnstructuredSolver(BaseSolver):
             import dimod
         except ImportError: # pragma: no cover
             raise RuntimeError("Can't use unstructured solver without dimod. "
-                               "Re-install the library with 'bqm' support.")
+                               "Re-install the library with 'bqm'/'dqm' support.")
 
         bqm = dimod.BinaryQuadraticModel.from_qubo(qubo, offset)
         return self.sample_bqm(bqm, **params)
@@ -523,6 +523,14 @@ class DQMSolver(BaseUnstructuredSolver):
 
         logger.debug("Problem encoded for upload: %r", data)
         return data
+
+    def sample_bqm(self, bqm, **params):
+        from dwave.cloud.utils import bqm_to_dqm
+
+        # to sample BQM problems, we need to convert them to DQM
+        dqm = bqm_to_dqm(bqm)
+
+        return self.sample_dqm(dqm, **params)
 
     def sample_dqm(self, dqm, **params):
         """Sample from the specified :term:`DQM`.
