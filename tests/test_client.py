@@ -28,7 +28,6 @@ from contextlib import contextmanager
 import requests.exceptions
 from plucky import merge
 
-from dwave.cloud.config import load_config
 from dwave.cloud.client import Client
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
 from dwave.cloud.exceptions import (
@@ -174,7 +173,7 @@ class ClientFactory(unittest.TestCase):
 
     def test_default(self):
         conf = {k: k for k in 'endpoint token'.split()}
-        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 self.assertEqual(client.endpoint, 'endpoint')
                 self.assertEqual(client.token, 'token')
@@ -185,11 +184,8 @@ class ClientFactory(unittest.TestCase):
 
     def test_client_type(self):
         conf = {k: k for k in 'endpoint token'.split()}
-        def mocked_load_config(**kwargs):
-            kwargs.update(conf)
-            return kwargs
 
-        with mock.patch("dwave.cloud.client.load_config", mocked_load_config):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 self.assertIsInstance(client, dwave.cloud.client.Client)
 
@@ -219,7 +215,7 @@ class ClientFactory(unittest.TestCase):
 
     def test_custom_kwargs(self):
         conf = {k: k for k in 'endpoint token'.split()}
-        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with mock.patch("dwave.cloud.client.Client.__init__", return_value=None) as init:
                 dwave.cloud.Client.from_config(custom='custom')
                 init.assert_called_once_with(
@@ -227,7 +223,7 @@ class ClientFactory(unittest.TestCase):
 
     def test_custom_kwargs_overrides_config(self):
         conf = {k: k for k in 'endpoint token custom'.split()}
-        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with mock.patch("dwave.cloud.client.Client.__init__", return_value=None) as init:
                 dwave.cloud.Client.from_config(custom='new-custom')
                 init.assert_called_once_with(
@@ -238,7 +234,7 @@ class ClientFactory(unittest.TestCase):
         conf = {k: k for k in 'endpoint token'.split()}
         conf.update(solver=json.dumps(solver_def))
 
-        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 self.assertEqual(client.default_solver, solver_def)
 
@@ -246,7 +242,7 @@ class ClientFactory(unittest.TestCase):
         solver_def = {"name__eq": "solver"}
         conf = {k: k for k in 'endpoint token solver'.split()}
 
-        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 self.assertEqual(client.default_solver, solver_def)
 
@@ -254,10 +250,7 @@ class ClientFactory(unittest.TestCase):
         new_solver_def = {"software": True}
         conf = {k: k for k in 'endpoint token solver'.split()}
 
-        def load_config(**kwargs):
-            return merge(kwargs, conf, op=lambda a, b: a or b)
-
-        with mock.patch("dwave.cloud.client.load_config", load_config):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with dwave.cloud.Client.from_config(solver=new_solver_def) as client:
                 self.assertEqual(client.default_solver, new_solver_def)
 
@@ -265,17 +258,14 @@ class ClientFactory(unittest.TestCase):
         conf = {k: k for k in 'endpoint token solver'.split()}
         conf.update(solver=json.dumps({"software": True}))
 
-        def load_config(**kwargs):
-            return merge(kwargs, conf, op=lambda a, b: a or b)
-
-        with mock.patch("dwave.cloud.client.load_config", load_config):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with dwave.cloud.Client.from_config(solver='solver') as client:
                 self.assertEqual(client.default_solver, {"name__eq": "solver"})
 
     def test_boolean_options_parsed_from_config(self):
         conf = {'connection_close': 'off', 'permissive_ssl': 'true'}
 
-        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with dwave.cloud.Client.from_config(token='token') as client:
                 self.assertFalse(client.connection_close)
                 self.assertTrue(client.permissive_ssl)
@@ -285,7 +275,7 @@ class ClientFactory(unittest.TestCase):
         DEFAULTS = Client.DEFAULTS.copy()
         DEFAULTS.update(token=token)
 
-        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: {}):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: {}):
             with mock.patch.multiple("dwave.cloud.Client", DEFAULTS=DEFAULTS):
                 with dwave.cloud.Client.from_config() as client:
                     self.assertEqual(client.token, token)
@@ -294,7 +284,7 @@ class ClientFactory(unittest.TestCase):
         token = 'value'
         defaults = dict(token=token)
 
-        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: {}):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: {}):
             with dwave.cloud.Client.from_config(defaults=defaults) as client:
                 self.assertEqual(client.token, token)
 
@@ -310,12 +300,10 @@ class ClientFactory(unittest.TestCase):
         defaults = dict(solver='wrong')
 
         conf = dict(solver=solver)
-        def load_config(**kwargs):
-            return merge(kwargs, conf, op=lambda a, b: a or b)
 
         kwargs = dict(token=token, defaults=defaults)
 
-        with mock.patch("dwave.cloud.client.load_config", load_config):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with mock.patch.multiple("dwave.cloud.Client", DEFAULTS=DEFAULTS):
                 with dwave.cloud.Client.from_config(**kwargs) as client:
 
@@ -335,7 +323,7 @@ class ClientFactory(unittest.TestCase):
         """
         conf = dict(token='token', headers=headers_str)
 
-        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 self.assertDictEqual(client.headers, headers_dict)
 
@@ -344,16 +332,13 @@ class ClientFactory(unittest.TestCase):
         headers_str = "key-2:value-2\nkey-1:value-1"
         conf = dict(token='token')
 
-        def load_config(**kwargs):
-            return merge(kwargs, conf, op=lambda a, b: a or b)
-
         # headers as dict
-        with mock.patch("dwave.cloud.client.load_config", load_config):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with dwave.cloud.Client.from_config(headers=headers_dict) as client:
                 self.assertDictEqual(client.headers, headers_dict)
 
         # headers as str
-        with mock.patch("dwave.cloud.client.load_config", load_config):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with dwave.cloud.Client.from_config(headers=headers_str) as client:
                 self.assertDictEqual(client.headers, headers_dict)
 
@@ -365,7 +350,7 @@ class ClientFactory(unittest.TestCase):
         client_cert = crt
         conf = dict(token='token', client_cert=crt)
 
-        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 self.assertEqual(client.client_cert, client_cert)
 
@@ -376,7 +361,7 @@ class ClientFactory(unittest.TestCase):
         client_cert = (crt, key)
         conf = dict(token='token', client_cert=crt, client_cert_key=key)
 
-        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 self.assertEqual(client.client_cert, client_cert)
 
@@ -420,14 +405,14 @@ class ClientFactory(unittest.TestCase):
         conf = dict(token='token', **poll_conf)
 
         # polling params from config file propagated to client object
-        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 self.assertEqual(client.poll_backoff_min, 0.1)
                 self.assertEqual(client.poll_backoff_max, 1.0)
 
         # test defaults
         conf = dict(token='token')
-        with mock.patch("dwave.cloud.client.load_config", lambda **kwargs: conf):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 self.assertEqual(client.poll_backoff_min, Client.DEFAULTS['poll_backoff_min'])
                 self.assertEqual(client.poll_backoff_max, Client.DEFAULTS['poll_backoff_max'])
@@ -436,10 +421,7 @@ class ClientFactory(unittest.TestCase):
         poll_conf = {"poll_backoff_min": "0.1", "poll_backoff_max": "1"}
         conf = dict(token='token', **poll_conf)
 
-        def load_config(**kwargs):
-            return merge(kwargs, conf, op=lambda a, b: a or b)
-
-        with mock.patch("dwave.cloud.client.load_config", load_config):
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with dwave.cloud.Client.from_config(poll_backoff_min=0.5) as client:
                 self.assertEqual(client.poll_backoff_min, 0.5)
                 self.assertEqual(client.poll_backoff_max, 1.0)
