@@ -283,7 +283,8 @@ class Client(object):
         logger.debug("File/env config loaded: %r", config)
 
         # manual config override with client constructor options
-        config.update(client=client, **kwargs)
+        kwargs.update(client=client)
+        config.update({k: v for k, v in kwargs.items() if v is not None})
         logger.debug("Code config loaded: %r", config)
 
         from dwave.cloud import qpu, sw, hybrid

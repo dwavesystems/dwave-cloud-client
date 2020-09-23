@@ -754,7 +754,12 @@ def load_config(config_file=None, profile=None, **kwargs):
         :exc:`~dwave.cloud.exceptions.ConfigFileParseError`:
             Config file parse failed.
 
-    Examples
+    Note:
+        Prior to 0.8.0, some keyword arguments did not overwrite config
+        variables when their value was ``None``. Now we consistently do
+        :meth:`dict.update` on the config read from file/env for all ``kwargs``.
+
+    Examples:
         This example loads the configuration from an auto-detected configuration file
         in the home directory of a Windows system user.
 
