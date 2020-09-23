@@ -1068,11 +1068,13 @@ class Client(object):
 
         # in absence of other filters, config/env solver filters/name are used
         if not filters and self.default_solver:
-            filters = self.default_solver
+            filters = copy.deepcopy(self.default_solver)
 
         # allow `order_by` from default config/init override
         if order_by is None:
             order_by = filters.pop('order_by', 'avg_load')
+        else:
+            filters.pop('order_by', None)
 
         # get the first solver that satisfies all filters
         try:
