@@ -394,6 +394,6 @@ def bqm_as_file(bqm, **options):
     # test explicitly to avoid copy on cast if possible
     fileviewable = (dimod.AdjArrayBQM, dimod.AdjVectorBQM, dimod.AdjMapBQM)
     if not isinstance(bqm, fileviewable):
-        bqm = AdjVectorBQM(bqm)
+        bqm = dimod.AdjVectorBQM(bqm)
 
     return BQMFileView(bqm, **options)
