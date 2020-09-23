@@ -357,7 +357,7 @@ def decode_bq(msg):
     result['sampleset'] = dimod.SampleSet.from_serializable(answer['data'])
 
     # include problem type
-    result['problem_type'] = 'bqm'
+    result['problem_type'] = msg['type']
 
     return result
 
