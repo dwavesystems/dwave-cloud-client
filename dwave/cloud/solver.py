@@ -49,7 +49,10 @@ try:
 except ImportError:
     _numpy = False
 
-__all__ = ['Solver', 'BaseSolver', 'StructuredSolver', 'UnstructuredSolver']
+__all__ = [
+    'Solver', 'BaseSolver', 'StructuredSolver',
+    'BaseUnstructuredSolver', 'BQMSolver', 'DQMSolver', 'UnstructuredSolver',
+]
 
 logger = logging.getLogger(__name__)
 
