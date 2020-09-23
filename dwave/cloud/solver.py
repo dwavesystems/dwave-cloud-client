@@ -488,6 +488,79 @@ class BQMSolver(BaseUnstructuredSolver):
         return self.upload_problem(bqm)
 
 
+class DQMSolver(BaseUnstructuredSolver):
+    """Class for D-Wave unstructured discrete quadratic model solvers.
+
+    This class provides a :term:`DQM` sampling
+    method and encapsulates the solver description returned from the D-Wave
+    cloud API.
+
+    Args:
+        client (:class:`~dwave.cloud.client.Client`):
+            Client that manages access to this solver.
+
+        data (`dict`):
+            Data from the server describing this solver.
+
+    Note:
+        Events are not yet dispatched from unstructured solvers.
+    """
+
+    _handled_problem_types = {"dqm"}
+    _handled_encoding_formats = {"bq"}
+
+    def _encode_problem_for_upload(self, dqm):
+        try:
+            data = dqm.to_file()
+        except Exception as e:
+            logger.debug("DQM conversion to file failed with %r, "
+                         "assuming data already encoded.", e)
+            # assume `dqm` given as file, ready for upload
+            data = dqm
+
+        logger.debug("Problem encoded for upload: %r", data)
+        return data
+
+    def sample_dqm(self, dqm, **params):
+        """Sample from the specified :term:`DQM`.
+
+        Args:
+            dqm (:class:`~dimod.DiscreteQuadraticModel`/str):
+                A discrete quadratic model, or a reference to one
+                (Problem ID returned by `.upload_dqm` method).
+
+            **params:
+                Parameters for the sampling method, solver-specific.
+
+        Returns:
+            :class:`~dwave.cloud.computation.Future`
+
+        Note:
+            To use this method, dimod package has to be installed.
+        """
+        return self.sample_problem(dqm, **params)
+
+    def upload_dqm(self, dqm):
+        """Upload the specified :term:`DQM` to SAPI, returning a Problem ID
+        that can be used to submit the DQM to this solver (i.e. call the
+        `.sample_dqm` method).
+
+        Args:
+            dqm (:class:`~dimod.DiscreteQuadraticModel`/bytes-like/file-like):
+                A discrete quadratic model given either as an in-memory
+                :class:`~dimod.DiscreteQuadraticModel` object, or as raw data
+                (encoded serialized model) in either a file-like or a bytes-like
+                object.
+
+        Returns:
+            :class:`concurrent.futures.Future`[str]:
+                Problem ID in a Future. Problem ID can be used to submit
+                problems by reference.
+
+        Note:
+            To use this method, dimod package has to be installed.
+        """
+        return self.upload_problem(dqm)
 
 
 class StructuredSolver(BaseSolver):
@@ -882,4 +955,4 @@ UnstructuredSolver = BQMSolver
 
 # list of all available solvers, ordered according to loading attempt priority
 # (more specific first)
-available_solvers = [StructuredSolver, BQMSolver]
+available_solvers = [StructuredSolver, BQMSolver, DQMSolver]
