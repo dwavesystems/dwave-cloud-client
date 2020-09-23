@@ -254,6 +254,18 @@ class ClientFactory(unittest.TestCase):
             with dwave.cloud.Client.from_config(solver=new_solver_def) as client:
                 self.assertEqual(client.default_solver, new_solver_def)
 
+    def test_none_kwargs_do_not_override_config(self):
+        """kwargs with value ``None`` should be ignored (issue #430)"""
+        conf = {k: k for k in 'endpoint token'.split()}
+        solver_json = '{"qpu": true}'
+        conf.update(solver=solver_json)
+        solver = json.loads(solver_json)
+
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
+            with dwave.cloud.Client.from_config(endpoint=None, solver=None) as client:
+                self.assertEqual(client.endpoint, conf['endpoint'])
+                self.assertEqual(client.default_solver, solver)
+
     def test_solver_name_overrides_config_features(self):
         conf = {k: k for k in 'endpoint token solver'.split()}
         conf.update(solver=json.dumps({"software": True}))
@@ -280,6 +292,22 @@ class ClientFactory(unittest.TestCase):
                 with dwave.cloud.Client.from_config() as client:
                     self.assertEqual(client.token, token)
 
+                # None defaults are ignored
+                with dwave.cloud.Client(defaults=None) as client:
+                    self.assertEqual(client.token, token)
+
+                # explicit None kwargs do not modify defaults
+                with dwave.cloud.Client(
+                        endpoint=None, token=None, solver=None,
+                        connection_close=None, poll_backoff_min=None) as client:
+
+                    self.assertEqual(client.endpoint, client.DEFAULT_API_ENDPOINT)
+                    self.assertEqual(client.token, token)
+                    self.assertEqual(client.default_solver, {})
+
+                    self.assertEqual(client.connection_close, DEFAULTS['connection_close'])
+                    self.assertEqual(client.poll_backoff_min, DEFAULTS['poll_backoff_min'])
+
     def test_defaults_as_kwarg(self):
         token = 'value'
         defaults = dict(token=token)
@@ -293,15 +321,16 @@ class ClientFactory(unittest.TestCase):
 
         token = 'value'
         solver = {'feature': 'value'}
+        request_timeout = 10
 
         DEFAULTS = Client.DEFAULTS.copy()
         DEFAULTS.update(token='wrong')
 
         defaults = dict(solver='wrong')
 
-        conf = dict(solver=solver)
+        conf = dict(solver=solver, request_timeout=request_timeout)
 
-        kwargs = dict(token=token, defaults=defaults)
+        kwargs = dict(token=token, defaults=defaults, request_timeout=None)
 
         with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
             with mock.patch.multiple("dwave.cloud.Client", DEFAULTS=DEFAULTS):
@@ -315,6 +344,9 @@ class ClientFactory(unittest.TestCase):
 
                     # endpoint: used from class defaults
                     self.assertEqual(client.endpoint, DEFAULTS['endpoint'])
+
+                    # None kwarg: used from class defaults
+                    self.assertEqual(client.request_timeout, request_timeout)
 
     def test_headers_from_config(self):
         headers_dict = {"key-1": "value-1", "key-2": "value-2"}
