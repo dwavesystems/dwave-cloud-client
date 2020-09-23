@@ -14,6 +14,7 @@
 
 """Test problem submission to mock unstructured solvers."""
 
+import io
 import json
 import unittest
 from unittest import mock
@@ -23,7 +24,7 @@ import numpy
 
 from dwave.cloud.client import Client
 from dwave.cloud.solver import (
-    BaseUnstructuredSolver, UnstructuredSolver, BQMSolver)
+    BaseUnstructuredSolver, UnstructuredSolver, BQMSolver, DQMSolver)
 from dwave.cloud.concurrency import Present
 
 
@@ -67,7 +68,7 @@ def choose_reply(path, replies):
 
 class TestUnstructuredSolver(unittest.TestCase):
 
-    def test_submit_bqm_immediate_reply(self):
+    def test_sample_bqm_immediate_reply(self):
         """Construction of and sampling from an unstructured BQM solver works."""
 
         # build a test problem
@@ -131,6 +132,41 @@ class TestUnstructuredSolver(unittest.TestCase):
                     numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
                     numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
                     numpy.testing.assert_array_equal(fut.num_occurrences, ss.record.num_occurrences)
+
+    def test_sample_dqm_smoke_test(self):
+        """Construction of and sampling from an unstructured DQM solver works."""
+        # note: full test pending dimod release that supports DQM
+
+        # mock a DQM problem
+        #bqm = dimod.BQM.from_ising({}, {'ab': 1})
+        dqm = mock.Mock()
+        dqm.to_file.return_value._file = io.BytesIO(b'123')
+
+        problem_type = 'dqm'
+
+        # use a global mocked session, so we can modify it on-fly
+        session = mock.Mock()
+
+        # upload is now part of submit, so we need to mock it
+        mock_problem_id = 'mock-problem-id'
+        def mock_upload(self, bqm):
+            return Present(result=mock_problem_id)
+
+        # construct a functional solver by mocking client and api response data
+        with mock.patch.object(Client, 'create_session', lambda self: session):
+            with Client('endpoint', 'token') as client:
+                with mock.patch.object(BaseUnstructuredSolver, 'upload_problem', mock_upload):
+                    solver = DQMSolver(client, unstructured_solver_data(problem_type=problem_type))
+
+                    # use bqm for now
+                    ss = dimod.ExactSolver().sample(dimod.BQM.empty('SPIN'))
+                    session.post = lambda path, _: choose_reply(
+                        path, {'problems/': complete_reply(ss, problem_type=problem_type)})
+
+                    # verify decoding works
+                    fut = solver.sample_dqm(dqm)
+                    numpy.testing.assert_array_equal(fut.sampleset, ss)
+                    numpy.testing.assert_array_equal(fut.problem_type, problem_type)
 
     def test_upload_failure(self):
         """Submit should gracefully fail if upload as part of submit fails."""
