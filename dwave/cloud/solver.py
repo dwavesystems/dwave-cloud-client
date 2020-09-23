@@ -350,13 +350,16 @@ class BaseUnstructuredSolver(BaseSolver):
         data = self._encode_problem_for_upload(problem)
         return self.client.upload_problem_encoded(data)
 
-    def _encode_problem_for_submission(self, problem, params):
+    def _encode_problem_for_submission(self, problem, problem_type, params):
         """Encode `problem` for submitting in `ref` format. Upload the
         problem if it's not already uploaded.
 
         Args:
             problem (dimod-model-like/str):
                 A quadratic model, or a reference to one (Problem ID).
+
+            problem_type (str):
+                Problem type, one of the handled problem types by the solver.
 
             params (dict):
                 Parameters for the sampling method, solver-specific.
@@ -376,14 +379,14 @@ class BaseUnstructuredSolver(BaseSolver):
         body = json.dumps({
             'solver': self.id,
             'data': encode_problem_as_ref(problem_id),
-            'type': 'bqm',
+            'type': problem_type,
             'params': params
         })
         logger.trace("Sampling request encoded as: %s", body)
 
         return body
 
-    def sample_problem(self, problem, **params):
+    def sample_problem(self, problem, problem_type=None, **params):
         """Sample from the specified problem.
 
         Args:
@@ -392,6 +395,10 @@ class BaseUnstructuredSolver(BaseSolver):
                 or a reference to one (Problem ID returned by
                 :meth:`.upload_problem` method).
 
+            problem_type (str, optional):
+                Problem type, one of the handled problem types by the solver.
+                If not specified, the first handled problem type is used.
+
             **params:
                 Parameters for the sampling method, solver-specific.
 
@@ -399,10 +406,14 @@ class BaseUnstructuredSolver(BaseSolver):
             :class:`~dwave.cloud.computation.Future`
         """
 
+        # infer problem_type; for now just the the first handled (always just one)
+        if problem_type is None:
+            problem_type = next(iter(self._handled_problem_types))
+
         # encode the request (body as future)
         body = self.client._encode_problem_executor.submit(
             self._encode_problem_for_submission,
-            problem=problem, params=params)
+            problem=problem, problem_type=problem_type, params=params)
 
         # computation future holds a reference to the remote job
         computation = Future(
