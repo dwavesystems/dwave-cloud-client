@@ -365,19 +365,6 @@ class TestChunkedData(unittest.TestCase):
         self.assertListEqual(chunks_expected, chunks_generated)
 
 
-@unittest.skipUnless(config, "No live server configuration available.")
-class TestMultipartUpload(unittest.TestCase):
-
-    def test_smoke_test(self):
-        data = b'123'
-        with Client(**config) as client:
-            future = client.upload_problem_encoded(data)
-            try:
-                problem_id = future.result()
-            except Exception as e:
-                self.fail(e)
-
-
 def choose_reply(key, replies, statuses=None):
     """Choose the right response based on a hashable `key` and make a mock
     response.
@@ -729,7 +716,7 @@ class TestMockedMultipartUpload(unittest.TestCase):
                         part_data[i],
                         json.dumps(sorted([
                             ('Content-MD5', _b64(part_digest[i])),
-                            ('Content-Type',     'application/octet-stream')
+                            ('Content-Type', 'application/octet-stream')
                         ]))
                     ): json.dumps({})
                     for i in parts[2:]
@@ -756,3 +743,25 @@ class TestMockedMultipartUpload(unittest.TestCase):
                     self.fail(e)
 
                 self.assertEqual(returned_problem_id, upload_problem_id)
+
+
+@unittest.skipUnless(config, "No live server configuration available.")
+class TestMultipartUpload(unittest.TestCase):
+
+    def test_smoke_test(self):
+        data = b'123'
+        with Client(**config) as client:
+            future = client.upload_problem_encoded(data)
+            try:
+                problem_id = future.result()
+            except Exception as e:
+                self.fail(e)
+
+    def test_initiate_size_limit(self):
+        size = 100 * 2**30
+
+        with Client(**config) as client:
+            with client.create_session() as session:
+                with self.assertRaisesRegex(ProblemUploadError,
+                                            'bigger than the maximum'):
+                    client._initiate_multipart_upload(session, size)

@@ -1614,14 +1614,27 @@ class Client(object):
         except requests.exceptions.Timeout:
             raise RequestTimeout
 
+        logger.trace("Multipart upload initiate response (code=%r, text=%r)",
+                     response.status_code, response.text)
+
         if response.status_code == 401:
             raise SolverAuthenticationError()
-        else:
-            logger.trace("Multipart upload initiate response: %r", response.text)
-            response.raise_for_status()
 
         try:
-            problem_id = response.json()['id']
+            msg = response.json()
+        except:
+            response.raise_for_status()
+
+        if response.status_code != 200:
+            try:
+                error_msg = msg['error_msg']
+            except KeyError:
+                response.raise_for_status()
+
+            raise ProblemUploadError(error_msg)
+
+        try:
+            problem_id = msg['id']
         except KeyError:
             raise InvalidAPIResponseError("problem ID missing")
 
@@ -1834,7 +1847,7 @@ class Client(object):
                     errmsg = ("Multipart upload initialization failed "
                               "with {!r}.".format(e))
                     logger.error(errmsg)
-                    raise ProblemUploadError(errmsg)
+                    raise ProblemUploadError(errmsg) from e
 
             # check problem status, so we only upload parts missing or invalid
             problem_status = \
@@ -1869,7 +1882,7 @@ class Client(object):
                     errmsg = ("Multipart upload of problem_id={!r} failed for "
                               "part_no={!r} with {!r}.".format(problem_id, part_no, e))
                     logger.error(errmsg)
-                    raise ProblemUploadError(errmsg)
+                    raise ProblemUploadError(errmsg) from e
 
             # verify all parts uploaded via status call
             # (check remote checksum matches the local one)
@@ -1904,6 +1917,6 @@ class Client(object):
                 errmsg = ("Multipart upload of problem_id={!r} failed on parts "
                           "combine with {!r}".format(problem_id, e))
                 logger.error(errmsg)
-                raise ProblemUploadError(errmsg)
+                raise ProblemUploadError(errmsg) from e
 
             return problem_id
