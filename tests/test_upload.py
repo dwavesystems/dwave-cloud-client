@@ -316,6 +316,7 @@ class TestChunkedData(unittest.TestCase):
     def verify_chunking(self, cd, chunks_expected):
         self.assertEqual(len(cd), len(chunks_expected))
         self.assertEqual(cd.num_chunks, len(chunks_expected))
+        self.assertEqual(cd.total_size, sum(map(len, chunks_expected)))
 
         chunks_iter = [c.read() for c in cd]
         chunks_explicit = []

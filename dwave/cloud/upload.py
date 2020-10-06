@@ -373,11 +373,14 @@ class ChunkedData(object):
             raise TypeError("bytes/str/IOBase-subclass data required")
 
     @property
+    def total_size(self):
+        """Total data size, in bytes."""
+        return len(self.view)
+
+    @property
     def num_chunks(self):
         """Total number of chunks."""
-
-        total_size = len(self.view)
-        return math.ceil(total_size / self.chunk_size)
+        return math.ceil(self.total_size / self.chunk_size)
 
     def __len__(self):
         return self.num_chunks

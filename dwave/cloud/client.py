@@ -1838,7 +1838,7 @@ class Client(object):
         # via executor initializer
         with self.create_session() as session:
             chunks = ChunkedData(problem, chunk_size=self._UPLOAD_PART_SIZE_BYTES)
-            size = len(chunks.view)
+            size = chunks.total_size
 
             if problem_id is None:
                 try:
