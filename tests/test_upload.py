@@ -450,7 +450,7 @@ class TestMockedMultipartUpload(unittest.TestCase):
                         part_data[i],
                         json.dumps(sorted([
                             ('Content-MD5', _b64(part_digest[i])),
-                            ('Content-Type',     'application/octet-stream')
+                            ('Content-Type', 'application/octet-stream')
                         ]))
                     ): json.dumps({})
                     for i in parts
@@ -536,7 +536,7 @@ class TestMockedMultipartUpload(unittest.TestCase):
                         part_data[i],
                         json.dumps(sorted([
                             ('Content-MD5', _b64(part_digest[i])),
-                            ('Content-Type',     'application/octet-stream')
+                            ('Content-Type', 'application/octet-stream')
                         ]))
                     ): json.dumps({})
                     for i in parts[:1]
@@ -621,7 +621,7 @@ class TestMockedMultipartUpload(unittest.TestCase):
                         part_data[i],
                         json.dumps(sorted([
                             ('Content-MD5', _b64(part_digest[i])),
-                            ('Content-Type',     'application/octet-stream')
+                            ('Content-Type', 'application/octet-stream')
                         ]))
                     ) for i in parts
                 ]
@@ -748,6 +748,7 @@ class TestMockedMultipartUpload(unittest.TestCase):
 
 @unittest.skipUnless(config, "No live server configuration available.")
 class TestMultipartUpload(unittest.TestCase):
+    _100gb = 100 * 2**30
 
     def test_smoke_test(self):
         data = b'123'
@@ -759,10 +760,19 @@ class TestMultipartUpload(unittest.TestCase):
                 self.fail(e)
 
     def test_initiate_size_limit(self):
-        size = 100 * 2**30
+        size = self._100gb
 
         with Client(**config) as client:
             with client.create_session() as session:
                 with self.assertRaisesRegex(ProblemUploadError,
                                             'bigger than the maximum'):
                     client._initiate_multipart_upload(session, size)
+
+    @mock.patch.object(ChunkedData, 'total_size', _100gb)
+    def test_initiate_size_limit_end_to_end(self):
+
+        with Client(**config) as client:
+            future = client.upload_problem_encoded(b'')
+            with self.assertRaisesRegex(ProblemUploadError,
+                                        'bigger than the maximum'):
+                problem_id = future.result()
