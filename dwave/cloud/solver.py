@@ -525,10 +525,7 @@ class DQMSolver(BaseUnstructuredSolver):
 
     def _encode_problem_for_upload(self, dqm):
         try:
-            # note: SpooledTemporaryFile currently returned by DQM.to_file
-            # does not implement io.BaseIO interface, so we use the underlying
-            # (and internal) file-like object for now
-            data = dqm.to_file()._file
+            data = dqm.to_file()
         except Exception as e:
             logger.debug("DQM conversion to file failed with %r, "
                          "assuming data already encoded.", e)
@@ -544,6 +541,7 @@ class DQMSolver(BaseUnstructuredSolver):
         # to sample BQM problems, we need to convert them to DQM
         dqm = bqm_to_dqm(bqm)
 
+        # TODO: convert sampleset back
         return self.sample_dqm(dqm, **params)
 
     def sample_dqm(self, dqm, **params):

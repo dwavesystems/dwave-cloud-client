@@ -27,7 +27,7 @@ extras_require = {
     'bqm': ['dimod>=0.8.15', 'numpy>=1.16'],
 
     # dqm support
-    'bqm': ['dimod>=0.9.7', 'numpy>=1.16'],
+    'dqm': ['dimod>=0.9.7', 'numpy>=1.16'],
 }
 
 # Packages provided. Only include packages under the 'dwave' namespace.
