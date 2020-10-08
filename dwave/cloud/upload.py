@@ -342,14 +342,7 @@ class ChunkedData(object):
 
     """
 
-    def __init__(self, data, chunk_size):
-        self.data = data
-        self.view = None
-        self.chunk_size = int(chunk_size)
-
-        if self.chunk_size <= 0:
-            raise ValueError("positive integer required for chunk size")
-
+    def _thread_safe_data_view(self, data):
         # convenience string handler
         if isinstance(data, str) and not isinstance(data, bytes):
             data = data.encode('ascii')
@@ -359,25 +352,32 @@ class ChunkedData(object):
             # buffer) only for `bytes` objects, and make a copy otherwise!
 
             # use non-locking memory view over data buffer
-            self.view = FileView(GettableMemory(data))
+            return FileView(GettableMemory(data))
 
-        if self.view is None and isinstance(data, io.IOBase):
-            # use locking file view if possible
-            if not data.seekable():
-                raise ValueError("seekable file-like data object expected")
-            if not data.readable():
-                raise ValueError("readable file-like data object expected")
-            self.view = FileView(GettableFile(data, strict=True))
+        # use locking file view if possible
+        try:
+            return FileView(GettableFile(data, strict=True))
+        except TypeError:
+            logger.debug("data does not conform to strict file-like requirements")
 
         # TODO: use stream view if possible
 
-        if self.view is None:
-            # fallback to less strict check of file-like's capabilities,
-            # accepting we might fail later
-            self.view = FileView(GettableFile(data, strict=False))
+        # fallback to a less strict check of file-like's capabilities,
+        # accepting we might fail later
+        try:
+            return FileView(GettableFile(data, strict=False))
+        except TypeError:
+            logger.debug("data does not conform to loose file-like requirements")
 
-        if self.view is None:
-            raise TypeError("bytes/str/IOBase-subclass data required")
+        raise TypeError("bytes/str/file-like data required")
+
+    def __init__(self, data, chunk_size):
+        self.data = data
+        self.view = self._thread_safe_data_view(data)
+
+        if chunk_size <= 0:
+            raise ValueError("positive integer required for chunk size")
+        self.chunk_size = int(chunk_size)
 
     @property
     def total_size(self):
