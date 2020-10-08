@@ -316,6 +316,7 @@ class TestChunkedData(unittest.TestCase):
     def verify_chunking(self, cd, chunks_expected):
         self.assertEqual(len(cd), len(chunks_expected))
         self.assertEqual(cd.num_chunks, len(chunks_expected))
+        self.assertEqual(cd.total_size, sum(map(len, chunks_expected)))
 
         chunks_iter = [c.read() for c in cd]
         chunks_explicit = []
@@ -363,19 +364,6 @@ class TestChunkedData(unittest.TestCase):
         chunks_expected = [b'012', b'345', b'678', b'9']
         chunks_generated = [g().read() for g in cd.generators()]
         self.assertListEqual(chunks_expected, chunks_generated)
-
-
-@unittest.skipUnless(config, "No live server configuration available.")
-class TestMultipartUpload(unittest.TestCase):
-
-    def test_smoke_test(self):
-        data = b'123'
-        with Client(**config) as client:
-            future = client.upload_problem_encoded(data)
-            try:
-                problem_id = future.result()
-            except Exception as e:
-                self.fail(e)
 
 
 def choose_reply(key, replies, statuses=None):
@@ -462,7 +450,7 @@ class TestMockedMultipartUpload(unittest.TestCase):
                         part_data[i],
                         json.dumps(sorted([
                             ('Content-MD5', _b64(part_digest[i])),
-                            ('Content-Type',     'application/octet-stream')
+                            ('Content-Type', 'application/octet-stream')
                         ]))
                     ): json.dumps({})
                     for i in parts
@@ -548,7 +536,7 @@ class TestMockedMultipartUpload(unittest.TestCase):
                         part_data[i],
                         json.dumps(sorted([
                             ('Content-MD5', _b64(part_digest[i])),
-                            ('Content-Type',     'application/octet-stream')
+                            ('Content-Type', 'application/octet-stream')
                         ]))
                     ): json.dumps({})
                     for i in parts[:1]
@@ -633,7 +621,7 @@ class TestMockedMultipartUpload(unittest.TestCase):
                         part_data[i],
                         json.dumps(sorted([
                             ('Content-MD5', _b64(part_digest[i])),
-                            ('Content-Type',     'application/octet-stream')
+                            ('Content-Type', 'application/octet-stream')
                         ]))
                     ) for i in parts
                 ]
@@ -729,7 +717,7 @@ class TestMockedMultipartUpload(unittest.TestCase):
                         part_data[i],
                         json.dumps(sorted([
                             ('Content-MD5', _b64(part_digest[i])),
-                            ('Content-Type',     'application/octet-stream')
+                            ('Content-Type', 'application/octet-stream')
                         ]))
                     ): json.dumps({})
                     for i in parts[2:]
@@ -756,3 +744,35 @@ class TestMockedMultipartUpload(unittest.TestCase):
                     self.fail(e)
 
                 self.assertEqual(returned_problem_id, upload_problem_id)
+
+
+@unittest.skipUnless(config, "No live server configuration available.")
+class TestMultipartUpload(unittest.TestCase):
+    _100gb = 100 * 2**30
+
+    def test_smoke_test(self):
+        data = b'123'
+        with Client(**config) as client:
+            future = client.upload_problem_encoded(data)
+            try:
+                problem_id = future.result()
+            except Exception as e:
+                self.fail(e)
+
+    def test_initiate_size_limit(self):
+        size = self._100gb
+
+        with Client(**config) as client:
+            with client.create_session() as session:
+                with self.assertRaisesRegex(ProblemUploadError,
+                                            'bigger than the maximum'):
+                    client._initiate_multipart_upload(session, size)
+
+    @mock.patch.object(ChunkedData, 'total_size', _100gb)
+    def test_initiate_size_limit_end_to_end(self):
+
+        with Client(**config) as client:
+            future = client.upload_problem_encoded(b'')
+            with self.assertRaisesRegex(ProblemUploadError,
+                                        'bigger than the maximum'):
+                problem_id = future.result()

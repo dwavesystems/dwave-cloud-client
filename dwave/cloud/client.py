@@ -44,12 +44,12 @@ import sys
 import time
 import json
 import copy
+import queue
 import logging
-import threading
-import requests
+import inspect
 import warnings
 import operator
-import queue
+import threading
 
 import base64
 import hashlib
@@ -61,6 +61,7 @@ from functools import partial, wraps
 from collections import abc, namedtuple, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 
+import requests
 from dateutil.parser import parse as parse_datetime
 from plucky import pluck
 
@@ -1599,6 +1600,31 @@ class Client(object):
             self._upload_problem_worker, problem=problem, problem_id=problem_id)
 
     @staticmethod
+    def _parse_multipart_upload_response(response):
+        """Parse the JSON response body, raising appropriate exceptions."""
+
+        caller = inspect.stack()[1].function
+        logger.trace("%s response: (code=%r, text=%r)",
+                     caller, response.status_code, response.text)
+
+        if response.status_code == 401:
+            raise SolverAuthenticationError()
+
+        try:
+            msg = response.json()
+        except:
+            response.raise_for_status()
+
+        if response.status_code != 200:
+            try:
+                error_msg = msg['error_msg']
+            except KeyError:
+                response.raise_for_status()
+            raise ProblemUploadError(error_msg)
+
+        return msg
+
+    @staticmethod
     @retried(_UPLOAD_REQUEST_RETRIES, backoff=_UPLOAD_RETRIES_BACKOFF)
     def _initiate_multipart_upload(session, size):
         """Sync http request using `session`."""
@@ -1614,14 +1640,10 @@ class Client(object):
         except requests.exceptions.Timeout:
             raise RequestTimeout
 
-        if response.status_code == 401:
-            raise SolverAuthenticationError()
-        else:
-            logger.trace("Multipart upload initiate response: %r", response.text)
-            response.raise_for_status()
+        msg = Client._parse_multipart_upload_response(response)
 
         try:
-            problem_id = response.json()['id']
+            problem_id = msg['id']
         except KeyError:
             raise InvalidAPIResponseError("problem ID missing")
 
@@ -1715,11 +1737,7 @@ class Client(object):
         except requests.exceptions.Timeout:
             raise RequestTimeout
 
-        if response.status_code == 401:
-            raise SolverAuthenticationError()
-        else:
-            logger.trace("Part upload response: %r", response.text)
-            response.raise_for_status()
+        msg = Client._parse_multipart_upload_response(response)
 
         logger.debug("Uploaded part_id=%r of problem_id=%r", part_id, problem_id)
 
@@ -1738,23 +1756,18 @@ class Client(object):
         except requests.exceptions.Timeout:
             raise RequestTimeout
 
-        if response.status_code == 401:
-            raise SolverAuthenticationError()
-        else:
-            logger.trace("Upload status response: %r", response.text)
-            response.raise_for_status()
+        msg = Client._parse_multipart_upload_response(response)
 
         try:
-            problem_status = response.json()
-            problem_status['status']
-            problem_status['parts']
+            msg['status']
+            msg['parts']
         except KeyError:
             raise InvalidAPIResponseError("'status' and/or 'parts' missing")
 
         logger.debug("Got upload status=%r for problem_id=%r",
-                     problem_status['status'], problem_id)
+                     msg['status'], problem_id)
 
-        return problem_status
+        return msg
 
     @staticmethod
     def _failsafe_get_multipart_upload_status(session, problem_id):
@@ -1780,11 +1793,7 @@ class Client(object):
         except requests.exceptions.Timeout:
             raise RequestTimeout
 
-        if response.status_code == 401:
-            raise SolverAuthenticationError()
-        else:
-            logger.trace("Combine parts response: %r", response.text)
-            response.raise_for_status()
+        msg = Client._parse_multipart_upload_response(response)
 
         logger.debug("Issued a combine command for problem_id=%r", problem_id)
 
@@ -1825,7 +1834,7 @@ class Client(object):
         # via executor initializer
         with self.create_session() as session:
             chunks = ChunkedData(problem, chunk_size=self._UPLOAD_PART_SIZE_BYTES)
-            size = len(chunks.view)
+            size = chunks.total_size
 
             if problem_id is None:
                 try:
@@ -1834,7 +1843,7 @@ class Client(object):
                     errmsg = ("Multipart upload initialization failed "
                               "with {!r}.".format(e))
                     logger.error(errmsg)
-                    raise ProblemUploadError(errmsg)
+                    raise ProblemUploadError(errmsg) from e
 
             # check problem status, so we only upload parts missing or invalid
             problem_status = \
@@ -1869,7 +1878,7 @@ class Client(object):
                     errmsg = ("Multipart upload of problem_id={!r} failed for "
                               "part_no={!r} with {!r}.".format(problem_id, part_no, e))
                     logger.error(errmsg)
-                    raise ProblemUploadError(errmsg)
+                    raise ProblemUploadError(errmsg) from e
 
             # verify all parts uploaded via status call
             # (check remote checksum matches the local one)
@@ -1904,6 +1913,6 @@ class Client(object):
                 errmsg = ("Multipart upload of problem_id={!r} failed on parts "
                           "combine with {!r}".format(problem_id, e))
                 logger.error(errmsg)
-                raise ProblemUploadError(errmsg)
+                raise ProblemUploadError(errmsg) from e
 
             return problem_id

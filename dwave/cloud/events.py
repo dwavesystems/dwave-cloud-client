@@ -62,6 +62,8 @@ def add_handler(name, handler):
 def dispatch_event(name, *args, **kwargs):
     """Call the complete chain of event handlers attached to event `name`."""
 
+    logger.trace("dispatch_event(%r, *%r, **%r)", name, args, kwargs)
+
     if name not in _client_event_hooks_registry:
         raise ValueError('invalid event name')
 
