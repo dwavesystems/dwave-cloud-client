@@ -153,7 +153,8 @@ class GettableFile(GettableBase):
                 isinstance(f, (io.BufferedIOBase, io.RawIOBase))
                 and f.seekable() and f.readable())
         else:
-            valid = lambda f: all([hasattr(f, 'readinto'), hasattr(f, 'seek')])
+            valid = lambda f: all([
+                hasattr(f, 'readinto'), hasattr(f, 'seek'), hasattr(f, 'tell')])
 
         if not valid(fp):
             raise TypeError("expected file-like, seekable, readable object")
@@ -161,8 +162,9 @@ class GettableFile(GettableBase):
         # store file size, assuming it won't change
         self._size = fp.seek(0, os.SEEK_END)
         if self._size is None:
-            # handle python2, when `fp.seek()` is `file.seek()`
-            # note: not a thread-safe way
+            # handle python2 and non-standard file seek() impl.
+            # (like tempfile.SpooledTemporaryFile)
+            # note: not thread-safe!
             self._size = fp.tell()
 
         self._fp = fp
@@ -365,9 +367,14 @@ class ChunkedData(object):
                 raise ValueError("seekable file-like data object expected")
             if not data.readable():
                 raise ValueError("readable file-like data object expected")
-            self.view = FileView(GettableFile(data))
+            self.view = FileView(GettableFile(data, strict=True))
 
         # TODO: use stream view if possible
+
+        if self.view is None:
+            # fallback to less strict check of file-like's capabilities,
+            # accepting we might fail later
+            self.view = FileView(GettableFile(data, strict=False))
 
         if self.view is None:
             raise TypeError("bytes/str/IOBase-subclass data required")
