@@ -162,7 +162,7 @@ class GettableFile(GettableBase):
         # store file size, assuming it won't change
         self._size = fp.seek(0, os.SEEK_END)
         if self._size is None:
-            # handle python2 and non-standard file seek() impl.
+            # handle non-python3 and/or non-standard file seek() impl.
             # (like tempfile.SpooledTemporaryFile)
             # note: not thread-safe!
             self._size = fp.tell()
@@ -344,7 +344,7 @@ class ChunkedData(object):
 
     def _thread_safe_data_view(self, data):
         # convenience string handler
-        if isinstance(data, str) and not isinstance(data, bytes):
+        if isinstance(data, str):
             data = data.encode('ascii')
 
         if isinstance(data, (bytes, bytearray)):
