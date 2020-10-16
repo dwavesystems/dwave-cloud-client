@@ -153,7 +153,8 @@ class GettableFile(GettableBase):
                 isinstance(f, (io.BufferedIOBase, io.RawIOBase))
                 and f.seekable() and f.readable())
         else:
-            valid = lambda f: all([hasattr(f, 'readinto'), hasattr(f, 'seek')])
+            valid = lambda f: all([
+                hasattr(f, 'readinto'), hasattr(f, 'seek'), hasattr(f, 'tell')])
 
         if not valid(fp):
             raise TypeError("expected file-like, seekable, readable object")
@@ -161,8 +162,9 @@ class GettableFile(GettableBase):
         # store file size, assuming it won't change
         self._size = fp.seek(0, os.SEEK_END)
         if self._size is None:
-            # handle python2, when `fp.seek()` is `file.seek()`
-            # note: not a thread-safe way
+            # handle non-python3 and/or non-standard file seek() impl.
+            # (like tempfile.SpooledTemporaryFile)
+            # note: not thread-safe!
             self._size = fp.tell()
 
         self._fp = fp
@@ -340,16 +342,9 @@ class ChunkedData(object):
 
     """
 
-    def __init__(self, data, chunk_size):
-        self.data = data
-        self.view = None
-        self.chunk_size = int(chunk_size)
-
-        if self.chunk_size <= 0:
-            raise ValueError("positive integer required for chunk size")
-
+    def _thread_safe_data_view(self, data):
         # convenience string handler
-        if isinstance(data, str) and not isinstance(data, bytes):
+        if isinstance(data, str):
             data = data.encode('ascii')
 
         if isinstance(data, (bytes, bytearray)):
@@ -357,20 +352,32 @@ class ChunkedData(object):
             # buffer) only for `bytes` objects, and make a copy otherwise!
 
             # use non-locking memory view over data buffer
-            self.view = FileView(GettableMemory(data))
+            return FileView(GettableMemory(data))
 
-        if self.view is None and isinstance(data, io.IOBase):
-            # use locking file view if possible
-            if not data.seekable():
-                raise ValueError("seekable file-like data object expected")
-            if not data.readable():
-                raise ValueError("readable file-like data object expected")
-            self.view = FileView(GettableFile(data))
+        # use locking file view if possible
+        try:
+            return FileView(GettableFile(data, strict=True))
+        except TypeError:
+            logger.debug("data does not conform to strict file-like requirements")
 
         # TODO: use stream view if possible
 
-        if self.view is None:
-            raise TypeError("bytes/str/IOBase-subclass data required")
+        # fallback to a less strict check of file-like's capabilities,
+        # accepting we might fail later
+        try:
+            return FileView(GettableFile(data, strict=False))
+        except TypeError:
+            logger.debug("data does not conform to loose file-like requirements")
+
+        raise TypeError("bytes/str/file-like data required")
+
+    def __init__(self, data, chunk_size):
+        self.data = data
+        self.view = self._thread_safe_data_view(data)
+
+        if chunk_size <= 0:
+            raise ValueError("positive integer required for chunk size")
+        self.chunk_size = int(chunk_size)
 
     @property
     def total_size(self):

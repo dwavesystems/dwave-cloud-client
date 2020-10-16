@@ -347,6 +347,46 @@ class TestChunkedData(unittest.TestCase):
         chunks_expected = [b'012', b'345', b'678', b'9']
         self.verify_chunking(cd, chunks_expected)
 
+    def test_chunks_from_bqm(self):
+        try:
+            from dimod import AdjVectorBQM
+            AdjVectorBQM.to_file
+        except (ImportError, AttributeError):
+            self.skipTest("dimod.AdjVectorBQM with .to_file() unavailable")
+
+        # serialize a BQM via .to_file
+        bqm = AdjVectorBQM.from_ising({'a': 1}, {})
+        bqmfile = bqm.to_file()     # returns dimod's FileView
+
+        chunk_size = 10
+        cd = ChunkedData(bqmfile, chunk_size=chunk_size)
+
+        # verify chunks
+        bqmfile.seek(0)
+        raw = bqmfile.read()
+        chunks_expected = [raw[i:i+chunk_size] for i in range(0, len(raw), chunk_size)]
+        self.verify_chunking(cd, chunks_expected)
+
+    def test_chunks_from_dqm(self):
+        try:
+            from dimod import DQM
+        except ImportError:
+            self.skipTest("dimod.DQM unavailable")
+
+        # serialize a DQM via .to_file
+        dqm = DQM()
+        dqm.add_variable(1)
+        dqmfile = dqm.to_file()    # returns SpooledTemporaryFile subclass
+
+        chunk_size = 100
+        cd = ChunkedData(dqmfile, chunk_size=chunk_size)
+
+        # verify chunks
+        dqmfile.seek(0)
+        raw = dqmfile.read()
+        chunks_expected = [raw[i:i+chunk_size] for i in range(0, len(raw), chunk_size)]
+        self.verify_chunking(cd, chunks_expected)
+
     def test_chunk_size_edges(self):
         with self.assertRaises(ValueError):
             cd = ChunkedData(self.data, chunk_size=0)
