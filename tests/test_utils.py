@@ -26,7 +26,7 @@ from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_head, strip_tail,
     active_qubits, generate_random_ising_problem,
     default_text_input, utcnow, cached, retried, deprecated, aliasdict,
-    parse_loglevel, user_agent)
+    parse_loglevel, user_agent, hasinstance)
 
 
 class TestSimpleUtils(unittest.TestCase):
@@ -547,6 +547,30 @@ class TestAliasdict(unittest.TestCase):
         self.assertIsNot(new, ad)
         self.assertDictEqual(new, src)
         self.assertDictEqual(new.aliases, aliases)
+
+
+class TestExceptionUtils(unittest.TestCase):
+
+    def test_hasinstance(self):
+        # not contained
+        self.assertFalse(hasinstance([], ValueError))
+        self.assertFalse(hasinstance([TypeError], ValueError))
+        self.assertFalse(hasinstance([TypeError()], ValueError))
+        self.assertFalse(hasinstance([ValueError], ValueError))
+
+        # contained in unit list
+        self.assertTrue(hasinstance([ValueError()], ValueError))
+        self.assertTrue(hasinstance([ValueError('msg')], ValueError))
+
+        # contained in a list
+        self.assertTrue(hasinstance([TypeError(), ValueError()], ValueError))
+        self.assertTrue(hasinstance([ValueError(), ValueError()], ValueError))
+
+        # contained in a tuple
+        self.assertTrue(hasinstance((TypeError(), ValueError()), ValueError))
+
+        # base class also contained
+        self.assertTrue(hasinstance([ValueError()], Exception))
 
 
 if __name__ == '__main__':

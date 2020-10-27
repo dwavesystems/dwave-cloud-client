@@ -303,6 +303,14 @@ class BaseUrlSession(requests.Session):
         return urljoin(self.base_url, url)
 
 
+def hasinstance(iterable, class_or_tuple):
+    """Extension of ``isinstance`` to iterables/sequences. Returns True iff the
+    sequence contains at least one :class:func`isinstance` of ``class_or_tuple``.
+    """
+
+    return any(isinstance(e, class_or_tuple) for e in iterable)
+
+
 def user_agent(name=None, version=None):
     """Return User-Agent ~ "name/version language/version interpreter/version os/version"."""
 
