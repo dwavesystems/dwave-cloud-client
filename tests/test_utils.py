@@ -22,11 +22,13 @@ from collections import OrderedDict
 from itertools import count
 from datetime import datetime
 
+from parameterized import parameterized
+
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_head, strip_tail,
     active_qubits, generate_random_ising_problem,
     default_text_input, utcnow, cached, retried, deprecated, aliasdict,
-    parse_loglevel, user_agent, hasinstance)
+    parse_loglevel, user_agent, hasinstance, exception_chain)
 
 
 class TestSimpleUtils(unittest.TestCase):
@@ -551,6 +553,24 @@ class TestAliasdict(unittest.TestCase):
 
 class TestExceptionUtils(unittest.TestCase):
 
+    def raise_implicit():
+        try:
+            1/0
+        except:
+            raise ValueError
+
+    def raise_explicit():
+        try:
+            1/0
+        except Exception as e:
+            raise ValueError from e
+
+    def raise_mixed():
+        try:
+            TestExceptionUtils.raise_explicit()
+        except:
+            raise TypeError
+
     def test_hasinstance(self):
         # not contained
         self.assertFalse(hasinstance([], ValueError))
@@ -571,6 +591,26 @@ class TestExceptionUtils(unittest.TestCase):
 
         # base class also contained
         self.assertTrue(hasinstance([ValueError()], Exception))
+
+    @parameterized.expand([
+        (raise_implicit, (ValueError, ZeroDivisionError)),
+        (raise_explicit, (ValueError, ZeroDivisionError)),
+        (raise_mixed, (TypeError, ValueError, ZeroDivisionError))
+    ])
+    def test_exception_chain(self, raise_exc, chained_types):
+        try:
+            raise_exc()
+        except Exception as e:
+            exc = e
+
+        chain = list(exception_chain(exc))
+        self.assertEqual(len(chain), len(chained_types))
+
+        for idx, typ in enumerate(chained_types):
+            self.assertIsInstance(chain[idx], typ)
+
+        for typ in chained_types:
+            self.assertTrue(hasinstance(exception_chain(exc), typ))
 
 
 if __name__ == '__main__':

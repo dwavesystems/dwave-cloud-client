@@ -40,7 +40,8 @@ except ImportError:  # pragma: no cover
 
 __all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
            'default_text_input', 'click_info_switch', 'datetime_to_timestamp',
-           'datetime_to_timestamp', 'utcnow', 'epochnow', 'tictoc']
+           'datetime_to_timestamp', 'utcnow', 'epochnow', 'tictoc',
+           'hasinstance', 'exception_chain']
 
 logger = logging.getLogger(__name__)
 
@@ -309,6 +310,45 @@ def hasinstance(iterable, class_or_tuple):
     """
 
     return any(isinstance(e, class_or_tuple) for e in iterable)
+
+
+def exception_chain(exception):
+    """Traverse the chain of embedded exceptions, yielding one at the time.
+
+    Args:
+        exception (:class:`Exception`): Chained exception.
+
+    Yields:
+        :class:`Exception`: The next exception in the input exception's chain.
+
+    Examples:
+        def f():
+            try:
+                1/0
+            except ZeroDivisionError:
+                raise ValueError
+
+        try:
+            f()
+        except Exception as e:
+            assert(hasinstance(exception_chain(e), ZeroDivisionError))
+
+    See: PEP-3134.
+    """
+
+    while exception:
+        yield exception
+
+        # explicit exception chaining, i.e `raise .. from ..`
+        if exception.__cause__:
+            exception = exception.__cause__
+
+        # implicit exception chaining
+        elif exception.__context__:
+            exception = exception.__context__
+
+        else:
+            return
 
 
 def user_agent(name=None, version=None):
