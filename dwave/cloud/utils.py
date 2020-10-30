@@ -41,7 +41,7 @@ except ImportError:  # pragma: no cover
 __all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
            'default_text_input', 'click_info_switch', 'datetime_to_timestamp',
            'datetime_to_timestamp', 'utcnow', 'epochnow', 'tictoc',
-           'hasinstance', 'exception_chain']
+           'hasinstance', 'exception_chain', 'hasexception']
 
 logger = logging.getLogger(__name__)
 
@@ -349,6 +349,27 @@ def exception_chain(exception):
 
         else:
             return
+
+
+def hasexception(exception, exception_types):
+    """Check if any of ``exception_types`` is causing the ``exception``.
+    Equivalently, check if any of ``exception_types`` is contained in the
+    exception chain rooted at ``exception``.
+
+    Args:
+        exception (:class:`Exception`):
+            Chained exception.
+
+        exception_types (:class:`Exception` or tuple of :class:`Exception`):
+            Exception type or a tuple of exception types to check for.
+
+    Returns:
+        bool:
+            True when ``exception`` is caused by any of exceptions in
+            ``exception_types``.
+    """
+
+    return hasinstance(exception_chain(exception), exception_types)
 
 
 def user_agent(name=None, version=None):

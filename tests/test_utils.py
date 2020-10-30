@@ -28,7 +28,7 @@ from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_head, strip_tail,
     active_qubits, generate_random_ising_problem,
     default_text_input, utcnow, cached, retried, deprecated, aliasdict,
-    parse_loglevel, user_agent, hasinstance, exception_chain)
+    parse_loglevel, user_agent, hasinstance, exception_chain, hasexception)
 
 
 class TestSimpleUtils(unittest.TestCase):
@@ -592,6 +592,13 @@ class TestExceptionUtils(unittest.TestCase):
         # base class also contained
         self.assertTrue(hasinstance([ValueError()], Exception))
 
+        # multiple types can be checked
+        self.assertFalse(hasinstance([ValueError()], (dict, list)))
+        self.assertTrue(hasinstance([ValueError()], (dict, Exception)))
+        self.assertTrue(hasinstance([ValueError()], (ValueError, TypeError)))
+        self.assertTrue(hasinstance([TypeError()], (ValueError, TypeError)))
+        self.assertTrue(hasinstance([TypeError(), ValueError], (ValueError, TypeError)))
+
     @parameterized.expand([
         (raise_implicit, (ValueError, ZeroDivisionError)),
         (raise_explicit, (ValueError, ZeroDivisionError)),
@@ -602,6 +609,8 @@ class TestExceptionUtils(unittest.TestCase):
             raise_exc()
         except Exception as e:
             exc = e
+        else:
+            self.fail('Exception not raised')
 
         chain = list(exception_chain(exc))
         self.assertEqual(len(chain), len(chained_types))
@@ -611,6 +620,22 @@ class TestExceptionUtils(unittest.TestCase):
 
         for typ in chained_types:
             self.assertTrue(hasinstance(exception_chain(exc), typ))
+
+    @parameterized.expand([
+        (raise_implicit, (ValueError, ZeroDivisionError)),
+        (raise_explicit, (ValueError, ZeroDivisionError)),
+        (raise_mixed, (TypeError, ValueError, ZeroDivisionError))
+    ])
+    def test_hasexception(self, raise_exc, exception_types):
+        try:
+            raise_exc()
+        except Exception as exc:
+            self.assertTrue(hasexception(exc, exception_types))
+
+            for typ in exception_types:
+                self.assertTrue(hasexception(exc, typ))
+
+            self.assertFalse(hasexception(exc, KeyError))
 
 
 if __name__ == '__main__':
