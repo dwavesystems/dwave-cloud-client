@@ -334,9 +334,12 @@ class Client(object):
 
         # combine instance-level defaults with file/env/kwarg option values
         # note: treat empty string values (e.g. from file/env) as undefined/None
+        # TODO: to avoid the `first_non_empty` hack, we need to parse config
+        # values downstream (immediately after reading from file or env var)
+        first_non_empty = lambda a, b: b if a == '' or a is None else a
         options = {}
         for k, v in self.defaults.items():
-            options[k] = kwargs.get(k) or v
+            options[k] = first_non_empty(kwargs.get(k), v)
 
         logger.debug("Client options with defaults: %r", options)
 
