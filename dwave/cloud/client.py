@@ -69,7 +69,7 @@ from plucky import pluck
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
 from dwave.cloud.computation import Future
-from dwave.cloud.config import load_config, parse_float, parse_boolean
+from dwave.cloud.config import load_config, parse_float, parse_int, parse_boolean
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.upload import ChunkedData
@@ -200,6 +200,14 @@ class Client(object):
         # poll back-off schedule defaults [sec]
         'poll_backoff_min': 0.05,
         'poll_backoff_max': 60,
+        # idempotent http requests retry params
+        'http_retry_total': 10,
+        'http_retry_connect': None,
+        'http_retry_read': None,
+        'http_retry_redirect': None,
+        'http_retry_status': None,
+        'http_retry_backoff_factor': 0.01,
+        'http_retry_backoff_max': 60,
     }
 
     # Number of problems to include in a submit/status query
@@ -392,6 +400,7 @@ class Client(object):
         logger.debug("Parsed headers=%r", headers_dict)
 
         # Store connection/session parameters
+        # TODO: consolidate all options under Client.options or similar
         self.endpoint = endpoint
         self.token = token
         self.default_solver = solver_def
@@ -408,20 +417,28 @@ class Client(object):
         self.poll_backoff_min = parse_float(options['poll_backoff_min'])
         self.poll_backoff_max = parse_float(options['poll_backoff_max'])
 
+        self.http_retry_total = parse_int(options['http_retry_total'])
+        self.http_retry_connect = parse_int(options['http_retry_connect'])
+        self.http_retry_read = parse_int(options['http_retry_read'])
+        self.http_retry_redirect = parse_int(options['http_retry_redirect'])
+        self.http_retry_status = parse_int(options['http_retry_status'])
+        self.http_retry_backoff_factor = parse_float(options['http_retry_backoff_factor'])
+        self.http_retry_backoff_max = parse_float(options['http_retry_backoff_max'])
+
+        opts = (
+            'endpoint', 'token', 'default_solver',
+            'client_cert', 'request_timeout', 'polling_timeout',
+            'proxy', 'headers', 'permissive_ssl', 'connection_close',
+            'poll_backoff_min', 'poll_backoff_max',
+            'http_retry_total', 'http_retry_connect', 'http_retry_read',
+            'http_retry_redirect', 'http_retry_status',
+            'http_retry_backoff_factor', 'http_retry_backoff_max')
+        logger.debug(
+            "Client initialized with (%s)",
+            ", ".join("{}={!r}".format(o, getattr(self, o)) for o in opts))
+
         # Create session for main thread only
         self.session = self.create_session()
-
-        logger.debug(
-            "Client initialized with ("
-            "endpoint=%r, token=%r, default_solver=%r, proxy=%r, "
-            "permissive_ssl=%r, request_timeout=%r, polling_timeout=%r, "
-            "connection_close=%r, headers=%r, client_cert=%r, "
-            "poll_backoff_min=%r, poll_backoff_max=%r)",
-            self.endpoint, self.token, self.default_solver, self.proxy,
-            self.permissive_ssl, self.request_timeout, self.polling_timeout,
-            self.connection_close, self.headers, self.client_cert,
-            self.poll_backoff_min, self.poll_backoff_max
-        )
 
         # Build the problem submission queue, start its workers
         self._submission_queue = queue.Queue()
@@ -484,13 +501,31 @@ class Client(object):
         if not endpoint.endswith('/'):
             endpoint += '/'
 
+        # create http idempotent Retry config
+        def get_retry_conf():
+
+            # need a subclass to override the backoff_max
+            class Retry(urllib3.Retry):
+                BACKOFF_MAX = self.http_retry_backoff_max
+
+            return Retry(
+                total=self.http_retry_total,
+                connect=self.http_retry_connect,
+                read=self.http_retry_read,
+                redirect=self.http_retry_redirect,
+                status=self.http_retry_status,
+                backoff_factor=self.http_retry_backoff_factor,
+                raise_on_redirect=True,
+                raise_on_status=True,
+                respect_retry_after_header=True)
+
         session = BaseUrlSession(base_url=endpoint)
         session.mount('http://',
             TimeoutingHTTPAdapter(timeout=self.request_timeout,
-                                  max_retries=urllib3.Retry()))
+                                  max_retries=get_retry_conf()))
         session.mount('https://',
             TimeoutingHTTPAdapter(timeout=self.request_timeout,
-                                  max_retries=urllib3.Retry()))
+                                  max_retries=get_retry_conf()))
 
         session.headers.update({'User-Agent': user_agent(__packagename__, __version__)})
         if self.headers:
