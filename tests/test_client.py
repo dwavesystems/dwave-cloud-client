@@ -147,23 +147,23 @@ class SolverLoading(unittest.TestCase):
         with Client(**conf) as base_client:
 
             with qpu.Client(**conf) as client:
-                solvers = base_client.get_solvers(qpu=True)
+                solvers = {s.id for s in base_client.get_solvers(qpu=True)}
                 if solvers:
-                    self.assertEqual(client.get_solver().id, solvers[0].id)
+                    self.assertIn(client.get_solver().id, solvers)
                 else:
                     self.assertRaises(SolverError, client.get_solver)
 
             with sw.Client(**conf) as client:
-                solvers = base_client.get_solvers(software=True)
+                solvers = {s.id for s in base_client.get_solvers(software=True)}
                 if solvers:
-                    self.assertEqual(client.get_solver().id, solvers[0].id)
+                    self.assertIn(client.get_solver().id, solvers)
                 else:
                     self.assertRaises(SolverError, client.get_solver)
 
             with hybrid.Client(**conf) as client:
-                solvers = base_client.get_solvers(hybrid=True)
+                solvers = {s.id for s in base_client.get_solvers(hybrid=True)}
                 if solvers:
-                    self.assertEqual(client.get_solver().id, solvers[0].id)
+                    self.assertIn(client.get_solver().id, solvers)
                 else:
                     self.assertRaises(SolverError, client.get_solver)
 
