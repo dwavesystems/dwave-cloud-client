@@ -23,7 +23,7 @@ from dwave.cloud.exceptions import ConfigFileParseError, ConfigFileReadError
 from dwave.cloud.testing import iterable_mock_open
 from dwave.cloud.config import (
     get_configfile_paths, load_config_from_files, load_config,
-    parse_float, parse_boolean)
+    parse_float, parse_int, parse_boolean)
 
 
 class TestConfig(unittest.TestCase):
@@ -399,6 +399,20 @@ class TestConfigUtils(unittest.TestCase):
         self.assertEqual(parse_float('1.5'), 1.5)
         self.assertEqual(parse_float(1.5), 1.5)
         self.assertEqual(parse_float(1), 1.0)
+
+    def test_parse_int(self):
+        self.assertEqual(parse_int(None), None)
+        self.assertEqual(parse_int(''), None)
+        self.assertEqual(parse_int('', default=1), 1)
+
+        with self.assertRaises(ValueError):
+            parse_int('1.5')
+        with self.assertRaises(ValueError):
+            parse_int(1.5)
+
+        self.assertEqual(parse_int(123), 123)
+        self.assertEqual(parse_int(0), 0)
+        self.assertEqual(parse_int(-123), -123)
 
     def test_parse_boolean(self):
         self.assertEqual(parse_boolean(None), None)
