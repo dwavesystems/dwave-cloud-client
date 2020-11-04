@@ -168,8 +168,8 @@ class SolverLoading(unittest.TestCase):
                     self.assertRaises(SolverError, client.get_solver)
 
 
-class ClientFactory(unittest.TestCase):
-    """Test Client.from_config() factory."""
+class ClientConstruction(unittest.TestCase):
+    """Test Client constructor and Client.from_config() factory."""
 
     def test_default(self):
         conf = {k: k for k in 'endpoint token'.split()}
@@ -457,6 +457,69 @@ class ClientFactory(unittest.TestCase):
             with dwave.cloud.Client.from_config(poll_backoff_min=0.5) as client:
                 self.assertEqual(client.poll_backoff_min, 0.5)
                 self.assertEqual(client.poll_backoff_max, 1.0)
+
+    def _verify_retry_config(self, retry, opts):
+        self.assertEqual(retry.total, opts['http_retry_total'])
+        self.assertEqual(retry.connect, opts['http_retry_connect'])
+        self.assertEqual(retry.read, opts['http_retry_read'])
+        self.assertEqual(retry.redirect, opts['http_retry_redirect'])
+        self.assertEqual(retry.status, opts['http_retry_status'])
+        self.assertEqual(retry.backoff_factor, opts['http_retry_backoff_factor'])
+        self.assertEqual(retry.BACKOFF_MAX, opts['http_retry_backoff_max'])
+
+    def test_http_retry_params_from_config(self):
+        retry_opts = {
+            "http_retry_total": 3,
+            "http_retry_connect": 2,
+            "http_retry_read": 2,
+            "http_retry_redirect": 0,
+            "http_retry_status": 2,
+            "http_retry_backoff_factor": 0.5,
+            "http_retry_backoff_max": 30,
+        }
+        retry_conf = {k: str(v) for k, v in retry_opts.items()}
+        conf = dict(token='token', **retry_conf)
+
+        # http retry params from config file propagated to client object
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
+            with dwave.cloud.Client.from_config() as client:
+                for opt, val in retry_opts.items():
+                    self.assertEqual(getattr(client, opt), val,
+                                     "%s doesn't match" % opt)
+
+                # verify Retry object config
+                retry = client.session.get_adapter('https://').max_retries
+                self._verify_retry_config(retry, retry_opts)
+
+        # test defaults
+        conf = dict(token='token')
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
+            with dwave.cloud.Client.from_config() as client:
+                for param in retry_conf:
+                    self.assertEqual(getattr(client, param), Client.DEFAULTS[param])
+
+    def test_http_retry_params_from_kwargs(self):
+        retry_kwargs = {
+            "http_retry_total": 3,
+            "http_retry_connect": 2,
+            "http_retry_read": None,
+            "http_retry_redirect": 0,
+            "http_retry_status": None,
+            "http_retry_backoff_factor": 0.5,
+            "http_retry_backoff_max": 30,
+        }
+        conf = dict(token='token')
+
+        with mock.patch("dwave.cloud.client.load_config", lambda **kw: conf):
+            with dwave.cloud.Client.from_config(**retry_kwargs) as client:
+                # verify client final config
+                for opt, val in retry_kwargs.items():
+                    self.assertEqual(getattr(client, opt), val,
+                                     "%s doesn't match" % opt)
+
+                # verify Retry object config
+                retry = client.session.get_adapter('https://').max_retries
+                self._verify_retry_config(retry, retry_kwargs)
 
 
 class FeatureBasedSolverSelection(unittest.TestCase):
