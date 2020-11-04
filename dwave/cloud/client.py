@@ -143,6 +143,40 @@ class Client(object):
             Problem status is polled with exponential back-off schedule.
             Maximum back-off period is limited to ``poll_backoff_max`` seconds.
 
+        http_retry_total (int, default=10):
+            Total number of retries of failing idempotent HTTP requests to
+            allow. Takes precedence over other counts.
+            See ``total`` in :class:`~urllib3.util.retry.Retry` for details.
+
+        http_retry_connect (int, default=None):
+            How many connection-related errors to retry on.
+            See ``connect`` in :class:`~urllib3.util.retry.Retry` for details.
+
+        http_retry_read (int, default=None):
+            How many times to retry on read errors.
+            See ``read`` in :class:`~urllib3.util.retry.Retry` for details.
+
+        http_retry_redirect (int, default=None):
+            How many redirects to perform.
+            See ``redirect`` in :class:`~urllib3.util.retry.Retry` for details.
+
+        http_retry_status (int, default=None):
+            How many times to retry on bad status codes.
+            See ``status`` in :class:`~urllib3.util.retry.Retry` for details.
+
+        http_retry_backoff_factor (float, default=0.01):
+            A backoff factor to apply between attempts after the second try.
+            Sleep between retries, in seconds::
+
+                {backoff factor} * (2 ** ({number of total retries} - 1))
+
+            See ``backoff_factor`` in :class:`~urllib3.util.retry.Retry` for
+            details.
+
+        http_retry_backoff_max (float, default=60):
+            Maximum backoff time in seconds.
+            See :attr:`~urllib3.util.retry.Retry.BACKOFF_MAX` for details.
+
         defaults (dict, optional):
             Defaults for the client instance that override the class
             :attr:`.DEFAULTS`.
