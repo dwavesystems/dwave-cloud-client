@@ -62,6 +62,7 @@ from collections import abc, namedtuple, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
+import urllib3
 from dateutil.parser import parse as parse_datetime
 from plucky import pluck
 
@@ -75,7 +76,7 @@ from dwave.cloud.upload import ChunkedData
 from dwave.cloud.events import dispatch_event
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent,
-    datetime_to_timestamp, utcnow, epochnow, cached, retried)
+    datetime_to_timestamp, utcnow, epochnow, cached, retried, hasexception)
 
 __all__ = ['Client']
 
@@ -484,8 +485,12 @@ class Client(object):
             endpoint += '/'
 
         session = BaseUrlSession(base_url=endpoint)
-        session.mount('http://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
-        session.mount('https://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
+        session.mount('http://',
+            TimeoutingHTTPAdapter(timeout=self.request_timeout,
+                                  max_retries=urllib3.Retry()))
+        session.mount('https://',
+            TimeoutingHTTPAdapter(timeout=self.request_timeout,
+                                  max_retries=urllib3.Retry()))
 
         session.headers.update({'User-Agent': user_agent(__packagename__, __version__)})
         if self.headers:
@@ -604,8 +609,12 @@ class Client(object):
 
         try:
             response = self.session.get(url)
-        except requests.exceptions.Timeout:
-            raise RequestTimeout
+        except Exception as exc:
+            if hasexception(exc, (requests.exceptions.Timeout,
+                                  urllib3.exceptions.TimeoutError)):
+                raise RequestTimeout
+            else:
+                raise
 
         if response.status_code == 401:
             raise SolverAuthenticationError
@@ -1162,11 +1171,19 @@ class Client(object):
                 logger.debug("Submitting %d problems", len(ready_problems))
                 try:
                     body = '[' + ','.join(mess.body.result() for mess in ready_problems) + ']'
+                    logger.debug('Size of POST body = %d', len(body))
                     try:
+                        # note: post requests are not retried
                         response = session.post('problems/', body)
                         localtime_of_response = epochnow()
-                    except requests.exceptions.Timeout:
-                        raise RequestTimeout
+                    except Exception as exc:
+                        logger.exception("Submitting %d problems failed",
+                                         len(ready_problems))
+                        if hasexception(exc, (requests.exceptions.Timeout,
+                                              urllib3.exceptions.TimeoutError)):
+                            raise RequestTimeout
+                        else:
+                            raise
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()
@@ -1332,8 +1349,12 @@ class Client(object):
 
                     try:
                         session.delete('problems/', json=body)
-                    except requests.exceptions.Timeout:
-                        raise RequestTimeout
+                    except Exception as exc:
+                        if hasexception(exc, (requests.exceptions.Timeout,
+                                              urllib3.exceptions.TimeoutError)):
+                            raise RequestTimeout
+                        else:
+                            raise
 
                 except Exception as exc:
                     for _, future in item_list:
@@ -1458,8 +1479,12 @@ class Client(object):
 
                     try:
                         response = session.get(query_string)
-                    except requests.exceptions.Timeout:
-                        raise RequestTimeout
+                    except Exception as exc:
+                        if hasexception(exc, (requests.exceptions.Timeout,
+                                              urllib3.exceptions.TimeoutError)):
+                            raise RequestTimeout
+                        else:
+                            raise
 
                     if response.status_code == 401:
                         raise SolverAuthenticationError()
@@ -1539,8 +1564,12 @@ class Client(object):
 
                     try:
                         response = session.get(query_string)
-                    except requests.exceptions.Timeout:
-                        raise RequestTimeout
+                    except Exception as exc:
+                        if hasexception(exc, (requests.exceptions.Timeout,
+                                              urllib3.exceptions.TimeoutError)):
+                            raise RequestTimeout
+                        else:
+                            raise
 
                     logger.trace(("Answer load response: "
                                   "code={r.status_code!r}, "
@@ -1636,6 +1665,8 @@ class Client(object):
 
         logger.trace("session.post(path=%r, json=%r)", path, body)
         try:
+            # note: post requests are not retried, so only requests.Timeout
+            # can be raised
             response = session.post(path, json=body)
         except requests.exceptions.Timeout:
             raise RequestTimeout
@@ -1734,8 +1765,12 @@ class Client(object):
                      path, part_stream, headers)
         try:
             response = session.put(path, data=part_stream, headers=headers)
-        except requests.exceptions.Timeout:
-            raise RequestTimeout
+        except Exception as exc:
+            if hasexception(exc, (requests.exceptions.Timeout,
+                                  urllib3.exceptions.TimeoutError)):
+                raise RequestTimeout
+            else:
+                raise
 
         msg = Client._parse_multipart_upload_response(response)
 
@@ -1753,8 +1788,12 @@ class Client(object):
         logger.trace("session.get(path=%r)", path)
         try:
             response = session.get(path)
-        except requests.exceptions.Timeout:
-            raise RequestTimeout
+        except Exception as exc:
+            if hasexception(exc, (requests.exceptions.Timeout,
+                                  urllib3.exceptions.TimeoutError)):
+                raise RequestTimeout
+            else:
+                raise
 
         msg = Client._parse_multipart_upload_response(response)
 
@@ -1789,6 +1828,7 @@ class Client(object):
         logger.trace("session.post(path=%r, json=%r)", path, body)
 
         try:
+            # note: post is not retried by urllib3
             response = session.post(path, json=body)
         except requests.exceptions.Timeout:
             raise RequestTimeout
