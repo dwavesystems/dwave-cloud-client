@@ -22,7 +22,18 @@ class ConfigFileParseError(ConfigFileError):
     """Invalid format of config file."""
 
 
-class SolverError(Exception):
+class SAPIError(IOError):
+    """Generic SAPI error base class."""
+
+    def __init__(self, *args, **kwargs):
+        self.error_msg = kwargs.pop('error_msg', None)
+        self.error_code = kwargs.pop('error_code', None)
+        super(SAPIError, self).__init__(*args, **kwargs)
+
+    def __str__(self):
+        return super(SAPIError, self).__str__() or self.error_msg or ''
+
+class SolverError(SAPIError):
     """Generic base class for all solver-related errors."""
 
 class SolverFailureError(SolverError):
