@@ -680,22 +680,12 @@ class Client(object):
             url = 'solvers/remote/'
 
         try:
-            response = self.session.get(url)
-        except Exception as exc:
-            if hasexception(exc, (requests.exceptions.Timeout,
-                                  urllib3.exceptions.TimeoutError)):
-                raise RequestTimeout
+            data = self._sapi_request(self.session.get, url)
+        except SAPIError as exc:
+            if name is not None and exc.error_code == 404:
+                raise SolverNotFoundError("No solver with name={!r} available".format(name))
             else:
                 raise
-
-        if response.status_code == 401:
-            raise SolverAuthenticationError
-
-        if name is not None and response.status_code == 404:
-            raise SolverNotFoundError("No solver with name={!r} available".format(name))
-
-        response.raise_for_status()
-        data = response.json()
 
         if name is not None:
             data = [data]
@@ -1244,38 +1234,21 @@ class Client(object):
                 try:
                     body = '[' + ','.join(mess.body.result() for mess in ready_problems) + ']'
                     logger.debug('Size of POST body = %d', len(body))
-                    try:
-                        # note: post requests are not retried
-                        response = session.post('problems/', body)
-                        localtime_of_response = epochnow()
-                    except Exception as exc:
-                        logger.exception("Submitting %d problems failed",
-                                         len(ready_problems))
-                        if hasexception(exc, (requests.exceptions.Timeout,
-                                              urllib3.exceptions.TimeoutError)):
-                            raise RequestTimeout
-                        else:
-                            raise
-
-                    if response.status_code == 401:
-                        raise SolverAuthenticationError()
-                    response.raise_for_status()
-
-                    message = response.json()
+                    message = self._sapi_request(session.post, 'problems/', body)
                     logger.debug("Finished submitting %d problems", len(ready_problems))
-                except BaseException as exception:
+
+                except Exception as exc:
                     logger.debug("Submit failed for %d problems", len(ready_problems))
-                    if not isinstance(exception, SolverAuthenticationError):
-                        exception = IOError(exception)
+                    if not isinstance(exc, SolverAuthenticationError):
+                        exc = IOError(exc)
 
                     for mess in ready_problems:
-                        mess.future._set_exception(exception)
+                        mess.future._set_exception(exc)
                         task_done()
                     continue
 
                 # Pass on the information
                 for submission, res in zip(ready_problems, message):
-                    submission.future._set_clock_diff(response, localtime_of_response)
                     self._handle_problem_status(res, submission.future)
                     task_done()
 
@@ -1417,16 +1390,8 @@ class Client(object):
                 # Submit the problems, attach the ids as a json list in the
                 # body of the delete query.
                 try:
-                    body = [item[0] for item in item_list]
-
-                    try:
-                        session.delete('problems/', json=body)
-                    except Exception as exc:
-                        if hasexception(exc, (requests.exceptions.Timeout,
-                                              urllib3.exceptions.TimeoutError)):
-                            raise RequestTimeout
-                        else:
-                            raise
+                    ids = [item[0] for item in item_list]
+                    self._sapi_request(session.delete, 'problems/', json=ids)
 
                 except Exception as exc:
                     for _, future in item_list:
@@ -1550,44 +1515,34 @@ class Client(object):
                     logger.trace("Executing poll API request")
 
                     try:
-                        response = session.get(query_string)
-                    except Exception as exc:
-                        if hasexception(exc, (requests.exceptions.Timeout,
-                                              urllib3.exceptions.TimeoutError)):
-                            raise RequestTimeout
+                        statuses = self._sapi_request(session.get, query_string)
+
+                    except SAPIError as exc:
+                        # assume 5xx errors are transient, and don't abort polling
+                        if 500 <= exc.error_code < 600:
+                            logger.warning(
+                                "Received an internal server error response on "
+                                "problem status polling request (%s). Assuming "
+                                "error is transient, and resuming polling.",
+                                exc.error_code)
+                            # add all futures in this frame back to the polling queue
+                            # XXX: logic split between `_handle_problem_status` and here
+                            for future in frame_futures.values():
+                                self._poll(future)
                         else:
                             raise
 
-                    if response.status_code == 401:
-                        raise SolverAuthenticationError()
-
-                    # assume 5xx errors are transient, and don't abort polling
-                    if 500 <= response.status_code < 600:
-                        logger.warning(
-                            "Received an internal server error response on "
-                            "problem status polling request (%s). Assuming "
-                            "error is transient, and resuming polling.",
-                            response.status_code)
-                        # add all futures in this frame back to the polling queue
-                        # XXX: logic split between `_handle_problem_status` and here
-                        for future in frame_futures.values():
-                            self._poll(future)
-
                     else:
-                        # otherwise, fail
-                        response.raise_for_status()
-
-                        # or handle a successful request
-                        statuses = response.json()
+                        # handle a successful request
                         for status in statuses:
                             self._handle_problem_status(status, frame_futures[status['id']])
 
-                except BaseException as exception:
-                    if not isinstance(exception, SolverAuthenticationError):
-                        exception = IOError(exception)
+                except Exception as exc:
+                    if not isinstance(exc, SolverAuthenticationError):
+                        exc = IOError(exc)
 
                     for id_ in frame_futures.keys():
-                        frame_futures[id_]._set_exception(exception)
+                        frame_futures[id_]._set_exception(exc)
 
                 for id_ in frame_futures.keys():
                     task_done()
@@ -1631,36 +1586,17 @@ class Client(object):
 
                 # Submit the query
                 query_string = 'problems/{}/'.format(future.id)
+
                 try:
-                    logger.trace("Executing answer load request")
+                    message = self._sapi_request(session.get, query_string)
 
-                    try:
-                        response = session.get(query_string)
-                    except Exception as exc:
-                        if hasexception(exc, (requests.exceptions.Timeout,
-                                              urllib3.exceptions.TimeoutError)):
-                            raise RequestTimeout
-                        else:
-                            raise
+                except Exception as exc:
+                    logger.debug("Answer load request failed with %r", exc)
 
-                    logger.trace(("Answer load response: "
-                                  "code={r.status_code!r}, "
-                                  "body={r.text!r}").format(r=response))
+                    if not isinstance(exc, SolverError):
+                        exc = IOError(exc)
 
-                    if response.status_code == 401:
-                        raise SolverAuthenticationError()
-                    if response.status_code == 404:
-                        raise SolverError(response.text)
-                    response.raise_for_status()
-
-                    message = response.json()
-                except BaseException as exception:
-                    logger.trace("Answer load request failed with %r", exception)
-
-                    if not isinstance(exception, SolverError):
-                        exception = IOError(exception)
-
-                    future._set_exception(exception)
+                    future._set_exception(exc)
                     self._load_queue.task_done()
                     continue
 
@@ -1745,10 +1681,7 @@ class Client(object):
             except:
                 error_code = response.status_code
 
-            if error_msg:
-                raise SolverError(error_msg=error_msg, error_code=error_code)
-            else:
-                response.raise_for_status()
+            raise SolverError(error_msg=error_msg, error_code=error_code)
 
     @staticmethod
     def _parse_multipart_upload_response(response):
