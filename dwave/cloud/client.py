@@ -1700,12 +1700,62 @@ class Client(object):
         return self._upload_problem_executor.submit(
             self._upload_problem_worker, problem=problem, problem_id=problem_id)
 
+    def _sapi_request(self, meth, *args, **kwargs):
+        caller = inspect.stack()[1].function
+        verb = meth.__name__
+        logger.trace("[%s] request: session.%s(*%r, **%r)", caller, verb, args, kwargs)
+
+        # execute request
+        try:
+            response = meth(*args, **kwargs)
+        except Exception as exc:
+            if hasexception(exc, (requests.exceptions.Timeout,
+                                  urllib3.exceptions.TimeoutError)):
+                raise RequestTimeout
+            else:
+                raise
+
+        # parse response
+        logger.trace("[%s] response: (code=%r, body=%r)",
+                     caller, response.status_code, response.text)
+
+        # NOTE: the expected behavior is for SAPI to return JSON error on
+        # failure. However, that is currently not the case. We need to work
+        # around this until it's fixed.
+
+        # no error -> body is json
+        # error -> body can be json or plain text error message
+        if response.ok:
+            try:
+                return response.json()
+            except:
+                raise InvalidAPIResponseError("Expected JSON response")
+
+        else:
+            if response.status_code == 401:
+                raise SolverAuthenticationError()
+
+            try:
+                error_msg = response.json()['error_msg']
+            except:
+                error_msg = response.text
+
+            try:
+                error_code = response.json()['error_code']
+            except:
+                error_code = response.status_code
+
+            if error_msg:
+                raise SolverError(error_msg=error_msg, error_code=error_code)
+            else:
+                response.raise_for_status()
+
     @staticmethod
     def _parse_multipart_upload_response(response):
         """Parse the JSON response body, raising appropriate exceptions."""
 
         caller = inspect.stack()[1].function
-        logger.trace("%s response: (code=%r, text=%r)",
+        logger.trace("%s response: (code=%r, body=%r)",
                      caller, response.status_code, response.text)
 
         if response.status_code == 401:
