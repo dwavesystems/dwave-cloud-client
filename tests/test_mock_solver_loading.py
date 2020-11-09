@@ -19,7 +19,6 @@ import json
 import unittest
 from unittest import mock
 
-import requests
 import requests_mock
 
 from dwave.cloud.client import Client, Solver
@@ -28,7 +27,6 @@ from dwave.cloud.sw import Client as SoftwareClient
 from dwave.cloud.hybrid import Client as HybridClient
 from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config
-from dwave.cloud.testing import iterable_mock_open
 
 
 url = 'https://dwavesys.com'
@@ -318,64 +316,3 @@ class MockSolverLoading(unittest.TestCase):
         self.assertFalse(solver_object('hybrid_x', cat='').qpu)
         self.assertFalse(solver_object('hybrid_x', cat='').software)
         self.assertTrue(solver_object('hybrid_x', cat='').hybrid)
-
-
-class RequestEvent(Exception):
-    """Throws exception when mocked client submits an HTTP request."""
-
-    def __init__(self, method, url, *args, **kwargs):
-        """Return the URL of the request with the exception for test verification."""
-        self.method = method
-        self.url = url
-        self.args = args
-        self.kwargs = kwargs
-
-    @staticmethod
-    def request(session, method, url, *args, **kwargs):
-        """Callback function that can be inserted into a mock."""
-        raise RequestEvent(method, url, *args, **kwargs)
-
-
-config_body = """
-[prod]
-endpoint = http://file-prod.url
-token = file-prod-token
-
-[alpha]
-endpoint = http://file-alpha.url
-token = file-alpha-token
-solver = alpha-solver
-
-[custom]
-endpoint = http://httpbin.org/delay/10
-token = 123
-permissive_ssl = True
-request_timeout = 15
-polling_timeout = 180
-"""
-
-
-class MockConfiguration(unittest.TestCase):
-
-    def test_custom_options(self):
-        """Test custom options (request_timeout, polling_timeout, permissive_ssl) are propagated to Client."""
-        request_timeout = 15
-        polling_timeout = 180
-
-        with mock.patch("dwave.cloud.config.open", iterable_mock_open(config_body), create=True):
-            with Client.from_config('config_file', profile='custom') as client:
-                # check permissive_ssl and timeouts custom params passed-thru
-                self.assertFalse(client.session.verify)
-                self.assertEqual(client.request_timeout, request_timeout)
-                self.assertEqual(client.polling_timeout, polling_timeout)
-
-                # verify client uses those properly
-                def mock_send(*args, **kwargs):
-                    self.assertEqual(kwargs.get('timeout'), request_timeout)
-                    response = requests.Response()
-                    response.status_code = 200
-                    response._content = b'{}'
-                    return response
-
-                with mock.patch("requests.adapters.HTTPAdapter.send", mock_send):
-                    client.get_solvers()

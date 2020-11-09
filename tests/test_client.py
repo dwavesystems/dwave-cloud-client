@@ -25,13 +25,14 @@ import unittest
 from unittest import mock
 from contextlib import contextmanager
 
-import requests.exceptions
+import requests
 from plucky import merge
 
 from dwave.cloud.client import Client
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, SolverError, SolverNotFoundError)
+from dwave.cloud.testing import iterable_mock_open
 import dwave.cloud
 
 from tests import config
@@ -520,6 +521,42 @@ class ClientConstruction(unittest.TestCase):
                 # verify Retry object config
                 retry = client.session.get_adapter('https://').max_retries
                 self._verify_retry_config(retry, retry_kwargs)
+
+
+class MockConfigClientIntegration(unittest.TestCase):
+
+    def test_custom_options(self):
+        """Test custom options (request_timeout, polling_timeout, permissive_ssl)
+        are propagated to Client."""
+
+        request_timeout = 15
+        polling_timeout = 180
+
+        config_body = """
+            [custom]
+            token = 123
+            permissive_ssl = on
+            request_timeout = {}
+            polling_timeout = {}
+        """.format(request_timeout, polling_timeout)
+
+        with mock.patch("dwave.cloud.config.open", iterable_mock_open(config_body)):
+            with Client.from_config('config_file', profile='custom') as client:
+                # check permissive_ssl and timeouts custom params passed-thru
+                self.assertFalse(client.session.verify)
+                self.assertEqual(client.request_timeout, request_timeout)
+                self.assertEqual(client.polling_timeout, polling_timeout)
+
+                # verify client uses those properly
+                def mock_send(*args, **kwargs):
+                    self.assertEqual(kwargs.get('timeout'), request_timeout)
+                    response = requests.Response()
+                    response.status_code = 200
+                    response._content = b'{}'
+                    return response
+
+                with mock.patch("requests.adapters.HTTPAdapter.send", mock_send):
+                    client.get_solvers()
 
 
 class FeatureBasedSolverSelection(unittest.TestCase):

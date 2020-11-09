@@ -26,7 +26,7 @@ from dwave.cloud.config import (
     parse_float, parse_int, parse_boolean)
 
 
-class TestConfig(unittest.TestCase):
+class TestConfigParsing(unittest.TestCase):
 
     config_body = """
         [defaults]
