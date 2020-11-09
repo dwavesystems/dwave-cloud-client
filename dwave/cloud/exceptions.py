@@ -22,7 +22,7 @@ class ConfigFileParseError(ConfigFileError):
     """Invalid format of config file."""
 
 
-class SAPIError(IOError):
+class SAPIError(Exception):
     """Generic SAPI error base class."""
 
     def __init__(self, *args, **kwargs):
@@ -33,23 +33,37 @@ class SAPIError(IOError):
     def __str__(self):
         return super(SAPIError, self).__str__() or self.error_msg or ''
 
+class ResourceAuthenticationError(SAPIError):
+    """Access to resource not authorized."""
+
+class ResourceNotFoundError(SAPIError):
+    """Resource does not exist."""
+
+
 class SolverError(SAPIError):
     """Generic base class for all solver-related errors."""
+
+class ProblemError(SAPIError):
+    """Generic base class for all problem-related errors."""
+
 
 class SolverFailureError(SolverError):
     """An exception raised when there is a remote failure calling a solver."""
 
-class SolverNotFoundError(SolverError):
+class SolverNotFoundError(ResourceNotFoundError, SolverError):
     """Solver with matching feature set not found / not available."""
+
+class ProblemNotFoundError(ResourceNotFoundError, ProblemError):
+    """Problem not found."""
 
 class SolverOfflineError(SolverError):
     """Action attempted on an offline solver."""
 
-class SolverAuthenticationError(SolverError):
+class SolverAuthenticationError(ResourceAuthenticationError, SolverError):
     """An exception raised when there is an authentication error."""
 
-    def __init__(self):
-        super(SolverAuthenticationError, self).__init__("Token not accepted for that action.")
+    def __init__(self, *args, **kwargs):
+        super(SolverAuthenticationError, self).__init__("Invalid token or access denied.", *args, **kwargs)
 
 class UnsupportedSolverError(SolverError):
     """The solver we received from the API is not supported by the client."""

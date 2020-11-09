@@ -26,9 +26,7 @@ from dwave.cloud.client import Client, Solver
 from dwave.cloud.qpu import Client as QPUClient
 from dwave.cloud.sw import Client as SoftwareClient
 from dwave.cloud.hybrid import Client as HybridClient
-from dwave.cloud.exceptions import (
-    SolverPropertyMissingError, ConfigFileReadError, ConfigFileParseError,
-    SolverError, SolverNotFoundError, InvalidAPIResponseError)
+from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config
 from dwave.cloud.testing import iterable_mock_open
 
@@ -81,14 +79,15 @@ def setup_server(m):
     two_solver_response = '[' + first_solver_response + ',' + second_solver_response + ']'
 
     # Setup the server
-    headers = {'X-Auth-Token': token}
+    valid_token_headers = {'X-Auth-Token': token}
+    invalid_token_headers = {'X-Auth-Token': bad_token}
+
     m.get(requests_mock.ANY, status_code=404)
-    m.get(all_solver_url, status_code=403, request_headers={})
-    m.get(solver1_url, status_code=403, request_headers={})
-    m.get(solver2_url, status_code=403, request_headers={})
-    m.get(all_solver_url, text=two_solver_response, request_headers=headers)
-    m.get(solver1_url, text=first_solver_response, request_headers=headers)
-    m.get(solver2_url, text=second_solver_response, request_headers=headers)
+    m.get(requests_mock.ANY, status_code=401, request_headers=invalid_token_headers)
+
+    m.get(all_solver_url, text=two_solver_response, request_headers=valid_token_headers)
+    m.get(solver1_url, text=first_solver_response, request_headers=valid_token_headers)
+    m.get(solver2_url, text=second_solver_response, request_headers=valid_token_headers)
 
 
 class MockConnectivityTests(unittest.TestCase):
@@ -96,17 +95,19 @@ class MockConnectivityTests(unittest.TestCase):
 
     def test_bad_url(self):
         """Connect with a bad URL."""
-        with requests_mock.mock() as m:
+        with requests_mock.Mocker() as m:
             setup_server(m)
-            with self.assertRaises(IOError):
+            with self.assertRaises(SAPIError) as err:
                 with Client(bad_url, token) as client:
                     client.get_solvers()
+            # TODO: fix when exceptions/sapi call generalized
+            self.assertEqual(err.exception.error_code, 404)
 
     def test_bad_token(self):
         """Connect with a bad token."""
-        with requests_mock.mock() as m:
+        with requests_mock.Mocker() as m:
             setup_server(m)
-            with self.assertRaises(IOError):
+            with self.assertRaises(SolverAuthenticationError) as err:
                 with Client(url, bad_token) as client:
                     client.get_solvers()
 

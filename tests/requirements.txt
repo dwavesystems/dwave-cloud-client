@@ -1,5 +1,5 @@
 mock
-requests_mock
+requests_mock>=1.8
 coverage
 coveralls
 parameterized

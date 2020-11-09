@@ -23,7 +23,7 @@ class TestExceptions(unittest.TestCase):
         try:
             raise SolverAuthenticationError
         except Exception as e:
-            self.assertEqual(str(e), "Token not accepted for that action.")
+            self.assertEqual(str(e), "Invalid token or access denied.")
 
     def test_canceled_future_error_msg(self):
         try:

@@ -1693,7 +1693,7 @@ class Client(object):
 
         else:
             if response.status_code == 401:
-                raise SolverAuthenticationError()
+                raise SolverAuthenticationError(error_code=401)
 
             try:
                 error_msg = response.json()['error_msg']
