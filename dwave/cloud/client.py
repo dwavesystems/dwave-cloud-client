@@ -680,7 +680,7 @@ class Client(object):
             url = 'solvers/remote/'
 
         try:
-            data = self._sapi_request(self.session.get, url)
+            data = Client._sapi_request(self.session.get, url)
         except SAPIError as exc:
             if name is not None and exc.error_code == 404:
                 raise SolverNotFoundError("No solver with name={!r} available".format(name))
@@ -1234,7 +1234,7 @@ class Client(object):
                 try:
                     body = '[' + ','.join(mess.body.result() for mess in ready_problems) + ']'
                     logger.debug('Size of POST body = %d', len(body))
-                    message = self._sapi_request(session.post, 'problems/', body)
+                    message = Client._sapi_request(session.post, 'problems/', body)
                     logger.debug("Finished submitting %d problems", len(ready_problems))
 
                 except Exception as exc:
@@ -1391,7 +1391,7 @@ class Client(object):
                 # body of the delete query.
                 try:
                     ids = [item[0] for item in item_list]
-                    self._sapi_request(session.delete, 'problems/', json=ids)
+                    Client._sapi_request(session.delete, 'problems/', json=ids)
 
                 except Exception as exc:
                     for _, future in item_list:
@@ -1515,7 +1515,7 @@ class Client(object):
                     logger.trace("Executing poll API request")
 
                     try:
-                        statuses = self._sapi_request(session.get, query_string)
+                        statuses = Client._sapi_request(session.get, query_string)
 
                     except SAPIError as exc:
                         # assume 5xx errors are transient, and don't abort polling
@@ -1588,7 +1588,7 @@ class Client(object):
                 query_string = 'problems/{}/'.format(future.id)
 
                 try:
-                    message = self._sapi_request(session.get, query_string)
+                    message = Client._sapi_request(session.get, query_string)
 
                 except Exception as exc:
                     logger.debug("Answer load request failed with %r", exc)
@@ -1636,7 +1636,31 @@ class Client(object):
         return self._upload_problem_executor.submit(
             self._upload_problem_worker, problem=problem, problem_id=problem_id)
 
-    def _sapi_request(self, meth, *args, **kwargs):
+    @staticmethod
+    def _sapi_request(meth, *args, **kwargs):
+        """Execute an HTTP request defined with the ``meth`` callable and
+        parse the response and interpret errors in compliance with SAPI REST
+        interface.
+
+        Note:
+            For internal use only.
+
+        Args:
+            meth (callable):
+                Callable object to be called with args and kwargs supplied, with
+                expected behavior consistent with one of ``requests.Session()``
+                request methods.
+
+            *args, **kwargs (list, dict):
+                Arguments to the ``meth`` callable.
+
+        Returns:
+            dict: JSON decoded body
+
+        Raises:
+            A :class:`~dwave.cloud.exceptions.SAPIError` subclass.
+        """
+
         caller = inspect.stack()[1].function
         verb = meth.__name__
         logger.trace("[%s] request: session.%s(*%r, **%r)", caller, verb, args, kwargs)
@@ -1665,7 +1689,7 @@ class Client(object):
             try:
                 return response.json()
             except:
-                raise InvalidAPIResponseError("Expected JSON response")
+                raise InvalidAPIResponseError("JSON response expected")
 
         else:
             if response.status_code == 401:
@@ -1684,31 +1708,6 @@ class Client(object):
             raise SolverError(error_msg=error_msg, error_code=error_code)
 
     @staticmethod
-    def _parse_multipart_upload_response(response):
-        """Parse the JSON response body, raising appropriate exceptions."""
-
-        caller = inspect.stack()[1].function
-        logger.trace("%s response: (code=%r, body=%r)",
-                     caller, response.status_code, response.text)
-
-        if response.status_code == 401:
-            raise SolverAuthenticationError()
-
-        try:
-            msg = response.json()
-        except:
-            response.raise_for_status()
-
-        if response.status_code != 200:
-            try:
-                error_msg = msg['error_msg']
-            except KeyError:
-                response.raise_for_status()
-            raise ProblemUploadError(error_msg)
-
-        return msg
-
-    @staticmethod
     @retried(_UPLOAD_REQUEST_RETRIES, backoff=_UPLOAD_RETRIES_BACKOFF)
     def _initiate_multipart_upload(session, size):
         """Sync http request using `session`."""
@@ -1717,16 +1716,7 @@ class Client(object):
 
         path = 'bqm/multipart'
         body = dict(size=size)
-
-        logger.trace("session.post(path=%r, json=%r)", path, body)
-        try:
-            # note: post requests are not retried, so only requests.Timeout
-            # can be raised
-            response = session.post(path, json=body)
-        except requests.exceptions.Timeout:
-            raise RequestTimeout
-
-        msg = Client._parse_multipart_upload_response(response)
+        msg = Client._sapi_request(session.post, path, json=body)
 
         try:
             problem_id = msg['id']
@@ -1816,18 +1806,7 @@ class Client(object):
             'Content-Type': 'application/octet-stream',
         }
 
-        logger.trace("session.put(path=%r, data=%r, headers=%r)",
-                     path, part_stream, headers)
-        try:
-            response = session.put(path, data=part_stream, headers=headers)
-        except Exception as exc:
-            if hasexception(exc, (requests.exceptions.Timeout,
-                                  urllib3.exceptions.TimeoutError)):
-                raise RequestTimeout
-            else:
-                raise
-
-        msg = Client._parse_multipart_upload_response(response)
+        msg = Client._sapi_request(session.put, path, data=part_stream, headers=headers)
 
         logger.debug("Uploaded part_id=%r of problem_id=%r", part_id, problem_id)
 
@@ -1840,17 +1819,7 @@ class Client(object):
 
         path = 'bqm/multipart/{problem_id}/status'.format(problem_id=problem_id)
 
-        logger.trace("session.get(path=%r)", path)
-        try:
-            response = session.get(path)
-        except Exception as exc:
-            if hasexception(exc, (requests.exceptions.Timeout,
-                                  urllib3.exceptions.TimeoutError)):
-                raise RequestTimeout
-            else:
-                raise
-
-        msg = Client._parse_multipart_upload_response(response)
+        msg = Client._sapi_request(session.get, path)
 
         try:
             msg['status']
@@ -1880,15 +1849,7 @@ class Client(object):
         path = 'bqm/multipart/{problem_id}/combine'.format(problem_id=problem_id)
         body = dict(checksum=checksum)
 
-        logger.trace("session.post(path=%r, json=%r)", path, body)
-
-        try:
-            # note: post is not retried by urllib3
-            response = session.post(path, json=body)
-        except requests.exceptions.Timeout:
-            raise RequestTimeout
-
-        msg = Client._parse_multipart_upload_response(response)
+        msg = Client._sapi_request(session.post, path, json=body)
 
         logger.debug("Issued a combine command for problem_id=%r", problem_id)
 
