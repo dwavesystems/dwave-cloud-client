@@ -89,7 +89,7 @@ class CanceledFutureError(Exception):
         super(CanceledFutureError, self).__init__("An error occurred reading results from a canceled request")
 
 
-class InvalidAPIResponseError(Exception):
+class InvalidAPIResponseError(SAPIError):
     """Raised when an invalid/unexpected response from D-Wave Solver API is received."""
 
 

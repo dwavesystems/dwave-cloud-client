@@ -1658,7 +1658,8 @@ class Client(object):
             dict: JSON decoded body
 
         Raises:
-            A :class:`~dwave.cloud.exceptions.SAPIError` subclass.
+            A :class:`~dwave.cloud.exceptions.SAPIError` subclass, or
+            :class:`dwave.cloud.exceptions.RequestTimeout`
         """
 
         caller = inspect.stack()[1].function
@@ -1696,15 +1697,14 @@ class Client(object):
                 raise SolverAuthenticationError(error_code=401)
 
             try:
-                error_msg = response.json()['error_msg']
+                msg = response.json()
+                error_msg = msg['error_msg']
+                error_code = msg['error_code']
             except:
                 error_msg = response.text
-
-            try:
-                error_code = response.json()['error_code']
-            except:
                 error_code = response.status_code
 
+            # NOTE: for backwards compat only. Change to: SAPIError
             raise SolverError(error_msg=error_msg, error_code=error_code)
 
     @staticmethod

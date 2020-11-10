@@ -523,7 +523,7 @@ class ClientConstruction(unittest.TestCase):
                 self._verify_retry_config(retry, retry_kwargs)
 
 
-class MockConfigClientIntegration(unittest.TestCase):
+class ClientConfigIntegration(unittest.TestCase):
 
     def test_custom_options(self):
         """Test custom options (request_timeout, polling_timeout, permissive_ssl)
