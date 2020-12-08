@@ -6,6 +6,12 @@ matrix:
   include:
     - os: linux
       sudo: required
+      python: "3.9"
+      env: TOXENV=py39
+      deploy:
+
+    - os: linux
+      sudo: required
       python: "3.8"
       env: TOXENV=py38
       deploy:
