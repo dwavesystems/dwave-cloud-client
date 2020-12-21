@@ -258,8 +258,9 @@ class Submission(_QueryTest):
 
             # simple problem with a large energy gap
             # (ground state: [-1, -1] @ -2.0)
-            h = {0: 1, 4: 1}
-            J = {(0, 4): -1}
+            n1, n2 = next(iter(solver.edges))
+            h = {n1: 1, n2: 1}
+            J = {(n1, n2): -1}
             offset = 1.0
 
             bqm = dimod.BinaryQuadraticModel.from_ising(h, J, offset)
