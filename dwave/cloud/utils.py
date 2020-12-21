@@ -41,7 +41,7 @@ except ImportError:  # pragma: no cover
 __all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
            'default_text_input', 'click_info_switch', 'datetime_to_timestamp',
            'datetime_to_timestamp', 'utcnow', 'epochnow', 'tictoc',
-           'hasinstance', 'exception_chain', 'hasexception']
+           'hasinstance', 'exception_chain', 'is_caused_by']
 
 logger = logging.getLogger(__name__)
 
@@ -306,7 +306,7 @@ class BaseUrlSession(requests.Session):
 
 def hasinstance(iterable, class_or_tuple):
     """Extension of ``isinstance`` to iterables/sequences. Returns True iff the
-    sequence contains at least one :class:func`isinstance` of ``class_or_tuple``.
+    sequence contains at least one object which is instance of ``class_or_tuple``.
     """
 
     return any(isinstance(e, class_or_tuple) for e in iterable)
@@ -351,7 +351,7 @@ def exception_chain(exception):
             return
 
 
-def hasexception(exception, exception_types):
+def is_caused_by(exception, exception_types):
     """Check if any of ``exception_types`` is causing the ``exception``.
     Equivalently, check if any of ``exception_types`` is contained in the
     exception chain rooted at ``exception``.
@@ -365,7 +365,7 @@ def hasexception(exception, exception_types):
 
     Returns:
         bool:
-            True when ``exception`` is caused by any of exceptions in
+            True when ``exception`` is caused by any of the exceptions in
             ``exception_types``.
     """
 

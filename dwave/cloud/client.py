@@ -76,7 +76,7 @@ from dwave.cloud.upload import ChunkedData
 from dwave.cloud.events import dispatch_event
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent,
-    datetime_to_timestamp, utcnow, epochnow, cached, retried, hasexception)
+    datetime_to_timestamp, utcnow, epochnow, cached, retried, is_caused_by)
 
 __all__ = ['Client']
 
@@ -1232,7 +1232,7 @@ class Client(object):
                 # Submit the problems
                 logger.debug("Submitting %d problems", len(ready_problems))
                 try:
-                    body = '[' + ','.join(mess.body.result() for mess in ready_problems) + ']'
+                    body = '[' + ','.join(msg.body.result() for msg in ready_problems) + ']'
                     logger.debug('Size of POST body = %d', len(body))
                     message = Client._sapi_request(session.post, 'problems/', body)
                     logger.debug("Finished submitting %d problems", len(ready_problems))
@@ -1242,8 +1242,8 @@ class Client(object):
                     if not isinstance(exc, SolverAuthenticationError):
                         exc = IOError(exc)
 
-                    for mess in ready_problems:
-                        mess.future._set_exception(exc)
+                    for msg in ready_problems:
+                        msg.future._set_exception(exc)
                         task_done()
                     continue
 
@@ -1655,11 +1655,11 @@ class Client(object):
                 Arguments to the ``meth`` callable.
 
         Returns:
-            dict: JSON decoded body
+            dict: JSON decoded body.
 
         Raises:
             A :class:`~dwave.cloud.exceptions.SAPIError` subclass, or
-            :class:`dwave.cloud.exceptions.RequestTimeout`
+            :class:`~dwave.cloud.exceptions.RequestTimeout`.
         """
 
         caller = inspect.stack()[1].function
@@ -1670,7 +1670,7 @@ class Client(object):
         try:
             response = meth(*args, **kwargs)
         except Exception as exc:
-            if hasexception(exc, (requests.exceptions.Timeout,
+            if is_caused_by(exc, (requests.exceptions.Timeout,
                                   urllib3.exceptions.TimeoutError)):
                 raise RequestTimeout
             else:

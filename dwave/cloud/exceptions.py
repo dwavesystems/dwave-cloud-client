@@ -37,7 +37,7 @@ class ResourceAuthenticationError(SAPIError):
     """Access to resource not authorized."""
 
 class ResourceNotFoundError(SAPIError):
-    """Resource does not exist."""
+    """Resource not found."""
 
 
 class SolverError(SAPIError):
