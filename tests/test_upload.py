@@ -26,7 +26,7 @@ from requests.exceptions import HTTPError
 
 from dwave.cloud.utils import tictoc
 from dwave.cloud.client import Client
-from dwave.cloud.exceptions import ProblemUploadError
+from dwave.cloud.exceptions import SAPIError, ProblemUploadError
 from dwave.cloud.upload import (
     Gettable, GettableFile, GettableMemory, FileView, ChunkedData)
 
@@ -815,7 +815,7 @@ class TestMultipartUpload(unittest.TestCase):
 
         with Client(**config) as client:
             with client.create_session() as session:
-                with self.assertRaisesRegex(ProblemUploadError,
+                with self.assertRaisesRegex(SAPIError,
                                             'bigger than the maximum'):
                     client._initiate_multipart_upload(session, size)
 
