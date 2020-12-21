@@ -39,7 +39,8 @@ from dwave.cloud.utils import evaluate_ising, generate_const_ising_problem
 from dwave.cloud.client import Client, Solver
 from dwave.cloud.computation import Future
 from dwave.cloud.exceptions import (
-    SolverFailureError, CanceledFutureError, SolverError)
+    SolverFailureError, CanceledFutureError, SolverError,
+    InvalidAPIResponseError)
 
 
 def test_problem(solver):
@@ -257,7 +258,7 @@ class MockSubmission(_QueryTest):
                 linear, quadratic = test_problem(solver)
                 results = solver.sample_ising(linear, quadratic)
 
-                with self.assertRaises(IOError):
+                with self.assertRaises(InvalidAPIResponseError):
                     results.samples
 
     def test_submit_ising_ok_reply(self):

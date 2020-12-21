@@ -1238,10 +1238,8 @@ class Client(object):
                     logger.debug("Finished submitting %d problems", len(ready_problems))
 
                 except Exception as exc:
-                    logger.debug("Submit failed for %d problems", len(ready_problems))
-                    if not isinstance(exc, SolverAuthenticationError):
-                        exc = IOError(exc)
-
+                    logger.debug("Submit failed for %d problems with %r",
+                                 len(ready_problems), exc)
                     for msg in ready_problems:
                         msg.future._set_exception(exc)
                         task_done()
@@ -1251,9 +1249,6 @@ class Client(object):
                 for submission, res in zip(ready_problems, message):
                     self._handle_problem_status(res, submission.future)
                     task_done()
-
-                # this is equivalent to a yield to scheduler in other threading libraries
-                time.sleep(0)
 
         except BaseException as err:
             logger.exception(err)
@@ -1399,10 +1394,8 @@ class Client(object):
                             future._set_exception(exc)
 
                 # Mark all the ids as processed regardless of success or failure.
-                [self._cancel_queue.task_done() for _ in item_list]
-
-                # this is equivalent to a yield to scheduler in other threading libraries
-                time.sleep(0)
+                for _ in item_list:
+                    self._cancel_queue.task_done()
 
         except Exception as err:
             logger.exception(err)
@@ -1538,16 +1531,11 @@ class Client(object):
                             self._handle_problem_status(status, frame_futures[status['id']])
 
                 except Exception as exc:
-                    if not isinstance(exc, SolverAuthenticationError):
-                        exc = IOError(exc)
-
                     for id_ in frame_futures.keys():
                         frame_futures[id_]._set_exception(exc)
 
                 for id_ in frame_futures.keys():
                     task_done()
-
-                time.sleep(0)
 
         except Exception as err:
             logger.exception(err)
@@ -1592,10 +1580,6 @@ class Client(object):
 
                 except Exception as exc:
                     logger.debug("Answer load request failed with %r", exc)
-
-                    if not isinstance(exc, SolverError):
-                        exc = IOError(exc)
-
                     future._set_exception(exc)
                     self._load_queue.task_done()
                     continue
@@ -1603,9 +1587,6 @@ class Client(object):
                 # Dispatch the results, mark the task complete
                 self._handle_problem_status(message, future)
                 self._load_queue.task_done()
-
-                # this is equivalent to a yield to scheduler in other threading libraries
-                time.sleep(0)
 
         except Exception as err:
             logger.error('Load result error: ' + str(err))
