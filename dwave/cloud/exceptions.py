@@ -28,6 +28,8 @@ class SAPIError(Exception):
     def __init__(self, *args, **kwargs):
         self.error_msg = kwargs.pop('error_msg', None)
         self.error_code = kwargs.pop('error_code', None)
+        if len(args) < 1:
+            args = (self.error_msg, )
         super(SAPIError, self).__init__(*args, **kwargs)
 
     def __str__(self):
