@@ -19,31 +19,27 @@ import json
 import unittest
 from unittest import mock
 
-import requests
 import requests_mock
 
 from dwave.cloud.client import Client, Solver
 from dwave.cloud.qpu import Client as QPUClient
 from dwave.cloud.sw import Client as SoftwareClient
 from dwave.cloud.hybrid import Client as HybridClient
-from dwave.cloud.exceptions import (
-    SolverPropertyMissingError, ConfigFileReadError, ConfigFileParseError,
-    SolverError, SolverNotFoundError)
+from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config
-from dwave.cloud.testing import iterable_mock_open
 
 
 url = 'https://dwavesys.com'
 token = 'abc123abc123abc123abc123abc123abc123'
-solver_name = 'test_solver'
-second_solver_name = 'test_solver2'
+solver1_name = 'first_solver'
+solver2_name = 'second_solver'
 
 bad_url = 'https://not-a-subdomain.dwavesys.com'
 bad_token = '------------------------'
 
 
 def structured_solver_data(id_, cat='qpu', incomplete=False):
-    """Return string describing a single solver."""
+    """Return data dict describing a single solver."""
     obj = {
         "properties": {
             "supported_problem_types": ["qubo", "ising"],
@@ -61,34 +57,35 @@ def structured_solver_data(id_, cat='qpu', incomplete=False):
     if incomplete:
         del obj['properties']['supported_problem_types']
 
-    return json.dumps(obj)
+    return obj
 
 def solver_object(id_, cat='qpu', incomplete=False):
-    return Solver(client=None, data=json.loads(structured_solver_data(id_, cat, incomplete)))
+    return Solver(client=None, data=structured_solver_data(id_, cat, incomplete))
 
 
 # Define the endpoints
+solver1_url = '{}/solvers/remote/{}/'.format(url, solver1_name)
+solver2_url = '{}/solvers/remote/{}/'.format(url, solver2_name)
 all_solver_url = '{}/solvers/remote/'.format(url)
-solver1_url = '{}/solvers/remote/{}/'.format(url, solver_name)
-solver2_url = '{}/solvers/remote/{}/'.format(url, second_solver_name)
 
 
 def setup_server(m):
     """Add endpoints to the server."""
-    # Content strings
-    first_solver_response = structured_solver_data(solver_name)
-    second_solver_response = structured_solver_data(second_solver_name)
-    two_solver_response = '[' + first_solver_response + ',' + second_solver_response + ']'
+
+    solver1_data = structured_solver_data(solver1_name)
+    solver2_data = structured_solver_data(solver2_name)
+    all_solver_data = [solver1_data, solver2_data]
 
     # Setup the server
-    headers = {'X-Auth-Token': token}
+    valid_token_headers = {'X-Auth-Token': token}
+    invalid_token_headers = {'X-Auth-Token': bad_token}
+
     m.get(requests_mock.ANY, status_code=404)
-    m.get(all_solver_url, status_code=403, request_headers={})
-    m.get(solver1_url, status_code=403, request_headers={})
-    m.get(solver2_url, status_code=403, request_headers={})
-    m.get(all_solver_url, text=two_solver_response, request_headers=headers)
-    m.get(solver1_url, text=first_solver_response, request_headers=headers)
-    m.get(solver2_url, text=second_solver_response, request_headers=headers)
+    m.get(requests_mock.ANY, status_code=401, request_headers=invalid_token_headers)
+
+    m.get(solver1_url, json=solver1_data, request_headers=valid_token_headers)
+    m.get(solver2_url, json=solver2_data, request_headers=valid_token_headers)
+    m.get(all_solver_url, json=all_solver_data, request_headers=valid_token_headers)
 
 
 class MockConnectivityTests(unittest.TestCase):
@@ -96,17 +93,19 @@ class MockConnectivityTests(unittest.TestCase):
 
     def test_bad_url(self):
         """Connect with a bad URL."""
-        with requests_mock.mock() as m:
+        with requests_mock.Mocker() as m:
             setup_server(m)
-            with self.assertRaises(IOError):
+            with self.assertRaises(SAPIError) as err:
                 with Client(bad_url, token) as client:
                     client.get_solvers()
+            # TODO: fix when exceptions/sapi call generalized
+            self.assertEqual(err.exception.error_code, 404)
 
     def test_bad_token(self):
         """Connect with a bad token."""
-        with requests_mock.mock() as m:
+        with requests_mock.Mocker() as m:
             setup_server(m)
-            with self.assertRaises(IOError):
+            with self.assertRaises(SolverAuthenticationError) as err:
                 with Client(url, bad_token) as client:
                     client.get_solvers()
 
@@ -141,16 +140,16 @@ class MockSolverLoading(unittest.TestCase):
             # test default, cached solver get
             with Client(url, token) as client:
                 # fetch solver not present in cache
-                solver = client.get_solver(solver_name)
-                self.assertEqual(solver.id, solver_name)
+                solver = client.get_solver(solver1_name)
+                self.assertEqual(solver.id, solver1_name)
 
                 # modify cached solver and re-fetch it
                 solver.id = 'different-solver'
                 # cached solver name doesn't match, so it won't be returned
                 with self.assertRaises(SolverError):
-                    client.get_solver(solver_name, refresh=False)
+                    client.get_solver(solver1_name, refresh=False)
                 # cache is refreshed?
-                self.assertEqual(client.get_solver(solver_name, refresh=True).id, solver_name)
+                self.assertEqual(client.get_solver(solver1_name, refresh=True).id, solver1_name)
 
     def test_load_all_solvers(self):
         """Load the list of solver names."""
@@ -189,24 +188,24 @@ class MockSolverLoading(unittest.TestCase):
             m.get(requests_mock.ANY, status_code=404)
             with Client(url, token) as client:
                 with self.assertRaises(SolverNotFoundError):
-                    client.get_solver(solver_name)
+                    client.get_solver(solver1_name)
 
     def test_load_solver_missing_data(self):
         """Try to load a solver that has incomplete data."""
         with requests_mock.mock() as m:
-            m.get(solver1_url, text=structured_solver_data(solver_name, incomplete=True))
+            m.get(solver1_url, json=structured_solver_data(solver1_name, incomplete=True))
             with Client(url, token) as client:
                 with self.assertRaises(SolverNotFoundError):
-                    client.get_solver(solver_name)
+                    client.get_solver(solver1_name)
 
     def test_load_solver_broken_response(self):
         """Try to load a solver for which the server has returned a truncated response."""
         with requests_mock.mock() as m:
-            body = structured_solver_data(solver_name)
+            body = json.dumps(structured_solver_data(solver1_name))
             m.get(solver1_url, text=body[0:len(body)//2])
             with Client(url, token) as client:
-                with self.assertRaises(ValueError):
-                    client.get_solver(solver_name)
+                with self.assertRaises(InvalidAPIResponseError):
+                    client.get_solver(solver1_name)
 
     def test_get_solver_reproducible(self):
         """get_solver should return same solver (assuming cache hasn't changed)"""
@@ -219,10 +218,10 @@ class MockSolverLoading(unittest.TestCase):
 
             with Client(url, token, defaults=defaults) as client:
                 solver = client.get_solver()
-                self.assertEqual(solver.id, second_solver_name)
+                self.assertEqual(solver.id, solver2_name)
 
                 solver = client.get_solver()
-                self.assertEqual(solver.id, second_solver_name)
+                self.assertEqual(solver.id, solver2_name)
 
     def test_solver_filtering_in_client(self):
         # base client
@@ -267,14 +266,14 @@ class MockSolverLoading(unittest.TestCase):
         self.assertFalse(solver_object('solver').has_flux_biases)
 
         # test .num_qubits vs .num_actual_qubits
-        data = json.loads(structured_solver_data('test'))
+        data = structured_solver_data('test')
         data['properties']['num_qubits'] = 7
         solver = Solver(None, data)
         self.assertEqual(solver.num_qubits, 7)
         self.assertEqual(solver.num_active_qubits, 3)
 
         # test .is_vfyc
-        data = json.loads(structured_solver_data('test'))
+        data = structured_solver_data('test')
         data['properties']['vfyc'] = 'error'
         self.assertFalse(Solver(None, data).is_vfyc)
         data['properties']['vfyc'] = True
@@ -292,7 +291,7 @@ class MockSolverLoading(unittest.TestCase):
 
         # test `.online` property
         self.assertTrue(solver_object('solver').online)
-        data = json.loads(structured_solver_data('test'))
+        data = structured_solver_data('test')
         data['status'] = 'offline'
         self.assertFalse(Solver(None, data).online)
         del data['status']
@@ -317,64 +316,3 @@ class MockSolverLoading(unittest.TestCase):
         self.assertFalse(solver_object('hybrid_x', cat='').qpu)
         self.assertFalse(solver_object('hybrid_x', cat='').software)
         self.assertTrue(solver_object('hybrid_x', cat='').hybrid)
-
-
-class RequestEvent(Exception):
-    """Throws exception when mocked client submits an HTTP request."""
-
-    def __init__(self, method, url, *args, **kwargs):
-        """Return the URL of the request with the exception for test verification."""
-        self.method = method
-        self.url = url
-        self.args = args
-        self.kwargs = kwargs
-
-    @staticmethod
-    def request(session, method, url, *args, **kwargs):
-        """Callback function that can be inserted into a mock."""
-        raise RequestEvent(method, url, *args, **kwargs)
-
-
-config_body = """
-[prod]
-endpoint = http://file-prod.url
-token = file-prod-token
-
-[alpha]
-endpoint = http://file-alpha.url
-token = file-alpha-token
-solver = alpha-solver
-
-[custom]
-endpoint = http://httpbin.org/delay/10
-token = 123
-permissive_ssl = True
-request_timeout = 15
-polling_timeout = 180
-"""
-
-
-class MockConfiguration(unittest.TestCase):
-
-    def test_custom_options(self):
-        """Test custom options (request_timeout, polling_timeout, permissive_ssl) are propagated to Client."""
-        request_timeout = 15
-        polling_timeout = 180
-
-        with mock.patch("dwave.cloud.config.open", iterable_mock_open(config_body), create=True):
-            with Client.from_config('config_file', profile='custom') as client:
-                # check permissive_ssl and timeouts custom params passed-thru
-                self.assertFalse(client.session.verify)
-                self.assertEqual(client.request_timeout, request_timeout)
-                self.assertEqual(client.polling_timeout, polling_timeout)
-
-                # verify client uses those properly
-                def mock_send(*args, **kwargs):
-                    self.assertEqual(kwargs.get('timeout'), request_timeout)
-                    response = requests.Response()
-                    response.status_code = 200
-                    response._content = b'{}'
-                    return response
-
-                with mock.patch("requests.adapters.HTTPAdapter.send", mock_send):
-                    client.get_solvers()

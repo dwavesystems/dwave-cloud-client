@@ -62,20 +62,21 @@ from collections import abc, namedtuple, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
+import urllib3
 from dateutil.parser import parse as parse_datetime
 from plucky import pluck
 
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
 from dwave.cloud.computation import Future
-from dwave.cloud.config import load_config, parse_float, parse_boolean
+from dwave.cloud.config import load_config, parse_float, parse_int, parse_boolean
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.upload import ChunkedData
 from dwave.cloud.events import dispatch_event
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent,
-    datetime_to_timestamp, utcnow, epochnow, cached, retried)
+    datetime_to_timestamp, utcnow, epochnow, cached, retried, is_caused_by)
 
 __all__ = ['Client']
 
@@ -142,6 +143,40 @@ class Client(object):
             Problem status is polled with exponential back-off schedule.
             Maximum back-off period is limited to ``poll_backoff_max`` seconds.
 
+        http_retry_total (int, default=10):
+            Total number of retries of failing idempotent HTTP requests to
+            allow. Takes precedence over other counts.
+            See ``total`` in :class:`~urllib3.util.retry.Retry` for details.
+
+        http_retry_connect (int, default=None):
+            How many connection-related errors to retry on.
+            See ``connect`` in :class:`~urllib3.util.retry.Retry` for details.
+
+        http_retry_read (int, default=None):
+            How many times to retry on read errors.
+            See ``read`` in :class:`~urllib3.util.retry.Retry` for details.
+
+        http_retry_redirect (int, default=None):
+            How many redirects to perform.
+            See ``redirect`` in :class:`~urllib3.util.retry.Retry` for details.
+
+        http_retry_status (int, default=None):
+            How many times to retry on bad status codes.
+            See ``status`` in :class:`~urllib3.util.retry.Retry` for details.
+
+        http_retry_backoff_factor (float, default=0.01):
+            A backoff factor to apply between attempts after the second try.
+            Sleep between retries, in seconds::
+
+                {backoff factor} * (2 ** ({number of total retries} - 1))
+
+            See ``backoff_factor`` in :class:`~urllib3.util.retry.Retry` for
+            details.
+
+        http_retry_backoff_max (float, default=60):
+            Maximum backoff time in seconds.
+            See :attr:`~urllib3.util.retry.Retry.BACKOFF_MAX` for details.
+
         defaults (dict, optional):
             Defaults for the client instance that override the class
             :attr:`.DEFAULTS`.
@@ -199,6 +234,14 @@ class Client(object):
         # poll back-off schedule defaults [sec]
         'poll_backoff_min': 0.05,
         'poll_backoff_max': 60,
+        # idempotent http requests retry params
+        'http_retry_total': 10,
+        'http_retry_connect': None,
+        'http_retry_read': None,
+        'http_retry_redirect': None,
+        'http_retry_status': None,
+        'http_retry_backoff_factor': 0.01,
+        'http_retry_backoff_max': 60,
     }
 
     # Number of problems to include in a submit/status query
@@ -325,9 +368,12 @@ class Client(object):
 
         # combine instance-level defaults with file/env/kwarg option values
         # note: treat empty string values (e.g. from file/env) as undefined/None
+        # TODO: to avoid the `first_non_empty` hack, we need to parse config
+        # values downstream (immediately after reading from file or env var)
+        first_non_empty = lambda a, b: b if a == '' or a is None else a
         options = {}
         for k, v in self.defaults.items():
-            options[k] = kwargs.get(k) or v
+            options[k] = first_non_empty(kwargs.get(k), v)
 
         logger.debug("Client options with defaults: %r", options)
 
@@ -391,6 +437,7 @@ class Client(object):
         logger.debug("Parsed headers=%r", headers_dict)
 
         # Store connection/session parameters
+        # TODO: consolidate all options under Client.options or similar
         self.endpoint = endpoint
         self.token = token
         self.default_solver = solver_def
@@ -407,20 +454,28 @@ class Client(object):
         self.poll_backoff_min = parse_float(options['poll_backoff_min'])
         self.poll_backoff_max = parse_float(options['poll_backoff_max'])
 
+        self.http_retry_total = parse_int(options['http_retry_total'])
+        self.http_retry_connect = parse_int(options['http_retry_connect'])
+        self.http_retry_read = parse_int(options['http_retry_read'])
+        self.http_retry_redirect = parse_int(options['http_retry_redirect'])
+        self.http_retry_status = parse_int(options['http_retry_status'])
+        self.http_retry_backoff_factor = parse_float(options['http_retry_backoff_factor'])
+        self.http_retry_backoff_max = parse_float(options['http_retry_backoff_max'])
+
+        opts = (
+            'endpoint', 'token', 'default_solver',
+            'client_cert', 'request_timeout', 'polling_timeout',
+            'proxy', 'headers', 'permissive_ssl', 'connection_close',
+            'poll_backoff_min', 'poll_backoff_max',
+            'http_retry_total', 'http_retry_connect', 'http_retry_read',
+            'http_retry_redirect', 'http_retry_status',
+            'http_retry_backoff_factor', 'http_retry_backoff_max')
+        logger.debug(
+            "Client initialized with (%s)",
+            ", ".join("{}={!r}".format(o, getattr(self, o)) for o in opts))
+
         # Create session for main thread only
         self.session = self.create_session()
-
-        logger.debug(
-            "Client initialized with ("
-            "endpoint=%r, token=%r, default_solver=%r, proxy=%r, "
-            "permissive_ssl=%r, request_timeout=%r, polling_timeout=%r, "
-            "connection_close=%r, headers=%r, client_cert=%r, "
-            "poll_backoff_min=%r, poll_backoff_max=%r)",
-            self.endpoint, self.token, self.default_solver, self.proxy,
-            self.permissive_ssl, self.request_timeout, self.polling_timeout,
-            self.connection_close, self.headers, self.client_cert,
-            self.poll_backoff_min, self.poll_backoff_max
-        )
 
         # Build the problem submission queue, start its workers
         self._submission_queue = queue.Queue()
@@ -483,9 +538,31 @@ class Client(object):
         if not endpoint.endswith('/'):
             endpoint += '/'
 
+        # create http idempotent Retry config
+        def get_retry_conf():
+
+            # need a subclass to override the backoff_max
+            class Retry(urllib3.Retry):
+                BACKOFF_MAX = self.http_retry_backoff_max
+
+            return Retry(
+                total=self.http_retry_total,
+                connect=self.http_retry_connect,
+                read=self.http_retry_read,
+                redirect=self.http_retry_redirect,
+                status=self.http_retry_status,
+                backoff_factor=self.http_retry_backoff_factor,
+                raise_on_redirect=True,
+                raise_on_status=True,
+                respect_retry_after_header=True)
+
         session = BaseUrlSession(base_url=endpoint)
-        session.mount('http://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
-        session.mount('https://', TimeoutingHTTPAdapter(timeout=self.request_timeout))
+        session.mount('http://',
+            TimeoutingHTTPAdapter(timeout=self.request_timeout,
+                                  max_retries=get_retry_conf()))
+        session.mount('https://',
+            TimeoutingHTTPAdapter(timeout=self.request_timeout,
+                                  max_retries=get_retry_conf()))
 
         session.headers.update({'User-Agent': user_agent(__packagename__, __version__)})
         if self.headers:
@@ -603,18 +680,12 @@ class Client(object):
             url = 'solvers/remote/'
 
         try:
-            response = self.session.get(url)
-        except requests.exceptions.Timeout:
-            raise RequestTimeout
-
-        if response.status_code == 401:
-            raise SolverAuthenticationError
-
-        if name is not None and response.status_code == 404:
-            raise SolverNotFoundError("No solver with name={!r} available".format(name))
-
-        response.raise_for_status()
-        data = response.json()
+            data = Client._sapi_request(self.session.get, url)
+        except SAPIError as exc:
+            if name is not None and exc.error_code == 404:
+                raise SolverNotFoundError("No solver with name={!r} available".format(name))
+            else:
+                raise
 
         if name is not None:
             data = [data]
@@ -1161,37 +1232,23 @@ class Client(object):
                 # Submit the problems
                 logger.debug("Submitting %d problems", len(ready_problems))
                 try:
-                    body = '[' + ','.join(mess.body.result() for mess in ready_problems) + ']'
-                    try:
-                        response = session.post('problems/', body)
-                        localtime_of_response = epochnow()
-                    except requests.exceptions.Timeout:
-                        raise RequestTimeout
-
-                    if response.status_code == 401:
-                        raise SolverAuthenticationError()
-                    response.raise_for_status()
-
-                    message = response.json()
+                    body = '[' + ','.join(msg.body.result() for msg in ready_problems) + ']'
+                    logger.debug('Size of POST body = %d', len(body))
+                    message = Client._sapi_request(session.post, 'problems/', body)
                     logger.debug("Finished submitting %d problems", len(ready_problems))
-                except BaseException as exception:
-                    logger.debug("Submit failed for %d problems", len(ready_problems))
-                    if not isinstance(exception, SolverAuthenticationError):
-                        exception = IOError(exception)
 
-                    for mess in ready_problems:
-                        mess.future._set_exception(exception)
+                except Exception as exc:
+                    logger.debug("Submit failed for %d problems with %r",
+                                 len(ready_problems), exc)
+                    for msg in ready_problems:
+                        msg.future._set_exception(exc)
                         task_done()
                     continue
 
                 # Pass on the information
                 for submission, res in zip(ready_problems, message):
-                    submission.future._set_clock_diff(response, localtime_of_response)
                     self._handle_problem_status(res, submission.future)
                     task_done()
-
-                # this is equivalent to a yield to scheduler in other threading libraries
-                time.sleep(0)
 
         except BaseException as err:
             logger.exception(err)
@@ -1328,12 +1385,8 @@ class Client(object):
                 # Submit the problems, attach the ids as a json list in the
                 # body of the delete query.
                 try:
-                    body = [item[0] for item in item_list]
-
-                    try:
-                        session.delete('problems/', json=body)
-                    except requests.exceptions.Timeout:
-                        raise RequestTimeout
+                    ids = [item[0] for item in item_list]
+                    Client._sapi_request(session.delete, 'problems/', json=ids)
 
                 except Exception as exc:
                     for _, future in item_list:
@@ -1341,10 +1394,8 @@ class Client(object):
                             future._set_exception(exc)
 
                 # Mark all the ids as processed regardless of success or failure.
-                [self._cancel_queue.task_done() for _ in item_list]
-
-                # this is equivalent to a yield to scheduler in other threading libraries
-                time.sleep(0)
+                for _ in item_list:
+                    self._cancel_queue.task_done()
 
         except Exception as err:
             logger.exception(err)
@@ -1457,45 +1508,34 @@ class Client(object):
                     logger.trace("Executing poll API request")
 
                     try:
-                        response = session.get(query_string)
-                    except requests.exceptions.Timeout:
-                        raise RequestTimeout
+                        statuses = Client._sapi_request(session.get, query_string)
 
-                    if response.status_code == 401:
-                        raise SolverAuthenticationError()
-
-                    # assume 5xx errors are transient, and don't abort polling
-                    if 500 <= response.status_code < 600:
-                        logger.warning(
-                            "Received an internal server error response on "
-                            "problem status polling request (%s). Assuming "
-                            "error is transient, and resuming polling.",
-                            response.status_code)
-                        # add all futures in this frame back to the polling queue
-                        # XXX: logic split between `_handle_problem_status` and here
-                        for future in frame_futures.values():
-                            self._poll(future)
+                    except SAPIError as exc:
+                        # assume 5xx errors are transient, and don't abort polling
+                        if 500 <= exc.error_code < 600:
+                            logger.warning(
+                                "Received an internal server error response on "
+                                "problem status polling request (%s). Assuming "
+                                "error is transient, and resuming polling.",
+                                exc.error_code)
+                            # add all futures in this frame back to the polling queue
+                            # XXX: logic split between `_handle_problem_status` and here
+                            for future in frame_futures.values():
+                                self._poll(future)
+                        else:
+                            raise
 
                     else:
-                        # otherwise, fail
-                        response.raise_for_status()
-
-                        # or handle a successful request
-                        statuses = response.json()
+                        # handle a successful request
                         for status in statuses:
                             self._handle_problem_status(status, frame_futures[status['id']])
 
-                except BaseException as exception:
-                    if not isinstance(exception, SolverAuthenticationError):
-                        exception = IOError(exception)
-
+                except Exception as exc:
                     for id_ in frame_futures.keys():
-                        frame_futures[id_]._set_exception(exception)
+                        frame_futures[id_]._set_exception(exc)
 
                 for id_ in frame_futures.keys():
                     task_done()
-
-                time.sleep(0)
 
         except Exception as err:
             logger.exception(err)
@@ -1534,41 +1574,19 @@ class Client(object):
 
                 # Submit the query
                 query_string = 'problems/{}/'.format(future.id)
+
                 try:
-                    logger.trace("Executing answer load request")
+                    message = Client._sapi_request(session.get, query_string)
 
-                    try:
-                        response = session.get(query_string)
-                    except requests.exceptions.Timeout:
-                        raise RequestTimeout
-
-                    logger.trace(("Answer load response: "
-                                  "code={r.status_code!r}, "
-                                  "body={r.text!r}").format(r=response))
-
-                    if response.status_code == 401:
-                        raise SolverAuthenticationError()
-                    if response.status_code == 404:
-                        raise SolverError(response.text)
-                    response.raise_for_status()
-
-                    message = response.json()
-                except BaseException as exception:
-                    logger.trace("Answer load request failed with %r", exception)
-
-                    if not isinstance(exception, SolverError):
-                        exception = IOError(exception)
-
-                    future._set_exception(exception)
+                except Exception as exc:
+                    logger.debug("Answer load request failed with %r", exc)
+                    future._set_exception(exc)
                     self._load_queue.task_done()
                     continue
 
                 # Dispatch the results, mark the task complete
                 self._handle_problem_status(message, future)
                 self._load_queue.task_done()
-
-                # this is equivalent to a yield to scheduler in other threading libraries
-                time.sleep(0)
 
         except Exception as err:
             logger.error('Load result error: ' + str(err))
@@ -1600,29 +1618,75 @@ class Client(object):
             self._upload_problem_worker, problem=problem, problem_id=problem_id)
 
     @staticmethod
-    def _parse_multipart_upload_response(response):
-        """Parse the JSON response body, raising appropriate exceptions."""
+    def _sapi_request(meth, *args, **kwargs):
+        """Execute an HTTP request defined with the ``meth`` callable and
+        parse the response and interpret errors in compliance with SAPI REST
+        interface.
+
+        Note:
+            For internal use only.
+
+        Args:
+            meth (callable):
+                Callable object to be called with args and kwargs supplied, with
+                expected behavior consistent with one of ``requests.Session()``
+                request methods.
+
+            *args, **kwargs (list, dict):
+                Arguments to the ``meth`` callable.
+
+        Returns:
+            dict: JSON decoded body.
+
+        Raises:
+            A :class:`~dwave.cloud.exceptions.SAPIError` subclass, or
+            :class:`~dwave.cloud.exceptions.RequestTimeout`.
+        """
 
         caller = inspect.stack()[1].function
-        logger.trace("%s response: (code=%r, text=%r)",
+        verb = meth.__name__
+        logger.trace("[%s] request: session.%s(*%r, **%r)", caller, verb, args, kwargs)
+
+        # execute request
+        try:
+            response = meth(*args, **kwargs)
+        except Exception as exc:
+            if is_caused_by(exc, (requests.exceptions.Timeout,
+                                  urllib3.exceptions.TimeoutError)):
+                raise RequestTimeout
+            else:
+                raise
+
+        # parse response
+        logger.trace("[%s] response: (code=%r, body=%r)",
                      caller, response.status_code, response.text)
 
-        if response.status_code == 401:
-            raise SolverAuthenticationError()
+        # NOTE: the expected behavior is for SAPI to return JSON error on
+        # failure. However, that is currently not the case. We need to work
+        # around this until it's fixed.
 
-        try:
-            msg = response.json()
-        except:
-            response.raise_for_status()
-
-        if response.status_code != 200:
+        # no error -> body is json
+        # error -> body can be json or plain text error message
+        if response.ok:
             try:
-                error_msg = msg['error_msg']
-            except KeyError:
-                response.raise_for_status()
-            raise ProblemUploadError(error_msg)
+                return response.json()
+            except:
+                raise InvalidAPIResponseError("JSON response expected")
 
-        return msg
+        else:
+            if response.status_code == 401:
+                raise SolverAuthenticationError(error_code=401)
+
+            try:
+                msg = response.json()
+                error_msg = msg['error_msg']
+                error_code = msg['error_code']
+            except:
+                error_msg = response.text
+                error_code = response.status_code
+
+            # NOTE: for backwards compat only. Change to: SAPIError
+            raise SolverError(error_msg=error_msg, error_code=error_code)
 
     @staticmethod
     @retried(_UPLOAD_REQUEST_RETRIES, backoff=_UPLOAD_RETRIES_BACKOFF)
@@ -1633,14 +1697,7 @@ class Client(object):
 
         path = 'bqm/multipart'
         body = dict(size=size)
-
-        logger.trace("session.post(path=%r, json=%r)", path, body)
-        try:
-            response = session.post(path, json=body)
-        except requests.exceptions.Timeout:
-            raise RequestTimeout
-
-        msg = Client._parse_multipart_upload_response(response)
+        msg = Client._sapi_request(session.post, path, json=body)
 
         try:
             problem_id = msg['id']
@@ -1730,14 +1787,7 @@ class Client(object):
             'Content-Type': 'application/octet-stream',
         }
 
-        logger.trace("session.put(path=%r, data=%r, headers=%r)",
-                     path, part_stream, headers)
-        try:
-            response = session.put(path, data=part_stream, headers=headers)
-        except requests.exceptions.Timeout:
-            raise RequestTimeout
-
-        msg = Client._parse_multipart_upload_response(response)
+        msg = Client._sapi_request(session.put, path, data=part_stream, headers=headers)
 
         logger.debug("Uploaded part_id=%r of problem_id=%r", part_id, problem_id)
 
@@ -1750,13 +1800,7 @@ class Client(object):
 
         path = 'bqm/multipart/{problem_id}/status'.format(problem_id=problem_id)
 
-        logger.trace("session.get(path=%r)", path)
-        try:
-            response = session.get(path)
-        except requests.exceptions.Timeout:
-            raise RequestTimeout
-
-        msg = Client._parse_multipart_upload_response(response)
+        msg = Client._sapi_request(session.get, path)
 
         try:
             msg['status']
@@ -1786,14 +1830,7 @@ class Client(object):
         path = 'bqm/multipart/{problem_id}/combine'.format(problem_id=problem_id)
         body = dict(checksum=checksum)
 
-        logger.trace("session.post(path=%r, json=%r)", path, body)
-
-        try:
-            response = session.post(path, json=body)
-        except requests.exceptions.Timeout:
-            raise RequestTimeout
-
-        msg = Client._parse_multipart_upload_response(response)
+        msg = Client._sapi_request(session.post, path, json=body)
 
         logger.debug("Issued a combine command for problem_id=%r", problem_id)
 

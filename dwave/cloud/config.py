@@ -253,6 +253,20 @@ def parse_float(s, default=None):
     return float(s)
 
 
+def parse_int(s, default=None):
+    """Parse value as returned by ConfigParse as int.
+
+    NB: we need this instead of ``ConfigParser.getint`` when we're parsing
+    values downstream.
+    """
+
+    if s is None or s == '':
+        return default
+    if float(s) != int(s):
+        raise ValueError
+    return int(s)
+
+
 def parse_boolean(s, default=None):
     """Parse value as returned by ConfigParse as bool.
 

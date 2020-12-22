@@ -40,7 +40,8 @@ except ImportError:  # pragma: no cover
 
 __all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
            'default_text_input', 'click_info_switch', 'datetime_to_timestamp',
-           'datetime_to_timestamp', 'utcnow', 'epochnow', 'tictoc']
+           'datetime_to_timestamp', 'utcnow', 'epochnow', 'tictoc',
+           'hasinstance', 'exception_chain', 'is_caused_by']
 
 logger = logging.getLogger(__name__)
 
@@ -301,6 +302,74 @@ class BaseUrlSession(requests.Session):
     def create_url(self, url):
         """Create the URL based off this partial path."""
         return urljoin(self.base_url, url)
+
+
+def hasinstance(iterable, class_or_tuple):
+    """Extension of ``isinstance`` to iterables/sequences. Returns True iff the
+    sequence contains at least one object which is instance of ``class_or_tuple``.
+    """
+
+    return any(isinstance(e, class_or_tuple) for e in iterable)
+
+
+def exception_chain(exception):
+    """Traverse the chain of embedded exceptions, yielding one at the time.
+
+    Args:
+        exception (:class:`Exception`): Chained exception.
+
+    Yields:
+        :class:`Exception`: The next exception in the input exception's chain.
+
+    Examples:
+        def f():
+            try:
+                1/0
+            except ZeroDivisionError:
+                raise ValueError
+
+        try:
+            f()
+        except Exception as e:
+            assert(hasinstance(exception_chain(e), ZeroDivisionError))
+
+    See: PEP-3134.
+    """
+
+    while exception:
+        yield exception
+
+        # explicit exception chaining, i.e `raise .. from ..`
+        if exception.__cause__:
+            exception = exception.__cause__
+
+        # implicit exception chaining
+        elif exception.__context__:
+            exception = exception.__context__
+
+        else:
+            return
+
+
+def is_caused_by(exception, exception_types):
+    """Check if any of ``exception_types`` is causing the ``exception``.
+    Equivalently, check if any of ``exception_types`` is contained in the
+    exception chain rooted at ``exception``.
+
+    Args:
+        exception (:class:`Exception`):
+            Chained exception.
+
+        exception_types (:class:`Exception` or tuple of :class:`Exception`):
+            Exception type or a tuple of exception types to check for.
+
+    Returns:
+        bool:
+            True when ``exception`` is caused by any of the exceptions in
+            ``exception_types``.
+    """
+
+    return hasinstance(exception_chain(exception), exception_types)
 
 
 def user_agent(name=None, version=None):

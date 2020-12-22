@@ -26,7 +26,7 @@ from requests.exceptions import HTTPError
 
 from dwave.cloud.utils import tictoc
 from dwave.cloud.client import Client
-from dwave.cloud.exceptions import ProblemUploadError
+from dwave.cloud.exceptions import SAPIError, ProblemUploadError
 from dwave.cloud.upload import (
     Gettable, GettableFile, GettableMemory, FileView, ChunkedData)
 
@@ -419,10 +419,21 @@ def choose_reply(key, replies, statuses=None):
         response.status_code = next(statuses[key])
         response.text = replies[key]
         response.json.side_effect = lambda: json.loads(replies[key])
+
         def raise_for_status():
-            if not 200 <= response.status_code < 300:
+            if not 200 <= response.status_code < 400:
                 raise HTTPError(response.status_code)
         response.raise_for_status = raise_for_status
+
+        def ok():
+            try:
+                response.raise_for_status()
+            except HTTPError:
+                return False
+            return True
+        ok_property = mock.PropertyMock(side_effect=ok)
+        type(response).ok = ok_property
+
         return response
     else:
         raise NotImplementedError(key)
@@ -804,7 +815,7 @@ class TestMultipartUpload(unittest.TestCase):
 
         with Client(**config) as client:
             with client.create_session() as session:
-                with self.assertRaisesRegex(ProblemUploadError,
+                with self.assertRaisesRegex(SAPIError,
                                             'bigger than the maximum'):
                     client._initiate_multipart_upload(session, size)
 
