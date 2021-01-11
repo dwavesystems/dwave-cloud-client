@@ -117,6 +117,9 @@ class Future(object):
         #: The id the server will use to identify this problem, None until the id is actually known
         self.id = id_
 
+        #: Problem label, as (optionally) set on submission. None until parsed from a response.
+        self.label = None
+
         #: `datetime` the Future was created (immediately before enqueued in Client's submit queue)
         self.time_created = utcnow()
 
@@ -789,8 +792,8 @@ class Future(object):
         vartype_from_problem_type = {'ising': 'SPIN', 'qubo': 'BINARY'}
         vartype = vartype_from_problem_type[self.problem_type]
 
-        # include timing and id in info
-        info = dict(timing=self.timing, problem_id=self.id)
+        # include timing and id/label in info
+        info = dict(timing=self.timing, problem_id=self.id, problem_label=self.label)
 
         sampleset = dimod.SampleSet.from_samples(
             (samples, variables), vartype=vartype,
