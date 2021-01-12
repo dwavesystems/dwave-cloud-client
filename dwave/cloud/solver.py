@@ -389,16 +389,18 @@ class BaseUnstructuredSolver(BaseSolver):
                          "we need to upload it first.")
             problem_id = self.upload_problem(problem).result()
 
-        body = json.dumps({
+        body = {
             'solver': self.id,
             'data': encode_problem_as_ref(problem_id),
             'type': problem_type,
-            'params': params,
-            'label': label,
-        })
-        logger.trace("Sampling request encoded as: %s", body)
+            'params': params
+        }
+        if label is not None:
+            body['label'] = label
+        body_data = json.dumps(body)
+        logger.trace("Sampling request encoded as: %s", body_data)
 
-        return body
+        return body_data
 
     def sample_problem(self, problem, problem_type=None, label=None, **params):
         """Sample from the specified problem.
@@ -917,14 +919,16 @@ class StructuredSolver(BaseSolver):
         # transform some of the parameters in-place
         self._format_params(type_, combined_params)
 
-        body_data = json.dumps({
+        body_dict = {
             'solver': self.id,
             'data': encode_problem_as_qp(self, linear, quadratic, offset,
                                          undirected_biases=undirected_biases),
             'type': type_,
-            'params': combined_params,
-            'label': label,
-        })
+            'params': combined_params
+        }
+        if label is not None:
+            body_dict['label'] = label
+        body_data = json.dumps(body_dict)
         logger.trace("Encoded sample request: %s", body_data)
 
         body = Present(result=body_data)
