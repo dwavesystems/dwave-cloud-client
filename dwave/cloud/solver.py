@@ -276,7 +276,8 @@ class BaseUnstructuredSolver(BaseSolver):
                 Constant offset applied to the model.
 
             label (str, optional):
-                Problem label.
+                Problem label you can optionally tag submissions with for ease
+                of identification.
 
             **params:
                 Parameters for the sampling method, solver-specific.
@@ -310,7 +311,8 @@ class BaseUnstructuredSolver(BaseSolver):
                 Constant offset applied to the model.
 
             label (str, optional):
-                Problem label.
+                Problem label you can optionally tag submissions with for ease
+                of identification.
 
             **params:
                 Parameters for the sampling method, solver-specific.
@@ -416,7 +418,8 @@ class BaseUnstructuredSolver(BaseSolver):
                 If not specified, the first handled problem type is used.
 
             label (str, optional):
-                Problem label.
+                Problem label you can optionally tag submissions with for ease
+                of identification.
 
             **params:
                 Parameters for the sampling method, solver-specific.
@@ -486,7 +489,8 @@ class BQMSolver(BaseUnstructuredSolver):
                 (Problem ID returned by `.upload_bqm` method).
 
             label (str, optional):
-                Problem label.
+                Problem label you can optionally tag submissions with for ease
+                of identification.
 
             **params:
                 Parameters for the sampling method, solver-specific.
@@ -573,7 +577,8 @@ class DQMSolver(BaseUnstructuredSolver):
                 (Problem ID returned by `.upload_dqm` method).
 
             label (str, optional):
-                Problem label.
+                Problem label you can optionally tag submissions with for ease
+                of identification.
 
             **params:
                 Parameters for the sampling method, solver-specific.
@@ -752,7 +757,8 @@ class StructuredSolver(BaseSolver):
                 Constant offset applied to the model.
 
             label (str, optional):
-                Problem label.
+                Problem label you can optionally tag submissions with for ease
+                of identification.
 
             **params:
                 Parameters for the sampling method, solver-specific.
@@ -800,7 +806,8 @@ class StructuredSolver(BaseSolver):
                 Constant offset applied to the model.
 
             label (str, optional):
-                Problem label.
+                Problem label you can optionally tag submissions with for ease
+                of identification.
 
             **params:
                 Parameters for the sampling method, solver-specific.
@@ -842,7 +849,8 @@ class StructuredSolver(BaseSolver):
                 A binary quadratic model.
 
             label (str, optional):
-                Problem label.
+                Problem label you can optionally tag submissions with for ease
+                of identification.
 
             **params:
                 Parameters for the sampling method, solver-specific.
