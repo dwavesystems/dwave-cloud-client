@@ -1185,4 +1185,4 @@ class TestProblemLabel(unittest.TestCase):
                         info = future.sampleset.info    # ensure future is resolved
 
                         self.assertEqual(future.label, label)
-                        self.assertEqual(info['problem_label'], label)
+                        self.assertEqual(info.get('problem_label'), label)

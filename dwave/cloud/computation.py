@@ -793,7 +793,9 @@ class Future(object):
         vartype = vartype_from_problem_type[self.problem_type]
 
         # include timing and id/label in info
-        info = dict(timing=self.timing, problem_id=self.id, problem_label=self.label)
+        info = dict(timing=self.timing, problem_id=self.id)
+        if self.label is not None:
+            info.update(problem_label=self.label)
 
         sampleset = dimod.SampleSet.from_samples(
             (samples, variables), vartype=vartype,
