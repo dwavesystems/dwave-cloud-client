@@ -138,7 +138,7 @@ class TestEventDispatch(unittest.TestCase):
         before = memo['before_sample']
         args = dict(type_='ising', linear=lin, quadratic=quad,
                     offset=offset, params=params,
-                    undirected_biases=False)
+                    undirected_biases=False, label=None)
         self.assertEqual(before['obj'], self.solver)
         self.assertDictEqual(before['args'], args)
 

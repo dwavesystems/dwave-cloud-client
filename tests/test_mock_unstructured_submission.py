@@ -18,6 +18,7 @@ import io
 import json
 import unittest
 from unittest import mock
+from parameterized import parameterized
 
 import dimod
 import numpy
@@ -38,7 +39,7 @@ def unstructured_solver_data(problem_type='bqm'):
         "description": "A test unstructured solver"
     }
 
-def complete_reply(sampleset, problem_type='bqm'):
+def complete_reply(sampleset, problem_type='bqm', label=""):
     """Reply with the sampleset as a solution."""
 
     return json.dumps([{
@@ -51,7 +52,8 @@ def complete_reply(sampleset, problem_type='bqm'):
             "data": sampleset.to_serializable()
         },
         "type": problem_type,
-        "id": "problem-id"
+        "id": "problem-id",
+        "label": label
     }])
 
 def choose_reply(path, replies):
@@ -229,3 +231,71 @@ class TestUnstructuredSolver(unittest.TestCase):
                     for fut in futs:
                         with self.assertRaises(type(mock_upload_exc)):
                             fut.result()
+
+
+class TestProblemLabel(unittest.TestCase):
+
+    class PrimaryAssertionSatisfied(Exception):
+        """Raised by `on_submit_label_verifier` to signal correct label."""
+
+    def on_submit_label_verifier(self, expected_label):
+        """Factory for mock Client._submit() that will verify existence, and
+        optionally validate label value.
+        """
+
+        # replacement for Client._submit()
+        def _submit(client, body_data, computation):
+            body = json.loads(body_data.result())
+
+            if 'label' not in body:
+                if expected_label is None:
+                    raise TestProblemLabel.PrimaryAssertionSatisfied
+                else:
+                    raise AssertionError("label field missing")
+
+            label = body['label']
+            if label != expected_label:
+                raise AssertionError(
+                    "unexpected label value: {!r} != {!r}".format(label, expected_label))
+
+            raise TestProblemLabel.PrimaryAssertionSatisfied
+
+        return _submit
+
+    @parameterized.expand([
+        ("undefined", None),
+        ("empty", ""),
+        ("string", "text label")
+    ])
+    @mock.patch.object(Client, 'create_session', lambda client: mock.Mock())
+    def test_label_is_sent(self, name, label):
+        """Problem label is set on problem submit."""
+
+        bqm = dimod.BQM.from_ising({}, {'ab': 1})
+
+        # use a global mocked session, so we can modify it on-fly
+        session = mock.Mock()
+
+        # upload is now part of submit, so we need to mock it
+        mock_problem_id = 'mock-problem-id'
+        def mock_upload(self, bqm):
+            return Present(result=mock_problem_id)
+
+        # construct a functional solver by mocking client and api response data
+        with mock.patch.multiple(Client, create_session=lambda self: session,
+                                 upload_problem_encoded=mock_upload):
+            with Client('endpoint', 'token') as client:
+                solver = BQMSolver(client, unstructured_solver_data())
+
+                problems = [("sample_ising", (bqm.linear, bqm.quadratic)),
+                            ("sample_qubo", (bqm.quadratic,)),
+                            ("sample_bqm", (bqm,))]
+
+                for method_name, problem_args in problems:
+                    with self.subTest(method_name=method_name):
+                        sample = getattr(solver, method_name)
+
+                        with mock.patch.object(Client, '_submit', self.on_submit_label_verifier(label)):
+
+                            with self.assertRaises(self.PrimaryAssertionSatisfied):
+                                sample(*problem_args, label=label).result()

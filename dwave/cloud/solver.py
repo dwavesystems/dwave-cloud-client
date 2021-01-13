@@ -145,7 +145,7 @@ class BaseSolver(object):
             id_: Identification of the query.
 
         Returns:
-            :obj: `Future`
+            :class:`~dwave.cloud.computation.Future`
         """
         future = Future(self, id_, self.return_matrix)
         self.client._poll(future)
@@ -257,7 +257,7 @@ class BaseUnstructuredSolver(BaseSolver):
         Events are not yet dispatched from unstructured solvers.
     """
 
-    def sample_ising(self, linear, quadratic, offset=0, **params):
+    def sample_ising(self, linear, quadratic, offset=0, label=None, **params):
         """Sample from the specified :term:`Ising` model.
 
         Args:
@@ -275,11 +275,15 @@ class BaseUnstructuredSolver(BaseSolver):
             offset (optional, default=0):
                 Constant offset applied to the model.
 
+            label (str, optional):
+                Problem label you can optionally tag submissions with for ease
+                of identification.
+
             **params:
                 Parameters for the sampling method, solver-specific.
 
         Returns:
-            :class:`Future`
+            :class:`~dwave.cloud.computation.Future`
 
         Note:
             To use this method, dimod package has to be installed.
@@ -291,9 +295,9 @@ class BaseUnstructuredSolver(BaseSolver):
                                "Re-install the library with 'bqm'/'dqm' support.")
 
         bqm = dimod.BinaryQuadraticModel.from_ising(linear, quadratic, offset)
-        return self.sample_bqm(bqm, **params)
+        return self.sample_bqm(bqm, label=label, **params)
 
-    def sample_qubo(self, qubo, offset=0, **params):
+    def sample_qubo(self, qubo, offset=0, label=None, **params):
         """Sample from the specified :term:`QUBO`.
 
         Args:
@@ -306,11 +310,15 @@ class BaseUnstructuredSolver(BaseSolver):
             offset (optional, default=0):
                 Constant offset applied to the model.
 
+            label (str, optional):
+                Problem label you can optionally tag submissions with for ease
+                of identification.
+
             **params:
                 Parameters for the sampling method, solver-specific.
 
         Returns:
-            :class:`Future`
+            :class:`~dwave.cloud.computation.Future`
 
         Note:
             To use this method, dimod package has to be installed.
@@ -322,7 +330,7 @@ class BaseUnstructuredSolver(BaseSolver):
                                "Re-install the library with 'bqm'/'dqm' support.")
 
         bqm = dimod.BinaryQuadraticModel.from_qubo(qubo, offset)
-        return self.sample_bqm(bqm, **params)
+        return self.sample_bqm(bqm, label=label, **params)
 
     def _encode_problem_for_upload(self, problem):
         """Encode problem for upload to solver.
@@ -353,7 +361,8 @@ class BaseUnstructuredSolver(BaseSolver):
         data = self._encode_problem_for_upload(problem)
         return self.client.upload_problem_encoded(data)
 
-    def _encode_problem_for_submission(self, problem, problem_type, params):
+    def _encode_problem_for_submission(self, problem, problem_type, params,
+                                       label=None):
         """Encode `problem` for submitting in `ref` format. Upload the
         problem if it's not already uploaded.
 
@@ -367,6 +376,9 @@ class BaseUnstructuredSolver(BaseSolver):
             params (dict):
                 Parameters for the sampling method, solver-specific.
 
+            label (str, optional):
+                Problem label.
+
         Returns:
             str:
                 JSON-encoded problem submit body
@@ -379,17 +391,20 @@ class BaseUnstructuredSolver(BaseSolver):
                          "we need to upload it first.")
             problem_id = self.upload_problem(problem).result()
 
-        body = json.dumps({
+        body = {
             'solver': self.id,
             'data': encode_problem_as_ref(problem_id),
             'type': problem_type,
             'params': params
-        })
-        logger.trace("Sampling request encoded as: %s", body)
+        }
+        if label is not None:
+            body['label'] = label
+        body_data = json.dumps(body)
+        logger.trace("Sampling request encoded as: %s", body_data)
 
-        return body
+        return body_data
 
-    def sample_problem(self, problem, problem_type=None, **params):
+    def sample_problem(self, problem, problem_type=None, label=None, **params):
         """Sample from the specified problem.
 
         Args:
@@ -401,6 +416,10 @@ class BaseUnstructuredSolver(BaseSolver):
             problem_type (str, optional):
                 Problem type, one of the handled problem types by the solver.
                 If not specified, the first handled problem type is used.
+
+            label (str, optional):
+                Problem label you can optionally tag submissions with for ease
+                of identification.
 
             **params:
                 Parameters for the sampling method, solver-specific.
@@ -416,7 +435,8 @@ class BaseUnstructuredSolver(BaseSolver):
         # encode the request (body as future)
         body = self.client._encode_problem_executor.submit(
             self._encode_problem_for_submission,
-            problem=problem, problem_type=problem_type, params=params)
+            problem=problem, problem_type=problem_type, params=params,
+            label=label)
 
         # computation future holds a reference to the remote job
         computation = Future(
@@ -460,13 +480,17 @@ class BQMSolver(BaseUnstructuredSolver):
 
         return data
 
-    def sample_bqm(self, bqm, **params):
+    def sample_bqm(self, bqm, label=None, **params):
         """Sample from the specified :term:`BQM`.
 
         Args:
             bqm (:class:`~dimod.BinaryQuadraticModel`/str):
                 A binary quadratic model, or a reference to one
                 (Problem ID returned by `.upload_bqm` method).
+
+            label (str, optional):
+                Problem label you can optionally tag submissions with for ease
+                of identification.
 
             **params:
                 Parameters for the sampling method, solver-specific.
@@ -477,7 +501,7 @@ class BQMSolver(BaseUnstructuredSolver):
         Note:
             To use this method, dimod package has to be installed.
         """
-        return self.sample_problem(bqm, **params)
+        return self.sample_problem(bqm, label=label, **params)
 
     def upload_bqm(self, bqm):
         """Upload the specified :term:`BQM` to SAPI, returning a Problem ID
@@ -535,22 +559,26 @@ class DQMSolver(BaseUnstructuredSolver):
         logger.debug("Problem encoded for upload: %r", data)
         return data
 
-    def sample_bqm(self, bqm, **params):
+    def sample_bqm(self, bqm, label=None, **params):
         from dwave.cloud.utils import bqm_to_dqm
 
         # to sample BQM problems, we need to convert them to DQM
         dqm = bqm_to_dqm(bqm)
 
         # TODO: convert sampleset back
-        return self.sample_dqm(dqm, **params)
+        return self.sample_dqm(dqm, label=label, **params)
 
-    def sample_dqm(self, dqm, **params):
+    def sample_dqm(self, dqm, label=None, **params):
         """Sample from the specified :term:`DQM`.
 
         Args:
             dqm (:class:`~dimod.DiscreteQuadraticModel`/str):
                 A discrete quadratic model, or a reference to one
                 (Problem ID returned by `.upload_dqm` method).
+
+            label (str, optional):
+                Problem label you can optionally tag submissions with for ease
+                of identification.
 
             **params:
                 Parameters for the sampling method, solver-specific.
@@ -561,7 +589,7 @@ class DQMSolver(BaseUnstructuredSolver):
         Note:
             To use this method, dimod package has to be installed.
         """
-        return self.sample_problem(dqm, **params)
+        return self.sample_problem(dqm, label=label, **params)
 
     def upload_dqm(self, dqm):
         """Upload the specified :term:`DQM` to SAPI, returning a Problem ID
@@ -710,7 +738,7 @@ class StructuredSolver(BaseSolver):
 
     # Sampling methods
 
-    def sample_ising(self, linear, quadratic, offset=0, **params):
+    def sample_ising(self, linear, quadratic, offset=0, label=None, **params):
         """Sample from the specified :term:`Ising` model.
 
         Args:
@@ -725,14 +753,18 @@ class StructuredSolver(BaseSolver):
                 that are 2-tuples of variables and values are quadratic biases
                 associated with the pair of variables (the interaction).
 
-            offset (optional, default=0):
+            offset (float, optional, default=0):
                 Constant offset applied to the model.
+
+            label (str, optional):
+                Problem label you can optionally tag submissions with for ease
+                of identification.
 
             **params:
                 Parameters for the sampling method, solver-specific.
 
         Returns:
-            :class:`Future`
+            :class:`~dwave.cloud.computation.Future`
 
         Examples:
             This example creates a client using the local system's default D-Wave Cloud Client
@@ -758,9 +790,9 @@ class StructuredSolver(BaseSolver):
         """
         # Our linear and quadratic objective terms are already separated in an
         # ising model so we can just directly call `_sample`.
-        return self._sample('ising', linear, quadratic, offset, params)
+        return self._sample('ising', linear, quadratic, offset, params, label=label)
 
-    def sample_qubo(self, qubo, offset=0, **params):
+    def sample_qubo(self, qubo, offset=0, label=None, **params):
         """Sample from the specified :term:`QUBO`.
 
         Args:
@@ -773,11 +805,15 @@ class StructuredSolver(BaseSolver):
             offset (optional, default=0):
                 Constant offset applied to the model.
 
+            label (str, optional):
+                Problem label you can optionally tag submissions with for ease
+                of identification.
+
             **params:
                 Parameters for the sampling method, solver-specific.
 
         Returns:
-            :class:`Future`
+            :class:`~dwave.cloud.computation.Future`
 
         Examples:
             This example creates a client using the local system's default D-Wave Cloud Client
@@ -803,20 +839,24 @@ class StructuredSolver(BaseSolver):
 
         """
         linear, quadratic = reformat_qubo_as_ising(qubo)
-        return self._sample('qubo', linear, quadratic, offset, params)
+        return self._sample('qubo', linear, quadratic, offset, params, label=label)
 
-    def sample_bqm(self, bqm, **params):
+    def sample_bqm(self, bqm, label=None, **params):
         """Sample from the specified :term:`BQM`.
 
         Args:
             bqm (:class:`~dimod.BinaryQuadraticModel`):
                 A binary quadratic model.
 
+            label (str, optional):
+                Problem label you can optionally tag submissions with for ease
+                of identification.
+
             **params:
                 Parameters for the sampling method, solver-specific.
 
         Returns:
-            :class:`Future`
+            :class:`~dwave.cloud.computation.Future`
 
         Note:
             To use this method, dimod package has to be installed.
@@ -828,16 +868,17 @@ class StructuredSolver(BaseSolver):
                                "Re-install the library with 'bqm' support.")
 
         if bqm.vartype is dimod.SPIN:
-            return self._sample('ising', bqm.linear, bqm.quadratic, bqm.offset,
-                                params, undirected_biases=True)
+            problem_type = 'ising'
         elif bqm.vartype is dimod.BINARY:
-            return self._sample('qubo', bqm.linear, bqm.quadratic, bqm.offset,
-                                params, undirected_biases=True)
+            problem_type = 'qubo'
         else:
             raise TypeError("unknown/unsupported vartype")
 
+        return self._sample(problem_type, bqm.linear, bqm.quadratic, bqm.offset,
+                            params, label=label, undirected_biases=True)
+
     def _sample(self, type_, linear, quadratic, offset, params,
-                undirected_biases=False):
+                label=None, undirected_biases=False):
         """Internal method for `sample_ising`, `sample_qubo` and `sample_bqm`.
 
         Args:
@@ -853,17 +894,20 @@ class StructuredSolver(BaseSolver):
             params (dict):
                 Parameters for the sampling method, solver-specific.
 
+            label (str, optional):
+                Problem label.
+
             undirected_biases (boolean, default=False):
                 Are (quadratic) biases specified on undirected edges? For
                 triangular or symmetric matrix of quadratic biases set it to
                 ``True``.
 
         Returns:
-            :class:`Future`
+            :class:`~dwave.cloud.computation.Future`
         """
 
         args = dict(type_=type_, linear=linear, quadratic=quadratic,
-                    offset=offset, params=params,
+                    offset=offset, params=params, label=label,
                     undirected_biases=undirected_biases)
         dispatch_event('before_sample', obj=self, args=args)
 
@@ -883,13 +927,16 @@ class StructuredSolver(BaseSolver):
         # transform some of the parameters in-place
         self._format_params(type_, combined_params)
 
-        body_data = json.dumps({
+        body_dict = {
             'solver': self.id,
             'data': encode_problem_as_qp(self, linear, quadratic, offset,
                                          undirected_biases=undirected_biases),
             'type': type_,
             'params': combined_params
-        })
+        }
+        if label is not None:
+            body_dict['label'] = label
+        body_data = json.dumps(body_dict)
         logger.trace("Encoded sample request: %s", body_data)
 
         body = Present(result=body_data)

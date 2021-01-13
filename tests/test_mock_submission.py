@@ -29,6 +29,7 @@ from dateutil.parser import parse as parse_datetime
 from requests.structures import CaseInsensitiveDict
 from requests.exceptions import HTTPError
 from concurrent.futures import TimeoutError
+from parameterized import parameterized
 
 try:
     import dimod
@@ -68,7 +69,7 @@ def solver_data(id_, incomplete=False):
     return obj
 
 
-def complete_reply(id_, solver_name, answer=None, msg=None):
+def complete_reply(id_, solver_name, answer=None, msg=None, label=""):
     """Reply with solutions for the test problem."""
     response = {
         "status": "COMPLETED",
@@ -85,7 +86,8 @@ def complete_reply(id_, solver_name, answer=None, msg=None):
             "timing": {}
         },
         "type": "ising",
-        "id": id_
+        "id": id_,
+        "label": label
     }
 
     # optional answer fields override
@@ -99,7 +101,7 @@ def complete_reply(id_, solver_name, answer=None, msg=None):
     return json.dumps(response)
 
 
-def complete_no_answer_reply(id_, solver_name):
+def complete_no_answer_reply(id_, solver_name, label=""):
     """A reply saying a problem is finished without providing the results."""
     return json.dumps({
         "status": "COMPLETED",
@@ -107,11 +109,12 @@ def complete_no_answer_reply(id_, solver_name):
         "solver": solver_name,
         "submitted_on": "2012-12-05T19:06:57+00:00",
         "type": "ising",
-        "id": id_
+        "id": id_,
+        "label": label
     })
 
 
-def error_reply(id_, solver_name, error):
+def error_reply(id_, solver_name, error, label=""):
     """A reply saying an error has occurred."""
     return json.dumps({
         "status": "FAILED",
@@ -120,6 +123,7 @@ def error_reply(id_, solver_name, error):
         "submitted_on": "2013-01-18T10:25:59.941674",
         "type": "ising",
         "id": id_,
+        "label": label,
         "error_message": error
     })
 
@@ -132,7 +136,7 @@ def immediate_error_reply(code, msg):
     })
 
 
-def cancel_reply(id_, solver_name):
+def cancel_reply(id_, solver_name, label=""):
     """A reply saying a problem was canceled."""
     return json.dumps({
         "status": "CANCELLED",
@@ -140,7 +144,8 @@ def cancel_reply(id_, solver_name):
         "solver": solver_name,
         "submitted_on": "2013-01-18T10:25:59.941674",
         "type": "ising",
-        "id": id_
+        "id": id_,
+        "label": label
     })
 
 
@@ -149,7 +154,7 @@ def datetime_in_future(seconds=0):
     return now + timedelta(seconds=seconds)
 
 
-def continue_reply(id_, solver_name, now=None, eta_min=None, eta_max=None):
+def continue_reply(id_, solver_name, now=None, eta_min=None, eta_max=None, label=""):
     """A reply saying a problem is still in the queue."""
 
     if not now:
@@ -161,7 +166,8 @@ def continue_reply(id_, solver_name, now=None, eta_min=None, eta_max=None):
         "solver": solver_name,
         "submitted_on": now.isoformat(),
         "type": "ising",
-        "id": id_
+        "id": id_,
+        "label": label
     }
     if eta_min:
         resp.update({
@@ -1081,3 +1087,102 @@ class TestComputationDeprecations(_QueryTest):
                 # .occurrences is deprecated in 0.8.0, scheduled for removal in 0.10.0+
                 with self.assertWarns(DeprecationWarning):
                     results.occurrences
+
+
+class TestProblemLabel(unittest.TestCase):
+
+    class PrimaryAssertionSatisfied(Exception):
+        """Raised by `on_submit_label_verifier` to signal correct label."""
+
+    def on_submit_label_verifier(self, expected_label):
+        """Factory for mock Client._submit() that will verify existence, and
+        optionally validate label value.
+        """
+
+        # replacement for Client._submit()
+        def _submit(client, body_data, computation):
+            body = json.loads(body_data.result())
+
+            if 'label' not in body:
+                if expected_label is None:
+                    raise TestProblemLabel.PrimaryAssertionSatisfied
+                else:
+                    raise AssertionError("label field missing")
+
+            label = body['label']
+            if label != expected_label:
+                raise AssertionError(
+                    "unexpected label value: {!r} != {!r}".format(label, expected_label))
+
+            raise TestProblemLabel.PrimaryAssertionSatisfied
+
+        return _submit
+
+    def generate_sample_problems(self, solver):
+        linear, quadratic = test_problem(solver)
+
+        # test sample_{ising,qubo,bqm}
+        problems = [("sample_ising", (linear, quadratic)),
+                    ("sample_qubo", (quadratic,))]
+        if dimod:
+            bqm = dimod.BQM.from_ising(linear, quadratic)
+            problems.append(("sample_bqm", (bqm,)))
+
+        return problems
+
+    @parameterized.expand([
+        ("undefined", None),
+        ("empty", ""),
+        ("string", "text label")
+    ])
+    @mock.patch.object(Client, 'create_session', lambda client: mock.Mock())
+    def test_label_is_sent(self, name, label):
+        """Problem label is set on problem submit."""
+
+        with Client('endpoint', 'token') as client:
+            solver = Solver(client, solver_data('solver'))
+            problems = self.generate_sample_problems(solver)
+
+            for method_name, problem_args in problems:
+                with self.subTest(method_name=method_name):
+                    sample = getattr(solver, method_name)
+
+                    with mock.patch.object(Client, '_submit', self.on_submit_label_verifier(label)):
+
+                        with self.assertRaises(self.PrimaryAssertionSatisfied):
+                            sample(*problem_args, label=label).result()
+
+    @parameterized.expand([
+        ("undefined", None),
+        ("empty", ""),
+        ("string", "text label")
+    ])
+    def test_label_is_received(self, name, label):
+        """Problem label is set from response in result/sampleset."""
+
+        def make_session_generator(label):
+            def create_mock_session(client):
+                session = mock.Mock()
+                session.post = lambda a, _: choose_reply(a, {
+                    'problems/': '[%s]' % complete_no_answer_reply(
+                        '123', 'abc123', label=None)})
+                session.get = lambda a: choose_reply(a, {
+                    'problems/123/': complete_reply(
+                        '123', 'abc123', label=label)})
+                return session
+            return create_mock_session
+
+        with mock.patch.object(Client, 'create_session', make_session_generator(label)):
+            with Client('endpoint', 'token') as client:
+                solver = Solver(client, solver_data('abc123'))
+                problems = self.generate_sample_problems(solver)
+
+                for method_name, problem_args in problems:
+                    with self.subTest(method_name=method_name):
+                        sample = getattr(solver, method_name)
+
+                        future = sample(*problem_args, label=label)
+                        info = future.sampleset.info    # ensure future is resolved
+
+                        self.assertEqual(future.label, label)
+                        self.assertEqual(info.get('problem_label'), label)

@@ -113,6 +113,11 @@ class _QueryTest(unittest.TestCase):
             self.assertAlmostEqual(
                 energy, evaluate_ising(linear, quad, state, offset=offset))
 
+        # label is optional
+        label = kwargs.get('label')
+        if label is not None:
+            self.assertEqual(results.label, label)
+
         return results
 
 
@@ -204,6 +209,14 @@ class Submission(_QueryTest):
                 quad = {key: value for key, value in quad.items() if index not in key}
 
             self._submit_and_check(solver, linear, quad)
+
+    def test_problem_label(self):
+        """Problem label is set."""
+
+        with Client(**config) as client:
+            solver = client.get_solver()
+            linear, quad = generate_random_ising_problem(solver)
+            self._submit_and_check(solver, linear, quad, label="test")
 
     @unittest.skipUnless(dimod, "dimod required for 'Solver.sample_bqm'")
     def test_submit_bqm_ising_problem(self):
