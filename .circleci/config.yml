@@ -1,0 +1,235 @@
+version: 2
+
+jobs:
+
+  #
+  # linux
+  #
+
+  test-3.9: &test-linux-template
+    docker:
+      - image: circleci/python:3.9
+
+    steps:
+      - checkout
+
+      - restore_cache: &restore-cache-env
+          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ checksum "docs/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
+
+      - run: &create-virtualenv
+          name: Create virtual environment
+          command: |
+            python -m venv env
+
+      - run: &install-requirements
+          name: Install requirements
+          command: |
+            . env/bin/activate
+            pip install -r requirements.txt -r tests/requirements.txt -r docs/requirements.txt
+            pip install wheel twine
+
+      - save_cache: &save-cache-env
+          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ checksum "docs/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
+          paths:
+            - env
+
+      - run: &build-package
+          name: Build package
+          command: env/bin/python setup.py sdist bdist_wheel
+
+      - run: &install-package
+          name: Install requirements
+          command: env/bin/pip install .
+
+      - run: &run-python-tests
+          name: Run Python tests
+          command: env/bin/coverage run -m unittest discover
+
+      - run: &upload-python-code-coverage
+          name: Upload code coverage
+          command: env/bin/coveralls
+
+  test-3.8:
+    <<: *test-linux-template
+    docker:
+      - image: circleci/python:3.8
+
+  test-3.7:
+    <<: *test-linux-template
+    docker:
+      - image: circleci/python:3.7
+
+  test-3.6:
+    <<: *test-linux-template
+    docker:
+      - image: circleci/python:3.6
+
+  test-3.5:
+    <<: *test-linux-template
+    docker:
+      - image: circleci/python:3.5
+
+  #
+  # macos
+  #
+
+  test-osx-3.9: &test-osx-template
+    macos:
+      xcode: "12.1.0"
+
+    environment:
+      PYTHON: 3.9.0
+
+    steps:
+      - checkout
+
+      # install $PYTHON and cache it
+      - run: &brew-install-pyenv
+          name: Install pyenv
+          command: HOMEBREW_NO_AUTO_UPDATE=1 brew install pyenv
+
+      - restore_cache: &restore-cache-pyenv
+          keys:
+            - v1-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-12.1.0
+
+      - run: &pyenv-install-python
+          name: Install python
+          command: pyenv install $PYTHON -s
+
+      - run: &pyenv-set-system-python
+          name: Set system python
+          command: |
+            pyenv global $PYTHON
+            echo 'eval "$(pyenv init -)"' >> ~/.bash_profile
+
+      - save_cache: &save-cache-pyenv
+          key: v1-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-12.1.0
+          paths:
+            - ~/.pyenv
+
+      # install dependencies and cache them
+      - restore_cache: *restore-cache-env
+
+      - run: *create-virtualenv
+
+      - run: *install-requirements
+
+      - save_cache: *save-cache-env
+
+      - run: *install-package
+
+      - run: *run-python-tests
+
+  test-osx-3.8:
+    <<: *test-osx-template
+    environment:
+      PYTHON: 3.8.1
+
+  test-osx-3.7:
+    <<: *test-osx-template
+    environment:
+      PYTHON: 3.7.4
+
+  test-osx-3.6:
+    <<: *test-osx-template
+    environment:
+      PYTHON: 3.6.5
+
+  test-osx-3.5:
+    <<: *test-osx-template
+    environment:
+      PYTHON: 3.5.5
+
+  #
+  # docs
+  #
+
+  test-docs:
+    docker:
+      - image: circleci/python:3.7
+
+    steps:
+      - checkout
+
+      - restore_cache: *restore-cache-env
+
+      - run: *create-virtualenv
+
+      - run: *install-requirements
+
+      - save_cache: *save-cache-env
+
+      - run: *install-package
+
+      - run: &build-docs
+          name: Build docs
+          command: |
+            . env/bin/activate
+            make -C docs/ html
+
+      - store_artifacts: &save-docs
+          path: ./docs/build/html
+
+      - run: &run-doctest
+          name: Test docs
+          command: |
+            . env/bin/activate
+            make -C docs/ doctest
+
+  #
+  # deploy
+  #
+
+  pypi-deploy:
+    <<: *test-linux-template
+    steps:
+      - checkout
+
+      - restore_cache: *restore-cache-env
+
+      - run: *create-virtualenv
+
+      - run: *install-requirements
+
+      - save_cache: *save-cache-env
+
+      - run: *build-package
+
+      - store_artifacts:
+          path: ./dist
+
+      - run:
+          name: Upload package to PyPI
+          command: env/bin/twine upload -u "$PYPI_USERNAME" -p "$PYPI_PASSWORD" --skip-existing ./dist/*
+
+workflows:
+  version: 2
+  test:
+    jobs:
+      - test-3.9
+      - test-3.8
+      - test-3.7
+      - test-3.6
+      - test-3.5
+      - test-osx-3.9
+      - test-osx-3.8
+      - test-osx-3.7
+      - test-osx-3.6
+      - test-osx-3.5
+
+  deploy:
+    jobs:
+      - test-3.8:
+          filters:
+            tags:
+              only: /^[0-9]+(\.[0-9]+)*(\.dev([0-9]+)?)?$/
+            branches:
+              ignore: /.*/
+      - pypi-deploy:
+          requires:
+            - test-3.8
+          filters:
+            tags:
+              only: /^[0-9]+(\.[0-9]+)*(\.dev([0-9]+)?)?$/
+            branches:
+              ignore: /.*/
