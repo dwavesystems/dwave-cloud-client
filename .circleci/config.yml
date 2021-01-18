@@ -1,20 +1,19 @@
-version: 2
+version: 2.1
 
 jobs:
+  test-linux:
+    parameters:
+      python-version:
+        type: string
 
-  #
-  # linux
-  #
-
-  test-3.9: &test-linux-template
     docker:
-      - image: circleci/python:3.9
+      - image: circleci/python:<< parameters.python-version >>
 
     steps:
       - checkout
 
       - restore_cache: &restore-cache-env
-          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ checksum "docs/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
+          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
 
       - run: &create-virtualenv
           name: Create virtual environment
@@ -25,11 +24,11 @@ jobs:
           name: Install requirements
           command: |
             . env/bin/activate
-            pip install -r requirements.txt -r tests/requirements.txt -r docs/requirements.txt
+            pip install -r requirements.txt -r tests/requirements.txt
             pip install wheel twine
 
       - save_cache: &save-cache-env
-          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ checksum "docs/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
+          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
           paths:
             - env
 
@@ -38,7 +37,7 @@ jobs:
           command: env/bin/python setup.py sdist bdist_wheel
 
       - run: &install-package
-          name: Install requirements
+          name: Install package
           command: env/bin/pip install .
 
       - run: &run-python-tests
@@ -49,61 +48,38 @@ jobs:
           name: Upload code coverage
           command: env/bin/coveralls
 
-  test-3.8:
-    <<: *test-linux-template
-    docker:
-      - image: circleci/python:3.8
+  test-macos:
+    parameters:
+      python-version:
+        type: string
 
-  test-3.7:
-    <<: *test-linux-template
-    docker:
-      - image: circleci/python:3.7
-
-  test-3.6:
-    <<: *test-linux-template
-    docker:
-      - image: circleci/python:3.6
-
-  test-3.5:
-    <<: *test-linux-template
-    docker:
-      - image: circleci/python:3.5
-
-  #
-  # macos
-  #
-
-  test-osx-3.9: &test-osx-template
     macos:
-      xcode: "12.1.0"
-
-    environment:
-      PYTHON: 3.9.0
+      xcode: "12.3.0"
 
     steps:
       - checkout
 
-      # install $PYTHON and cache it
+      # install `python-version` and cache it
       - run: &brew-install-pyenv
           name: Install pyenv
           command: HOMEBREW_NO_AUTO_UPDATE=1 brew install pyenv
 
       - restore_cache: &restore-cache-pyenv
           keys:
-            - v1-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-12.1.0
+            - v1-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-12.3.0
 
       - run: &pyenv-install-python
           name: Install python
-          command: pyenv install $PYTHON -s
+          command: pyenv install << parameters.python-version >> -s
 
       - run: &pyenv-set-system-python
           name: Set system python
           command: |
-            pyenv global $PYTHON
+            pyenv global << parameters.python-version >>
             echo 'eval "$(pyenv init -)"' >> ~/.bash_profile
 
       - save_cache: &save-cache-pyenv
-          key: v1-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-12.1.0
+          key: v1-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-12.3.0
           paths:
             - ~/.pyenv
 
@@ -120,30 +96,6 @@ jobs:
 
       - run: *run-python-tests
 
-  test-osx-3.8:
-    <<: *test-osx-template
-    environment:
-      PYTHON: 3.8.1
-
-  test-osx-3.7:
-    <<: *test-osx-template
-    environment:
-      PYTHON: 3.7.4
-
-  test-osx-3.6:
-    <<: *test-osx-template
-    environment:
-      PYTHON: 3.6.5
-
-  test-osx-3.5:
-    <<: *test-osx-template
-    environment:
-      PYTHON: 3.5.5
-
-  #
-  # docs
-  #
-
   test-docs:
     docker:
       - image: circleci/python:3.7
@@ -151,37 +103,43 @@ jobs:
     steps:
       - checkout
 
-      - restore_cache: *restore-cache-env
+      - restore_cache:
+          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ checksum "docs/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
 
       - run: *create-virtualenv
 
       - run: *install-requirements
 
-      - save_cache: *save-cache-env
+      - run:
+          name: Install docs requirements
+          command: env/bin/pip install -r docs/requirements.txt
+
+      - save_cache:
+          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ checksum "docs/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
+          paths:
+            - env
 
       - run: *install-package
 
-      - run: &build-docs
+      - run:
           name: Build docs
           command: |
             . env/bin/activate
             make -C docs/ html
 
-      - store_artifacts: &save-docs
+      - store_artifacts:
           path: ./docs/build/html
 
-      - run: &run-doctest
+      - run:
           name: Test docs
           command: |
             . env/bin/activate
             make -C docs/ doctest
 
-  #
-  # deploy
-  #
-
   pypi-deploy:
-    <<: *test-linux-template
+    docker:
+      - image: circleci/python:3.7
+
     steps:
       - checkout
 
@@ -202,32 +160,25 @@ jobs:
           name: Upload package to PyPI
           command: env/bin/twine upload -u "$PYPI_USERNAME" -p "$PYPI_PASSWORD" --skip-existing ./dist/*
 
+
 workflows:
-  version: 2
   test:
     jobs:
-      - test-3.9
-      - test-3.8
-      - test-3.7
-      - test-3.6
-      - test-3.5
-      - test-osx-3.9
-      - test-osx-3.8
-      - test-osx-3.7
-      - test-osx-3.6
-      - test-osx-3.5
+      - test-linux:
+          matrix:
+            parameters:
+              python-version: ["3.5.10", "3.6.12", "3.7.9", "3.8.6", "3.9.0"]
+
+      - test-macos:
+          matrix:
+            parameters:
+              python-version: ["3.5.10", "3.6.12", "3.7.9", "3.8.6", "3.9.0"]
+
+      - test-docs
 
   deploy:
     jobs:
-      - test-3.8:
-          filters:
-            tags:
-              only: /^[0-9]+(\.[0-9]+)*((\.dev|rc)([0-9]+)?)?$/
-            branches:
-              ignore: /.*/
       - pypi-deploy:
-          requires:
-            - test-3.8
           filters:
             tags:
               only: /^[0-9]+(\.[0-9]+)*((\.dev|rc)([0-9]+)?)?$/
