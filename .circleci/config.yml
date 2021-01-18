@@ -46,7 +46,9 @@ jobs:
 
       - run: &upload-python-code-coverage
           name: Upload code coverage
-          command: env/bin/coveralls
+          command: |
+            . env/bin/activate
+            codecov     # calls `coverage xml`, so we must activate venv
 
   test-macos:
     parameters:

@@ -10,8 +10,8 @@
     :target: https://ci.appveyor.com/project/dwave-adtt/dwave-cloud-client/branch/master
     :alt: Windows build status
 
-.. image:: https://coveralls.io/repos/github/dwavesystems/dwave-cloud-client/badge.svg?branch=master
-    :target: https://coveralls.io/github/dwavesystems/dwave-cloud-client?branch=master
+.. image:: https://codecov.io/gh/dwavesystems/dwave-cloud-client/branch/master/graph/badge.svg
+    :target: https://codecov.io/gh/dwavesystems/dwave-cloud-client
     :alt: Coverage report
 
 .. image:: https://readthedocs.com/projects/d-wave-systems-dwave-cloud-client/badge/?version=latest
