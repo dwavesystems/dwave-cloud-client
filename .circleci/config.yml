@@ -54,9 +54,11 @@ jobs:
     parameters:
       python-version:
         type: string
+      xcode:
+        type: string
 
     macos:
-      xcode: "12.3.0"
+      xcode: << parameters.xcode >>
 
     steps:
       - checkout
@@ -68,7 +70,7 @@ jobs:
 
       - restore_cache: &restore-cache-pyenv
           keys:
-            - v1-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-12.3.0
+            - v1-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-<< parameters.xcode >>
 
       - run: &pyenv-install-python
           name: Install python
@@ -81,7 +83,7 @@ jobs:
             echo 'eval "$(pyenv init -)"' >> ~/.bash_profile
 
       - save_cache: &save-cache-pyenv
-          key: v1-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-12.3.0
+          key: v1-pyenv-{{ .Environment.CIRCLE_JOB }}-<< parameters.xcode >>
           paths:
             - ~/.pyenv
 
@@ -175,6 +177,7 @@ workflows:
           matrix:
             parameters:
               python-version: *python-versions
+              xcode: ["12.3.0"]
 
       - test-docs
 
