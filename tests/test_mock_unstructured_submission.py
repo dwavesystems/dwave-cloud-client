@@ -39,7 +39,7 @@ def unstructured_solver_data(problem_type='bqm'):
         "description": "A test unstructured solver"
     }
 
-def complete_reply(sampleset, problem_type='bqm', label=""):
+def complete_reply(sampleset, id_="problem-id", type_='bqm', label=None):
     """Reply with the sampleset as a solution."""
 
     return json.dumps([{
@@ -51,8 +51,8 @@ def complete_reply(sampleset, problem_type='bqm', label=""):
             "format": "bq",
             "data": sampleset.to_serializable()
         },
-        "type": problem_type,
-        "id": "problem-id",
+        "type": type_,
+        "id": id_,
         "label": label
     }])
 
@@ -95,8 +95,9 @@ class TestUnstructuredSolver(unittest.TestCase):
 
                 # direct bqm sampling
                 ss = dimod.ExactSolver().sample(bqm)
+                ss.info.update(problem_id=mock_problem_id)
                 session.post = lambda path, _: choose_reply(
-                    path, {'problems/': complete_reply(ss)})
+                    path, {'problems/': complete_reply(ss, id_=mock_problem_id)})
 
                 fut = solver.sample_bqm(bqm)
                 numpy.testing.assert_array_equal(fut.sampleset, ss)
@@ -114,8 +115,9 @@ class TestUnstructuredSolver(unittest.TestCase):
                 # ising sampling
                 lin, quad, _ = bqm.to_ising()
                 ss = dimod.ExactSolver().sample_ising(lin, quad)
+                ss.info.update(problem_id=mock_problem_id)
                 session.post = lambda path, _: choose_reply(
-                    path, {'problems/': complete_reply(ss)})
+                    path, {'problems/': complete_reply(ss, id_=mock_problem_id)})
 
                 fut = solver.sample_ising(lin, quad)
                 numpy.testing.assert_array_equal(fut.sampleset, ss)
@@ -126,8 +128,9 @@ class TestUnstructuredSolver(unittest.TestCase):
                 # qubo sampling
                 qubo, _ = bqm.to_qubo()
                 ss = dimod.ExactSolver().sample_qubo(qubo)
+                ss.info.update(problem_id=mock_problem_id)
                 session.post = lambda path, _: choose_reply(
-                    path, {'problems/': complete_reply(ss)})
+                    path, {'problems/': complete_reply(ss, id_=mock_problem_id)})
 
                 fut = solver.sample_qubo(qubo)
                 numpy.testing.assert_array_equal(fut.sampleset, ss)
@@ -168,8 +171,9 @@ class TestUnstructuredSolver(unittest.TestCase):
 
                 # use bqm for mock response (for now)
                 ss = dimod.ExactSolver().sample(dimod.BQM.empty('SPIN'))
+                ss.info.update(problem_id=mock_problem_id)
                 session.post = lambda path, _: choose_reply(
-                    path, {'problems/': complete_reply(ss, problem_type=problem_type)})
+                    path, {'problems/': complete_reply(ss, id_=mock_problem_id, type_=problem_type)})
 
                 # verify decoding works
                 fut = solver.sample_dqm(dqm)
