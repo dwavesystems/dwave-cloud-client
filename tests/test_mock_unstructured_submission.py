@@ -303,3 +303,41 @@ class TestProblemLabel(unittest.TestCase):
 
                             with self.assertRaises(self.PrimaryAssertionSatisfied):
                                 sample(*problem_args, label=label).result()
+
+    @parameterized.expand([
+        ("undefined", None),
+        ("empty", ""),
+        ("string", "text label")
+    ])
+    def test_label_is_received(self, name, label):
+        """Problem label is set from response in result/sampleset."""
+
+        # build a test problem
+        bqm = dimod.BQM.from_ising({}, {'ab': 1})
+
+        # use a global mocked session, so we can modify it on-fly
+        session = mock.Mock()
+
+        # upload is now part of submit, so we need to mock it
+        mock_problem_id = 'mock-problem-id'
+        def mock_upload(self, bqm):
+            return Present(result=mock_problem_id)
+
+        # construct a functional solver by mocking client and api response data
+        with mock.patch.multiple(Client, create_session=lambda self: session,
+                                 upload_problem_encoded=mock_upload):
+            with Client('endpoint', 'token') as client:
+                solver = BQMSolver(client, unstructured_solver_data())
+
+                # construct mock response
+                ss = dimod.ExactSolver().sample(bqm)
+                session.post = lambda path, _: choose_reply(
+                    path, {'problems/': complete_reply(ss, id_=mock_problem_id, label=label)})
+
+                # sample and verify label
+                fut = solver.sample_bqm(bqm, label=label)
+                info = fut.sampleset.info
+                self.assertIn('problem_id', info)
+                if label is not None:
+                    self.assertIn('problem_label', info)
+                    self.assertEqual(info['problem_label'], label)
