@@ -69,7 +69,7 @@ def solver_data(id_, incomplete=False):
     return obj
 
 
-def complete_reply(id_, solver_name, answer=None, msg=None, label=""):
+def complete_reply(id_, solver_name, answer=None, msg=None, label=None):
     """Reply with solutions for the test problem."""
     response = {
         "status": "COMPLETED",
@@ -101,7 +101,7 @@ def complete_reply(id_, solver_name, answer=None, msg=None, label=""):
     return json.dumps(response)
 
 
-def complete_no_answer_reply(id_, solver_name, label=""):
+def complete_no_answer_reply(id_, solver_name, label=None):
     """A reply saying a problem is finished without providing the results."""
     return json.dumps({
         "status": "COMPLETED",
@@ -114,7 +114,7 @@ def complete_no_answer_reply(id_, solver_name, label=""):
     })
 
 
-def error_reply(id_, solver_name, error, label=""):
+def error_reply(id_, solver_name, error, label=None):
     """A reply saying an error has occurred."""
     return json.dumps({
         "status": "FAILED",
@@ -136,7 +136,7 @@ def immediate_error_reply(code, msg):
     })
 
 
-def cancel_reply(id_, solver_name, label=""):
+def cancel_reply(id_, solver_name, label=None):
     """A reply saying a problem was canceled."""
     return json.dumps({
         "status": "CANCELLED",
@@ -154,7 +154,7 @@ def datetime_in_future(seconds=0):
     return now + timedelta(seconds=seconds)
 
 
-def continue_reply(id_, solver_name, now=None, eta_min=None, eta_max=None, label=""):
+def continue_reply(id_, solver_name, now=None, eta_min=None, eta_max=None, label=None):
     """A reply saying a problem is still in the queue."""
 
     if not now:
