@@ -772,9 +772,19 @@ class Future(object):
     def wait_sampleset(self):
         """Blocking sampleset getter."""
 
+        # blocking result get
         result = self._load_result()
+
+        # common problem info: id/label
+        problem_info = dict(problem_id=self.id)
+        if self.label is not None:
+            problem_info.update(problem_label=self.label)
+
+        # sapi returned sampleset directly
         if 'sampleset' in result:
-            return result['sampleset']
+            sampleset = result['sampleset']
+            sampleset.info.update(problem_info)
+            return sampleset
 
         # construct sampleset from available data
         try:
@@ -792,10 +802,9 @@ class Future(object):
         vartype_from_problem_type = {'ising': 'SPIN', 'qubo': 'BINARY'}
         vartype = vartype_from_problem_type[self.problem_type]
 
-        # include timing and id/label in info
-        info = dict(timing=self.timing, problem_id=self.id)
-        if self.label is not None:
-            info.update(problem_label=self.label)
+        # for QPU jobs, info field is blank; add timing info
+        info = dict(timing=self.timing)
+        info.update(problem_info)
 
         sampleset = dimod.SampleSet.from_samples(
             (samples, variables), vartype=vartype,
