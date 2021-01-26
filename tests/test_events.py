@@ -16,7 +16,7 @@ import unittest
 
 from dwave.cloud.client import Client
 from dwave.cloud.solver import Solver
-from dwave.cloud.events import add_handler
+from dwave.cloud.events import add_handler, dispatches_events
 
 
 class TestEventDispatch(unittest.TestCase):
@@ -147,3 +147,46 @@ class TestEventDispatch(unittest.TestCase):
         self.assertEqual(after['obj'], self.solver)
         self.assertDictEqual(after['args'], args)
         self.assertEqual(after['return_value'], future)
+
+
+class TestEventDispatchDecorator(unittest.TestCase):
+
+    def setUp(self):
+        # reset all event handlers
+        from dwave.cloud.events import _client_event_hooks_registry as reg
+        reg.update({k: [] for k in reg})
+
+    def test_decorator(self):
+        """Decorator adds on-entry and on-exit event calls, with correct args."""
+
+        class MockSampler:
+            @dispatches_events('sample')
+            def mock_sample(self, h, J, offset=0, fail=False, **kwargs):
+                if fail:
+                    raise ValueError
+                return offset + 1
+
+        mock_object = MockSampler()
+        h = [1, 1]
+        J = {(0, 1): 1}
+
+        def before(name, obj, args):
+            self.assertEqual(obj, mock_object)
+            args.pop('fail')
+            self.assertEqual(args, dict(h=h, J=J, offset=0, kwargs={}))
+
+        def after(name, obj, args, return_value=None, exception=None):
+            self.assertEqual(obj, mock_object)
+            fail = args.pop('fail')
+            self.assertEqual(args, dict(h=h, J=J, offset=0, kwargs={}))
+            if fail:
+                self.assertIsInstance(exception, ValueError)
+            else:
+                self.assertEqual(return_value, 1)
+
+        add_handler('before_sample', before)
+        add_handler('before_sample', after)
+
+        mock_object.mock_sample(h, J)
+        with self.assertRaises(ValueError):
+            mock_object.mock_sample(h, J, fail=True)
