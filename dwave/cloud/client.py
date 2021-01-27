@@ -73,7 +73,7 @@ from dwave.cloud.config import load_config, parse_float, parse_int, parse_boolea
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.upload import ChunkedData
-from dwave.cloud.events import dispatch_event
+from dwave.cloud.events import dispatch_event, dispatches_events
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent,
     datetime_to_timestamp, utcnow, epochnow, cached, retried, is_caused_by)
@@ -728,6 +728,7 @@ class Client(object):
         self._load(future)
         return future
 
+    @dispatches_events('get_solvers')
     def get_solvers(self, refresh=False, order_by='avg_load', **filters):
         """Return a filtered list of solvers handled by this client.
 
@@ -913,9 +914,6 @@ class Client(object):
             )
         """
 
-        args = dict(refresh=refresh, order_by=order_by, filters=filters)
-        dispatch_event('before_get_solvers', obj=self, args=args)
-
         def covers_op(prop, val):
             """Does LHS `prop` (range) fully cover RHS `val` (range or item)?"""
 
@@ -1063,9 +1061,6 @@ class Client(object):
         # and plain list reverse without sorting)
         if sort_reverse:
             solvers.reverse()
-
-        dispatch_event(
-            'after_get_solvers', obj=self, args=args, return_value=solvers)
 
         return solvers
 
