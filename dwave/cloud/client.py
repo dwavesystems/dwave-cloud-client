@@ -73,7 +73,7 @@ from dwave.cloud.config import load_config, parse_float, parse_int, parse_boolea
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.upload import ChunkedData
-from dwave.cloud.events import dispatch_event, dispatches_events
+from dwave.cloud.events import dispatches_events
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent,
     datetime_to_timestamp, utcnow, epochnow, cached, retried, is_caused_by)
@@ -343,6 +343,7 @@ class Client(object):
         logger.debug("Creating %s.Client() with: %r", _client, config)
         return _clients[_client](**config)
 
+    @dispatches_events('client_init')
     def __init__(self, endpoint=None, token=None, solver=None, **kwargs):
         # for (reasonable) backwards compatibility, accept only the first few
         # positional args.
@@ -353,9 +354,6 @@ class Client(object):
             kwargs.setdefault('token', token)
         if solver is not None:
             kwargs.setdefault('solver', solver)
-
-        dispatched_args = kwargs.copy()
-        dispatch_event('before_client_init', obj=self, args=dispatched_args)
 
         logger.debug("Client init called with: %r", kwargs)
 
@@ -522,9 +520,6 @@ class Client(object):
 
         self._encode_problem_executor = \
             ThreadPoolExecutor(self._ENCODE_PROBLEM_THREAD_COUNT)
-
-        dispatch_event(
-            'after_client_init', obj=self, args=dispatched_args, return_value=None)
 
     def create_session(self):
         """Create a new requests session based on client's (self) params.

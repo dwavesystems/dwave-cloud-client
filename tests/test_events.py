@@ -77,16 +77,18 @@ class TestEventDispatch(unittest.TestCase):
         # test entry values
         before = memo['before_client_init']
         self.assertEqual(before['obj'], client)
-        self.assertNotIn('endpoint', before['args'])
+        self.assertIn('endpoint', before['args'])
         self.assertIn('token', before['args'])
+        self.assertIn('kwargs', before['args'])
         self.assertEqual(before['args']['token'], 'token')
-        self.assertEqual(before['args']['unknown'], 'unknown')
+        self.assertEqual(before['args']['kwargs']['unknown'], 'unknown')
 
         # test exit values
         after = memo['after_client_init']
         self.assertEqual(after['obj'], client)
         self.assertEqual(after['args']['token'], 'token')
-        self.assertEqual(after['args']['unknown'], 'unknown')
+        self.assertEqual(after['args']['kwargs']['unknown'], 'unknown')
+        self.assertEqual(after['args']['endpoint'], None)
         self.assertEqual(after['return_value'], None)
 
     def test_get_solvers(self):
