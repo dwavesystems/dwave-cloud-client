@@ -404,6 +404,7 @@ class BaseUnstructuredSolver(BaseSolver):
 
         return body_data
 
+    @dispatches_events('sample')
     def sample_problem(self, problem, problem_type=None, label=None, **params):
         """Sample from the specified problem.
 
