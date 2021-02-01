@@ -19,6 +19,8 @@ inspection.
 """
 
 import logging
+import inspect
+from functools import wraps
 
 __all__ = ['add_handler']
 
@@ -41,13 +43,17 @@ _client_event_hooks_registry = {
 def add_handler(name, handler):
     """Register a `handler` function to be called on event `name`.
 
-    Handler's signature are::
+    Handler signatures are::
 
         def before_event_handler(event_name, obj, args):
-            pass
+            # called just before `obj.method(**args)` executes
 
         def after_event_handler(event_name, obj, args, return_value):
-            pass
+            # function succeeded with `return_value`
+
+        def after_event_handler(event_name, obj, args, exception):
+            # function failed with `exception` raised
+            # after event handler invocation, exception is re-raised
 
     """
 
@@ -73,3 +79,35 @@ def dispatch_event(name, *args, **kwargs):
         except Exception as e:
             logger.debug("Exception in {!r} event handler {!r}: {!r}".format(
                 name, handler, e))
+
+
+class dispatches_events:
+    """Decorate function to :func:`.dispatch_event` on entry and exit."""
+
+    def __init__(self, basename):
+        self.before_eventname = 'before_' + basename
+        self.after_eventname = 'after_' + basename
+
+    def __call__(self, fn):
+        if not callable(fn):
+            raise TypeError("decorated object must be callable")
+
+        @wraps(fn)
+        def wrapped(*pargs, **kwargs):
+            sig = inspect.signature(fn)
+            bound = sig.bind(*pargs, **kwargs)
+            bound.apply_defaults()
+            args = bound.arguments
+            obj = args.pop('self', None)
+
+            dispatch_event(self.before_eventname, obj=obj, args=args)
+            try:
+                rval = fn(*pargs, **kwargs)
+            except Exception as exc:
+                dispatch_event(self.after_eventname, obj=obj, args=args, exception=exc)
+                raise
+            else:
+                dispatch_event(self.after_eventname, obj=obj, args=args, return_value=rval)
+                return rval
+
+        return wrapped

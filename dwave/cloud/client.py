@@ -73,7 +73,7 @@ from dwave.cloud.config import load_config, parse_float, parse_int, parse_boolea
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.upload import ChunkedData
-from dwave.cloud.events import dispatch_event
+from dwave.cloud.events import dispatches_events
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent,
     datetime_to_timestamp, utcnow, epochnow, cached, retried, is_caused_by)
@@ -343,6 +343,7 @@ class Client(object):
         logger.debug("Creating %s.Client() with: %r", _client, config)
         return _clients[_client](**config)
 
+    @dispatches_events('client_init')
     def __init__(self, endpoint=None, token=None, solver=None, **kwargs):
         # for (reasonable) backwards compatibility, accept only the first few
         # positional args.
@@ -353,9 +354,6 @@ class Client(object):
             kwargs.setdefault('token', token)
         if solver is not None:
             kwargs.setdefault('solver', solver)
-
-        dispatched_args = kwargs.copy()
-        dispatch_event('before_client_init', obj=self, args=dispatched_args)
 
         logger.debug("Client init called with: %r", kwargs)
 
@@ -522,9 +520,6 @@ class Client(object):
 
         self._encode_problem_executor = \
             ThreadPoolExecutor(self._ENCODE_PROBLEM_THREAD_COUNT)
-
-        dispatch_event(
-            'after_client_init', obj=self, args=dispatched_args, return_value=None)
 
     def create_session(self):
         """Create a new requests session based on client's (self) params.
@@ -728,6 +723,7 @@ class Client(object):
         self._load(future)
         return future
 
+    @dispatches_events('get_solvers')
     def get_solvers(self, refresh=False, order_by='avg_load', **filters):
         """Return a filtered list of solvers handled by this client.
 
@@ -913,9 +909,6 @@ class Client(object):
             )
         """
 
-        args = dict(refresh=refresh, order_by=order_by, filters=filters)
-        dispatch_event('before_get_solvers', obj=self, args=args)
-
         def covers_op(prop, val):
             """Does LHS `prop` (range) fully cover RHS `val` (range or item)?"""
 
@@ -1063,9 +1056,6 @@ class Client(object):
         # and plain list reverse without sorting)
         if sort_reverse:
             solvers.reverse()
-
-        dispatch_event(
-            'after_get_solvers', obj=self, args=args, return_value=solvers)
 
         return solvers
 

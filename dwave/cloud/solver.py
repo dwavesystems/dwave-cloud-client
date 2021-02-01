@@ -40,7 +40,7 @@ from dwave.cloud.coders import (
 from dwave.cloud.utils import uniform_iterator, reformat_qubo_as_ising
 from dwave.cloud.computation import Future
 from dwave.cloud.concurrency import Present
-from dwave.cloud.events import dispatch_event
+from dwave.cloud.events import dispatches_events
 
 # Use numpy if available for fast encoding/decoding
 try:
@@ -404,6 +404,7 @@ class BaseUnstructuredSolver(BaseSolver):
 
         return body_data
 
+    @dispatches_events('sample')
     def sample_problem(self, problem, problem_type=None, label=None, **params):
         """Sample from the specified problem.
 
@@ -877,6 +878,7 @@ class StructuredSolver(BaseSolver):
         return self._sample(problem_type, bqm.linear, bqm.quadratic, bqm.offset,
                             params, label=label, undirected_biases=True)
 
+    @dispatches_events('sample')
     def _sample(self, type_, linear, quadratic, offset, params,
                 label=None, undirected_biases=False):
         """Internal method for `sample_ising`, `sample_qubo` and `sample_bqm`.
@@ -905,11 +907,6 @@ class StructuredSolver(BaseSolver):
         Returns:
             :class:`~dwave.cloud.computation.Future`
         """
-
-        args = dict(type_=type_, linear=linear, quadratic=quadratic,
-                    offset=offset, params=params, label=label,
-                    undirected_biases=undirected_biases)
-        dispatch_event('before_sample', obj=self, args=args)
 
         # Check the problem
         if not self.check_problem(linear, quadratic):
@@ -947,8 +944,6 @@ class StructuredSolver(BaseSolver):
 
         logger.debug("Submitting new problem to: %s", self.id)
         self.client._submit(body, computation)
-
-        dispatch_event('after_sample', obj=self, args=args, return_value=computation)
 
         return computation
 
