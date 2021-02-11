@@ -337,13 +337,16 @@ def ping(config_file, profile, solver_def, sampling_params, json_output,
 @click.option('--config-file', '-c', default=None,
               type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
 @click.option('--profile', '-p', default=None, help='Connection profile name')
+@click.option('--client', 'client_type', default=None,
+              type=click.Choice(['base', 'qpu', 'sw', 'hybrid'], case_sensitive=False),
+              help='Client type used (default: from config)')
 @click.option('--solver', '-s', 'solver_def', default=None,
               help='Feature-based solver filter (default: from config)')
 @click.option('--list', '-l', 'list_solvers', default=False, is_flag=True,
               help='Print filtered list of solver names, one per line')
 @click.option('--all', '-a', 'list_all', default=False, is_flag=True,
               help='Ignore solver filter (list/print all solvers)')
-def solvers(config_file, profile, solver_def, list_solvers, list_all):
+def solvers(config_file, profile, client_type, solver_def, list_solvers, list_all):
     """Get solver details.
 
     Solver filter is inherited from environment or the specified configuration
@@ -351,10 +354,12 @@ def solvers(config_file, profile, solver_def, list_solvers, list_all):
     """
 
     if list_all:
+        client_type = 'base'
         solver_def = '{}'
 
     with Client.from_config(
-            config_file=config_file, profile=profile, solver=solver_def) as client:
+            config_file=config_file, profile=profile,
+            client=client_type, solver=solver_def) as client:
 
         try:
             solvers = client.get_solvers(**client.default_solver)
