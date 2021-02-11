@@ -179,6 +179,7 @@ class TestCli(unittest.TestCase):
     def test_ping(self):
         config_file = 'dwave.conf'
         profile = 'profile'
+        client_type = 'qpu'
         params = dict(num_reads=10)
 
         with mock.patch('dwave.cloud.cli.Client') as m:
@@ -192,13 +193,15 @@ class TestCli(unittest.TestCase):
                 result = runner.invoke(cli, ['ping',
                                              '--config-file', config_file,
                                              '--profile', profile,
+                                             '--client', client_type,
                                              '--sampling-params', json.dumps(params),
                                              '--request-timeout', '.5',
                                              '--polling-timeout', '30'])
 
             # proper arguments passed to Client.from_config?
             m.from_config.assert_called_with(
-                config_file=config_file, profile=profile, solver=None,
+                config_file=config_file, profile=profile,
+                client=client_type, solver=None,
                 request_timeout=0.5, polling_timeout=30)
 
             # get solver called?
@@ -252,6 +255,7 @@ class TestCli(unittest.TestCase):
     def test_sample(self):
         config_file = 'dwave.conf'
         profile = 'profile'
+        client = 'qpu'
         solver = '{"qpu": true}'
         biases = '[0]'
         couplings = '{(0, 4): 1}'
@@ -265,13 +269,15 @@ class TestCli(unittest.TestCase):
                 result = runner.invoke(cli, ['sample',
                                              '--config-file', config_file,
                                              '--profile', profile,
+                                             '--client', client,
                                              '--solver', solver,
                                              '-h', biases,
                                              '-j', couplings,
                                              '-n', num_reads])
 
             # proper arguments passed to Client.from_config?
-            m.from_config.assert_called_with(config_file=config_file, profile=profile, solver=solver)
+            m.from_config.assert_called_with(
+                config_file=config_file, profile=profile, client=client, solver=solver)
 
             # get solver called?
             c = m.from_config.return_value
@@ -286,6 +292,7 @@ class TestCli(unittest.TestCase):
     def test_solvers(self):
         config_file = 'dwave.conf'
         profile = 'profile'
+        client_type = 'base'
         solver = '{"qpu": true}'
         solvers = [solver_object('A'), solver_object('B')]
 
@@ -300,11 +307,12 @@ class TestCli(unittest.TestCase):
                 result = runner.invoke(cli, ['solvers',
                                              '--config-file', config_file,
                                              '--profile', profile,
+                                             '--client', client_type,
                                              '--solver', solver])
 
             # proper arguments passed to Client.from_config?
             m.from_config.assert_called_with(
-                config_file=config_file, profile=profile, solver=solver)
+                config_file=config_file, profile=profile, client=client_type, solver=solver)
 
             # get solvers called?
             client.get_solvers.assert_called_with()
@@ -318,6 +326,7 @@ class TestCli(unittest.TestCase):
     def test_upload(self):
         config_file = 'dwave.conf'
         profile = 'profile'
+        client_type = 'base'
         format = 'dimodbqm'
         problem_id = 'prob:lem:id'
         filename = 'filename'
@@ -331,12 +340,14 @@ class TestCli(unittest.TestCase):
                 result = runner.invoke(cli, ['upload',
                                              '--config-file', config_file,
                                              '--profile', profile,
+                                             '--client', client_type,
                                              '--format', format,
                                              '--problem-id', problem_id,
                                              filename])
 
                 # proper arguments passed to Client.from_config?
-                m.from_config.assert_called_with(config_file=config_file, profile=profile)
+                m.from_config.assert_called_with(
+                    config_file=config_file, profile=profile, client=client_type)
 
                 # upload method called on client?
                 c = m.from_config.return_value
