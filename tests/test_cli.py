@@ -19,6 +19,7 @@ import unittest
 from unittest import mock
 
 from click.testing import CliRunner
+from parameterized import parameterized
 
 from dwave.cloud.cli import cli
 from dwave.cloud.config import load_config
@@ -176,7 +177,12 @@ class TestCli(unittest.TestCase):
             self.assertIn('endpoint = 1', result.output)
             self.assertIn('token = 3', result.output)
 
-    def test_ping(self):
+    @parameterized.expand([
+        ("--config-file", ),
+        ("-f", ),
+        ("-c", ),
+    ])
+    def test_ping(self, config_file_option):
         config_file = 'dwave.conf'
         profile = 'profile'
         client_type = 'qpu'
@@ -191,7 +197,7 @@ class TestCli(unittest.TestCase):
             with runner.isolated_filesystem():
                 touch(config_file)
                 result = runner.invoke(cli, ['ping',
-                                             '--config-file', config_file,
+                                             config_file_option, config_file,
                                              '--profile', profile,
                                              '--client', client_type,
                                              '--sampling-params', json.dumps(params),
@@ -252,7 +258,12 @@ class TestCli(unittest.TestCase):
         self.assertIn('error', res)
         self.assertEqual(result.exit_code, 9)
 
-    def test_sample(self):
+    @parameterized.expand([
+        ("--config-file", ),
+        ("-f", ),
+        ("-c", ),
+    ])
+    def test_sample(self, config_file_option):
         config_file = 'dwave.conf'
         profile = 'profile'
         client = 'qpu'
@@ -267,7 +278,7 @@ class TestCli(unittest.TestCase):
             with runner.isolated_filesystem():
                 touch(config_file)
                 result = runner.invoke(cli, ['sample',
-                                             '--config-file', config_file,
+                                             config_file_option, config_file,
                                              '--profile', profile,
                                              '--client', client,
                                              '--solver', solver,
@@ -289,7 +300,12 @@ class TestCli(unittest.TestCase):
 
         self.assertEqual(result.exit_code, 0)
 
-    def test_solvers(self):
+    @parameterized.expand([
+        ("--config-file", ),
+        ("-f", ),
+        ("-c", ),
+    ])
+    def test_solvers(self, config_file_option):
         config_file = 'dwave.conf'
         profile = 'profile'
         client_type = 'base'
@@ -305,7 +321,7 @@ class TestCli(unittest.TestCase):
             with runner.isolated_filesystem():
                 touch(config_file)
                 result = runner.invoke(cli, ['solvers',
-                                             '--config-file', config_file,
+                                             config_file_option, config_file,
                                              '--profile', profile,
                                              '--client', client_type,
                                              '--solver', solver])
@@ -323,7 +339,12 @@ class TestCli(unittest.TestCase):
         self.assertIn('Solver: A', result.output)
         self.assertIn('Solver: B', result.output)
 
-    def test_upload(self):
+    @parameterized.expand([
+        ("--config-file", ),
+        ("-f", ),
+        ("-c", ),
+    ])
+    def test_upload(self, config_file_option):
         config_file = 'dwave.conf'
         profile = 'profile'
         client_type = 'base'
@@ -338,7 +359,7 @@ class TestCli(unittest.TestCase):
                 touch(config_file)
                 touch(filename)
                 result = runner.invoke(cli, ['upload',
-                                             '--config-file', config_file,
+                                             config_file_option, config_file,
                                              '--profile', profile,
                                              '--client', client_type,
                                              '--format', format,

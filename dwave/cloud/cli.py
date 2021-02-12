@@ -16,19 +16,19 @@ import os
 import sys
 import ast
 import json
-import datetime
 import subprocess
 import pkg_resources
 
+from functools import partial
+from timeit import default_timer as timer
+
 import click
 import requests.exceptions
-from timeit import default_timer as timer
-from datetime import datetime, timedelta
 
 import dwave.cloud
 from dwave.cloud import Client
 from dwave.cloud.utils import (
-    default_text_input, click_info_switch, generate_random_ising_problem,
+    default_text_input, generate_random_ising_problem,
     datetime_to_timestamp, utcnow, strtrunc, CLIError, set_loglevel,
     get_contrib_packages, user_agent)
 from dwave.cloud.coders import bqm_as_file
@@ -56,6 +56,31 @@ def show_platform(ctx, param, value):
         click.echo(user_agent())
         sys.exit()
 
+def deprecated_option(msg=None, update=None):
+    """Generate click callback function that will print a deprecation notice
+    to stderr with a customized message and copy option value to new option.
+
+    Note: if you provide the `update` option name, make sure that option is
+    processed before the deprecated one (set `is_eager`).
+    """
+
+    def _print_deprecation(ctx, param, value, msg=None, update=None):
+        if msg is None:
+            msg = "DeprecationWarning: The following options are deprecated: {opts!r}."
+        if value and not ctx.resilient_parsing:
+            click.echo(click.style(msg.format(opts=param.opts), fg="red"), err=True)
+            if update:
+                ctx.params[update] = value
+
+    # click seems to strip closure variables in calls to `callback`,
+    # so we pass `msg` and `update` via partial application
+    return partial(_print_deprecation, msg=msg, update=update)
+
+CONFIG_FILE_DEPRECATION_MSG = (
+    "DeprecationWarning: Use of '-c' for '--config-file' has been deprecated "
+    "in favor of '-f' and it will be removed in 0.10.0")
+
+
 @click.group()
 @click.version_option(prog_name=__title__, version=__version__)
 @click.option('--debug', is_flag=True, callback=enable_logging,
@@ -64,7 +89,7 @@ def show_platform(ctx, param, value):
               help='Enable trace-level debug logging.')
 @click.option('--log', 'loglevel', metavar='LEVEL', callback=enable_loglevel,
               help='Set custom numeric or symbolic log level.')
-@click.option('--platform', is_flag=True, callback=show_platform,
+@click.option('--platform', is_flag=True, is_eager=True, callback=show_platform,
               help='Show the platform tags and exit.')
 def cli(debug=False, trace=False, loglevel=None, platform=False):
     """D-Wave Cloud Client interactive configuration tool."""
@@ -97,8 +122,11 @@ def ls(system, user, local, include_missing):
 
 
 @config.command()
-@click.option('--config-file', '-c', default=None,
+@click.option('--config-file', '-f', default=None, is_eager=True,
               type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
+@click.option('-c', default=None, expose_value=False,
+              type=click.Path(exists=True, dir_okay=False), help="[Deprecated in favor of '-f']",
+              callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))
 @click.option('--profile', '-p', default=None,
               help='Connection profile (section) name')
 def inspect(config_file, profile):
@@ -119,8 +147,11 @@ def inspect(config_file, profile):
 
 
 @config.command()
-@click.option('--config-file', '-c', default=None,
+@click.option('--config-file', '-f', default=None, is_eager=True,
               type=click.Path(exists=False, dir_okay=False), help='Configuration file path')
+@click.option('-c', default=None, expose_value=False,
+              type=click.Path(exists=True, dir_okay=False), help="[Deprecated in favor of '-f']",
+              callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))
 @click.option('--profile', '-p', default=None,
               help='Connection profile (section) name')
 def create(config_file, profile):
@@ -293,8 +324,11 @@ def _ping(config_file, profile, client_type, solver_def, sampling_params,
 
 
 @cli.command()
-@click.option('--config-file', '-c', default=None,
+@click.option('--config-file', '-f', default=None, is_eager=True,
               type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
+@click.option('-c', default=None, expose_value=False,
+              type=click.Path(exists=True, dir_okay=False), help="[Deprecated in favor of '-f']",
+              callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))
 @click.option('--profile', '-p', default=None,
               help='Connection profile (section) name')
 @click.option('--client', 'client_type', default=None,
@@ -338,8 +372,11 @@ def ping(config_file, profile, client_type, solver_def, sampling_params, json_ou
 
 
 @cli.command()
-@click.option('--config-file', '-c', default=None,
+@click.option('--config-file', '-f', default=None, is_eager=True,
               type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
+@click.option('-c', default=None, expose_value=False,
+              type=click.Path(exists=True, dir_okay=False), help="[Deprecated in favor of '-f']",
+              callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))
 @click.option('--profile', '-p', default=None, help='Connection profile name')
 @click.option('--client', 'client_type', default=None,
               type=click.Choice(['base', 'qpu', 'sw', 'hybrid'], case_sensitive=False),
@@ -393,8 +430,11 @@ def solvers(config_file, profile, client_type, solver_def, list_solvers, list_al
 
 
 @cli.command()
-@click.option('--config-file', '-c', default=None,
+@click.option('--config-file', '-f', default=None, is_eager=True,
               type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
+@click.option('-c', default=None, expose_value=False,
+              type=click.Path(exists=True, dir_okay=False), help="[Deprecated in favor of '-f']",
+              callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))
 @click.option('--profile', '-p', default=None,
               help='Connection profile (section) name')
 @click.option('--client', 'client_type', default=None,
@@ -480,8 +520,11 @@ def sample(config_file, profile, client_type, solver_def, biases, couplings,
 
 
 @cli.command()
-@click.option('--config-file', '-c', default=None,
+@click.option('--config-file', '-f', default=None, is_eager=True,
               type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
+@click.option('-c', default=None, expose_value=False,
+              type=click.Path(exists=True, dir_okay=False), help="[Deprecated in favor of '-f']",
+              callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))
 @click.option('--profile', '-p', default=None,
               help='Connection profile (section) name')
 @click.option('--client', 'client_type', default=None,
@@ -489,7 +532,7 @@ def sample(config_file, profile, client_type, solver_def, biases, couplings,
               help='Client type used (default: from config)')
 @click.option('--problem-id', '-i', default=None,
               help='Problem ID (optional)')
-@click.option('--format', '-f', default='dimodbqm',
+@click.option('--format', '--fmt', default='dimodbqm',
               type=click.Choice(['coo', 'dimodbqm'], case_sensitive=False),
               help='Problem data encoding')
 @click.argument('input_file', metavar='FILE', type=click.File('rb'))
