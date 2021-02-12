@@ -76,9 +76,43 @@ def deprecated_option(msg=None, update=None):
     # so we pass `msg` and `update` via partial application
     return partial(_print_deprecation, msg=msg, update=update)
 
+
 CONFIG_FILE_DEPRECATION_MSG = (
     "DeprecationWarning: Use of '-c' for '--config-file' has been deprecated "
     "in favor of '-f' and it will be removed in 0.10.0")
+
+
+def config_file_options(fn):
+    """Decorate `fn` with `--config-file` and `--profile` options."""
+
+    fn = click.option(
+        '--config-file', '-f', default=None, is_eager=True,
+        type=click.Path(exists=True, dir_okay=False),
+        help='Configuration file path')(fn)
+    fn = click.option(
+        '-c', default=None, expose_value=False,
+        type=click.Path(exists=True, dir_okay=False),
+        help="[Deprecated in favor of '-f']",
+        callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))(fn)
+    fn = click.option(
+        '--profile', '-p', default=None,
+        help='Connection profile (section) name')(fn)
+
+    return fn
+
+
+def solver_options(fn):
+    """Decorate `fn` with `--client` and `--solver` options."""
+
+    fn = click.option(
+        '--client', 'client_type', default=None,
+        type=click.Choice(['base', 'qpu', 'sw', 'hybrid'], case_sensitive=False),
+        help='Client type used (default: from config)')(fn)
+    fn = click.option(
+        '--solver', '-s', 'solver_def', default=None,
+        help='Feature-based solver filter (default: from config)')(fn)
+
+    return fn
 
 
 @click.group()
@@ -122,13 +156,7 @@ def ls(system, user, local, include_missing):
 
 
 @config.command()
-@click.option('--config-file', '-f', default=None, is_eager=True,
-              type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
-@click.option('-c', default=None, expose_value=False,
-              type=click.Path(exists=True, dir_okay=False), help="[Deprecated in favor of '-f']",
-              callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))
-@click.option('--profile', '-p', default=None,
-              help='Connection profile (section) name')
+@config_file_options
 def inspect(config_file, profile):
     """Inspect existing configuration/profile."""
 
@@ -147,13 +175,7 @@ def inspect(config_file, profile):
 
 
 @config.command()
-@click.option('--config-file', '-f', default=None, is_eager=True,
-              type=click.Path(exists=False, dir_okay=False), help='Configuration file path')
-@click.option('-c', default=None, expose_value=False,
-              type=click.Path(exists=True, dir_okay=False), help="[Deprecated in favor of '-f']",
-              callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))
-@click.option('--profile', '-p', default=None,
-              help='Connection profile (section) name')
+@config_file_options
 def create(config_file, profile):
     """Create and/or update cloud client configuration file."""
     return _config_create(config_file, profile)
@@ -324,17 +346,8 @@ def _ping(config_file, profile, client_type, solver_def, sampling_params,
 
 
 @cli.command()
-@click.option('--config-file', '-f', default=None, is_eager=True,
-              type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
-@click.option('-c', default=None, expose_value=False,
-              type=click.Path(exists=True, dir_okay=False), help="[Deprecated in favor of '-f']",
-              callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))
-@click.option('--profile', '-p', default=None,
-              help='Connection profile (section) name')
-@click.option('--client', 'client_type', default=None,
-              type=click.Choice(['base', 'qpu', 'sw', 'hybrid'], case_sensitive=False),
-              help='Client type used (default: from config)')
-@click.option('--solver', '-s', 'solver_def', default=None, help='Feature-based solver definition')
+@config_file_options
+@solver_options
 @click.option('--sampling-params', '-m', default=None, help='Sampling parameters (JSON encoded)')
 @click.option('--request-timeout', default=None, type=float,
               help='Connection and read timeouts (in seconds) for all API requests')
@@ -372,17 +385,8 @@ def ping(config_file, profile, client_type, solver_def, sampling_params, json_ou
 
 
 @cli.command()
-@click.option('--config-file', '-f', default=None, is_eager=True,
-              type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
-@click.option('-c', default=None, expose_value=False,
-              type=click.Path(exists=True, dir_okay=False), help="[Deprecated in favor of '-f']",
-              callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))
-@click.option('--profile', '-p', default=None, help='Connection profile name')
-@click.option('--client', 'client_type', default=None,
-              type=click.Choice(['base', 'qpu', 'sw', 'hybrid'], case_sensitive=False),
-              help='Client type used (default: from config)')
-@click.option('--solver', '-s', 'solver_def', default=None,
-              help='Feature-based solver filter (default: from config)')
+@config_file_options
+@solver_options
 @click.option('--list', '-l', 'list_solvers', default=False, is_flag=True,
               help='Print filtered list of solver names, one per line')
 @click.option('--all', '-a', 'list_all', default=False, is_flag=True,
@@ -430,18 +434,8 @@ def solvers(config_file, profile, client_type, solver_def, list_solvers, list_al
 
 
 @cli.command()
-@click.option('--config-file', '-f', default=None, is_eager=True,
-              type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
-@click.option('-c', default=None, expose_value=False,
-              type=click.Path(exists=True, dir_okay=False), help="[Deprecated in favor of '-f']",
-              callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))
-@click.option('--profile', '-p', default=None,
-              help='Connection profile (section) name')
-@click.option('--client', 'client_type', default=None,
-              type=click.Choice(['base', 'qpu', 'sw', 'hybrid'], case_sensitive=False),
-              help='Client type used (default: from config)')
-@click.option('--solver', '-s', 'solver_def', default=None,
-              help='Feature-based solver filter')
+@config_file_options
+@solver_options
 @click.option('--biases', '-h', default=None,
               help='List/dict of biases for Ising model problem formulation')
 @click.option('--couplings', '-j', default=None,
@@ -520,23 +514,15 @@ def sample(config_file, profile, client_type, solver_def, biases, couplings,
 
 
 @cli.command()
-@click.option('--config-file', '-f', default=None, is_eager=True,
-              type=click.Path(exists=True, dir_okay=False), help='Configuration file path')
-@click.option('-c', default=None, expose_value=False,
-              type=click.Path(exists=True, dir_okay=False), help="[Deprecated in favor of '-f']",
-              callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))
-@click.option('--profile', '-p', default=None,
-              help='Connection profile (section) name')
-@click.option('--client', 'client_type', default=None,
-              type=click.Choice(['base', 'qpu', 'sw', 'hybrid'], case_sensitive=False),
-              help='Client type used (default: from config)')
+@config_file_options
+@solver_options
 @click.option('--problem-id', '-i', default=None,
               help='Problem ID (optional)')
 @click.option('--format', '--fmt', default='dimodbqm',
               type=click.Choice(['coo', 'dimodbqm'], case_sensitive=False),
               help='Problem data encoding')
 @click.argument('input_file', metavar='FILE', type=click.File('rb'))
-def upload(config_file, profile, client_type, problem_id, format, input_file):
+def upload(config_file, profile, client_type, solver_def, problem_id, format, input_file):
     """Multipart problem upload with cold restart support."""
 
     try:
