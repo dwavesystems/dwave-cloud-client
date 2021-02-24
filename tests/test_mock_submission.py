@@ -37,7 +37,8 @@ except ImportError:
     dimod = None
 
 from dwave.cloud.utils import evaluate_ising, generate_const_ising_problem
-from dwave.cloud.client import Client, Solver
+from dwave.cloud.client import Client
+from dwave.cloud.solver import Solver
 from dwave.cloud.computation import Future
 from dwave.cloud.exceptions import (
     SolverFailureError, CanceledFutureError, SolverError,
