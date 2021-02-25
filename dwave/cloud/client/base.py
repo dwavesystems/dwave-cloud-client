@@ -331,7 +331,7 @@ class Client(object):
         config.update({k: v for k, v in kwargs.items() if v is not None})
         logger.debug("Code config loaded: %r", config)
 
-        from dwave.cloud import qpu, sw, hybrid
+        from dwave.cloud.client import qpu, sw, hybrid
         _clients = {
             'base': cls,
             'qpu': qpu.Client,
