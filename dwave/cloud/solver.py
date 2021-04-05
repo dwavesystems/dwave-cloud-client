@@ -635,7 +635,7 @@ class StructuredSolver(BaseSolver):
     _handled_encoding_formats = {"qp"}
 
     def __init__(self, *args, **kwargs):
-        super(StructuredSolver, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         # The exact sequence of nodes/edges is used in encoding problems and must be preserved
         try:

@@ -62,7 +62,7 @@ class _PrioritizedWorkItem(_PriorityOrderedItem):
         else:
             priority = item.kwargs.pop('priority', sys.maxsize)
 
-        super(_PrioritizedWorkItem, self).__init__(item, priority)
+        super().__init__(item, priority)
 
 
 class _PrioritizingQueue(queue.PriorityQueue):
@@ -78,10 +78,10 @@ class _PrioritizingQueue(queue.PriorityQueue):
         else:
             item = _PriorityOrderedItem(item)
 
-        super(queue.PriorityQueue, self).put(item, *args, **kwargs)
+        super().put(item, *args, **kwargs)
 
     def get(self, *args, **kwargs):
-        prioritized_item = super(queue.PriorityQueue, self).get(*args, **kwargs)
+        prioritized_item = super().get(*args, **kwargs)
         return prioritized_item.item
 
 
@@ -102,7 +102,7 @@ class PriorityThreadPoolExecutor(concurrent.futures.ThreadPoolExecutor):
     """
 
     def __init__(self, *args, **kwargs):
-        super(PriorityThreadPoolExecutor, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._work_queue = _PrioritizingQueue()
 
 
@@ -115,7 +115,7 @@ class Present(concurrent.futures.Future):
     """
 
     def __init__(self, result=None, exception=None):
-        super(Present, self).__init__()
+        super().__init__()
         if result is not None:
             self.set_result(result)
         elif exception is not None:
