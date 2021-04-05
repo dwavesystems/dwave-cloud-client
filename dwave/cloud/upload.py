@@ -259,7 +259,7 @@ class FileView(io.RawIOBase):
     """
 
     def __init__(self, raw):
-        super(FileView, self).__init__()
+        super().__init__()
         self._raw = raw
         self._pos = 0
         self._offset = 0

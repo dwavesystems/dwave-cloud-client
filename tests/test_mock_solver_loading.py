@@ -21,10 +21,11 @@ from unittest import mock
 
 import requests_mock
 
-from dwave.cloud.client import Client, Solver
+from dwave.cloud.client import Client
 from dwave.cloud.qpu import Client as QPUClient
 from dwave.cloud.sw import Client as SoftwareClient
 from dwave.cloud.hybrid import Client as HybridClient
+from dwave.cloud.solver import Solver
 from dwave.cloud.exceptions import *
 from dwave.cloud.config import load_config
 
