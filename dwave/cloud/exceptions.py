@@ -30,10 +30,10 @@ class SAPIError(Exception):
         self.error_code = kwargs.pop('error_code', None)
         if len(args) < 1:
             args = (self.error_msg, )
-        super(SAPIError, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def __str__(self):
-        return super(SAPIError, self).__str__() or self.error_msg or ''
+        return super().__str__() or self.error_msg or ''
 
 class ResourceAuthenticationError(SAPIError):
     """Access to resource not authorized."""
@@ -65,7 +65,7 @@ class SolverAuthenticationError(ResourceAuthenticationError, SolverError):
     """An exception raised when there is an authentication error."""
 
     def __init__(self, *args, **kwargs):
-        super(SolverAuthenticationError, self).__init__("Invalid token or access denied.", *args, **kwargs)
+        super().__init__("Invalid token or access denied.", *args, **kwargs)
 
 class UnsupportedSolverError(SolverError):
     """The solver we received from the API is not supported by the client."""
@@ -88,7 +88,7 @@ class CanceledFutureError(Exception):
     """An exception raised when code tries to read from a canceled future."""
 
     def __init__(self):
-        super(CanceledFutureError, self).__init__("An error occurred reading results from a canceled request")
+        super().__init__("An error occurred reading results from a canceled request")
 
 
 class InvalidAPIResponseError(SAPIError):
