@@ -241,12 +241,12 @@ class TimeoutingHTTPAdapter(requests.adapters.HTTPAdapter):
 
     def __init__(self, timeout=None, *args, **kwargs):
         self.timeout = timeout
-        super(TimeoutingHTTPAdapter, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def send(self, *args, **kwargs):
         # can't use setdefault because caller always sets timeout kwarg
         kwargs['timeout'] = self.timeout
-        return super(TimeoutingHTTPAdapter, self).send(*args, **kwargs)
+        return super().send(*args, **kwargs)
 
 
 # Note: BaseUrlSession is taken from https://github.com/requests/toolbelt under
@@ -262,14 +262,12 @@ class BaseUrlSession(requests.Session):
     def __init__(self, base_url=None):
         if base_url:
             self.base_url = base_url
-        super(BaseUrlSession, self).__init__()
+        super().__init__()
 
     def request(self, method, url, *args, **kwargs):
         """Send the request after generating the complete URL."""
         url = self.create_url(url)
-        return super(BaseUrlSession, self).request(
-            method, url, *args, **kwargs
-        )
+        return super().request(method, url, *args, **kwargs)
 
     def create_url(self, url):
         """Create the URL based off this partial path."""
@@ -382,7 +380,7 @@ class CLIError(Exception):
     standard error message."""
 
     def __init__(self, message, code):
-        super(CLIError, self).__init__(message)
+        super().__init__(message)
         self.code = code
 
 
