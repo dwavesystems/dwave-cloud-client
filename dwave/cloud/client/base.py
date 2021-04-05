@@ -57,7 +57,7 @@ import codecs
 import concurrent.futures
 
 from itertools import chain
-from functools import partial, wraps
+from functools import partial, wraps, lru_cache
 from collections import abc, namedtuple, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 
@@ -521,6 +521,24 @@ class Client(object):
         self._encode_problem_executor = \
             ThreadPoolExecutor(self._ENCODE_PROBLEM_THREAD_COUNT)
 
+    # note: @cached_property available only in py38+
+    @property
+    @lru_cache(maxsize=None)
+    def _user_agent(self):
+        """User-Agent string for this client instance, as returned by
+        :meth:`~dwave.cloud.utils.user_agent`, computed on first access and
+        cached for the lifespan of the client.
+
+        Note:
+            The only tags that might change are platform tags, as returned by
+            ``dwave.common.platform.tags`` entry points, and `platform.platform()`
+            (like linux kernel version). Assuming OS/machine won't change during
+            client's lifespan, and typical platform tags defined via entry points
+            depend on process environments (which rarely change), it's pretty safe
+            to always use the per-instance cached user agent.
+        """
+        return user_agent(__packagename__, __version__)
+
     def create_session(self):
         """Create a new requests session based on client's (self) params.
 
@@ -559,7 +577,7 @@ class Client(object):
             TimeoutingHTTPAdapter(timeout=self.request_timeout,
                                   max_retries=get_retry_conf()))
 
-        session.headers.update({'User-Agent': user_agent(__packagename__, __version__)})
+        session.headers.update({'User-Agent': self._user_agent})
         if self.headers:
             session.headers.update(self.headers)
         if self.token:
