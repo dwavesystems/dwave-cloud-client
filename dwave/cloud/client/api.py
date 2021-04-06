@@ -39,7 +39,7 @@ class SAPI:
         'timeout': (60, 120),
 
         # urllib3.Retry options
-        'retry': dict(total=10, backoff_factor=0.01),
+        'retry': dict(total=10, backoff_factor=0.01, backoff_max=60),
 
         # optional additional headers
         'headers': None,
@@ -47,6 +47,7 @@ class SAPI:
         # ssl verify
         'verify': True,
 
+        # proxy urls, see :attr:`requests.Session.proxies`
         'proxies': None,
     }
 
@@ -57,12 +58,17 @@ class SAPI:
     user_agent = LazyUserAgentClassProperty()
 
     def __init__(self, **kwargs):
+        # populate .config with defaults overridden with supplied kwargs
         self.config = {}
         for opt, default in self.DEFAULTS.items():
             self.config[opt] = kwargs.get(opt, default)
 
     @classmethod
     def from_client_config(cls, client):
+        """Create SAPI client instance configured from a
+        :class:`~dwave.cloud.client.base.Client' instance.
+        """
+
         headers = client.headers.copy()
         if client.connection_close:
             headers.update({'Connection': 'close'})
@@ -91,17 +97,16 @@ class SAPI:
             headers=client.headers,
             verify=not client.permissive_ssl,
         )
+
         return cls(**opts)
 
     @staticmethod
-    def _retry(conf):
+    def _retry(backoff_max=None, **kwargs):
         """Create http idempotent urllib3.Retry config."""
 
+        retry = urllib3.Retry(**kwargs)
+
         # note: `Retry.BACKOFF_MAX` can't be set on construction
-        backoff_max = conf.pop('backoff_max', None)
-
-        retry = urllib3.Retry(**conf)
-
         if backoff_max is not None:
             retry.BACKOFF_MAX = backoff_max
 
@@ -109,6 +114,7 @@ class SAPI:
 
     def create_session(self):
         # allow endpoint path to not end with /
+        # (handle incorrect user input when merging paths, see rfc3986, sec 5.2.3)
         endpoint = self.config['endpoint']
         if not endpoint.endswith('/'):
             endpoint += '/'
@@ -116,13 +122,13 @@ class SAPI:
         # configure request timeout and retries
         session = BaseUrlSession(base_url=endpoint)
         timeout = self.config['timeout']
-        retry_conf = self.config['retry']
+        retry = self.config['retry']
         session.mount('http://',
             TimeoutingHTTPAdapter(
-                timeout=timeout, max_retries=self._retry(retry_conf)))
+                timeout=timeout, max_retries=self._retry(**retry)))
         session.mount('https://',
             TimeoutingHTTPAdapter(
-                timeout=timeout, max_retries=self._retry(retry_conf)))
+                timeout=timeout, max_retries=self._retry(**retry)))
 
         # configure headers
         session.headers.update({'User-Agent': self.user_agent})
