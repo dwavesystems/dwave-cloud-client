@@ -12,6 +12,23 @@ __all__ = ['SAPI']
 logger = logging.getLogger(__name__)
 
 
+class LazyUserAgentClassProperty:
+    # roughly equivalent to ``classmethod(property(cached_user_agent))``, but it
+    # doesn't require chained decorators support available in py39+
+    _user_agent = None
+
+    def __get__(self, obj, objtype=None):
+        # Note: The only tags that might change are platform tags, as returned
+        # by `dwave.common.platform.tags` entry points, and `platform.platform()`
+        # (like linux kernel version). Assuming OS/machine won't change during
+        # client's lifespan, and typical platform tags defined via entry points
+        # depend on process environment variables (which rarely change), it's
+        # pretty safe to cache the user-agent per-class (or even globally).
+        if self._user_agent is None:
+            self._user_agent = user_agent(__packagename__, __version__)
+        return self._user_agent
+
+
 class SAPI:
     DEFAULTS = {
         'endpoint': None,
@@ -32,6 +49,12 @@ class SAPI:
 
         'proxies': None,
     }
+
+    # User-Agent string used in SAPI requests, as returned by
+    # :meth:`~dwave.cloud.utils.user_agent`, computed on first access and
+    # cached for the lifespan of the class.
+    # TODO: consider exposing "user_agent" config parameter
+    user_agent = LazyUserAgentClassProperty()
 
     def __init__(self, **kwargs):
         self.config = {}
@@ -84,24 +107,6 @@ class SAPI:
 
         return retry
 
-    # note: @cached_property available only in py38+
-    @property
-    @lru_cache(maxsize=None)
-    def _user_agent(self):
-        """User-Agent string for this client instance, as returned by
-        :meth:`~dwave.cloud.utils.user_agent`, computed on first access and
-        cached for the lifespan of the client.
-
-        Note:
-            The only tags that might change are platform tags, as returned by
-            ``dwave.common.platform.tags`` entry points, and `platform.platform()`
-            (like linux kernel version). Assuming OS/machine won't change during
-            client's lifespan, and typical platform tags defined via entry points
-            depend on process environments (which rarely change), it's pretty safe
-            to always use the per-instance cached user agent.
-        """
-        return user_agent(__packagename__, __version__)
-
     def create_session(self):
         # allow endpoint path to not end with /
         endpoint = self.config['endpoint']
@@ -120,7 +125,7 @@ class SAPI:
                 timeout=timeout, max_retries=self._retry(retry_conf)))
 
         # configure headers
-        session.headers.update({'User-Agent': self._user_agent})
+        session.headers.update({'User-Agent': self.user_agent})
         if self.config['headers']:
             session.headers.update(self.config['headers'])
 
