@@ -182,3 +182,45 @@ class SAPI:
         logger.debug("create_session from config={!r}".format(self.config))
 
         return session
+
+    @staticmethod
+    def decode_response(response):
+        """Decode SAPI response, returning either parsed JSON data, or raising
+        a :class:`~dwave.cloud.exceptions.SAPIRequestError` subclass.
+        """
+        # NOTE: the expected behavior is for SAPI to return JSON error on
+        # failure. However, that is currently not the case. We need to work
+        # around this until it's fixed.
+
+        # no error -> body is json
+        # error -> body can be json or plain text error message
+        if response.ok:
+            try:
+                return response.json()
+            except:
+                raise InvalidAPIResponseError("JSON response expected")
+
+        else:
+            try:
+                msg = response.json()
+                error_msg = msg['error_msg']
+                error_code = msg['error_code']
+            except:
+                error_msg = response.text
+                error_code = response.status_code
+
+            kw = dict(error_msg=error_msg, error_code=error_code)
+
+            # map known SAPI error codes to exceptions
+            exception_map = {
+                400: BadRequestError,
+                401: UnauthorizedRequestError,
+                403: ForbiddenRequestError,
+                404: NotFoundError,
+                409: ConflictedRequestError,
+                429: TooManyRequestsError,
+            }
+            if error_code in exception_map:
+                raise exception_map[error_code](**kw)
+            elif 500 <= error_code < 600:
+                raise InternalServerError(**kw)
