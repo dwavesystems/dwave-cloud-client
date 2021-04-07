@@ -1,3 +1,4 @@
+import inspect
 import logging
 from functools import lru_cache
 
@@ -5,7 +6,12 @@ import requests
 import urllib3
 
 from dwave.cloud.package_info import __packagename__, __version__
-from dwave.cloud.utils import TimeoutingHTTPAdapter, BaseUrlSession, user_agent
+from dwave.cloud.exceptions import (
+    # standard http errors returned by sapi
+    BadRequestError, UnauthorizedRequestError, ForbiddenRequestError,
+    NotFoundError, ConflictedRequestError, TooManyRequestsError, InternalServerError)
+from dwave.cloud.utils import (
+    TimeoutingHTTPAdapter, BaseUrlSession, user_agent, is_caused_by)
 
 __all__ = ['SAPI']
 
@@ -27,6 +33,34 @@ class LazyUserAgentClassProperty:
         if self._user_agent is None:
             self._user_agent = user_agent(__packagename__, __version__)
         return self._user_agent
+
+
+class SAPISession(BaseUrlSession):
+
+    def request(self, method, *args, **kwargs):
+        # log args with and a caller from a correct stack level
+        caller = inspect.stack()[1].function
+        callee = type(self).__name__
+        logger.trace("[%s] %s.request(%r, *%r, **%r)",
+                    caller, callee, method, args, kwargs)
+
+        # unify timeout exceptions
+        try:
+            response = super().request(method, *args, **kwargs)
+
+        except Exception as exc:
+            logger.trace("[%s] %s.request failed with %r", caller, callee, exc)
+
+            if is_caused_by(exc, (requests.exceptions.Timeout,
+                                urllib3.exceptions.TimeoutError)):
+                raise RequestTimeout from exc
+            else:
+                raise
+
+        logger.trace("[%s] %s.request response=(code=%r, body=%r)",
+                    caller, callee, response.status_code, response.text)
+
+        return response
 
 
 class SAPI:
@@ -120,7 +154,7 @@ class SAPI:
             endpoint += '/'
 
         # configure request timeout and retries
-        session = BaseUrlSession(base_url=endpoint)
+        session = SAPISession(base_url=endpoint)
         timeout = self.config['timeout']
         retry = self.config['retry']
         session.mount('http://',
