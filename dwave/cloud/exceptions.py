@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import requests
+
+
 class ConfigFileError(Exception):
     """Base exception for all config file processing errors."""
 
@@ -22,8 +25,8 @@ class ConfigFileParseError(ConfigFileError):
     """Invalid format of config file."""
 
 
-class SAPIError(Exception):
-    """Generic SAPI error base class."""
+class SAPIRequestError(requests.exceptions.RequestException):
+    """Generic SAPI request error base class."""
 
     def __init__(self, *args, **kwargs):
         self.error_msg = kwargs.pop('error_msg', None)
@@ -35,17 +38,58 @@ class SAPIError(Exception):
     def __str__(self):
         return super().__str__() or self.error_msg or ''
 
-class ResourceAuthenticationError(SAPIError):
+# alias for backward compatibility
+SAPIError = SAPIRequestError
+
+# 400
+class BadRequestError(SAPIRequestError):
+    pass
+
+# 401
+class UnauthorizedRequestError(SAPIRequestError):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.error_msg:
+            self.error_msg = "Invalid token or access denied"
+
+# 403
+class ForbiddenRequestError(SAPIRequestError):
+    pass
+
+# 404
+class NotFoundError(SAPIRequestError):
+    pass
+
+# 409
+class ConflictedRequestError(SAPIRequestError):
+    pass
+
+# 429
+class TooManyRequestsError(SAPIRequestError):
+    pass
+
+# 5xx
+class InternalServerError(SAPIRequestError):
+    pass
+
+
+class ResourceAuthenticationError(UnauthorizedRequestError):
     """Access to resource not authorized."""
 
-class ResourceNotFoundError(SAPIError):
+class ResourceNotFoundError(NotFoundError):
     """Resource not found."""
 
+class ResourceConflictError(ConflictedRequestError):
+    """Conflict in the current state of the resource."""
 
-class SolverError(SAPIError):
+class APILimitExceeded(TooManyRequestsError):
+    """Number of API requests exceeds the permitted limit."""
+
+
+class SolverError(SAPIRequestError):
     """Generic base class for all solver-related errors."""
 
-class ProblemError(SAPIError):
+class ProblemError(SAPIRequestError):
     """Generic base class for all problem-related errors."""
 
 
@@ -64,9 +108,6 @@ class SolverOfflineError(SolverError):
 class SolverAuthenticationError(ResourceAuthenticationError, SolverError):
     """An exception raised when there is an authentication error."""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__("Invalid token or access denied.", *args, **kwargs)
-
 class UnsupportedSolverError(SolverError):
     """The solver we received from the API is not supported by the client."""
 
@@ -74,7 +115,7 @@ class SolverPropertyMissingError(UnsupportedSolverError):
     """The solver we received from the API does not have required properties."""
 
 
-class Timeout(Exception):
+class Timeout(SAPIRequestError):
     """General timeout error."""
 
 class RequestTimeout(Timeout):
