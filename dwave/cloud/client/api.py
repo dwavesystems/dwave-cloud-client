@@ -247,3 +247,45 @@ class SAPIClient:
                 raise InternalServerError(**kw)
             else:
                 raise SAPIRequestError(**kw)
+
+
+class Solvers(SAPIClient):
+
+    def list_solvers(self):
+        path = 'solvers/remote/'
+        response = self.session.get(path)
+        return response.json()
+
+    def get_solver(self, solver_id):
+        path = 'solvers/remote/{}'.format(solver_id)
+        response = self.session.get(path)
+        return response.json()
+
+
+class Problems(SAPIClient):
+
+    def list_problems(self, **params):
+        # available params: id, label, max_results, status, solver
+        path = 'problems'
+        response = self.session.get(path, params=params)
+        return response.json()
+
+    def get_problem(self, problem_id):
+        path = 'problems/{}'.format(problem_id)
+        response = self.session.get(path)
+        return response.json()
+
+    def get_problem_info(self, problem_id):
+        path = 'problems/{}/info'.format(problem_id)
+        response = self.session.get(path)
+        return response.json()
+
+    def get_problem_answer(self, problem_id):
+        path = 'problems/{}/answer'.format(problem_id)
+        response = self.session.get(path)
+        return response.json()
+
+    def get_problem_messages(self, problem_id):
+        path = 'problems/{}/messages'.format(problem_id)
+        response = self.session.get(path)
+        return response.json()
