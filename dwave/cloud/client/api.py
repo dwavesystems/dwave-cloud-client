@@ -13,7 +13,7 @@ from dwave.cloud.exceptions import (
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent, is_caused_by)
 
-__all__ = ['SAPI']
+__all__ = ['SAPIClient']
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,9 @@ class LazyUserAgentClassProperty:
 
 
 class SAPISession(BaseUrlSession):
+    """:class:`.BaseUrlSession` extended to unify timeout exceptions and log
+    requests.
+    """
 
     def request(self, method, *args, **kwargs):
         # log args with and a caller from a correct stack level
@@ -63,7 +66,11 @@ class SAPISession(BaseUrlSession):
         return response
 
 
-class SAPI:
+class SAPIClient:
+    """Low-level SAPI client, as a thin wrapper around `requests.Session`,
+    that handles SAPI specifics like authentication and response parsing.
+    """
+
     DEFAULTS = {
         'endpoint': None,
         'token': None,
@@ -96,6 +103,8 @@ class SAPI:
         self.config = {}
         for opt, default in self.DEFAULTS.items():
             self.config[opt] = kwargs.get(opt, default)
+
+        self.session = self._create_session()
 
     @classmethod
     def from_client_config(cls, client):
@@ -146,7 +155,7 @@ class SAPI:
 
         return retry
 
-    def create_session(self):
+    def _create_session(self):
         # allow endpoint path to not end with /
         # (handle incorrect user input when merging paths, see rfc3986, sec 5.2.3)
         endpoint = self.config['endpoint']
@@ -178,15 +187,24 @@ class SAPI:
         if self.config['proxies']:
             session.proxies = self.config['proxies']
 
+        # raise all response errors as exceptions automatically
+        session.hooks['response'].append(self._raise_for_status)
+
         # debug log
         logger.debug("create_session from config={!r}".format(self.config))
 
         return session
 
     @staticmethod
-    def decode_response(response):
-        """Decode SAPI response, returning either parsed JSON data, or raising
-        a :class:`~dwave.cloud.exceptions.SAPIRequestError` subclass.
+    def _raise_for_status(response, **kwargs):
+        """Raises :class:`~dwave.cloud.exceptions.SAPIRequestError`, if one
+        occurred, with message populated from SAPI error response.
+
+        See:
+            :meth:`requests.Response.raise_for_status`.
+
+        Raises:
+            :class:`dwave.cloud.exceptions.SAPIRequestError` subclass
         """
         # NOTE: the expected behavior is for SAPI to return JSON error on
         # failure. However, that is currently not the case. We need to work
@@ -196,7 +214,7 @@ class SAPI:
         # error -> body can be json or plain text error message
         if response.ok:
             try:
-                return response.json()
+                response.json()
             except:
                 raise InvalidAPIResponseError("JSON response expected")
 
@@ -206,10 +224,13 @@ class SAPI:
                 error_msg = msg['error_msg']
                 error_code = msg['error_code']
             except:
-                error_msg = response.text
+                # TODO: better message when error body blank
+                error_msg = response.text or response.reason
                 error_code = response.status_code
 
-            kw = dict(error_msg=error_msg, error_code=error_code)
+            kw = dict(error_msg=error_msg,
+                      error_code=error_code,
+                      response=response)
 
             # map known SAPI error codes to exceptions
             exception_map = {
@@ -224,3 +245,5 @@ class SAPI:
                 raise exception_map[error_code](**kw)
             elif 500 <= error_code < 600:
                 raise InternalServerError(**kw)
+            else:
+                raise SAPIRequestError(**kw)
