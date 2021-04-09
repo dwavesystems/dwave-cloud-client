@@ -251,17 +251,28 @@ class SAPIClient:
                 raise SAPIRequestError(**kw)
 
 
+@dataclass
+class SolverDescription:
+    id: str
+    status: str
+    description: str
+    properties: dict
+    avg_load: float
+
+
 class Solvers(SAPIClient):
 
-    def list_solvers(self):
+    def list_solvers(self) -> List[SolverDescription]:
         path = 'solvers/remote/'
         response = self.session.get(path)
-        return response.json()
+        solvers = response.json()
+        return [SolverDescription(**s) for s in solvers]
 
-    def get_solver(self, solver_id):
+    def get_solver(self, solver_id: str) -> SolverDescription:
         path = 'solvers/remote/{}'.format(solver_id)
         response = self.session.get(path)
-        return response.json()
+        solver = response.json()
+        return SolverDescription(**solver)
 
 
 @dataclass
