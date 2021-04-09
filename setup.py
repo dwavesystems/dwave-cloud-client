@@ -24,6 +24,9 @@ install_requires = ['requests[socks]>=2.18',
 extras_require = {
     'test': ['requests_mock', 'mock', 'numpy', 'coverage'],
 
+    # backports
+    ':python_version == "3.6"': ['dataclasses'],
+
     # bqm support
     'bqm': ['dimod>=0.8.21,<0.11,!=0.10.0,!=0.10.1,!=0.10.2,!=0.10.3,!=0.10.4', 'numpy>=1.16'],
 
