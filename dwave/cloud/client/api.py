@@ -1,6 +1,6 @@
 import inspect
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from functools import lru_cache
 from typing import List, Union
 
@@ -274,16 +274,18 @@ class Solvers(SAPIClient):
         solver = response.json()
         return SolverDescription(**solver)
 
-
 @dataclass
-class ProblemStatus:
+class ProblemInitialStatus:
     id: str
     solver: str
     type: str
     label: str
-    submitted_on: str   # TODO: convert to datetime?
-    solved_on: str      # TODO: convert to datetime?
-    status: str         # TODO: make enum?
+    status: str             # TODO: make enum?
+    submitted_on: str       # TODO: convert to datetime?
+
+@dataclass
+class ProblemStatus(ProblemInitialStatus):
+    solved_on: str = None
 
 @dataclass
 class ProblemAnswer:
@@ -296,8 +298,18 @@ class ProblemAnswer:
     num_variables: int
 
 @dataclass
-class ProblemStatusWithAnswer(ProblemStatus):
+class ProblemStatusWithAnswer(ProblemInitialStatus):
+    solved_on: str
     answer: ProblemAnswer
+
+@dataclass
+class ProblemStatusMaybeWithAnswer(ProblemInitialStatus):
+    solved_on: str = None
+    answer: ProblemAnswer = None
+
+    def __post_init__(self):
+        if self.answer is not None:
+            self.answer = ProblemAnswer(**self.answer)
 
 @dataclass
 class ProblemData:
@@ -314,10 +326,10 @@ class ProblemMetadata:
     solver: str
     type: str
     label: str
+    status: str             # TODO: make enum?
     submitted_by: str
-    submitted_on: str   # TODO: convert to datetime?
-    solved_on: str      # TODO: convert to datetime?
-    status: str         # TODO: make enum?
+    submitted_on: str       # TODO: convert to datetime?
+    solved_on: str = None   # TODO: convert to datetime?
     messages: list = None
 
 @dataclass
@@ -328,13 +340,19 @@ class ProblemInfo:
     metadata: ProblemMetadata
     answer: ProblemAnswer
 
-    # helper to unpack nested fields
-    def __init__(self, **info):
-        self.id = info['id']
-        self.data = ProblemData(**info['data'])
-        self.params = info['params']
-        self.metadata = ProblemMetadata(**info['metadata'])
-        self.answer = ProblemAnswer(**info['answer'])
+    # unpack nested fields
+    def __post_init__(self):
+        self.data = ProblemData(**self.data)
+        self.metadata = ProblemMetadata(**self.metadata)
+        self.answer = ProblemAnswer(**self.answer)
+
+@dataclass
+class ProblemJob:
+    data: ProblemData
+    params: dict
+    solver: str
+    type: str
+    label: str = None
 
 
 class Problems(SAPIClient):
@@ -346,17 +364,12 @@ class Problems(SAPIClient):
         statuses = response.json()
         return [ProblemStatus(**s) for s in statuses]
 
-    def get_problem(self, problem_id: str) -> Union[ProblemStatus,
-                                                    ProblemStatusWithAnswer]:
+    def get_problem(self, problem_id: str) -> ProblemStatusMaybeWithAnswer}:
         """Retrieve problem short status and answer if answer is available."""
         path = 'problems/{}'.format(problem_id)
         response = self.session.get(path)
         status = response.json()
-        answer = status.pop('answer', None)
-        if answer is not None:
-            return ProblemStatusWithAnswer(answer=ProblemAnswer(**answer), **status)
-        else:
-            return ProblemStatus(**status)
+        return ProblemStatusMaybeWithAnswer(**status)
 
     def get_problem_status(self, problem_id: str) -> ProblemStatus:
         """Retrieve short status of a single problem."""
@@ -396,3 +409,26 @@ class Problems(SAPIClient):
         path = 'problems/{}/messages'.format(problem_id)
         response = self.session.get(path)
         return response.json()
+
+    def submit_problem(self,
+                       data: ProblemData,
+                       params: dict,
+                       solver: str,
+                       type: str,
+                       label: str = None) -> ProblemStatusMaybeWithAnswer:
+        """Finite-time blocking problem submit, returning final status and
+        answer, if problem was solved within the (undisclosed) time limit.
+        """
+        path = 'problems/'
+        body = dict(data=asdict(data), params=params, solver=solver,
+                    type=type, label=label)
+        response = self.session.post(path, json=body)
+        return ProblemStatusMaybeWithAnswer(**response.json())
+
+    def submit_problems(self, problems: List[ProblemJob]):
+        """Asynchronous multi-problem submit, returning initial statuses."""
+        path = 'problems/'
+        body = [asdict(p) for p in problems]
+        response = self.session.post(path, json=body)
+        statuses = response.json()
+        return [ProblemInitialStatus(**s) for s in statuses]
