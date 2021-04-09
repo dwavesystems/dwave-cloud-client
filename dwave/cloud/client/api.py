@@ -1,6 +1,8 @@
 import inspect
 import logging
+from dataclasses import dataclass
 from functools import lru_cache
+from typing import List, Union
 
 import requests
 import urllib3
@@ -262,30 +264,124 @@ class Solvers(SAPIClient):
         return response.json()
 
 
+@dataclass
+class ProblemStatus:
+    id: str
+    solver: str
+    type: str
+    label: str
+    submitted_on: str   # TODO: convert to datetime?
+    solved_on: str      # TODO: convert to datetime?
+    status: str         # TODO: make enum?
+
+@dataclass
+class ProblemAnswer:
+    format: str
+    active_variables: str
+    energies: str
+    solutions: str
+    timing: dict
+    num_occurrences: int
+    num_variables: int
+
+@dataclass
+class ProblemStatusWithAnswer(ProblemStatus):
+    answer: ProblemAnswer
+
+@dataclass
+class ProblemData:
+    format: str
+    # qp format fields
+    lin: str = None
+    quad: str = None
+    offset: float = 0
+    # ref format fields
+    data: str = None
+
+@dataclass
+class ProblemMetadata:
+    solver: str
+    type: str
+    label: str
+    submitted_by: str
+    submitted_on: str   # TODO: convert to datetime?
+    solved_on: str      # TODO: convert to datetime?
+    status: str         # TODO: make enum?
+    messages: list = None
+
+@dataclass
+class ProblemInfo:
+    id: str
+    data: ProblemData
+    params: dict
+    metadata: ProblemMetadata
+    answer: ProblemAnswer
+
+    # helper to unpack nested fields
+    def __init__(self, **info):
+        self.id = info['id']
+        self.data = ProblemData(**info['data'])
+        self.params = info['params']
+        self.metadata = ProblemMetadata(**info['metadata'])
+        self.answer = ProblemAnswer(**info['answer'])
+
+
 class Problems(SAPIClient):
 
-    def list_problems(self, **params):
+    def list_problems(self, **params) -> List[ProblemStatus]:
         # available params: id, label, max_results, status, solver
         path = 'problems'
         response = self.session.get(path, params=params)
-        return response.json()
+        statuses = response.json()
+        return [ProblemStatus(**s) for s in statuses]
 
-    def get_problem(self, problem_id):
+    def get_problem(self, problem_id: str) -> Union[ProblemStatus,
+                                                    ProblemStatusWithAnswer]:
+        """Retrieve problem short status and answer if answer is available."""
         path = 'problems/{}'.format(problem_id)
         response = self.session.get(path)
-        return response.json()
+        status = response.json()
+        answer = status.pop('answer', None)
+        if answer is not None:
+            return ProblemStatusWithAnswer(answer=ProblemAnswer(**answer), **status)
+        else:
+            return ProblemStatus(**status)
 
-    def get_problem_info(self, problem_id):
+    def get_problem_status(self, problem_id: str) -> ProblemStatus:
+        """Retrieve short status of a single problem."""
+        path = 'problems/'
+        params = dict(id=problem_id)
+        response = self.session.get(path, params=params)
+        status = response.json()[0]
+        return ProblemStatus(**status)
+
+    def get_problem_statuses(self, problem_ids: List[str]) -> List[ProblemStatus]:
+        """Retrieve short problem statuses for a list of problems."""
+        if len(problem_ids) > 1000:
+            raise ValueError('number of problem ids is limited to 1000')
+
+        path = 'problems/'
+        params = dict(id=','.join(problem_ids))
+        response = self.session.get(path, params=params)
+        statuses = response.json()
+        return [ProblemStatus(**s) for s in statuses]
+
+    def get_problem_info(self, problem_id: str) -> ProblemInfo:
+        """Retrieve complete problem info."""
         path = 'problems/{}/info'.format(problem_id)
         response = self.session.get(path)
-        return response.json()
+        info = response.json()
+        return ProblemInfo(**info)
 
-    def get_problem_answer(self, problem_id):
+    def get_problem_answer(self, problem_id: str) -> ProblemAnswer:
+        """Retrieve problem answer."""
         path = 'problems/{}/answer'.format(problem_id)
         response = self.session.get(path)
-        return response.json()
+        answer = response.json()
+        return ProblemAnswer(**answer)
 
-    def get_problem_messages(self, problem_id):
+    def get_problem_messages(self, problem_id: str) -> List[dict]:
+        """Retrieve list of problem messages."""
         path = 'problems/{}/messages'.format(problem_id)
         response = self.session.get(path)
         return response.json()

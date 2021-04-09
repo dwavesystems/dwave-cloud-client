@@ -4,6 +4,9 @@ python-dateutil>=2.7
 click>=7
 plucky>=0.4.3
 
+# backports
+dataclasses; python_version == "3.7"
+
 # optional bqm support
 # note: dqm supported in dimod>0.9.6
 dimod>=0.8.15
