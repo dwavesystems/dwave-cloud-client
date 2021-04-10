@@ -359,9 +359,13 @@ class ProblemJob:
     label: str = None
 
 @dataclass
-class CancelError:
+class ProblemSubmitError:
     error_code: int
     error_msg: str
+
+@dataclass
+class ProblemCancelError(ProblemSubmitError):
+    pass
 
 
 class Problems(SAPIClient):
@@ -434,13 +438,13 @@ class Problems(SAPIClient):
         response = self.session.post(path, json=body)
         return ProblemStatusMaybeWithAnswer(**response.json())
 
-    def submit_problems(self, problems: List[ProblemJob]):
+    def submit_problems(self, problems: List[ProblemJob]) -> List[Union[ProblemInitialStatus, ProblemSubmitError]]:
         """Asynchronous multi-problem submit, returning initial statuses."""
         path = 'problems/'
         body = [asdict(p) for p in problems]
         response = self.session.post(path, json=body)
         statuses = response.json()
-        return [ProblemInitialStatus(**s) for s in statuses]
+        return [ProblemInitialStatus(**s) if 'status' in s else ProblemSubmitError(**s) for s in statuses]
 
     def cancel_problem(self, problem_id: str) -> ProblemStatus:
         """Initiate problem cancel by problem id."""
@@ -449,9 +453,9 @@ class Problems(SAPIClient):
         status = response.json()
         return ProblemStatus(**status)
 
-    def cancel_problems(self, problem_ids: List[str]) -> List[Union[ProblemStatus, CancelError]]:
+    def cancel_problems(self, problem_ids: List[str]) -> List[Union[ProblemStatus, ProblemCancelError]]:
         """Initiate problem cancel for a list of problems."""
         path = 'problems/'
         response = self.session.delete(path, json=problem_ids)
         statuses = response.json()
-        return [ProblemStatus(**s) if 'status' in s else CancelError(**s) for s in statuses]
+        return [ProblemStatus(**s) if 'status' in s else ProblemCancelError(**s) for s in statuses]
