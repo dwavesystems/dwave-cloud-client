@@ -10,6 +10,7 @@ import urllib3
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import (
     # standard http errors returned by sapi
+    SAPIRequestError,
     BadRequestError, UnauthorizedRequestError, ForbiddenRequestError,
     NotFoundError, ConflictedRequestError, TooManyRequestsError, InternalServerError)
 from dwave.cloud.utils import (
@@ -302,6 +303,9 @@ class ProblemStatusWithAnswer(ProblemInitialStatus):
     solved_on: str
     answer: ProblemAnswer
 
+    def __post_init__(self):
+        self.answer = ProblemAnswer(**self.answer)
+
 @dataclass
 class ProblemStatusMaybeWithAnswer(ProblemInitialStatus):
     solved_on: str = None
@@ -354,6 +358,11 @@ class ProblemJob:
     type: str
     label: str = None
 
+@dataclass
+class CancelError:
+    error_code: int
+    error_msg: str
+
 
 class Problems(SAPIClient):
 
@@ -364,7 +373,7 @@ class Problems(SAPIClient):
         statuses = response.json()
         return [ProblemStatus(**s) for s in statuses]
 
-    def get_problem(self, problem_id: str) -> ProblemStatusMaybeWithAnswer}:
+    def get_problem(self, problem_id: str) -> ProblemStatusMaybeWithAnswer:
         """Retrieve problem short status and answer if answer is available."""
         path = 'problems/{}'.format(problem_id)
         response = self.session.get(path)
@@ -432,3 +441,17 @@ class Problems(SAPIClient):
         response = self.session.post(path, json=body)
         statuses = response.json()
         return [ProblemInitialStatus(**s) for s in statuses]
+
+    def cancel_problem(self, problem_id: str) -> ProblemStatus:
+        """Initiate problem cancel by problem id."""
+        path = 'problems/{}/'.format(problem_id)
+        response = self.session.delete(path)
+        status = response.json()
+        return ProblemStatus(**status)
+
+    def cancel_problems(self, problem_ids: List[str]) -> List[Union[ProblemStatus, CancelError]]:
+        """Initiate problem cancel for a list of problems."""
+        path = 'problems/'
+        response = self.session.delete(path, json=problem_ids)
+        statuses = response.json()
+        return [ProblemStatus(**s) if 'status' in s else CancelError(**s) for s in statuses]
