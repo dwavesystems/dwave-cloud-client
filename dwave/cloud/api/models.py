@@ -47,7 +47,7 @@ class ProblemAnswer(BaseModel):
     energies: str
     solutions: str
     timing: dict
-    num_occurrences: int
+    num_occurrences: str
     num_variables: int
 
 
