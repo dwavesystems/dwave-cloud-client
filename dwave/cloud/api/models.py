@@ -12,34 +12,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass
-from typing import List, Union
+from typing import List, Union, Optional
+from datetime import datetime
+
+from pydantic import BaseModel
+
+from dwave.cloud.api import constants
 
 
-@dataclass
-class SolverDescription:
+class SolverDescription(BaseModel):
     id: str
     status: str
     description: str
     properties: dict
     avg_load: float
 
-@dataclass
-class ProblemInitialStatus:
+
+class ProblemInitialStatus(BaseModel):
     id: str
+    type: constants.ProblemType
     solver: str
-    type: str
-    label: str
-    status: str             # TODO: make enum?
-    submitted_on: str       # TODO: convert to datetime?
+    label: Optional[str]
+    status: constants.ProblemStatus
+    submitted_on: datetime
 
-@dataclass
+
 class ProblemStatus(ProblemInitialStatus):
-    solved_on: str = None
+    solved_on: Optional[datetime]
 
-@dataclass
-class ProblemAnswer:
-    format: str
+
+class ProblemAnswer(BaseModel):
+    format: constants.AnswerEncodingFormat
     active_variables: str
     energies: str
     solutions: str
@@ -47,26 +50,17 @@ class ProblemAnswer:
     num_occurrences: int
     num_variables: int
 
-@dataclass
-class ProblemStatusWithAnswer(ProblemInitialStatus):
-    solved_on: str
+
+class ProblemStatusWithAnswer(ProblemStatus):
     answer: ProblemAnswer
 
-    def __post_init__(self):
-        self.answer = ProblemAnswer(**self.answer)
 
-@dataclass
-class ProblemStatusMaybeWithAnswer(ProblemInitialStatus):
-    solved_on: str = None
-    answer: ProblemAnswer = None
+class ProblemStatusMaybeWithAnswer(ProblemStatus):
+    answer: Optional[ProblemAnswer]
 
-    def __post_init__(self):
-        if self.answer is not None:
-            self.answer = ProblemAnswer(**self.answer)
 
-@dataclass
-class ProblemData:
-    format: str
+class ProblemData(BaseModel):
+    format: constants.ProblemEncodingFormat
     # qp format fields
     lin: str = None
     quad: str = None
@@ -74,44 +68,41 @@ class ProblemData:
     # ref format fields
     data: str = None
 
-@dataclass
-class ProblemMetadata:
-    solver: str
-    type: str
-    label: str
-    status: str             # TODO: make enum?
-    submitted_by: str
-    submitted_on: str       # TODO: convert to datetime?
-    solved_on: str = None   # TODO: convert to datetime?
-    messages: list = None
 
-@dataclass
-class ProblemInfo:
+class ProblemMetadata(BaseModel):
+    solver: str
+    type: constants.ProblemType
+    label: Optional[str]
+    status: constants.ProblemStatus
+    submitted_by: str
+    submitted_on: datetime
+    solved_on: Optional[datetime]
+    messages: Optional[List[dict]]
+
+
+class ProblemInfo(BaseModel):
     id: str
     data: ProblemData
     params: dict
     metadata: ProblemMetadata
     answer: ProblemAnswer
 
-    # unpack nested fields
-    def __post_init__(self):
-        self.data = ProblemData(**self.data)
-        self.metadata = ProblemMetadata(**self.metadata)
-        self.answer = ProblemAnswer(**self.answer)
 
-@dataclass
-class ProblemJob:
+class ProblemJob(BaseModel):
     data: ProblemData
     params: dict
     solver: str
-    type: str
-    label: str = None
+    type: constants.ProblemType
+    label: Optional[str]
 
-@dataclass
-class ProblemSubmitError:
+
+class BatchItemError(BaseModel):
     error_code: int
     error_msg: str
 
-@dataclass
-class ProblemCancelError(ProblemSubmitError):
+
+class ProblemSubmitError(BatchItemError):
+    pass
+
+class ProblemCancelError(BatchItemError):
     pass
