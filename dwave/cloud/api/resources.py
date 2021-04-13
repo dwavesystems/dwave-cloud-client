@@ -93,7 +93,7 @@ class Problems(Resource):
         """Retrieve problem answer."""
         path = 'problems/{}/answer'.format(problem_id)
         response = self.session.get(path)
-        answer = response.json()
+        answer = response.json()['answer']
         return models.ProblemAnswer(**answer)
 
     # Content-Type: application/vnd.dwave.sapi.problem-message+json; version=2.1.0
@@ -124,8 +124,10 @@ class Problems(Resource):
             List[Union[models.ProblemInitialStatus, models.ProblemSubmitError]]:
         """Asynchronous multi-problem submit, returning initial statuses."""
         path = 'problems/'
-        body = [p.json() for p in problems]
-        response = self.session.post(path, json=body)
+        # encode piecewise so that enums are serialized (via pydantic encoder)
+        body = '[%s]' % ','.join(p.json() for p in problems)
+        response = self.session.post(path, data=body,
+                                     headers={'Content-Type': 'application/json'})
         statuses = response.json()
         return [models.ProblemInitialStatus(**s) if 'status' in s
                 else models.ProblemSubmitError(**s)
@@ -147,5 +149,5 @@ class Problems(Resource):
         response = self.session.delete(path, json=problem_ids)
         statuses = response.json()
         return [models.ProblemStatus(**s) if 'status' in s
-                else ProblemCancelError(**s)
+                else models.ProblemCancelError(**s)
                 for s in statuses]
