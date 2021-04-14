@@ -20,22 +20,45 @@ from dwave.cloud.api import constants, models
 __all__ = ['Solvers', 'Problems']
 
 
-class Resource(SAPIClient):
+class Resource:
     """A class for interacting with a SAPI resource."""
+
+    resource_path = ''
+
+    def __init__(self, **config):
+        self.client = SAPIClient(**config)
+
+        session = self.client.session
+        if self.resource_path:
+            session.base_url = session.create_url(self.resource_path)
+        self.session = session
+
+    @classmethod
+    def from_client(cls, client: Union[SAPIClient, 'dwave.cloud.client.base.Client']):
+        """Create Resource instance configured from a
+        :class:`~dwave.cloud.client.base.Client' instance.
+        """
+        if isinstance(client, SAPIClient):
+            return cls(**client.config)
+        else: # assume isinstance(client, dwave.cloud.Client), without importing
+            sapiclient = SAPIClient.from_client_config(client)
+            return cls(**sapiclient.config)
 
 
 class Solvers(Resource):
 
+    resource_path = 'solvers/'
+
     # Content-Type: application/vnd.dwave.sapi.solver-definition-list+json; version=2.0.0
     def list_solvers(self) -> List[models.SolverDescription]:
-        path = 'solvers/remote/'
+        path = 'remote/'
         response = self.session.get(path)
         solvers = response.json()
         return [models.SolverDescription(**s) for s in solvers]
 
     # Content-Type: application/vnd.dwave.sapi.solver-definition+json; version=2.0.0
     def get_solver(self, solver_id: str) -> models.SolverDescription:
-        path = 'solvers/remote/{}'.format(solver_id)
+        path = 'remote/{}'.format(solver_id)
         response = self.session.get(path)
         solver = response.json()
         return models.SolverDescription(**solver)
@@ -43,10 +66,12 @@ class Solvers(Resource):
 
 class Problems(Resource):
 
+    resource_path = 'problems/'
+
     # Content-Type: application/vnd.dwave.sapi.problems+json; version=2.1.0
     def list_problems(self, **params) -> List[models.ProblemStatus]:
         # available params: id, label, max_results, status, solver
-        path = 'problems'
+        path = ''
         response = self.session.get(path, params=params)
         statuses = response.json()
         return [models.ProblemStatus(**s) for s in statuses]
@@ -54,7 +79,7 @@ class Problems(Resource):
     # Content-Type: application/vnd.dwave.sapi.problem+json; version=2.1.0
     def get_problem(self, problem_id: str) -> models.ProblemStatusMaybeWithAnswer:
         """Retrieve problem short status and answer if answer is available."""
-        path = 'problems/{}'.format(problem_id)
+        path = '{}'.format(problem_id)
         response = self.session.get(path)
         status = response.json()
         return models.ProblemStatusMaybeWithAnswer(**status)
@@ -62,7 +87,7 @@ class Problems(Resource):
     # Content-Type: application/vnd.dwave.sapi.problems+json; version=2.1.0
     def get_problem_status(self, problem_id: str) -> models.ProblemStatus:
         """Retrieve short status of a single problem."""
-        path = 'problems/'
+        path = ''
         params = dict(id=problem_id)
         response = self.session.get(path, params=params)
         status = response.json()[0]
@@ -74,7 +99,7 @@ class Problems(Resource):
         if len(problem_ids) > 1000:
             raise ValueError('number of problem ids is limited to 1000')
 
-        path = 'problems/'
+        path = ''
         params = dict(id=','.join(problem_ids))
         response = self.session.get(path, params=params)
         statuses = response.json()
@@ -83,7 +108,7 @@ class Problems(Resource):
     # Content-Type: application/vnd.dwave.sapi.problem-data+json; version=2.1.0
     def get_problem_info(self, problem_id: str) -> models.ProblemInfo:
         """Retrieve complete problem info."""
-        path = 'problems/{}/info'.format(problem_id)
+        path = '{}/info'.format(problem_id)
         response = self.session.get(path)
         info = response.json()
         return models.ProblemInfo(**info)
@@ -91,7 +116,7 @@ class Problems(Resource):
     # Content-Type: application/vnd.dwave.sapi.problem-answer+json; version=2.1.0
     def get_problem_answer(self, problem_id: str) -> models.ProblemAnswer:
         """Retrieve problem answer."""
-        path = 'problems/{}/answer'.format(problem_id)
+        path = '{}/answer'.format(problem_id)
         response = self.session.get(path)
         answer = response.json()['answer']
         return models.ProblemAnswer(**answer)
@@ -99,7 +124,7 @@ class Problems(Resource):
     # Content-Type: application/vnd.dwave.sapi.problem-message+json; version=2.1.0
     def get_problem_messages(self, problem_id: str) -> List[dict]:
         """Retrieve list of problem messages."""
-        path = 'problems/{}/messages'.format(problem_id)
+        path = '{}/messages'.format(problem_id)
         response = self.session.get(path)
         return response.json()
 
@@ -113,7 +138,7 @@ class Problems(Resource):
         """Blocking problem submit with timeout, returning final status and
         answer, if problem was solved within the (undisclosed) time limit.
         """
-        path = 'problems/'
+        path = ''
         body = dict(data=data.dict(), params=params, solver=solver,
                     type=type, label=label)
         response = self.session.post(path, json=body)
@@ -123,7 +148,7 @@ class Problems(Resource):
     def submit_problems(self, problems: List[models.ProblemJob]) -> \
             List[Union[models.ProblemInitialStatus, models.ProblemSubmitError]]:
         """Asynchronous multi-problem submit, returning initial statuses."""
-        path = 'problems/'
+        path = ''
         # encode piecewise so that enums are serialized (via pydantic encoder)
         body = '[%s]' % ','.join(p.json() for p in problems)
         response = self.session.post(path, data=body,
@@ -136,7 +161,7 @@ class Problems(Resource):
     # Content-Type: application/vnd.dwave.sapi.problem+json; version=2.1.0
     def cancel_problem(self, problem_id: str) -> models.ProblemStatus:
         """Initiate problem cancel by problem id."""
-        path = 'problems/{}/'.format(problem_id)
+        path = '{}/'.format(problem_id)
         response = self.session.delete(path)
         status = response.json()
         return models.ProblemStatus(**status)
@@ -145,7 +170,7 @@ class Problems(Resource):
     def cancel_problems(self, problem_ids: List[str]) -> \
             List[Union[models.ProblemStatus, models.ProblemCancelError]]:
         """Initiate problem cancel for a list of problems."""
-        path = 'problems/'
+        path = ''
         response = self.session.delete(path, json=problem_ids)
         statuses = response.json()
         return [models.ProblemStatus(**s) if 'status' in s
