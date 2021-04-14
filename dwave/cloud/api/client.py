@@ -26,6 +26,7 @@ from dwave.cloud.exceptions import (
     NotFoundError, ConflictedRequestError, TooManyRequestsError, InternalServerError)
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent, is_caused_by)
+from dwave.cloud.api import constants
 
 __all__ = ['SAPIClient']
 
@@ -86,7 +87,7 @@ class SAPIClient:
     """
 
     DEFAULTS = {
-        'endpoint': None,
+        'endpoint': constants.DEFAULT_API_ENDPOINT,
         'token': None,
         'cert': None,
 
