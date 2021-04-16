@@ -23,7 +23,8 @@ from dwave.cloud.exceptions import (
     # standard http errors returned by sapi
     SAPIRequestError,
     BadRequestError, UnauthorizedRequestError, ForbiddenRequestError,
-    NotFoundError, ConflictedRequestError, TooManyRequestsError, InternalServerError)
+    NotFoundError, ConflictedRequestError, TooManyRequestsError, InternalServerError,
+    InvalidAPIResponseError)
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent, is_caused_by)
 from dwave.cloud.api import constants
