@@ -31,7 +31,7 @@ class SAPIRequestError(requests.exceptions.RequestException):
     def __init__(self, *args, **kwargs):
         self.error_msg = kwargs.pop('error_msg', None)
         self.error_code = kwargs.pop('error_code', None)
-        if len(args) < 1:
+        if len(args) < 1 and self.error_msg is not None:
             args = (self.error_msg, )
         super().__init__(*args, **kwargs)
 
