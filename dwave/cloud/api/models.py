@@ -20,7 +20,7 @@ from pydantic import BaseModel
 from dwave.cloud.api import constants
 
 
-class SolverDescription(BaseModel):
+class SolverConfiguration(BaseModel):
     id: str
     status: str
     description: str

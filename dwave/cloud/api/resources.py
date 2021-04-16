@@ -50,18 +50,18 @@ class Solvers(Resource):
     resource_path = 'solvers/'
 
     # Content-Type: application/vnd.dwave.sapi.solver-definition-list+json; version=2.0.0
-    def list_solvers(self) -> List[models.SolverDescription]:
+    def list_solvers(self) -> List[models.SolverConfiguration]:
         path = 'remote/'
         response = self.session.get(path)
         solvers = response.json()
-        return [models.SolverDescription(**s) for s in solvers]
+        return [models.SolverConfiguration(**s) for s in solvers]
 
     # Content-Type: application/vnd.dwave.sapi.solver-definition+json; version=2.0.0
-    def get_solver(self, solver_id: str) -> models.SolverDescription:
+    def get_solver(self, solver_id: str) -> models.SolverConfiguration:
         path = 'remote/{}'.format(solver_id)
         response = self.session.get(path)
         solver = response.json()
-        return models.SolverDescription(**solver)
+        return models.SolverConfiguration(**solver)
 
 
 class Problems(Resource):
