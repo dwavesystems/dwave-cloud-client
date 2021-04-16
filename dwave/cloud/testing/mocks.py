@@ -153,6 +153,7 @@ def unstructured_solver_data(id: str = None,
             "minimum_time_limit": [
                 [1, 1.0], [1024, 2.0], [4096, 4.0], [8192, 16.0]
             ],
+            "quota_conversion_rate": 20,
             "parameters": {
                 "time_limit": "Hybrid solver execution time limit."
             }
