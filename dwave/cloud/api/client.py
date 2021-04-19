@@ -18,16 +18,10 @@ import logging
 import requests
 import urllib3
 
+from dwave.cloud.api import constants, exceptions
 from dwave.cloud.package_info import __packagename__, __version__
-from dwave.cloud.exceptions import (
-    # standard http errors returned by sapi
-    SAPIRequestError,
-    BadRequestError, UnauthorizedRequestError, ForbiddenRequestError,
-    NotFoundError, ConflictedRequestError, TooManyRequestsError, InternalServerError,
-    InvalidAPIResponseError)
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent, is_caused_by)
-from dwave.cloud.api import constants
 
 __all__ = ['SAPIClient']
 
@@ -72,7 +66,7 @@ class SAPISession(BaseUrlSession):
 
             if is_caused_by(exc, (requests.exceptions.Timeout,
                                 urllib3.exceptions.TimeoutError)):
-                raise RequestTimeout from exc
+                raise exceptions.RequestTimeout from exc
             else:
                 raise
 
@@ -232,7 +226,7 @@ class SAPIClient:
             try:
                 response.json()
             except:
-                raise InvalidAPIResponseError("JSON response expected")
+                raise exceptions.ResourceBadResponseError("JSON response expected")
 
         else:
             try:
@@ -250,16 +244,16 @@ class SAPIClient:
 
             # map known SAPI error codes to exceptions
             exception_map = {
-                400: BadRequestError,
-                401: UnauthorizedRequestError,
-                403: ForbiddenRequestError,
-                404: NotFoundError,
-                409: ConflictedRequestError,
-                429: TooManyRequestsError,
+                400: exceptions.ResourceBadRequestError,
+                401: exceptions.ResourceAuthenticationError,
+                403: exceptions.ResourceAccessForbiddenError,
+                404: exceptions.ResourceNotFoundError,
+                409: exceptions.ResourceConflictError,
+                429: exceptions.ResourceLimitsExceededError,
             }
             if error_code in exception_map:
                 raise exception_map[error_code](**kw)
             elif 500 <= error_code < 600:
-                raise InternalServerError(**kw)
+                raise exceptions.InternalServerError(**kw)
             else:
-                raise SAPIRequestError(**kw)
+                raise exceptions.RequestError(**kw)

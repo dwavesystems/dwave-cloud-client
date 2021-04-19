@@ -22,7 +22,7 @@ import requests_mock
 
 from dwave.cloud.testing.mocks import qpu_clique_solver_data
 from dwave.cloud.api.resources import Solvers, Problems
-from dwave.cloud import exceptions
+from dwave.cloud.api import exceptions
 
 
 class TestSolvers(unittest.TestCase):
@@ -86,12 +86,12 @@ class TestSolvers(unittest.TestCase):
         """Not found error is raised when trying to fetch a non-existing solver."""
 
         resource = Solvers(token=self.token, endpoint=self.endpoint)
-        with self.assertRaises(exceptions.NotFoundError):
+        with self.assertRaises(exceptions.ResourceNotFoundError):
             resource.get_solver('non-existing-solver')
 
     def test_invalid_token(self):
         """Auth error is raised when request not authorized with token."""
 
         resource = Solvers(token='invalid-token', endpoint=self.endpoint)
-        with self.assertRaises(exceptions.UnauthorizedRequestError):
+        with self.assertRaises(exceptions.ResourceAuthenticationError):
             resource.list_solvers()
