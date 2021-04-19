@@ -26,64 +26,48 @@ class ConfigFileParseError(ConfigFileError):
 
 
 class SAPIRequestError(requests.exceptions.RequestException):
-    """Generic SAPI request error base class."""
+    """Generic SAPI request error"""
+
+    error_msg = None
+    error_code = None
 
     def __init__(self, *args, **kwargs):
-        self.error_msg = kwargs.pop('error_msg', None)
-        self.error_code = kwargs.pop('error_code', None)
+        self.error_msg = kwargs.pop('error_msg', self.error_msg)
+        self.error_code = kwargs.pop('error_code', self.error_code)
         if len(args) < 1 and self.error_msg is not None:
             args = (self.error_msg, )
+        if len(args) < 1:
+            args = (self.__doc__, )
         super().__init__(*args, **kwargs)
 
-    def __str__(self):
-        return super().__str__() or self.error_msg or ''
 
 # alias for backward compatibility
 SAPIError = SAPIRequestError
 
-# 400
-class BadRequestError(SAPIRequestError):
-    pass
 
-# 401
-class UnauthorizedRequestError(SAPIRequestError):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if not self.error_msg:
-            self.error_msg = "Invalid token or access denied"
+class ResourceBadRequestError(SAPIRequestError):
+    """Resource failed to parse the request"""
 
-# 403
-class ForbiddenRequestError(SAPIRequestError):
-    pass
+class ResourceAuthenticationError(SAPIRequestError):
+    """Access to resource not authorized: token is invalid or missing"""
 
-# 404
-class NotFoundError(SAPIRequestError):
-    pass
+class ResourceAccessForbiddenError(SAPIRequestError):
+    """Access to resource forbidden"""
 
-# 409
-class ConflictedRequestError(SAPIRequestError):
-    pass
+class ResourceNotFoundError(SAPIRequestError):
+    """Resource not found"""
 
-# 429
-class TooManyRequestsError(SAPIRequestError):
-    pass
+class ResourceConflictError(SAPIRequestError):
+    """Conflict in the current state of the resource"""
 
-# 5xx
+class ResourceLimitsExceededError(SAPIRequestError):
+    """Number of resource requests exceed the permitted limit"""
+
+class ResourceBadResponseError(SAPIRequestError):
+    """Unexpected resource response"""
+
 class InternalServerError(SAPIRequestError):
     pass
-
-
-class ResourceAuthenticationError(UnauthorizedRequestError):
-    """Access to resource not authorized."""
-
-class ResourceNotFoundError(NotFoundError):
-    """Resource not found."""
-
-class ResourceConflictError(ConflictedRequestError):
-    """Conflict in the current state of the resource."""
-
-class APILimitExceeded(TooManyRequestsError):
-    """Number of API requests exceeds the permitted limit."""
 
 
 class SolverError(SAPIRequestError):
@@ -132,7 +116,7 @@ class CanceledFutureError(Exception):
         super().__init__("An error occurred reading results from a canceled request")
 
 
-class InvalidAPIResponseError(SAPIError):
+class InvalidAPIResponseError(SAPIRequestError):
     """Raised when an invalid/unexpected response from D-Wave Solver API is received."""
 
 
