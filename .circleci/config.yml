@@ -141,6 +141,12 @@ jobs:
             . env/bin/activate
             make -C docs/ doctest
 
+      - run:
+          name: Test links
+          command: |
+            . env/bin/activate
+            make -C docs/ linkcheck
+
   pypi-deploy:
     docker:
       - image: circleci/python:3.7
