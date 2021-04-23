@@ -45,9 +45,9 @@ class LazyUserAgentClassProperty:
         return self._user_agent
 
 
-class SAPISession(BaseUrlSession):
-    """:class:`.BaseUrlSession` extended to unify timeout exceptions and log
-    requests.
+class LoggingSession(BaseUrlSession):
+    """:class:`.BaseUrlSession` extended to unify timeout exceptions and to log
+    all requests (and responses).
     """
 
     def request(self, method, *args, **kwargs):
@@ -55,7 +55,7 @@ class SAPISession(BaseUrlSession):
         caller = inspect.stack()[1].function
         callee = type(self).__name__
         logger.trace("[%s] %s.request(%r, *%r, **%r)",
-                    caller, callee, method, args, kwargs)
+                     caller, callee, method, args, kwargs)
 
         # unify timeout exceptions
         try:
@@ -65,13 +65,13 @@ class SAPISession(BaseUrlSession):
             logger.trace("[%s] %s.request failed with %r", caller, callee, exc)
 
             if is_caused_by(exc, (requests.exceptions.Timeout,
-                                urllib3.exceptions.TimeoutError)):
+                                  urllib3.exceptions.TimeoutError)):
                 raise exceptions.RequestTimeout from exc
             else:
                 raise
 
         logger.trace("[%s] %s.request response=(code=%r, body=%r)",
-                    caller, callee, response.status_code, response.text)
+                     caller, callee, response.status_code, response.text)
 
         return response
 
@@ -102,19 +102,21 @@ class SAPIClient:
         'proxies': None,
     }
 
+    # client instance config, populated on init from kwargs overridding DEFAULTS
+    config = None
+
     # User-Agent string used in SAPI requests, as returned by
     # :meth:`~dwave.cloud.utils.user_agent`, computed on first access and
     # cached for the lifespan of the class.
     # TODO: consider exposing "user_agent" config parameter
     user_agent = LazyUserAgentClassProperty()
 
-    def __init__(self, **kwargs):
-        # populate .config with defaults overridden with supplied kwargs
+    def __init__(self, **config):
         self.config = {}
         for opt, default in self.DEFAULTS.items():
-            self.config[opt] = kwargs.get(opt, default)
+            self.config[opt] = config.get(opt, default)
 
-        self.session = self._create_session()
+        self.session = self._create_session(self.config)
 
     @classmethod
     def from_client_config(cls, client):
@@ -154,7 +156,7 @@ class SAPIClient:
         return cls(**opts)
 
     @staticmethod
-    def _retry(backoff_max=None, **kwargs):
+    def _retry_config(backoff_max=None, **kwargs):
         """Create http idempotent urllib3.Retry config."""
 
         retry = urllib3.Retry(**kwargs)
@@ -165,43 +167,44 @@ class SAPIClient:
 
         return retry
 
-    def _create_session(self):
+    @classmethod
+    def _create_session(cls, config):
         # allow endpoint path to not end with /
         # (handle incorrect user input when merging paths, see rfc3986, sec 5.2.3)
-        endpoint = self.config['endpoint']
+        endpoint = config['endpoint']
         if not endpoint.endswith('/'):
             endpoint += '/'
 
         # configure request timeout and retries
-        session = SAPISession(base_url=endpoint)
-        timeout = self.config['timeout']
-        retry = self.config['retry']
+        session = LoggingSession(base_url=endpoint)
+        timeout = config['timeout']
+        retry = config['retry']
         session.mount('http://',
             TimeoutingHTTPAdapter(
-                timeout=timeout, max_retries=self._retry(**retry)))
+                timeout=timeout, max_retries=cls._retry_config(**retry)))
         session.mount('https://',
             TimeoutingHTTPAdapter(
-                timeout=timeout, max_retries=self._retry(**retry)))
+                timeout=timeout, max_retries=cls._retry_config(**retry)))
 
         # configure headers
-        session.headers.update({'User-Agent': self.user_agent})
-        if self.config['headers']:
-            session.headers.update(self.config['headers'])
+        session.headers.update({'User-Agent': cls.user_agent})
+        if config['headers']:
+            session.headers.update(config['headers'])
 
         # auth
-        if self.config['token']:
-            session.headers.update({'X-Auth-Token': self.config['token']})
-        if self.config['cert']:
-            session.cert = self.config['cert']
+        if config['token']:
+            session.headers.update({'X-Auth-Token': config['token']})
+        if config['cert']:
+            session.cert = config['cert']
 
-        if self.config['proxies']:
-            session.proxies = self.config['proxies']
+        if config['proxies']:
+            session.proxies = config['proxies']
 
         # raise all response errors as exceptions automatically
-        session.hooks['response'].append(self._raise_for_status)
+        session.hooks['response'].append(cls._raise_for_status)
 
         # debug log
-        logger.debug("create_session from config={!r}".format(self.config))
+        logger.debug("create_session from config={!r}".format(config))
 
         return session
 
