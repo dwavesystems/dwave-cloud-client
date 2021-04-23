@@ -30,11 +30,12 @@ class Resource:
 
         session = self.client.session
         if self.resource_path:
+            # append resource_path
             session.base_url = session.create_url(self.resource_path)
         self.session = session
 
     @classmethod
-    def from_client(cls, client: Union[SAPIClient, 'dwave.cloud.client.base.Client']):
+    def from_client_config(cls, client: Union[SAPIClient, 'dwave.cloud.client.base.Client']):
         """Create Resource instance configured from a
         :class:`~dwave.cloud.client.base.Client' instance.
         """
