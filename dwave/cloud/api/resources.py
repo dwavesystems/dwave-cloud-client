@@ -20,10 +20,10 @@ from dwave.cloud.api import constants, models
 __all__ = ['Solvers', 'Problems']
 
 
-class Resource:
+class ResourceBase:
     """A class for interacting with a SAPI resource."""
 
-    resource_path = ''
+    resource_path = None
 
     def __init__(self, **config):
         self.client = SAPIClient(**config)
@@ -39,6 +39,7 @@ class Resource:
         """Create Resource instance configured from a
         :class:`~dwave.cloud.client.base.Client' instance.
         """
+        # TODO: also accept configuration dict/dataclass when config/client refactored
         if isinstance(client, SAPIClient):
             return cls(**client.config)
         else: # assume isinstance(client, dwave.cloud.Client), without importing
@@ -46,7 +47,7 @@ class Resource:
             return cls(**sapiclient.config)
 
 
-class Solvers(Resource):
+class Solvers(ResourceBase):
 
     resource_path = 'solvers/'
 
@@ -65,13 +66,34 @@ class Solvers(Resource):
         return models.SolverConfiguration(**solver)
 
 
-class Problems(Resource):
+class Problems(ResourceBase):
 
     resource_path = 'problems/'
 
     # Content-Type: application/vnd.dwave.sapi.problems+json; version=2.1.0
-    def list_problems(self, **params) -> List[models.ProblemStatus]:
-        # available params: id, label, max_results, status, solver
+    def list_problems(self,
+                      id: str = None,
+                      label: str = None,
+                      max_results: int = None,
+                      status: Union[str, constants.ProblemStatus] = None,
+                      solver: str = None,
+                      **params) -> List[models.ProblemStatus]:
+        """Retrieve a filtered list of submitted problems."""
+
+        # build query
+        if id is not None:
+            params.setdefault('id', id)
+        if label is not None:
+            params.setdefault('label', label)
+        if max_results is not None:
+            params.setdefault('max_results', max_results)
+        if isinstance(status, constants.ProblemStatus):
+            params.setdefault('status', status.value)
+        elif status is not None:
+            params.setdefault('status', status)
+        if solver is not None:
+            params.setdefault('solver', solver)
+
         path = ''
         response = self.session.get(path, params=params)
         statuses = response.json()
@@ -137,7 +159,7 @@ class Problems(Resource):
                        type: constants.ProblemType,
                        label: str = None) -> models.ProblemStatusMaybeWithAnswer:
         """Blocking problem submit with timeout, returning final status and
-        answer, if problem was solved within the (undisclosed) time limit.
+        answer, if problem is solved within the (undisclosed) time limit.
         """
         path = ''
         body = dict(data=data.dict(), params=params, solver=solver,
@@ -150,9 +172,10 @@ class Problems(Resource):
             List[Union[models.ProblemInitialStatus, models.ProblemSubmitError]]:
         """Asynchronous multi-problem submit, returning initial statuses."""
         path = ''
-        # encode piecewise so that enums are serialized (via pydantic encoder)
+        # encode iteratively so that enums are serialized (via pydantic json encoder)
         body = '[%s]' % ','.join(p.json() for p in problems)
-        response = self.session.post(path, data=body,
+        response = self.session.post(path,
+                                     data=body,
                                      headers={'Content-Type': 'application/json'})
         statuses = response.json()
         return [models.ProblemInitialStatus(**s) if 'status' in s

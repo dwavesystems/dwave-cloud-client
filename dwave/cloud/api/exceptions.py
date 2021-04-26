@@ -22,6 +22,8 @@ class RequestError(requests.exceptions.RequestException):
     error_code = None
 
     def __init__(self, *args, **kwargs):
+        # exception message populated from, in order of precedence: `args`,
+        # `error_msg` kwarg, exception docstring
         self.error_msg = kwargs.pop('error_msg', self.error_msg)
         self.error_code = kwargs.pop('error_code', self.error_code)
         if len(args) < 1 and self.error_msg is not None:
