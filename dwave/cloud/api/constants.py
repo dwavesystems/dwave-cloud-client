@@ -19,7 +19,7 @@ import enum
 DEFAULT_API_ENDPOINT = 'https://cloud.dwavesys.com/sapi/'
 
 
-class ProblemStatus(enum.Enum):
+class ProblemStatus(str, enum.Enum):
     """Solver API problem status values.
 
     Initially a problem is in the PENDING state. When the D-Wave system starts
@@ -38,18 +38,18 @@ class ProblemStatus(enum.Enum):
     CANCELLED = "CANCELLED"
 
 
-class ProblemEncodingFormat(enum.Enum):
+class ProblemEncodingFormat(str, enum.Enum):
     QP = "qp"
     BQ = "bq"   # deprecated for submission
     REF = "ref"
 
 
-class AnswerEncodingFormat(enum.Enum):
+class AnswerEncodingFormat(str, enum.Enum):
     QP = "qp"
     BQ = "bq"   # dimod (de-)serialization-based
 
 
-class ProblemType(enum.Enum):
+class ProblemType(str, enum.Enum):
     ISING = "ising"
     QUBO = "qubo"
     BQM = "bqm"
