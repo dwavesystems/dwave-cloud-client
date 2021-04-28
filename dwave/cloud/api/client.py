@@ -159,6 +159,9 @@ class SAPIClient:
     def _retry_config(backoff_max=None, **kwargs):
         """Create http idempotent urllib3.Retry config."""
 
+        if not kwargs:
+            return None
+
         retry = urllib3.Retry(**kwargs)
 
         # note: `Retry.BACKOFF_MAX` can't be set on construction
@@ -199,6 +202,8 @@ class SAPIClient:
 
         if config['proxies']:
             session.proxies = config['proxies']
+        if config['verify'] is not None:
+            session.verify = config['verify']
 
         # raise all response errors as exceptions automatically
         session.hooks['response'].append(cls._raise_for_status)
