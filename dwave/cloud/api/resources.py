@@ -71,7 +71,7 @@ class Problems(ResourceBase):
     resource_path = 'problems/'
 
     # Content-Type: application/vnd.dwave.sapi.problems+json; version=2.1.0
-    def list_problems(self,
+    def list_problems(self, *,
                       id: str = None,
                       label: str = None,
                       max_results: int = None,
@@ -152,7 +152,7 @@ class Problems(ResourceBase):
         return response.json()
 
     # Content-Type: application/vnd.dwave.sapi.problems+json; version=2.1.0
-    def submit_problem(self,
+    def submit_problem(self, *,
                        data: models.ProblemData,
                        params: dict,
                        solver: str,
@@ -172,7 +172,7 @@ class Problems(ResourceBase):
             List[Union[models.ProblemInitialStatus, models.ProblemSubmitError]]:
         """Asynchronous multi-problem submit, returning initial statuses."""
         path = ''
-        # encode iteratively so that enums are serialized (via pydantic json encoder)
+        # encode iteratively so that timestamps are serialized (via pydantic json encoder)
         body = '[%s]' % ','.join(p.json() for p in problems)
         response = self.session.post(path,
                                      data=body,
