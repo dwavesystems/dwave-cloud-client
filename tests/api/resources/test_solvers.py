@@ -14,18 +14,19 @@
 
 import uuid
 import unittest
-from unittest import mock
 from urllib.parse import urljoin
 
-from requests.exceptions import HTTPError
 import requests_mock
 
+from dwave.cloud.api.resources import Solvers
+from dwave.cloud.api import exceptions, models
+from dwave.cloud.client.base import Client
 from dwave.cloud.testing.mocks import qpu_clique_solver_data
-from dwave.cloud.api.resources import Solvers, Problems
-from dwave.cloud.api import exceptions
+
+from tests import config
 
 
-class TestSolvers(unittest.TestCase):
+class TestMockSolvers(unittest.TestCase):
 
     token = str(uuid.uuid4())
     endpoint = 'http://test.com/path/'
@@ -60,7 +61,7 @@ class TestSolvers(unittest.TestCase):
     def tearDown(self):
         self.mocker.stop()
 
-    def test_list(self):
+    def test_list_solvers(self):
         """List of solver configurations fetched."""
 
         resource = Solvers(token=self.token, endpoint=self.endpoint)
@@ -95,3 +96,40 @@ class TestSolvers(unittest.TestCase):
         resource = Solvers(token='invalid-token', endpoint=self.endpoint)
         with self.assertRaises(exceptions.ResourceAuthenticationError):
             resource.list_solvers()
+
+
+@unittest.skipUnless(config, "SAPI access not configured.")
+class TestCloudSolvers(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        with Client(**config) as client:
+            cls.api = Solvers.from_client_config(client)
+
+    def test_list_solvers(self):
+        """List of all available solvers retrieved."""
+
+        solvers = self.api.list_solvers()
+
+        self.assertIsInstance(solvers, list)
+        self.assertGreater(len(solvers), 0)
+
+        for solver in solvers:
+            self.assertIsInstance(solver, models.SolverConfiguration)
+
+    def test_get_solver(self):
+        """Specific solver config retrieved (by id)."""
+
+        # don't assume solver availability, instead try fetching one from the list
+        solvers = self.api.list_solvers()
+        solver_id = solvers.pop().id
+
+        solver = self.api.get_solver(solver_id)
+        self.assertIsInstance(solver, models.SolverConfiguration)
+        self.assertEqual(solver.id, solver_id)
+
+    def test_nonexisting_solver(self):
+        """Not found error is raised when trying to fetch a non-existing solver."""
+
+        with self.assertRaises(exceptions.ResourceNotFoundError):
+            self.api.get_solver('non-existing-solver')
