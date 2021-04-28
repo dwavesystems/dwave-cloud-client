@@ -27,7 +27,7 @@ from dwave.cloud.api import exceptions, models, constants
 from tests import config
 
 
-class MockProblemsResource(unittest.TestCase):
+class TestMockProblems(unittest.TestCase):
 
     token = str(uuid.uuid4())
     endpoint = 'http://test.com/path/'
@@ -35,7 +35,7 @@ class MockProblemsResource(unittest.TestCase):
 
 
 @unittest.skipUnless(config, "SAPI access not configured.")
-class CloudProblemsResource(unittest.TestCase):
+class TestCloudProblems(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
