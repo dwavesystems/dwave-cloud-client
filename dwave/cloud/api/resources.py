@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import abc
-from typing import List, Union, Optional
+from typing import List, Union, Optional, get_type_hints
+
+from pydantic import parse_obj_as
 
 from dwave.cloud.api.client import SAPIClient
 from dwave.cloud.api import constants, models
@@ -57,14 +58,14 @@ class Solvers(ResourceBase):
         path = 'remote/'
         response = self.session.get(path)
         solvers = response.json()
-        return [models.SolverConfiguration(**s) for s in solvers]
+        return parse_obj_as(List[models.SolverConfiguration], solvers)
 
     # Content-Type: application/vnd.dwave.sapi.solver-definition+json; version=2.0.0
     def get_solver(self, solver_id: str) -> models.SolverConfiguration:
         path = 'remote/{}'.format(solver_id)
         response = self.session.get(path)
         solver = response.json()
-        return models.SolverConfiguration(**solver)
+        return models.SolverConfiguration.parse_obj(solver)
 
 
 class Problems(ResourceBase):
@@ -98,7 +99,7 @@ class Problems(ResourceBase):
         path = ''
         response = self.session.get(path, params=params)
         statuses = response.json()
-        return [models.ProblemStatus.parse_obj(s) for s in statuses]
+        return parse_obj_as(List[models.ProblemStatus], statuses)
 
     # Content-Type: application/vnd.dwave.sapi.problem+json; version=2.1.0
     def get_problem(self, problem_id: str) -> models.ProblemStatusMaybeWithAnswer:
@@ -130,7 +131,7 @@ class Problems(ResourceBase):
         params = dict(id=','.join(problem_ids))
         response = self.session.get(path, params=params)
         statuses = response.json()
-        return [models.ProblemStatus.parse_obj(s) for s in statuses]
+        return parse_obj_as(List[models.ProblemStatus], statuses)
 
     # Content-Type: application/vnd.dwave.sapi.problem-data+json; version=2.1.0
     def get_problem_info(self, problem_id: str) -> models.ProblemInfo:
@@ -178,21 +179,17 @@ class Problems(ResourceBase):
         path = ''
         # encode iteratively so that timestamps are serialized (via pydantic json encoder)
         body = '[%s]' % ','.join(p.json() for p in problems)
-        response = self.session.post(path,
-                                     data=body,
-                                     headers={'Content-Type': 'application/json'})
-        statuses = response.json()
-        return [models.ProblemInitialStatus(**s) if 'status' in s
-                else models.ProblemSubmitError(**s)
-                for s in statuses]
+        response = self.session.post(
+            path, data=body, headers={'Content-Type': 'application/json'})
+        rtype = get_type_hints(self.submit_problems)['return']
+        return parse_obj_as(rtype, response.json())
 
     # Content-Type: application/vnd.dwave.sapi.problem+json; version=2.1.0
     def cancel_problem(self, problem_id: str) -> models.ProblemStatus:
         """Initiate problem cancel by problem id."""
         path = '{}/'.format(problem_id)
         response = self.session.delete(path)
-        status = response.json()
-        return models.ProblemStatus(**status)
+        return models.ProblemStatus.parse_obj(response.json())
 
     # Content-Type: application/vnd.dwave.sapi.problems+json; version=2.1.0
     def cancel_problems(self, problem_ids: List[str]) -> \
@@ -200,7 +197,5 @@ class Problems(ResourceBase):
         """Initiate problem cancel for a list of problems."""
         path = ''
         response = self.session.delete(path, json=problem_ids)
-        statuses = response.json()
-        return [models.ProblemStatus(**s) if 'status' in s
-                else models.ProblemCancelError(**s)
-                for s in statuses]
+        rtype = get_type_hints(self.cancel_problems)['return']
+        return parse_obj_as(rtype, response.json())

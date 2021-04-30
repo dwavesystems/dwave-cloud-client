@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import abc
 from typing import List, Union, Optional
 from datetime import datetime
 
@@ -126,7 +127,6 @@ class ProblemJob(BaseModel):
 class BatchItemError(BaseModel):
     error_code: int
     error_msg: str
-
 
 class ProblemSubmitError(BatchItemError):
     pass

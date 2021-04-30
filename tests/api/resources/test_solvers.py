@@ -27,6 +27,9 @@ from tests import config
 
 
 class TestMockSolvers(unittest.TestCase):
+    """Test request formation and response parsing (including error handling)
+    works correctly for all :class:`dwave.cloud.api.resources.Solvers` methods.
+    """
 
     token = str(uuid.uuid4())
     endpoint = 'http://test.com/path/'
