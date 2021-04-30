@@ -41,14 +41,29 @@ class ProblemStatus(ProblemInitialStatus):
     solved_on: Optional[datetime]
 
 
-class ProblemAnswer(BaseModel):
-    format: constants.AnswerEncodingFormat
+class StructuredProblemAnswer(BaseModel):
+    format: constants.AnswerEncodingFormat = constants.AnswerEncodingFormat.QP
     active_variables: str
     energies: str
     solutions: str
     timing: dict
     num_occurrences: str
     num_variables: int
+
+
+class UnstructuredProblemAnswer(BaseModel):
+    format: constants.AnswerEncodingFormat = constants.AnswerEncodingFormat.BQ
+    data: dict
+
+
+class ProblemAnswer(BaseModel):
+    __root__: Union[StructuredProblemAnswer, UnstructuredProblemAnswer]
+
+    def __getattr__(self, item):
+        return getattr(self.__root__, item)
+
+    def dict(self, **kwargs):
+        return super().dict(**kwargs)['__root__']
 
 
 class ProblemStatusWithAnswer(ProblemStatus):
@@ -59,14 +74,26 @@ class ProblemStatusMaybeWithAnswer(ProblemStatus):
     answer: Optional[ProblemAnswer]
 
 
+class StructuredProblemData(BaseModel):
+    format: constants.ProblemEncodingFormat = constants.ProblemEncodingFormat.QP
+    lin: str
+    quad: str
+    offset: float = 0.0
+
+
+class UnstructuredProblemData(BaseModel):
+    format: constants.ProblemEncodingFormat = constants.ProblemEncodingFormat.REF
+    data: str
+
+
 class ProblemData(BaseModel):
-    format: constants.ProblemEncodingFormat
-    # qp format fields
-    lin: str = None
-    quad: str = None
-    offset: float = 0
-    # ref format fields
-    data: str = None
+    __root__: Union[StructuredProblemData, UnstructuredProblemData]
+
+    def __getattr__(self, item):
+        return getattr(self.__root__, item)
+
+    def dict(self, **kwargs):
+        return super().dict(**kwargs)['__root__']
 
 
 class ProblemMetadata(BaseModel):

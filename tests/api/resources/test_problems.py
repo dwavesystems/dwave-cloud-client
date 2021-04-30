@@ -57,7 +57,7 @@ class TestCloudProblems(unittest.TestCase):
             # double-check
             assert cls.future.remote_status == constants.ProblemStatus.COMPLETED.value
 
-    def verify_problem_status(self, status, solved=False):
+    def verify_problem_status(self, status: models.ProblemStatus, solved: bool = False):
         self.assertEqual(status.id, self.future.id)
         self.assertEqual(status.type, constants.ProblemType.ISING)
         self.assertEqual(status.solver, self.future.solver.id)
@@ -67,7 +67,7 @@ class TestCloudProblems(unittest.TestCase):
         if solved:
             self.assertIsNotNone(status.solved_on)
 
-    def verify_problem_answer(self, answer):
+    def verify_problem_answer(self, answer: models.ProblemAnswer):
         ans = decode_qp(msg=dict(answer=answer.dict(), type='ising'))
         var = set(chain(*self.quadratic)) | self.linear.keys()
         self.assertEqual(set(ans['active_variables']), var)
@@ -207,7 +207,7 @@ class TestCloudProblems(unittest.TestCase):
         """Problem submitted."""
 
         status = self.api.submit_problem(
-            data=models.ProblemData(**self.qp),
+            data=models.ProblemData.parse_obj(self.qp),
             params=self.params,
             solver=self.solver_id,
             type=self.problem_type,
@@ -227,7 +227,7 @@ class TestCloudProblems(unittest.TestCase):
 
         with self.assertRaises(exceptions.ResourceBadRequestError):
             self.api.submit_problem(
-                data=models.ProblemData(**self.qp),
+                data=models.ProblemData.parse_obj(self.qp),
                 params=dict(non_existing_param=1),
                 solver=self.solver_id,
                 type=self.problem_type,
@@ -235,7 +235,7 @@ class TestCloudProblems(unittest.TestCase):
 
         with self.assertRaises(exceptions.ResourceNotFoundError):
             self.api.submit_problem(
-                data=models.ProblemData(**self.qp),
+                data=models.ProblemData.parse_obj(self.qp),
                 params={},
                 solver='non-existing-solver',
                 type=self.problem_type,
@@ -245,7 +245,7 @@ class TestCloudProblems(unittest.TestCase):
         """Multiple problems are submitted and initial statuses returned."""
 
         job = models.ProblemJob(
-            data=models.ProblemData(**self.qp),
+            data=models.ProblemData.parse_obj(self.qp),
             params=dict(num_reads=1),
             solver=self.solver_id,
             type=self.problem_type,
@@ -263,7 +263,7 @@ class TestCloudProblems(unittest.TestCase):
         """Problem batch submit fails due to invalid parameters."""
 
         job = models.ProblemJob(
-            data=models.ProblemData(**self.qp),
+            data=models.ProblemData.parse_obj(self.qp),
             params=dict(non_existing_param=1),
             solver=self.solver_id,
             type=self.problem_type,
