@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import abc
 import uuid
 import unittest
 from urllib.parse import urljoin
@@ -19,8 +20,15 @@ from itertools import chain
 
 import requests_mock
 
+try:
+    import dimod
+except ImportError:
+    dimod = None
+
 from dwave.cloud.client.base import Client
-from dwave.cloud.coders import encode_problem_as_qp, decode_qp
+from dwave.cloud.coders import (
+    encode_problem_as_qp, decode_qp,
+    encode_problem_as_ref, decode_bq)
 from dwave.cloud.api.resources import Problems
 from dwave.cloud.api import exceptions, models, constants
 
@@ -33,33 +41,23 @@ class TestMockProblems(unittest.TestCase):
     endpoint = 'http://test.com/path/'
 
 
-
-@unittest.skipUnless(config, "SAPI access not configured.")
-class TestCloudProblems(unittest.TestCase):
+@unittest.skipUnless(config, "SAPI access not configured")
+class ProblemResourcesBaseTests(abc.ABC):
+    """Basic tests for `dwave.cloud.api.resources.Problems`."""
 
     @classmethod
+    @abc.abstractmethod
     def setUpClass(cls):
-        with Client(**config) as client:
-            cls.api = Problems.from_client_config(client)
+        """Create and submit one problem.
 
-            # submit and solve an Ising problem as a fixture
-            solver = client.get_solver(qpu=True)
-            edge = next(iter(solver.edges))
-            cls.linear = {}
-            cls.quadratic = {edge: 1.0}
-            cls.qp = encode_problem_as_qp(solver, cls.linear, cls.quadratic)
-            cls.params = dict(num_reads=100)
-            cls.future = solver.sample_ising(cls.linear, cls.quadratic, **cls.params)
-            cls.result = cls.future.result()
-            cls.solver_id = solver.id
-            cls.problem_type = constants.ProblemType.ISING
-
-            # double-check
-            assert cls.future.remote_status == constants.ProblemStatus.COMPLETED.value
+        Store as class attributes: `problem_data`, `problem_type`, sampling
+        `params`, submitted `future`, `solver_id`.
+        """
 
     def verify_problem_status(self, status: models.ProblemStatus, solved: bool = False):
+        """Verify `status` consistent with the submitted problem."""
         self.assertEqual(status.id, self.future.id)
-        self.assertEqual(status.type, constants.ProblemType.ISING)
+        self.assertEqual(status.type, self.problem_type)
         self.assertEqual(status.solver, self.future.solver.id)
         self.assertEqual(status.label, self.future.label)
         self.assertEqual(status.status, constants.ProblemStatus.COMPLETED)
@@ -67,12 +65,9 @@ class TestCloudProblems(unittest.TestCase):
         if solved:
             self.assertIsNotNone(status.solved_on)
 
+    @abc.abstractmethod
     def verify_problem_answer(self, answer: models.ProblemAnswer):
-        ans = decode_qp(msg=dict(answer=answer.dict(), type='ising'))
-        var = set(chain(*self.quadratic)) | self.linear.keys()
-        self.assertEqual(set(ans['active_variables']), var)
-        self.assertEqual(len(ans['energies']), len(ans['solutions']))
-        self.assertEqual(sum(ans['num_occurrences']), self.params['num_reads'])
+        """Verify `answer` consistent with the submitted problem."""
 
     def test_list_all(self):
         """List of all available problems retrieved."""
@@ -163,10 +158,7 @@ class TestCloudProblems(unittest.TestCase):
 
         # data
         self.assertIsInstance(info.data, models.ProblemData)
-        self.assertEqual(info.data.format, constants.ProblemEncodingFormat.QP)
-        self.assertEqual(info.data.lin, self.qp['lin'])
-        self.assertEqual(info.data.quad, self.qp['quad'])
-        self.assertEqual(info.data.offset, self.qp['offset'])
+        self.assertEqual(info.data, self.problem_data)
 
         # params
         self.assertEqual(info.params, self.params)
@@ -174,7 +166,7 @@ class TestCloudProblems(unittest.TestCase):
         # metadata
         self.assertIsInstance(info.metadata, models.ProblemMetadata)
         self.assertEqual(info.metadata.solver, self.future.solver.id)
-        self.assertEqual(info.metadata.type, constants.ProblemType.ISING)
+        self.assertEqual(info.metadata.type, self.problem_type)
         self.assertEqual(info.metadata.label, self.future.label)
         self.assertEqual(info.metadata.status.value, self.future.remote_status)
         self.assertEqual(info.metadata.submitted_by, config['token'])
@@ -207,14 +199,14 @@ class TestCloudProblems(unittest.TestCase):
         """Problem submitted."""
 
         status = self.api.submit_problem(
-            data=models.ProblemData.parse_obj(self.qp),
+            data=self.problem_data,
             params=self.params,
             solver=self.solver_id,
             type=self.problem_type,
         )
 
         self.assertIsInstance(status, models.ProblemStatusMaybeWithAnswer)
-        self.assertEqual(status.type, constants.ProblemType.ISING)
+        self.assertEqual(status.type, self.problem_type)
         self.assertEqual(status.solver, self.solver_id)
         self.assertIsNotNone(status.submitted_on)
 
@@ -227,7 +219,7 @@ class TestCloudProblems(unittest.TestCase):
 
         with self.assertRaises(exceptions.ResourceBadRequestError):
             self.api.submit_problem(
-                data=models.ProblemData.parse_obj(self.qp),
+                data=self.problem_data,
                 params=dict(non_existing_param=1),
                 solver=self.solver_id,
                 type=self.problem_type,
@@ -235,8 +227,8 @@ class TestCloudProblems(unittest.TestCase):
 
         with self.assertRaises(exceptions.ResourceNotFoundError):
             self.api.submit_problem(
-                data=models.ProblemData.parse_obj(self.qp),
-                params={},
+                data=self.problem_data,
+                params=self.params,
                 solver='non-existing-solver',
                 type=self.problem_type,
             )
@@ -245,8 +237,8 @@ class TestCloudProblems(unittest.TestCase):
         """Multiple problems are submitted and initial statuses returned."""
 
         job = models.ProblemJob(
-            data=models.ProblemData.parse_obj(self.qp),
-            params=dict(num_reads=1),
+            data=self.problem_data,
+            params=self.params,
             solver=self.solver_id,
             type=self.problem_type,
         )
@@ -263,7 +255,7 @@ class TestCloudProblems(unittest.TestCase):
         """Problem batch submit fails due to invalid parameters."""
 
         job = models.ProblemJob(
-            data=models.ProblemData.parse_obj(self.qp),
+            data=self.problem_data,
             params=dict(non_existing_param=1),
             solver=self.solver_id,
             type=self.problem_type,
@@ -277,3 +269,66 @@ class TestCloudProblems(unittest.TestCase):
         for status in statuses:
             self.assertIsInstance(status, models.ProblemSubmitError)
             self.assertEqual(status.error_code, 400)
+
+
+class TestCloudProblemsStructured(ProblemResourcesBaseTests, unittest.TestCase):
+    """Verify `dwave.cloud.api.resources.Problems` handle structured problems."""
+
+    @classmethod
+    def setUpClass(cls):
+        with Client(**config) as client:
+            cls.api = Problems.from_client_config(client)
+
+            # submit and solve an Ising problem as a fixture
+            solver = client.get_solver(qpu=True)
+            edge = next(iter(solver.edges))
+            cls.linear = {}
+            cls.quadratic = {edge: 1.0}
+            qp = encode_problem_as_qp(solver, cls.linear, cls.quadratic)
+            cls.problem_data = models.ProblemData.parse_obj(qp)
+            cls.problem_type = constants.ProblemType.ISING
+            cls.params = dict(num_reads=100)
+            cls.future = solver.sample_ising(cls.linear, cls.quadratic, **cls.params)
+            cls.solver_id = solver.id
+
+            # double-check
+            resolved = cls.future.result()
+            assert cls.future.remote_status == constants.ProblemStatus.COMPLETED.value
+
+    def verify_problem_answer(self, answer: models.ProblemAnswer):
+        ans = decode_qp(msg=dict(answer=answer.dict(), type=self.problem_type.value))
+        var = set(chain(*self.quadratic)) | self.linear.keys()
+        self.assertEqual(set(ans['active_variables']), var)
+        self.assertEqual(len(ans['energies']), len(ans['solutions']))
+        self.assertEqual(sum(ans['num_occurrences']), self.params['num_reads'])
+
+
+@unittest.skipUnless(dimod, "dimod not installed")
+class TestCloudProblemsUnstructured(ProblemResourcesBaseTests, unittest.TestCase):
+    """Verify `dwave.cloud.api.resources.Problems` handle unstructured problems."""
+
+    @classmethod
+    def setUpClass(cls):
+        with Client(**config) as client:
+            cls.api = Problems.from_client_config(client)
+
+            # submit and solve an Ising problem as a fixture
+            solver = client.get_solver(hybrid=True)
+            cls.bqm = dimod.BQM.from_ising({}, {'ab': 1.0})
+            problem_data_id = solver.upload_problem(cls.bqm).result()
+            problem_data_ref = encode_problem_as_ref(problem_data_id)
+            cls.problem_data = models.ProblemData.parse_obj(problem_data_ref)
+            cls.problem_type = constants.ProblemType.BQM
+            cls.params = dict(time_limit=3)
+            cls.future = solver.sample_bqm(problem_data_id, **cls.params)
+            cls.solver_id = solver.id
+
+            # double-check
+            resolved = cls.future.result()
+            assert cls.future.remote_status == constants.ProblemStatus.COMPLETED.value
+
+    def verify_problem_answer(self, answer: models.ProblemAnswer):
+        ans = decode_bq(msg=dict(answer=answer.dict(), type=self.problem_type.value))
+        ss = ans['sampleset']
+        self.assertEqual(ss.variables, self.bqm.variables)
+        dimod.testing.assert_sampleset_energies(ss, self.bqm)
