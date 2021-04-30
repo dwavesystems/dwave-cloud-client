@@ -13,7 +13,7 @@ try:
 except SyntaxError:
     execfile(package_info_path, package_info)
 
-python_requires = '>=3.5'
+python_requires = '>=3.6'
 
 # Package requirements, minimal pinning
 install_requires = ['requests[socks]>=2.18', 'homebase>=1.0',
@@ -38,7 +38,6 @@ classifiers = [
     'License :: OSI Approved :: Apache Software License',
     'Operating System :: OS Independent',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
     'Programming Language :: Python :: 3.7',
     'Programming Language :: Python :: 3.8',
