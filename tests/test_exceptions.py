@@ -14,7 +14,7 @@
 
 import unittest
 
-from dwave.cloud.exceptions import *
+from dwave.cloud.exceptions import SolverAuthenticationError, CanceledFutureError
 
 
 class TestExceptions(unittest.TestCase):
