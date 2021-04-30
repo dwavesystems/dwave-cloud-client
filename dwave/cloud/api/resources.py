@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import abc
 from typing import List, Union, Optional
 
 from dwave.cloud.api.client import SAPIClient
@@ -97,7 +98,7 @@ class Problems(ResourceBase):
         path = ''
         response = self.session.get(path, params=params)
         statuses = response.json()
-        return [models.ProblemStatus(**s) for s in statuses]
+        return [models.ProblemStatus.parse_obj(s) for s in statuses]
 
     # Content-Type: application/vnd.dwave.sapi.problem+json; version=2.1.0
     def get_problem(self, problem_id: str) -> models.ProblemStatusMaybeWithAnswer:
@@ -105,7 +106,7 @@ class Problems(ResourceBase):
         path = '{}'.format(problem_id)
         response = self.session.get(path)
         status = response.json()
-        return models.ProblemStatusMaybeWithAnswer(**status)
+        return models.ProblemStatusMaybeWithAnswer.parse_obj(status)
 
     # Content-Type: application/vnd.dwave.sapi.problems+json; version=2.1.0
     def get_problem_status(self, problem_id: str) -> models.ProblemStatus:
@@ -114,11 +115,14 @@ class Problems(ResourceBase):
         params = dict(id=problem_id)
         response = self.session.get(path, params=params)
         status = response.json()[0]
-        return models.ProblemStatus(**status)
+        return models.ProblemStatus.parse_obj(status)
 
     # Content-Type: application/vnd.dwave.sapi.problems+json; version=2.1.0
+    # XXX: @pydantic.validate_arguments
     def get_problem_statuses(self, problem_ids: List[str]) -> List[models.ProblemStatus]:
         """Retrieve short problem statuses for a list of problems."""
+        if not isinstance(problem_ids, list):
+            raise TypeError('a list of problem ids expected')
         if len(problem_ids) > 1000:
             raise ValueError('number of problem ids is limited to 1000')
 
@@ -126,7 +130,7 @@ class Problems(ResourceBase):
         params = dict(id=','.join(problem_ids))
         response = self.session.get(path, params=params)
         statuses = response.json()
-        return [models.ProblemStatus(**s) for s in statuses]
+        return [models.ProblemStatus.parse_obj(s) for s in statuses]
 
     # Content-Type: application/vnd.dwave.sapi.problem-data+json; version=2.1.0
     def get_problem_info(self, problem_id: str) -> models.ProblemInfo:
@@ -134,7 +138,7 @@ class Problems(ResourceBase):
         path = '{}/info'.format(problem_id)
         response = self.session.get(path)
         info = response.json()
-        return models.ProblemInfo(**info)
+        return models.ProblemInfo.parse_obj(info)
 
     # Content-Type: application/vnd.dwave.sapi.problem-answer+json; version=2.1.0
     def get_problem_answer(self, problem_id: str) -> models.ProblemAnswer:
@@ -142,7 +146,7 @@ class Problems(ResourceBase):
         path = '{}/answer'.format(problem_id)
         response = self.session.get(path)
         answer = response.json()['answer']
-        return models.ProblemAnswer(**answer)
+        return models.ProblemAnswer.parse_obj(answer)
 
     # Content-Type: application/vnd.dwave.sapi.problem-message+json; version=2.1.0
     def get_problem_messages(self, problem_id: str) -> List[dict]:
@@ -165,7 +169,7 @@ class Problems(ResourceBase):
         body = dict(data=data.dict(), params=params, solver=solver,
                     type=type, label=label)
         response = self.session.post(path, json=body)
-        return models.ProblemStatusMaybeWithAnswer(**response.json())
+        return models.ProblemStatusMaybeWithAnswer.parse_obj(response.json())
 
     # Content-Type: application/vnd.dwave.sapi.problems+json; version=2.1.0
     def submit_problems(self, problems: List[models.ProblemJob]) -> \
