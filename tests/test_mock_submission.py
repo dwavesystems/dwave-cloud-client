@@ -154,13 +154,13 @@ def datetime_in_future(seconds=0):
     return now + timedelta(seconds=seconds)
 
 
-def continue_reply(id_, solver_name, now=None, eta_min=None, eta_max=None, label=None):
+def continue_reply(id_, solver_name, now=None, label=None):
     """A reply saying a problem is still in the queue."""
 
     if not now:
         now = datetime_in_future(0)
 
-    resp = {
+    return json.dumps({
         "status": "PENDING",
         "solved_on": None,
         "solver": solver_name,
@@ -168,16 +168,7 @@ def continue_reply(id_, solver_name, now=None, eta_min=None, eta_max=None, label
         "type": "ising",
         "id": id_,
         "label": label
-    }
-    if eta_min:
-        resp.update({
-            "earliest_estimated_completion": eta_min.isoformat(),
-        })
-    if eta_max:
-        resp.update({
-            "latest_estimated_completion": eta_max.isoformat(),
-        })
-    return json.dumps(resp)
+    })
 
 
 def choose_reply(path, replies, statuses=None, date=None):
@@ -494,23 +485,20 @@ class MockSubmission(_QueryTest):
     def test_submit_continue_then_ok_reply(self):
         """Handle polling for a complete problem."""
 
-        now = datetime_in_future(0)
-        eta_min, eta_max = datetime_in_future(10), datetime_in_future(30)
-
         # each thread can have its instance of a session because
         # the mocked responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
                 'problems/': '[%s]' % continue_reply(
-                    '123', 'abc123', eta_min=eta_min, eta_max=eta_max, now=now)
-            }, date=now)
+                    '123', 'abc123')
+            })
             session.get = lambda a: choose_reply(a, {
                 'problems/?id=123': '[%s]' % complete_no_answer_reply(
                     '123', 'abc123'),
                 'problems/123/': complete_reply(
                     '123', 'abc123')
-            }, date=now)
+            })
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
@@ -522,10 +510,6 @@ class MockSubmission(_QueryTest):
                 results = solver.sample_ising(linear, quadratic, **params)
 
                 self._check(results, linear, quadratic, **params)
-
-                # test future has eta_min and eta_max parsed correctly
-                self.assertEqual(results.eta_min, eta_min)
-                self.assertEqual(results.eta_max, eta_max)
 
     def test_submit_continue_then_error_reply(self):
         """Handle polling for an error message."""
@@ -658,41 +642,8 @@ class MockSubmission(_QueryTest):
                 # after third poll, back-off interval should be 4 x initial back-off
                 self.assertEqual(future._poll_backoff, client.poll_backoff_min * 2**2)
 
-    def test_eta_min_is_ignored_on_first_poll(self):
-        "eta_min/earliest_estimated_completion should not be used anymore"
-
-        # each thread can have its instance of a session because
-        # the mocked responses are stateless
-        def create_mock_session(client):
-            now = datetime_in_future(0)
-            eta_min, eta_max = datetime_in_future(10), datetime_in_future(30)
-            session = mock.Mock()
-            session.post = lambda path, _: choose_reply(path, {
-                'problems/': '[%s]' % continue_reply(
-                    '1', 'abc123', eta_min=eta_min, eta_max=eta_max, now=now)
-            }, date=now)
-            session.get = lambda path: choose_reply(path, {
-                'problems/?id=1': '[%s]' % complete_no_answer_reply(
-                    '1', 'abc123'),
-                'problems/1/': complete_reply(
-                    '1', 'abc123')
-            }, date=now)
-            return session
-
-        with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
-
-                def assert_no_delay(s):
-                    s and self.assertTrue(
-                        abs(s - client.poll_backoff_min) < client.DEFAULTS['poll_backoff_min'])
-
-                with mock.patch('time.sleep', assert_no_delay):
-                    future = solver.sample_qubo({})
-                    future.result()
-
-    def test_immediate_polling_without_eta_min(self):
-        "First poll happens with minimal delay if eta_min missing"
+    def test_immediate_polling(self):
+        "First poll happens with minimal delay"
 
         # each thread can have its instance of a session because
         # responses are stateless
@@ -701,11 +652,11 @@ class MockSubmission(_QueryTest):
             session = mock.Mock()
             session.post = lambda path, _: choose_reply(path, {
                 'problems/': '[%s]' % continue_reply('1', 'abc123')
-            }, date=now)
+            })
             session.get = lambda path: choose_reply(path, {
                 'problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
                 'problems/1/': complete_reply('1', 'abc123')
-            }, date=now)
+            })
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
