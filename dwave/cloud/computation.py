@@ -132,12 +132,6 @@ class Future(object):
         #: `datetime` the Future was resolved (marked as done; succeeded or failed), or None before then
         self.time_resolved = None
 
-        # [removed from SAPI] estimated `earliest_completion_time` as returned on problem submit
-        self._eta_min = None
-
-        # [removed from SAPI] estimated `latest_completion_time` as returned on problem submit
-        self._eta_max = None
-
         # Track how long it took us to parse the data
         self.parse_time = None
 
@@ -187,11 +181,7 @@ class Future(object):
             "The eta_min attribute will be removed in 0.10.0.",
             DeprecationWarning)
 
-        return self._eta_min
-
-    @eta_min.setter
-    def eta_min(self, value):
-        self._eta_min = value
+        return None
 
     # TODO: remove in 0.10.0
     @property
@@ -202,11 +192,7 @@ class Future(object):
             "The eta_max attribute will be removed in 0.10.0.",
             DeprecationWarning)
 
-        return self._eta_max
-
-    @eta_max.setter
-    def eta_max(self, value):
-        self._eta_max = value
+        return None
 
     # make Future ordered
 
