@@ -56,7 +56,7 @@ import hashlib
 import codecs
 import concurrent.futures
 
-from itertools import chain
+from itertools import chain, zip_longest
 from functools import partial, wraps, lru_cache
 from collections import abc, namedtuple, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
@@ -1254,9 +1254,13 @@ class Client(object):
                     continue
 
                 # Pass on the information
-                for submission, res in zip(ready_problems, message):
-                    self._handle_problem_status(res, submission.future)
-                    task_done()
+                for submission, msg in zip_longest(ready_problems, message):
+                    try:
+                        self._handle_problem_status(msg, submission.future)
+                    except Exception as exc:
+                        submission.future._set_exception(exc)
+                    finally:
+                        task_done()
 
         except BaseException as err:
             logger.exception(err)
@@ -1281,6 +1285,8 @@ class Client(object):
         """
         try:
             logger.trace("Handling response: %r", message)
+            if not isinstance(message, dict):
+                raise InvalidAPIResponseError("Unexpected format of problem description response")
             logger.debug("Handling response for %s with status %s",
                          message.get('id'), message.get('status'))
 
