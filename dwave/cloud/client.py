@@ -1297,12 +1297,6 @@ class Client(object):
             if not future.time_solved and message.get('solved_on'):
                 future.time_solved = parse_datetime(message['solved_on'])
 
-            if not future.eta_min and message.get('earliest_estimated_completion'):
-                future.eta_min = parse_datetime(message['earliest_estimated_completion'])
-
-            if not future.eta_max and message.get('latest_estimated_completion'):
-                future.eta_max = parse_datetime(message['latest_estimated_completion'])
-
             if status == self.STATUS_COMPLETE:
                 # TODO: find a better way to differentiate between
                 # `completed-on-submit` and `completed-on-poll`.

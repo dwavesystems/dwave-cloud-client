@@ -132,12 +132,6 @@ class Future(object):
         #: `datetime` the Future was resolved (marked as done; succeeded or failed), or None before then
         self.time_resolved = None
 
-        # estimated `earliest_completion_time` as returned on problem submit
-        self.eta_min = None
-
-        # estimated `latest_completion_time` as returned on problem submit
-        self.eta_max = None
-
         # Track how long it took us to parse the data
         self.parse_time = None
 
@@ -177,6 +171,28 @@ class Future(object):
             DeprecationWarning)
 
         return self._exception
+
+    # TODO: remove in 0.10.0
+    @property
+    def eta_min(self):
+        warnings.warn(
+            "'Future.eta_min' is deprecated, since the underlying "
+            "'earliest_estimated_completion' field has been removed from SAPI. "
+            "The eta_min attribute will be removed in 0.10.0.",
+            DeprecationWarning)
+
+        return None
+
+    # TODO: remove in 0.10.0
+    @property
+    def eta_max(self):
+        warnings.warn(
+            "'Future.eta_max' is deprecated, since the underlying "
+            "'latest_estimated_completion' field has been removed from SAPI. "
+            "The eta_max attribute will be removed in 0.10.0.",
+            DeprecationWarning)
+
+        return None
 
     # make Future ordered
 
@@ -230,8 +246,6 @@ class Future(object):
     def _set_clock_diff(self, server_response, localtime_of_response):
         """Calculate and set the `.clock_diff`, based on headers from a server
         response, and the local time of response received.
-
-        Based on `clock_diff`, `eta_min`/`eta_max` may or may not make sense.
         """
         try:
             server_time = datetime_to_timestamp(parse(server_response.headers['date']))
