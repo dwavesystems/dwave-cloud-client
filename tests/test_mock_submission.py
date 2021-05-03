@@ -23,9 +23,6 @@ import warnings
 import collections
 
 from unittest import mock
-from datetime import datetime, timedelta
-from dateutil.tz import UTC
-from dateutil.parser import parse as parse_datetime
 from requests.structures import CaseInsensitiveDict
 from requests.exceptions import HTTPError
 from concurrent.futures import TimeoutError
@@ -36,140 +33,22 @@ try:
 except ImportError:
     dimod = None
 
-from dwave.cloud.utils import evaluate_ising, generate_const_ising_problem
 from dwave.cloud.client import Client
 from dwave.cloud.solver import Solver
 from dwave.cloud.computation import Future
+from dwave.cloud.utils import evaluate_ising, generate_const_ising_problem, utcrel
 from dwave.cloud.exceptions import (
     SolverFailureError, CanceledFutureError, SolverError,
     InvalidAPIResponseError)
+
+from tests.api.mocks import (
+    complete_reply, complete_no_answer_reply, error_reply,
+    immediate_error_reply, cancel_reply, continue_reply, solver_data)
 
 
 def test_problem(solver):
     """The problem answered by mocked replies below."""
     return generate_const_ising_problem(solver, h=1, j=-1)
-
-
-def solver_data(id_, incomplete=False):
-    """Return data for a solver."""
-    obj = {
-        "properties": {
-            "supported_problem_types": ["qubo", "ising"],
-            "qubits": [0, 1, 2, 3, 4],
-            "couplers": list(itertools.combinations(range(5), 2)),
-            "num_qubits": 5,
-            "parameters": {"num_reads": "Number of samples to return."}
-        },
-        "id": id_,
-        "description": "A test solver"
-    }
-
-    if incomplete:
-        del obj['properties']['parameters']
-
-    return obj
-
-
-def complete_reply(id_, solver_name, answer=None, msg=None, label=None):
-    """Reply with solutions for the test problem."""
-    response = {
-        "status": "COMPLETED",
-        "solved_on": "2013-01-18T10:26:00.020954",
-        "solver": solver_name,
-        "submitted_on": "2013-01-18T10:25:59.941674",
-        "answer": {
-            "format": "qp",
-            "num_variables": 5,
-            "energies": 'AAAAAAAALsA=',
-            "num_occurrences": 'ZAAAAA==',
-            "active_variables": 'AAAAAAEAAAACAAAAAwAAAAQAAAA=',
-            "solutions": 'AAAAAA==',
-            "timing": {}
-        },
-        "type": "ising",
-        "id": id_,
-        "label": label
-    }
-
-    # optional answer fields override
-    if answer:
-        response['answer'].update(answer)
-
-    # optional msg, top-level override
-    if msg:
-        response.update(msg)
-
-    return json.dumps(response)
-
-
-def complete_no_answer_reply(id_, solver_name, label=None):
-    """A reply saying a problem is finished without providing the results."""
-    return json.dumps({
-        "status": "COMPLETED",
-        "solved_on": "2012-12-05T19:15:07+00:00",
-        "solver": solver_name,
-        "submitted_on": "2012-12-05T19:06:57+00:00",
-        "type": "ising",
-        "id": id_,
-        "label": label
-    })
-
-
-def error_reply(id_, solver_name, error, label=None):
-    """A reply saying an error has occurred."""
-    return json.dumps({
-        "status": "FAILED",
-        "solved_on": "2013-01-18T10:26:00.020954",
-        "solver": solver_name,
-        "submitted_on": "2013-01-18T10:25:59.941674",
-        "type": "ising",
-        "id": id_,
-        "label": label,
-        "error_message": error
-    })
-
-
-def immediate_error_reply(code, msg):
-    """A reply saying an error has occurred (before scheduling for execution)."""
-    return json.dumps({
-        "error_code": code,
-        "error_msg": msg
-    })
-
-
-def cancel_reply(id_, solver_name, label=None):
-    """A reply saying a problem was canceled."""
-    return json.dumps({
-        "status": "CANCELLED",
-        "solved_on": "2013-01-18T10:26:00.020954",
-        "solver": solver_name,
-        "submitted_on": "2013-01-18T10:25:59.941674",
-        "type": "ising",
-        "id": id_,
-        "label": label
-    })
-
-
-def datetime_in_future(seconds=0):
-    now = datetime.utcnow().replace(tzinfo=UTC)
-    return now + timedelta(seconds=seconds)
-
-
-def continue_reply(id_, solver_name, now=None, label=None):
-    """A reply saying a problem is still in the queue."""
-
-    if not now:
-        now = datetime_in_future(0)
-
-    return json.dumps({
-        "status": "PENDING",
-        "solved_on": None,
-        "solver": solver_name,
-        "submitted_on": now.isoformat(),
-        "type": "ising",
-        "id": id_,
-        "label": label
-    })
 
 
 def choose_reply(path, replies, statuses=None, date=None):
@@ -179,13 +58,16 @@ def choose_reply(path, replies, statuses=None, date=None):
         statuses = collections.defaultdict(lambda: iter([200]))
 
     if date is None:
-        date = datetime_in_future(0)
+        date = utcrel(0)
 
     if path in replies:
         response = mock.Mock(['text', 'json', 'raise_for_status', 'headers'])
         response.status_code = next(statuses[path])
-        response.text = replies[path]
-        response.json.side_effect = lambda: json.loads(replies[path])
+        text = replies[path]
+        if not isinstance(text, str):
+            text = json.dumps(text)
+        response.text = text
+        response.json.side_effect = lambda: replies[path]
         response.headers = CaseInsensitiveDict({'Date': date.isoformat()})
 
         def raise_for_status():
@@ -251,7 +133,7 @@ class MockSubmission(_QueryTest):
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 linear, quadratic = test_problem(solver)
                 results = solver.sample_ising(linear, quadratic)
@@ -267,16 +149,14 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': '[%s]' % complete_no_answer_reply(
-                    '123', 'abc123')})
+                'problems/': [complete_no_answer_reply('123')]})
             session.get = lambda a: choose_reply(a, {
-                'problems/123/': complete_reply(
-                    '123', 'abc123')})
+                'problems/123/': complete_reply('123')})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 linear, quadratic = test_problem(solver)
                 params = dict(num_reads=100)
@@ -293,16 +173,14 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': '[%s]' % complete_no_answer_reply(
-                    '123', 'abc123')})
+                'problems/': [complete_no_answer_reply('123')]})
             session.get = lambda a: choose_reply(a, {
-                'problems/123/': complete_reply(
-                    '123', 'abc123')})
+                'problems/123/': complete_reply('123')})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 h, J = test_problem(solver)
                 bqm = dimod.BinaryQuadraticModel.from_ising(h, J)
@@ -327,16 +205,15 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': '[%s]' % complete_no_answer_reply(
-                    '123', 'abc123')})
+                'problems/': [complete_no_answer_reply('123')]})
             session.get = lambda a: choose_reply(a, {
                 'problems/123/': complete_reply(
-                    '123', 'abc123', answer=qubo_answer_diff, msg=qubo_msg_diff)})
+                    id='123', answer=qubo_answer_diff, msg=qubo_msg_diff)})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 qubo = {(0, 0): 4.0, (0, 4): -4, (4, 4): 4.0}
                 offset = -2.0
@@ -364,16 +241,15 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': '[%s]' % complete_no_answer_reply(
-                    '123', 'abc123')})
+                'problems/': [complete_no_answer_reply('123')]})
             session.get = lambda a: choose_reply(a, {
                 'problems/123/': complete_reply(
-                    '123', 'abc123', answer=qubo_answer_diff, msg=qubo_msg_diff)})
+                    id='123', answer=qubo_answer_diff, msg=qubo_msg_diff)})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 qubo = {(0, 0): 4.0, (0, 4): -4, (4, 4): 4.0}
                 offset = -2.0
@@ -393,13 +269,12 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': '[%s]' % error_reply(
-                    '123', 'abc123', 'An error message')})
+                'problems/': [error_reply(error_message='An error message')]})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 linear, quadratic = test_problem(solver)
                 results = solver.sample_ising(linear, quadratic)
@@ -415,13 +290,13 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': '[%s]' % immediate_error_reply(
-                    400, "Missing parameter 'num_reads' in problem JSON")})
+                'problems/': [immediate_error_reply(
+                    400, "Missing parameter 'num_reads' in problem JSON")]})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 linear, quadratic = test_problem(solver)
                 results = solver.sample_ising(linear, quadratic)
@@ -437,12 +312,12 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': '[%s]' % cancel_reply('123', 'abc123')})
+                'problems/': [cancel_reply()]})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 linear, quadratic = test_problem(solver)
                 results = solver.sample_ising(linear, quadratic)
@@ -461,8 +336,7 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda path, _: choose_reply(path, {
-                'problems/': '[%s]' % complete_no_answer_reply(
-                    '123', 'abc123')})
+                'problems/': [complete_no_answer_reply(id='123')]})
             session.get = lambda path: choose_reply(
                 path, replies={
                     'problems/123/': error_message
@@ -473,7 +347,7 @@ class MockSubmission(_QueryTest):
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 linear, quadratic = test_problem(solver)
                 future = solver.sample_ising(linear, quadratic)
@@ -491,20 +365,17 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': '[%s]' % continue_reply(
-                    '123', 'abc123')
+                'problems/': [continue_reply(id='123')]
             })
             session.get = lambda a: choose_reply(a, {
-                'problems/?id=123': '[%s]' % complete_no_answer_reply(
-                    '123', 'abc123'),
-                'problems/123/': complete_reply(
-                    '123', 'abc123')
+                'problems/?id=123': [complete_no_answer_reply('123')],
+                'problems/123/': complete_reply('123')
             })
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 linear, quadratic = test_problem(solver)
                 params = dict(num_reads=100)
@@ -520,16 +391,14 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': '[%s]' % continue_reply(
-                    '123', 'abc123')})
+                'problems/': [continue_reply('123')]})
             session.get = lambda a: choose_reply(a, {
-                'problems/?id=123': '[%s]' % error_reply(
-                    '123', 'abc123', "error message")})
+                'problems/?id=123': [error_reply('123')]})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 linear, quadratic = test_problem(solver)
                 params = dict(num_reads=100)
@@ -551,32 +420,31 @@ class MockSubmission(_QueryTest):
                 state['count'] += 1
                 if state['count'] < 2:
                     return choose_reply(path, {
-                        'problems/?id=1': '[{}]'.format(continue_reply('1', 'abc123')),
-                        'problems/?id=2': '[{}]'.format(continue_reply('2', 'abc123')),
-                        'problems/1/': continue_reply('1', 'abc123'),
-                        'problems/2/': continue_reply('2', 'abc123'),
-                        'problems/?id=1,2': '[{},{}]'.format(continue_reply('1', 'abc123'),
-                                                                      continue_reply('2', 'abc123')),
-                        'problems/?id=2,1': '[{},{}]'.format(continue_reply('2', 'abc123'),
-                                                                      continue_reply('1', 'abc123'))
+                        'problems/?id=1': [continue_reply('1')],
+                        'problems/?id=2': [continue_reply('2')],
+                        'problems/1/': continue_reply('1'),
+                        'problems/2/': continue_reply('2'),
+                        'problems/?id=1,2': [continue_reply('1'),
+                                             continue_reply('2')],
+                        'problems/?id=2,1': [continue_reply('2'),
+                                             continue_reply('1')]
                     })
                 else:
                     return choose_reply(path, {
-                        'problems/?id=1': '[{}]'.format(error_reply('1', 'abc123', 'error')),
-                        'problems/?id=2': '[{}]'.format(complete_no_answer_reply('2', 'abc123')),
-                        'problems/1/': error_reply('1', 'abc123', 'error'),
-                        'problems/2/': complete_reply('2', 'abc123'),
-                        'problems/?id=1,2': '[{},{}]'.format(error_reply('1', 'abc123', 'error'),
-                                                                      complete_no_answer_reply('2', 'abc123')),
-                        'problems/?id=2,1': '[{},{}]'.format(complete_no_answer_reply('2', 'abc123'),
-                                                                      error_reply('1', 'abc123', 'error'))
+                        'problems/?id=1': [error_reply('1')],
+                        'problems/?id=2': [complete_no_answer_reply('2')],
+                        'problems/1/': error_reply('1'),
+                        'problems/2/': complete_reply('2'),
+                        'problems/?id=1,2': [error_reply('1'),
+                                             complete_no_answer_reply('2')],
+                        'problems/?id=2,1': [complete_no_answer_reply('2'),
+                                             error_reply('1')]
                     })
 
             def accept_problems_with_continue_reply(path, body, ids=iter('12')):
                 problems = json.loads(body)
                 return choose_reply(path, {
-                    'problems/': json.dumps(
-                        [json.loads(continue_reply(next(ids), 'abc123')) for _ in problems])
+                    'problems/': [continue_reply(next(ids)) for _ in problems]
                 })
 
             session.get = continue_then_complete
@@ -588,7 +456,7 @@ class MockSubmission(_QueryTest):
 
         with mock.patch.object(Client, 'create_session', lambda self: session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 linear, quadratic = test_problem(solver)
                 params = dict(num_reads=100)
@@ -609,7 +477,7 @@ class MockSubmission(_QueryTest):
 
             # on submit, return status pending
             session.post = lambda path, _: choose_reply(path, {
-                'problems/': '[%s]' % continue_reply('123', 'abc123')
+                'problems/': [continue_reply('123')]
             })
 
             # on first and second status poll, return pending
@@ -618,13 +486,13 @@ class MockSubmission(_QueryTest):
                 state['count'] += 1
                 if state['count'] < 3:
                     return choose_reply(path, {
-                        'problems/?id=123': '[%s]' % continue_reply('123', 'abc123'),
-                        'problems/123/': continue_reply('123', 'abc123')
+                        'problems/?id=123': [continue_reply('123')],
+                        'problems/123/': continue_reply('123')
                     })
                 else:
                     return choose_reply(path, {
-                        'problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
-                        'problems/123/': complete_reply('123', 'abc123')
+                        'problems/?id=123': [complete_no_answer_reply('123')],
+                        'problems/123/': complete_reply('123')
                     })
 
             session.get = continue_then_complete
@@ -635,7 +503,7 @@ class MockSubmission(_QueryTest):
 
         with mock.patch.object(Client, 'create_session', lambda self: session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 future = solver.sample_qubo({})
                 future.result()
@@ -649,20 +517,19 @@ class MockSubmission(_QueryTest):
         # each thread can have its instance of a session because
         # responses are stateless
         def create_mock_session(client):
-            now = datetime_in_future(0)
             session = mock.Mock()
             session.post = lambda path, _: choose_reply(path, {
-                'problems/': '[%s]' % continue_reply('1', 'abc123')
+                'problems/': [continue_reply('1')]
             })
             session.get = lambda path: choose_reply(path, {
-                'problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
-                'problems/1/': complete_reply('1', 'abc123')
+                'problems/?id=1': [complete_no_answer_reply('1')],
+                'problems/1/': complete_reply('1')
             })
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 def assert_no_delay(s):
                     s and self.assertTrue(
@@ -679,20 +546,20 @@ class MockSubmission(_QueryTest):
         # each thread can have its instance of a session because
         # the mocked responses are stateless
         def create_mock_session(client):
-            badnow = datetime_in_future(100)
+            badnow = utcrel(100)
             session = mock.Mock()
             session.post = lambda path, _: choose_reply(path, {
-                'problems/': '[%s]' % continue_reply('1', 'abc123')
+                'problems/': [continue_reply('1')]
             }, date=badnow)
             session.get = lambda path: choose_reply(path, {
-                'problems/?id=1': '[%s]' % complete_no_answer_reply('1', 'abc123'),
-                'problems/1/': complete_reply('1', 'abc123')
+                'problems/?id=1': [complete_no_answer_reply('1')],
+                'problems/1/': complete_reply('1')
             }, date=badnow)
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 def assert_no_delay(s):
                     s and self.assertTrue(
@@ -711,7 +578,7 @@ class MockSubmission(_QueryTest):
 
             # on submit, return status pending
             session.post = lambda path, _: choose_reply(path, {
-                'problems/': '[%s]' % continue_reply('123', 'abc123')
+                'problems/': [continue_reply('123')]
             })
 
             # on first and second status poll, fail with 503 and 504
@@ -721,16 +588,16 @@ class MockSubmission(_QueryTest):
                 state['count'] += 1
                 if state['count'] < 3:
                     return choose_reply(path, replies={
-                        'problems/?id=123': '[%s]' % continue_reply('123', 'abc123'),
-                        'problems/123/': continue_reply('123', 'abc123')
+                        'problems/?id=123': [continue_reply('123')],
+                        'problems/123/': continue_reply('123')
                     }, statuses={
                         'problems/?id=123': statuses,
                         'problems/123/': statuses
                     })
                 else:
                     return choose_reply(path, {
-                        'problems/?id=123': '[%s]' % complete_no_answer_reply('123', 'abc123'),
-                        'problems/123/': complete_reply('123', 'abc123')
+                        'problems/?id=123': [complete_no_answer_reply('123')],
+                        'problems/123/': complete_reply('123')
                     })
 
             session.get = continue_then_complete
@@ -741,7 +608,7 @@ class MockSubmission(_QueryTest):
 
         with mock.patch.object(Client, 'create_session', lambda self: session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 future = solver.sample_qubo({})
                 future.result()
@@ -779,7 +646,7 @@ class MockCancel(unittest.TestCase):
         # the mocked responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
-            reply_body = '[%s]' % continue_reply(submission_id, 'solver')
+            reply_body = [continue_reply(submission_id, 'solver')]
             session.get = lambda a: choose_reply(a, {
                 'problems/?id={}'.format(submission_id): reply_body})
             session.delete = DeleteEvent.handle
@@ -787,7 +654,7 @@ class MockCancel(unittest.TestCase):
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
                 future = solver._retrieve_problem(submission_id)
                 future.cancel()
 
@@ -812,7 +679,7 @@ class MockCancel(unittest.TestCase):
         # each thread can have its instance of a session because
         # we use a global lock (event) in the mocked responses
         def create_mock_session(client):
-            reply_body = '[%s]' % continue_reply(submission_id, 'solver')
+            reply_body = [continue_reply(submission_id)]
 
             session = mock.Mock()
             session.get = lambda a: choose_reply(a, {
@@ -829,7 +696,7 @@ class MockCancel(unittest.TestCase):
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 linear, quadratic = test_problem(solver)
 
@@ -884,7 +751,7 @@ class TestComputationID(unittest.TestCase):
             def post(path, _):
                 release_reply.wait()
                 reply_body = complete_reply(submission_id, solver_name)
-                return choose_reply(path, {'problems/': '[%s]' % reply_body})
+                return choose_reply(path, {'problems/': [reply_body]})
 
             session.post = post
 
@@ -892,7 +759,7 @@ class TestComputationID(unittest.TestCase):
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data(solver_name))
+                solver = Solver(client, solver_data(id=solver_name))
 
                 linear, quadratic = test_problem(solver)
 
@@ -923,8 +790,8 @@ class TestOffsetHandling(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': '[%s]' % complete_no_answer_reply(
-                    '123', 'abc123')})
+                'problems/': [complete_no_answer_reply(
+                    '123', 'abc123')]})
             session.get = lambda a: choose_reply(a, {
                 'problems/123/': complete_reply(
                     '123', 'abc123', answer=dict(offset=offset))})
@@ -932,7 +799,7 @@ class TestOffsetHandling(_QueryTest):
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 linear, quadratic = test_problem(solver)
                 params = dict(num_reads=100)
@@ -951,16 +818,14 @@ class TestOffsetHandling(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': '[%s]' % complete_no_answer_reply(
-                    '123', 'abc123')})
+                'problems/': [complete_no_answer_reply('123')]})
             session.get = lambda a: choose_reply(a, {
-                'problems/123/': complete_reply(
-                    '123', 'abc123')})
+                'problems/123/': complete_reply('123')})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 linear, quadratic = test_problem(solver)
                 params = dict(num_reads=100)
@@ -981,16 +846,15 @@ class TestOffsetHandling(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': '[%s]' % complete_no_answer_reply(
-                    '123', 'abc123')})
+                'problems/': [complete_no_answer_reply('123')]})
             session.get = lambda a: choose_reply(a, {
                 'problems/123/': complete_reply(
-                    '123', 'abc123', answer=dict(offset=answer_offset))})
+                    id='123', answer=dict(offset=answer_offset))})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 linear, quadratic = test_problem(solver)
                 params = dict(num_reads=100)
@@ -1011,16 +875,14 @@ class TestComputationDeprecations(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': '[%s]' % complete_no_answer_reply(
-                    '123', 'abc123')})
+                'problems/': [complete_no_answer_reply('123')]})
             session.get = lambda a: choose_reply(a, {
-                'problems/123/': complete_reply(
-                    '123', 'abc123')})
+                'problems/123/': complete_reply('123')})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
 
                 linear, quadratic = test_problem(solver)
                 params = dict(num_reads=100)
@@ -1092,7 +954,7 @@ class TestProblemLabel(unittest.TestCase):
         """Problem label is set on problem submit."""
 
         with Client('endpoint', 'token') as client:
-            solver = Solver(client, solver_data('solver'))
+            solver = Solver(client, solver_data())
             problems = self.generate_sample_problems(solver)
 
             for method_name, problem_args in problems:
@@ -1116,17 +978,15 @@ class TestProblemLabel(unittest.TestCase):
             def create_mock_session(client):
                 session = mock.Mock()
                 session.post = lambda a, _: choose_reply(a, {
-                    'problems/': '[%s]' % complete_no_answer_reply(
-                        '123', 'abc123', label=None)})
+                    'problems/': [complete_no_answer_reply('123', label=None)]})
                 session.get = lambda a: choose_reply(a, {
-                    'problems/123/': complete_reply(
-                        '123', 'abc123', label=label)})
+                    'problems/123/': complete_reply('123', label=label)})
                 return session
             return create_mock_session
 
         with mock.patch.object(Client, 'create_session', make_session_generator(label)):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data('abc123'))
+                solver = Solver(client, solver_data())
                 problems = self.generate_sample_problems(solver)
 
                 for method_name, problem_args in problems:
