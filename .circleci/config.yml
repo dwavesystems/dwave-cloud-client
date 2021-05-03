@@ -84,7 +84,7 @@ jobs:
             echo 'eval "$(pyenv init -)"' >> ~/.bash_profile
 
       - save_cache: &save-cache-pyenv
-          key: v1-pyenv-{{ .Environment.CIRCLE_JOB }}-<< parameters.xcode >>
+          key: v1-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-<< parameters.xcode >>
           paths:
             - ~/.pyenv
 
