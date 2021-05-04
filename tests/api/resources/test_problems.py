@@ -15,7 +15,8 @@
 import abc
 import uuid
 import unittest
-from urllib.parse import urljoin
+import random
+from urllib.parse import urljoin, urlparse, parse_qs
 from itertools import chain
 
 import requests_mock
@@ -33,20 +34,18 @@ from dwave.cloud.api.resources import Problems
 from dwave.cloud.api import exceptions, models, constants
 
 from tests import config
+from tests.api.mocks import (
+    complete_reply, complete_no_answer_reply, error_reply,
+    immediate_error_reply, cancel_reply, continue_reply,
+    test_solver, test_problem, test_problem_data,
+    problem_info_reply, test_problem_metadata, problem_answer_reply, test_problem_messages
+)
 
 
-class TestMockProblems(unittest.TestCase):
-
-    token = str(uuid.uuid4())
-    endpoint = 'http://test.com/path/'
-
-
-@unittest.skipUnless(config, "SAPI access not configured")
 class ProblemResourcesBaseTests(abc.ABC):
     """Basic tests for `dwave.cloud.api.resources.Problems`."""
 
     @classmethod
-    @abc.abstractmethod
     def setUpClass(cls):
         """Create and submit one problem.
 
@@ -56,10 +55,10 @@ class ProblemResourcesBaseTests(abc.ABC):
 
     def verify_problem_status(self, status: models.ProblemStatus, solved: bool = False):
         """Verify `status` consistent with the submitted problem."""
-        self.assertEqual(status.id, self.future.id)
+        self.assertEqual(status.id, self.problem_id)
         self.assertEqual(status.type, self.problem_type)
-        self.assertEqual(status.solver, self.future.solver.id)
-        self.assertEqual(status.label, self.future.label)
+        self.assertEqual(status.solver, self.solver_id)
+        self.assertEqual(status.label, self.problem_label)
         self.assertEqual(status.status, constants.ProblemStatus.COMPLETED)
         self.assertIsNotNone(status.submitted_on)
         if solved:
@@ -117,7 +116,7 @@ class ProblemResourcesBaseTests(abc.ABC):
     def test_get_problem(self):
         """Problem status with answer retrieved by problem id."""
 
-        problem_id = self.future.id
+        problem_id = self.problem_id
         status = self.api.get_problem(problem_id)
 
         self.assertIsInstance(status, models.ProblemStatusMaybeWithAnswer)
@@ -129,7 +128,7 @@ class ProblemResourcesBaseTests(abc.ABC):
     def test_get_problem_status(self):
         """Problem status retrieved by problem id."""
 
-        problem_id = self.future.id
+        problem_id = self.problem_id
         status = self.api.get_problem_status(problem_id)
 
         self.assertIsInstance(status, models.ProblemStatus)
@@ -138,7 +137,7 @@ class ProblemResourcesBaseTests(abc.ABC):
     def test_get_problem_statuses(self):
         """Multiple problem statuses retrieved by problem ids."""
 
-        problem_id = self.future.id
+        problem_id = self.problem_id
         ids = [problem_id] * 3
         statuses = self.api.get_problem_statuses(ids)
 
@@ -150,11 +149,11 @@ class ProblemResourcesBaseTests(abc.ABC):
     def test_get_problem_info(self):
         """Problem info (complete problem description) retrieved by problem id."""
 
-        problem_id = self.future.id
+        problem_id = self.problem_id
         info = self.api.get_problem_info(problem_id)
 
         self.assertIsInstance(info, models.ProblemInfo)
-        self.assertEqual(info.id, self.future.id)
+        self.assertEqual(info.id, problem_id)
 
         # data
         self.assertIsInstance(info.data, models.ProblemData)
@@ -165,11 +164,11 @@ class ProblemResourcesBaseTests(abc.ABC):
 
         # metadata
         self.assertIsInstance(info.metadata, models.ProblemMetadata)
-        self.assertEqual(info.metadata.solver, self.future.solver.id)
+        self.assertEqual(info.metadata.solver, self.solver_id)
         self.assertEqual(info.metadata.type, self.problem_type)
-        self.assertEqual(info.metadata.label, self.future.label)
-        self.assertEqual(info.metadata.status.value, self.future.remote_status)
-        self.assertEqual(info.metadata.submitted_by, config['token'])
+        self.assertEqual(info.metadata.label, self.problem_label)
+        self.assertEqual(info.metadata.status, constants.ProblemStatus.COMPLETED)
+        self.assertEqual(info.metadata.submitted_by, self.token)
         self.assertIsNotNone(info.metadata.submitted_on)
         self.assertIsNotNone(info.metadata.solved_on)
 
@@ -180,7 +179,7 @@ class ProblemResourcesBaseTests(abc.ABC):
     def test_get_problem_answer(self):
         """Problem answer retrieved by problem id."""
 
-        problem_id = self.future.id
+        problem_id = self.problem_id
         answer = self.api.get_problem_answer(problem_id)
 
         self.assertIsInstance(answer, models.ProblemAnswer)
@@ -189,11 +188,12 @@ class ProblemResourcesBaseTests(abc.ABC):
     def test_get_problem_messages(self):
         """Problem messages retrieved by problem id."""
 
-        problem_id = self.future.id
+        problem_id = self.problem_id
         messages = self.api.get_problem_messages(problem_id)
 
         self.assertIsInstance(messages, list)
-        self.assertEqual(len(messages), 0)
+        if messages:
+            self.assertIsInstance(messages[0], dict)
 
     def test_problem_submit(self):
         """Problem submitted."""
@@ -271,29 +271,7 @@ class ProblemResourcesBaseTests(abc.ABC):
             self.assertEqual(status.error_code, 400)
 
 
-class TestCloudProblemsStructured(ProblemResourcesBaseTests, unittest.TestCase):
-    """Verify `dwave.cloud.api.resources.Problems` handle structured problems."""
-
-    @classmethod
-    def setUpClass(cls):
-        with Client(**config) as client:
-            cls.api = Problems.from_client_config(client)
-
-            # submit and solve an Ising problem as a fixture
-            solver = client.get_solver(qpu=True)
-            edge = next(iter(solver.edges))
-            cls.linear = {}
-            cls.quadratic = {edge: 1.0}
-            qp = encode_problem_as_qp(solver, cls.linear, cls.quadratic)
-            cls.problem_data = models.ProblemData.parse_obj(qp)
-            cls.problem_type = constants.ProblemType.ISING
-            cls.params = dict(num_reads=100)
-            cls.future = solver.sample_ising(cls.linear, cls.quadratic, **cls.params)
-            cls.solver_id = solver.id
-
-            # double-check
-            resolved = cls.future.result()
-            assert cls.future.remote_status == constants.ProblemStatus.COMPLETED.value
+class StructuredAnswerVerified:
 
     def verify_problem_answer(self, answer: models.ProblemAnswer):
         ans = decode_qp(msg=dict(answer=answer.dict(), type=self.problem_type.value))
@@ -303,32 +281,202 @@ class TestCloudProblemsStructured(ProblemResourcesBaseTests, unittest.TestCase):
         self.assertEqual(sum(ans['num_occurrences']), self.params['num_reads'])
 
 
-@unittest.skipUnless(dimod, "dimod not installed")
-class TestCloudProblemsUnstructured(ProblemResourcesBaseTests, unittest.TestCase):
-    """Verify `dwave.cloud.api.resources.Problems` handle unstructured problems."""
-
-    @classmethod
-    def setUpClass(cls):
-        with Client(**config) as client:
-            cls.api = Problems.from_client_config(client)
-
-            # submit and solve an Ising problem as a fixture
-            solver = client.get_solver(hybrid=True)
-            cls.bqm = dimod.BQM.from_ising({}, {'ab': 1.0})
-            problem_data_id = solver.upload_problem(cls.bqm).result()
-            problem_data_ref = encode_problem_as_ref(problem_data_id)
-            cls.problem_data = models.ProblemData.parse_obj(problem_data_ref)
-            cls.problem_type = constants.ProblemType.BQM
-            cls.params = dict(time_limit=3)
-            cls.future = solver.sample_bqm(problem_data_id, **cls.params)
-            cls.solver_id = solver.id
-
-            # double-check
-            resolved = cls.future.result()
-            assert cls.future.remote_status == constants.ProblemStatus.COMPLETED.value
+class UnstructuredAnswerVerified:
 
     def verify_problem_answer(self, answer: models.ProblemAnswer):
         ans = decode_bq(msg=dict(answer=answer.dict(), type=self.problem_type.value))
         ss = ans['sampleset']
         self.assertEqual(ss.variables, self.bqm.variables)
         dimod.testing.assert_sampleset_energies(ss, self.bqm)
+
+
+class TestMockProblemsStructured(StructuredAnswerVerified,
+                                 ProblemResourcesBaseTests,
+                                 unittest.TestCase):
+    """Test request formation and response parsing (including error handling)
+    works correctly for all :class:`dwave.cloud.api.resources.Problems` methods.
+    """
+
+    token = str(uuid.uuid4())
+    endpoint = 'http://test.com/path/'
+
+    def setUp(self):
+        def url(path):
+            return urljoin(self.endpoint, path)
+
+        self.mocker = requests_mock.Mocker()
+
+        # mock solver
+        solver = test_solver()
+        self.solver_id = solver.id
+
+        # mock problem
+        self.linear, self.quadratic = problem = test_problem(solver)
+        problem_data_dict = test_problem_data(solver, problem)
+        self.problem_data = models.ProblemData.parse_obj(problem_data_dict)
+
+        self.params = dict(num_reads=100)
+
+        all_statuses = {s.value for s in constants.ProblemStatus}
+        all_solvers = [self.solver_id]
+
+        # p1 is completed
+        p1_id = str(uuid.uuid4())
+        p1_status = complete_no_answer_reply(id=p1_id)
+        p1_status_with_answer = complete_reply(id=p1_id)
+        p1_metadata = test_problem_metadata(solver=self.solver_id, submitted_by=self.token)
+        p1_answer = problem_answer_reply()
+        p1_messages = test_problem_messages()
+        p1_info = problem_info_reply(id=p1_id, params=self.params, metadata=p1_metadata)
+        self.problem_id = p1_id
+        self.problem_type = constants.ProblemType(p1_status['type'])
+        self.problem_label = p1_status['label']
+
+        # p2 is submitted (and pending)
+        p2_id = str(uuid.uuid4())
+        p2_status = continue_reply(id=p2_id)
+
+        # p3 is cancelled
+        p3_id = str(uuid.uuid4())
+        p3_status = cancel_reply(id=p3_id)
+
+        all_problem_ids = {p1_id, p2_id, p3_id}
+
+        headers = {'X-Auth-Token': self.token}
+
+        self.mocker.get(requests_mock.ANY, status_code=401)
+        self.mocker.get(requests_mock.ANY, status_code=404, request_headers=headers)
+
+        # problem status et al
+        self.mocker.get(url(f'problems/{p1_id}'), json=p1_status_with_answer, request_headers=headers)
+        self.mocker.get(url(f'problems/?id={p1_id}'), complete_qs=True, json=[p1_status], request_headers=headers)
+        self.mocker.get(url(f'problems/?id={p1_id},{p1_id},{p1_id}'), complete_qs=True, json=[p1_status] * 3, request_headers=headers)
+        self.mocker.get(url(f'problems/{p1_id}/info'), json=p1_info, request_headers=headers)
+        self.mocker.get(url(f'problems/{p1_id}/answer'), json=p1_answer, request_headers=headers)
+        self.mocker.get(url(f'problems/{p1_id}/messages'), json=p1_messages, request_headers=headers)
+
+        self.mocker.get(url(f'problems/{p2_id}'), json=p2_status, request_headers=headers)
+        self.mocker.get(url(f'problems/?id={p2_id}'), complete_qs=True, json=[p2_status], request_headers=headers)
+
+        self.mocker.get(url(f'problems/{p3_id}'), json=p3_status, request_headers=headers)
+        self.mocker.get(url(f'problems/?id={p3_id}'), complete_qs=True, json=[p3_status], request_headers=headers)
+
+        # list problems
+        self.mocker.get(url('problems/'), complete_qs=True, json=[p1_status, p2_status, p3_status], request_headers=headers)
+        self.mocker.get(url(f'problems/?id={p1_id}'), complete_qs=True, json=[p1_status], request_headers=headers)
+        self.mocker.get(url(f'problems/?id={p1_id},{p2_id}'), complete_qs=True, json=[p1_status, p2_status], request_headers=headers)
+        self.mocker.get(url('problems/?max_results=1'), json=[p1_status], request_headers=headers)
+        self.mocker.get(url('problems/?status=COMPLETED'), json=[p1_status], request_headers=headers)
+
+        def match_invalid_status(request):
+            query = parse_qs(urlparse(request.url).query)
+            status = query.get('status')
+            return status is not None and status[0] not in all_statuses
+        self.mocker.get(url('problems/'), additional_matcher=match_invalid_status, status_code=400, request_headers=headers)
+
+        def match_invalid_solver(request):
+            query = parse_qs(urlparse(request.url).query)
+            solver = query.get('solver')
+            return solver is not None and solver[0] not in all_solvers
+        self.mocker.get(url('problems/'), additional_matcher=match_invalid_solver, json=[], request_headers=headers)
+
+        def match_invalid_problem_id(request):
+            query = parse_qs(urlparse(request.url).query)
+            problem_id = query.get('id')
+            return problem_id is not None and problem_id[0] not in all_problem_ids
+        self.mocker.get(url('problems/'), complete_qs=True, additional_matcher=match_invalid_problem_id, status_code=404, request_headers=headers)
+
+        # problem submit
+        self.mocker.post(url('problems/'), json=p2_status, request_headers=headers)
+
+        def match_invalid_problem_params(request):
+            return request.json()['params'] != self.params
+        self.mocker.post(url('problems/'), additional_matcher=match_invalid_problem_params, status_code=400, request_headers=headers)
+
+        def match_invalid_problem_solver(request):
+            return request.json()['solver'] != self.solver_id
+        self.mocker.post(url('problems/'), additional_matcher=match_invalid_problem_solver, status_code=404, request_headers=headers)
+
+        # problem batch submit
+        def match_batch_submit(request):
+            data = request.json()
+            return isinstance(data, list) and len(data) == 3
+        self.mocker.post(url('problems/'), additional_matcher=match_batch_submit, json=[p2_status] * 3, request_headers=headers)
+
+        def match_invalid_batch_submit(request):
+            data = request.json()
+            return isinstance(data, list) and len(data) == 1 and data[0]['params'] != self.params
+        self.mocker.post(
+            url('problems/'),
+            additional_matcher=match_invalid_batch_submit,
+            json=[immediate_error_reply(400, 'Unknown parameter')],
+            request_headers=headers)
+
+        self.mocker.start()
+
+        self.api = Problems(token=self.token, endpoint=self.endpoint)
+
+    def tearDown(self):
+        self.mocker.stop()
+
+
+@unittest.skipUnless(config, "SAPI access not configured")
+class TestCloudProblemsStructured(StructuredAnswerVerified,
+                                  ProblemResourcesBaseTests,
+                                  unittest.TestCase):
+    """Verify `dwave.cloud.api.resources.Problems` handle structured problems."""
+
+    @classmethod
+    def setUpClass(cls):
+        with Client(**config) as client:
+            cls.token = config['token']
+            cls.api = Problems.from_client_config(client)
+
+            # submit and solve an Ising problem as a fixture
+            solver = client.get_solver(qpu=True)
+            cls.solver_id = solver.id
+            edge = next(iter(solver.edges))
+            cls.linear = {}
+            cls.quadratic = {edge: 1.0}
+            qp = encode_problem_as_qp(solver, cls.linear, cls.quadratic)
+            cls.problem_data = models.ProblemData.parse_obj(qp)
+            cls.problem_type = constants.ProblemType.ISING
+            cls.params = dict(num_reads=100)
+            future = solver.sample_ising(cls.linear, cls.quadratic, **cls.params)
+            resolved = future.result()
+            cls.problem_id = future.id
+            cls.problem_label = future.label
+
+            # double-check
+            assert future.remote_status == constants.ProblemStatus.COMPLETED.value
+
+
+@unittest.skipUnless(dimod, "dimod not installed")
+@unittest.skipUnless(config, "SAPI access not configured")
+class TestCloudProblemsUnstructured(UnstructuredAnswerVerified,
+                                    ProblemResourcesBaseTests,
+                                    unittest.TestCase):
+    """Verify `dwave.cloud.api.resources.Problems` handle unstructured problems."""
+
+    @classmethod
+    def setUpClass(cls):
+        with Client(**config) as client:
+            cls.token = config['token']
+            cls.api = Problems.from_client_config(client)
+
+            # submit and solve an Ising problem as a fixture
+            solver = client.get_solver(hybrid=True)
+            cls.solver_id = solver.id
+            cls.bqm = dimod.BQM.from_ising({}, {'ab': 1.0})
+            problem_data_id = solver.upload_problem(cls.bqm).result()
+            problem_data_ref = encode_problem_as_ref(problem_data_id)
+            cls.problem_data = models.ProblemData.parse_obj(problem_data_ref)
+            cls.problem_type = constants.ProblemType.BQM
+            cls.params = dict(time_limit=3)
+            future = solver.sample_bqm(problem_data_id, **cls.params)
+            resolved = future.result()
+            cls.problem_id = future.id
+            cls.problem_label = future.label
+
+            # double-check
+            assert future.remote_status == constants.ProblemStatus.COMPLETED.value
