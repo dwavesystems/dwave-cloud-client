@@ -43,12 +43,8 @@ from dwave.cloud.exceptions import (
 
 from tests.api.mocks import (
     complete_reply, complete_no_answer_reply, error_reply,
-    immediate_error_reply, cancel_reply, continue_reply, solver_data)
-
-
-def test_problem(solver):
-    """The problem answered by mocked replies below."""
-    return generate_const_ising_problem(solver, h=1, j=-1)
+    immediate_error_reply, cancel_reply, continue_reply,
+    solver_data, test_problem)
 
 
 def choose_reply(path, replies, statuses=None, date=None):
