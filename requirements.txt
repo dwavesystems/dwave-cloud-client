@@ -6,7 +6,7 @@ click>=7
 plucky>=0.4.3
 
 # backports
-dataclasses; python_version == "3.7"
+dataclasses; python_version == "3.6"
 
 # optional bqm support
 # note: dqm supported in dimod>0.9.6
