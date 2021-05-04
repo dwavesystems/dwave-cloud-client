@@ -187,7 +187,7 @@ class Problems(ResourceBase):
     # Content-Type: application/vnd.dwave.sapi.problem+json; version=2.1.0
     def cancel_problem(self, problem_id: str) -> models.ProblemStatus:
         """Initiate problem cancel by problem id."""
-        path = '{}/'.format(problem_id)
+        path = '{}'.format(problem_id)
         response = self.session.delete(path)
         return models.ProblemStatus.parse_obj(response.json())
 

@@ -270,6 +270,25 @@ class ProblemResourcesBaseTests(abc.ABC):
             self.assertIsInstance(status, models.ProblemSubmitError)
             self.assertEqual(status.error_code, 400)
 
+    def test_problem_cancel(self):
+        """(Finished) problem cancel attempted."""
+
+        with self.assertRaises(exceptions.ResourceConflictError):
+            self.api.cancel_problem(self.problem_id)
+
+    def test_problem_batch_cancel(self):
+        """(Finished) problem cancel attempted."""
+
+        problem_ids = [self.problem_id, self.problem_id]
+        statuses = self.api.cancel_problems(problem_ids)
+
+        self.assertIsInstance(statuses, list)
+        self.assertEqual(len(statuses), len(problem_ids))
+
+        for status in statuses:
+            self.assertIsInstance(status, models.ProblemCancelError)
+            self.assertEqual(status.error_code, 409)
+
 
 class StructuredAnswerVerified:
 
@@ -301,10 +320,18 @@ class TestMockProblemsStructured(StructuredAnswerVerified,
     endpoint = 'http://test.com/path/'
 
     def setUp(self):
+        """Define all mock responses for requests issued during
+        `ProblemResourcesBaseTests` tests.
+        """
+
         def url(path):
             return urljoin(self.endpoint, path)
 
         self.mocker = requests_mock.Mocker()
+
+        headers = {'X-Auth-Token': self.token}
+        self.mocker.get(requests_mock.ANY, status_code=401)
+        self.mocker.get(requests_mock.ANY, status_code=404, request_headers=headers)
 
         # mock solver
         solver = test_solver()
@@ -342,74 +369,140 @@ class TestMockProblemsStructured(StructuredAnswerVerified,
 
         all_problem_ids = {p1_id, p2_id, p3_id}
 
-        headers = {'X-Auth-Token': self.token}
-
-        self.mocker.get(requests_mock.ANY, status_code=401)
-        self.mocker.get(requests_mock.ANY, status_code=404, request_headers=headers)
-
         # problem status et al
-        self.mocker.get(url(f'problems/{p1_id}'), json=p1_status_with_answer, request_headers=headers)
-        self.mocker.get(url(f'problems/?id={p1_id}'), complete_qs=True, json=[p1_status], request_headers=headers)
-        self.mocker.get(url(f'problems/?id={p1_id},{p1_id},{p1_id}'), complete_qs=True, json=[p1_status] * 3, request_headers=headers)
-        self.mocker.get(url(f'problems/{p1_id}/info'), json=p1_info, request_headers=headers)
-        self.mocker.get(url(f'problems/{p1_id}/answer'), json=p1_answer, request_headers=headers)
-        self.mocker.get(url(f'problems/{p1_id}/messages'), json=p1_messages, request_headers=headers)
-
-        self.mocker.get(url(f'problems/{p2_id}'), json=p2_status, request_headers=headers)
-        self.mocker.get(url(f'problems/?id={p2_id}'), complete_qs=True, json=[p2_status], request_headers=headers)
-
-        self.mocker.get(url(f'problems/{p3_id}'), json=p3_status, request_headers=headers)
-        self.mocker.get(url(f'problems/?id={p3_id}'), complete_qs=True, json=[p3_status], request_headers=headers)
+        self.mocker.get(
+            url(f'problems/{p1_id}'),
+            json=p1_status_with_answer,
+            request_headers=headers)
+        self.mocker.get(
+            url(f'problems/?id={p1_id}'),
+            complete_qs=True,
+            json=[p1_status],
+            request_headers=headers)
+        self.mocker.get(
+            url(f'problems/{p1_id}/info'),
+            json=p1_info,
+            request_headers=headers)
+        self.mocker.get(
+            url(f'problems/{p1_id}/answer'),
+            json=p1_answer,
+            request_headers=headers)
+        self.mocker.get(
+            url(f'problems/{p1_id}/messages'),
+            json=p1_messages,
+            request_headers=headers)
+        self.mocker.get(
+            url(f'problems/?id={p1_id},{p1_id},{p1_id}'),
+            complete_qs=True,
+            json=[p1_status] * 3,
+            request_headers=headers)
 
         # list problems
-        self.mocker.get(url('problems/'), complete_qs=True, json=[p1_status, p2_status, p3_status], request_headers=headers)
-        self.mocker.get(url(f'problems/?id={p1_id}'), complete_qs=True, json=[p1_status], request_headers=headers)
-        self.mocker.get(url(f'problems/?id={p1_id},{p2_id}'), complete_qs=True, json=[p1_status, p2_status], request_headers=headers)
-        self.mocker.get(url('problems/?max_results=1'), json=[p1_status], request_headers=headers)
-        self.mocker.get(url('problems/?status=COMPLETED'), json=[p1_status], request_headers=headers)
+        self.mocker.get(
+            url('problems/'),
+            complete_qs=True,
+            json=[p1_status, p2_status, p3_status],
+            request_headers=headers)
+        self.mocker.get(
+            url(f'problems/?id={p1_id}'),
+            complete_qs=True,
+            json=[p1_status],
+            request_headers=headers)
+        self.mocker.get(
+            url(f'problems/?id={p1_id},{p2_id}'),
+            complete_qs=True,
+            json=[p1_status, p2_status],
+            request_headers=headers)
+        self.mocker.get(
+            url('problems/?max_results=1'),
+            json=[p1_status],
+            request_headers=headers)
+        self.mocker.get(
+            url('problems/?status=COMPLETED'),
+            json=[p1_status],
+            request_headers=headers)
 
         def match_invalid_status(request):
             query = parse_qs(urlparse(request.url).query)
             status = query.get('status')
             return status is not None and status[0] not in all_statuses
-        self.mocker.get(url('problems/'), additional_matcher=match_invalid_status, status_code=400, request_headers=headers)
+
+        self.mocker.get(
+            url('problems/'),
+            additional_matcher=match_invalid_status,
+            status_code=400,
+            request_headers=headers)
 
         def match_invalid_solver(request):
             query = parse_qs(urlparse(request.url).query)
             solver = query.get('solver')
             return solver is not None and solver[0] not in all_solvers
-        self.mocker.get(url('problems/'), additional_matcher=match_invalid_solver, json=[], request_headers=headers)
+
+        self.mocker.get(
+            url('problems/'),
+            additional_matcher=match_invalid_solver,
+            json=[],
+            request_headers=headers)
 
         def match_invalid_problem_id(request):
             query = parse_qs(urlparse(request.url).query)
             problem_id = query.get('id')
             return problem_id is not None and problem_id[0] not in all_problem_ids
-        self.mocker.get(url('problems/'), complete_qs=True, additional_matcher=match_invalid_problem_id, status_code=404, request_headers=headers)
+
+        self.mocker.get(
+            url('problems/'),
+            complete_qs=True,
+            additional_matcher=match_invalid_problem_id,
+            status_code=404,
+            request_headers=headers)
 
         # problem submit
         self.mocker.post(url('problems/'), json=p2_status, request_headers=headers)
 
         def match_invalid_problem_params(request):
             return request.json()['params'] != self.params
-        self.mocker.post(url('problems/'), additional_matcher=match_invalid_problem_params, status_code=400, request_headers=headers)
+
+        self.mocker.post(
+            url('problems/'),
+            additional_matcher=match_invalid_problem_params,
+            status_code=400,
+            request_headers=headers)
 
         def match_invalid_problem_solver(request):
             return request.json()['solver'] != self.solver_id
-        self.mocker.post(url('problems/'), additional_matcher=match_invalid_problem_solver, status_code=404, request_headers=headers)
+
+        self.mocker.post(
+            url('problems/'),
+            additional_matcher=match_invalid_problem_solver,
+            status_code=404,
+            request_headers=headers)
 
         # problem batch submit
         def match_batch_submit(request):
             data = request.json()
             return isinstance(data, list) and len(data) == 3
-        self.mocker.post(url('problems/'), additional_matcher=match_batch_submit, json=[p2_status] * 3, request_headers=headers)
+
+        self.mocker.post(
+            url('problems/'),
+            additional_matcher=match_batch_submit,
+            json=[p2_status] * 3,
+            request_headers=headers)
 
         def match_invalid_batch_submit(request):
             data = request.json()
             return isinstance(data, list) and len(data) == 1 and data[0]['params'] != self.params
+
         self.mocker.post(
             url('problems/'),
             additional_matcher=match_invalid_batch_submit,
             json=[immediate_error_reply(400, 'Unknown parameter')],
+            request_headers=headers)
+
+        # problem cancel
+        self.mocker.delete(url(f'problems/{p1_id}'), status_code=409, request_headers=headers)
+        self.mocker.delete(
+            url('problems/'),
+            json=[immediate_error_reply(409, 'Problem has been finished.')] * 2,
             request_headers=headers)
 
         self.mocker.start()
