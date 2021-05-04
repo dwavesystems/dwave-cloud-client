@@ -208,7 +208,7 @@ class MockSubmission(_QueryTest):
                 'problems/': [complete_no_answer_reply('123')]})
             session.get = lambda a: choose_reply(a, {
                 'problems/123/': complete_reply(
-                    id='123', answer=qubo_answer_diff, msg=qubo_msg_diff)})
+                    id='123', answer=qubo_answer_diff, **qubo_msg_diff)})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
@@ -244,7 +244,7 @@ class MockSubmission(_QueryTest):
                 'problems/': [complete_no_answer_reply('123')]})
             session.get = lambda a: choose_reply(a, {
                 'problems/123/': complete_reply(
-                    id='123', answer=qubo_answer_diff, msg=qubo_msg_diff)})
+                    id='123', answer=qubo_answer_diff, **qubo_msg_diff)})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
