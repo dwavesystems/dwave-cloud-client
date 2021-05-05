@@ -162,7 +162,8 @@ class Problems(ResourceBase):
                        params: dict,
                        solver: str,
                        type: constants.ProblemType,
-                       label: str = None) -> models.ProblemStatusMaybeWithAnswer:
+                       label: str = None) -> \
+            Union[models.ProblemStatusMaybeWithAnswer, models.ProblemSubmitError]:
         """Blocking problem submit with timeout, returning final status and
         answer, if problem is solved within the (undisclosed) time limit.
         """
@@ -170,7 +171,8 @@ class Problems(ResourceBase):
         body = dict(data=data.dict(), params=params, solver=solver,
                     type=type, label=label)
         response = self.session.post(path, json=body)
-        return models.ProblemStatusMaybeWithAnswer.parse_obj(response.json())
+        rtype = get_type_hints(self.submit_problem)['return']
+        return parse_obj_as(rtype, response.json())
 
     # Content-Type: application/vnd.dwave.sapi.problems+json; version=2.1.0
     def submit_problems(self, problems: List[models.ProblemJob]) -> \
@@ -185,11 +187,13 @@ class Problems(ResourceBase):
         return parse_obj_as(rtype, response.json())
 
     # Content-Type: application/vnd.dwave.sapi.problem+json; version=2.1.0
-    def cancel_problem(self, problem_id: str) -> models.ProblemStatus:
+    def cancel_problem(self, problem_id: str) -> \
+            Union[models.ProblemStatus, models.ProblemCancelError]:
         """Initiate problem cancel by problem id."""
         path = '{}'.format(problem_id)
         response = self.session.delete(path)
-        return models.ProblemStatus.parse_obj(response.json())
+        rtype = get_type_hints(self.cancel_problem)['return']
+        return parse_obj_as(rtype, response.json())
 
     # Content-Type: application/vnd.dwave.sapi.problems+json; version=2.1.0
     def cancel_problems(self, problem_ids: List[str]) -> \

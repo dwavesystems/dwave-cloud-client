@@ -17,3 +17,6 @@ import dwave.cloud.api.constants
 import dwave.cloud.api.exceptions
 import dwave.cloud.api.models
 import dwave.cloud.api.resources
+
+from dwave.cloud.api.client import SAPIClient
+from dwave.cloud.api.resources import Solvers, Problems
