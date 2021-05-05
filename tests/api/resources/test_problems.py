@@ -34,12 +34,7 @@ from dwave.cloud.api.resources import Problems
 from dwave.cloud.api import exceptions, models, constants
 
 from tests import config
-from tests.api.mocks import (
-    complete_reply, complete_no_answer_reply, error_reply,
-    immediate_error_reply, cancel_reply, continue_reply,
-    test_solver, test_problem, test_problem_data,
-    problem_info_reply, test_problem_metadata, problem_answer_reply, test_problem_messages
-)
+from tests.api.mocks import StructuredSapiMockResponses, UnstructuredSapiMockResponses
 
 
 class ProblemResourcesBaseTests(abc.ABC):
@@ -333,13 +328,13 @@ class TestMockProblemsStructured(StructuredAnswerVerified,
         self.mocker.get(requests_mock.ANY, status_code=401)
         self.mocker.get(requests_mock.ANY, status_code=404, request_headers=headers)
 
-        # mock solver
-        solver = test_solver()
-        self.solver_id = solver.id
+        self.sapi = StructuredSapiMockResponses()
+
+        self.solver_id = self.sapi.solver.id
 
         # mock problem
-        self.linear, self.quadratic = problem = test_problem(solver)
-        problem_data_dict = test_problem_data(solver, problem)
+        self.linear, self.quadratic = self.sapi.problem
+        problem_data_dict = self.sapi.problem_data()
         self.problem_data = models.ProblemData.parse_obj(problem_data_dict)
 
         self.params = dict(num_reads=100)
@@ -349,23 +344,23 @@ class TestMockProblemsStructured(StructuredAnswerVerified,
 
         # p1 is completed
         p1_id = str(uuid.uuid4())
-        p1_status = complete_no_answer_reply(id=p1_id)
-        p1_status_with_answer = complete_reply(id=p1_id)
-        p1_metadata = test_problem_metadata(solver=self.solver_id, submitted_by=self.token)
-        p1_answer = problem_answer_reply()
-        p1_messages = test_problem_messages()
-        p1_info = problem_info_reply(id=p1_id, params=self.params, metadata=p1_metadata)
+        p1_status = self.sapi.complete_no_answer_reply()
+        p1_status_with_answer = self.sapi.complete_reply()
+        p1_metadata = self.sapi.problem_metadata(submitted_by=self.token)
+        p1_answer = self.sapi.problem_answer()
+        p1_messages = self.sapi.problem_messages()
+        p1_info = self.sapi.problem_info(params=self.params, metadata=p1_metadata)
         self.problem_id = p1_id
         self.problem_type = constants.ProblemType(p1_status['type'])
         self.problem_label = p1_status['label']
 
         # p2 is submitted (and pending)
         p2_id = str(uuid.uuid4())
-        p2_status = continue_reply(id=p2_id)
+        p2_status = self.sapi.continue_reply(id=p2_id)
 
         # p3 is cancelled
         p3_id = str(uuid.uuid4())
-        p3_status = cancel_reply(id=p3_id)
+        p3_status = self.sapi.cancel_reply(id=p3_id)
 
         all_problem_ids = {p1_id, p2_id, p3_id}
 
@@ -495,14 +490,14 @@ class TestMockProblemsStructured(StructuredAnswerVerified,
         self.mocker.post(
             url('problems/'),
             additional_matcher=match_invalid_batch_submit,
-            json=[immediate_error_reply(400, 'Unknown parameter')],
+            json=[self.sapi.immediate_error_reply(code=400, msg='Unknown parameter')],
             request_headers=headers)
 
         # problem cancel
         self.mocker.delete(url(f'problems/{p1_id}'), status_code=409, request_headers=headers)
         self.mocker.delete(
             url('problems/'),
-            json=[immediate_error_reply(409, 'Problem has been finished.')] * 2,
+            json=[self.sapi.immediate_error_reply(code=409, msg='Problem has been finished.')] * 2,
             request_headers=headers)
 
         self.mocker.start()
