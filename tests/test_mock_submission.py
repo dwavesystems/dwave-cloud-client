@@ -41,10 +41,7 @@ from dwave.cloud.exceptions import (
     SolverFailureError, CanceledFutureError, SolverError,
     InvalidAPIResponseError)
 
-from tests.api.mocks import (
-    complete_reply, complete_no_answer_reply, error_reply,
-    immediate_error_reply, cancel_reply, continue_reply,
-    solver_data, test_problem)
+from tests.api.mocks import StructuredSapiMockResponses
 
 
 def choose_reply(path, replies, statuses=None, date=None):
@@ -120,6 +117,10 @@ class _QueryTest(unittest.TestCase):
 class MockSubmission(_QueryTest):
     """Test connecting and some related failure modes."""
 
+    @classmethod
+    def setUpClass(cls):
+        cls.sapi = StructuredSapiMockResponses()
+
     def test_submit_null_reply(self):
         """Get an error when the server's response is incomplete."""
 
@@ -133,9 +134,9 @@ class MockSubmission(_QueryTest):
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
-                linear, quadratic = test_problem(solver)
+                linear, quadratic = self.sapi.problem
                 results = solver.sample_ising(linear, quadratic)
 
                 with self.assertRaises(InvalidAPIResponseError):
@@ -149,16 +150,16 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': [complete_no_answer_reply('123')]})
+                'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
             session.get = lambda a: choose_reply(a, {
-                'problems/123/': complete_reply('123')})
+                'problems/123/': self.sapi.complete_reply(id='123')})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
-                linear, quadratic = test_problem(solver)
+                linear, quadratic = self.sapi.problem
                 params = dict(num_reads=100)
                 results = solver.sample_ising(linear, quadratic, **params)
 
@@ -173,16 +174,16 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': [complete_no_answer_reply('123')]})
+                'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
             session.get = lambda a: choose_reply(a, {
-                'problems/123/': complete_reply('123')})
+                'problems/123/': self.sapi.complete_reply(id='123')})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
-                h, J = test_problem(solver)
+                h, J = self.sapi.problem
                 bqm = dimod.BinaryQuadraticModel.from_ising(h, J)
 
                 params = dict(num_reads=100)
@@ -205,15 +206,15 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': [complete_no_answer_reply('123')]})
+                'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
             session.get = lambda a: choose_reply(a, {
-                'problems/123/': complete_reply(
-                    id='123', answer=qubo_answer_diff, **qubo_msg_diff)})
+                'problems/123/': self.sapi.complete_reply(
+                    id='123', answer_patch=qubo_answer_diff, **qubo_msg_diff)})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
                 qubo = {(0, 0): 4.0, (0, 4): -4, (4, 4): 4.0}
                 offset = -2.0
@@ -241,15 +242,15 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': [complete_no_answer_reply('123')]})
+                'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
             session.get = lambda a: choose_reply(a, {
-                'problems/123/': complete_reply(
-                    id='123', answer=qubo_answer_diff, **qubo_msg_diff)})
+                'problems/123/': self.sapi.complete_reply(
+                    id='123', answer_patch=qubo_answer_diff, **qubo_msg_diff)})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
                 qubo = {(0, 0): 4.0, (0, 4): -4, (4, 4): 4.0}
                 offset = -2.0
@@ -269,14 +270,14 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': [error_reply(error_message='An error message')]})
+                'problems/': [self.sapi.error_reply(error_message='An error message')]})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
-                linear, quadratic = test_problem(solver)
+                linear, quadratic = self.sapi.problem
                 results = solver.sample_ising(linear, quadratic)
 
                 with self.assertRaises(SolverFailureError):
@@ -290,15 +291,15 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': [immediate_error_reply(
-                    400, "Missing parameter 'num_reads' in problem JSON")]})
+                'problems/': [self.sapi.immediate_error_reply(
+                    code=400, msg="Missing parameter 'num_reads' in problem JSON")]})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
-                linear, quadratic = test_problem(solver)
+                linear, quadratic = self.sapi.problem
                 results = solver.sample_ising(linear, quadratic)
 
                 with self.assertRaises(SolverFailureError):
@@ -312,14 +313,14 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': [cancel_reply()]})
+                'problems/': [self.sapi.cancel_reply()]})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
-                linear, quadratic = test_problem(solver)
+                linear, quadratic = self.sapi.problem
                 results = solver.sample_ising(linear, quadratic)
 
                 with self.assertRaises(CanceledFutureError):
@@ -336,7 +337,7 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda path, _: choose_reply(path, {
-                'problems/': [complete_no_answer_reply(id='123')]})
+                'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
             session.get = lambda path: choose_reply(
                 path, replies={
                     'problems/123/': error_message
@@ -347,9 +348,9 @@ class MockSubmission(_QueryTest):
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
-                linear, quadratic = test_problem(solver)
+                linear, quadratic = self.sapi.problem
                 future = solver.sample_ising(linear, quadratic)
 
                 with self.assertRaises(SolverError) as exc:
@@ -365,19 +366,19 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': [continue_reply(id='123')]
+                'problems/': [self.sapi.continue_reply(id='123')]
             })
             session.get = lambda a: choose_reply(a, {
-                'problems/?id=123': [complete_no_answer_reply('123')],
-                'problems/123/': complete_reply('123')
+                'problems/?id=123': [self.sapi.complete_no_answer_reply(id='123')],
+                'problems/123/': self.sapi.complete_reply(id='123')
             })
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
-                linear, quadratic = test_problem(solver)
+                linear, quadratic = self.sapi.problem
                 params = dict(num_reads=100)
                 results = solver.sample_ising(linear, quadratic, **params)
 
@@ -391,16 +392,16 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': [continue_reply('123')]})
+                'problems/': [self.sapi.continue_reply(id='123')]})
             session.get = lambda a: choose_reply(a, {
-                'problems/?id=123': [error_reply('123')]})
+                'problems/?id=123': [self.sapi.error_reply(id='123')]})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
-                linear, quadratic = test_problem(solver)
+                linear, quadratic = self.sapi.problem
                 params = dict(num_reads=100)
                 results = solver.sample_ising(linear, quadratic, **params)
 
@@ -420,31 +421,31 @@ class MockSubmission(_QueryTest):
                 state['count'] += 1
                 if state['count'] < 2:
                     return choose_reply(path, {
-                        'problems/?id=1': [continue_reply('1')],
-                        'problems/?id=2': [continue_reply('2')],
-                        'problems/1/': continue_reply('1'),
-                        'problems/2/': continue_reply('2'),
-                        'problems/?id=1,2': [continue_reply('1'),
-                                             continue_reply('2')],
-                        'problems/?id=2,1': [continue_reply('2'),
-                                             continue_reply('1')]
+                        'problems/?id=1': [self.sapi.continue_reply(id='1')],
+                        'problems/?id=2': [self.sapi.continue_reply(id='2')],
+                        'problems/1/': self.sapi.continue_reply(id='1'),
+                        'problems/2/': self.sapi.continue_reply(id='2'),
+                        'problems/?id=1,2': [self.sapi.continue_reply(id='1'),
+                                             self.sapi.continue_reply(id='2')],
+                        'problems/?id=2,1': [self.sapi.continue_reply(id='2'),
+                                             self.sapi.continue_reply(id='1')]
                     })
                 else:
                     return choose_reply(path, {
-                        'problems/?id=1': [error_reply('1')],
-                        'problems/?id=2': [complete_no_answer_reply('2')],
-                        'problems/1/': error_reply('1'),
-                        'problems/2/': complete_reply('2'),
-                        'problems/?id=1,2': [error_reply('1'),
-                                             complete_no_answer_reply('2')],
-                        'problems/?id=2,1': [complete_no_answer_reply('2'),
-                                             error_reply('1')]
+                        'problems/?id=1': [self.sapi.error_reply(id='1')],
+                        'problems/?id=2': [self.sapi.complete_no_answer_reply(id='2')],
+                        'problems/1/': self.sapi.error_reply(id='1'),
+                        'problems/2/': self.sapi.complete_reply(id='2'),
+                        'problems/?id=1,2': [self.sapi.error_reply(id='1'),
+                                             self.sapi.complete_no_answer_reply(id='2')],
+                        'problems/?id=2,1': [self.sapi.complete_no_answer_reply(id='2'),
+                                             self.sapi.error_reply(id='1')]
                     })
 
             def accept_problems_with_continue_reply(path, body, ids=iter('12')):
                 problems = json.loads(body)
                 return choose_reply(path, {
-                    'problems/': [continue_reply(next(ids)) for _ in problems]
+                    'problems/': [self.sapi.continue_reply(id=next(ids)) for _ in problems]
                 })
 
             session.get = continue_then_complete
@@ -456,9 +457,9 @@ class MockSubmission(_QueryTest):
 
         with mock.patch.object(Client, 'create_session', lambda self: session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
-                linear, quadratic = test_problem(solver)
+                linear, quadratic = self.sapi.problem
                 params = dict(num_reads=100)
 
                 results1 = solver.sample_ising(linear, quadratic, **params)
@@ -477,7 +478,7 @@ class MockSubmission(_QueryTest):
 
             # on submit, return status pending
             session.post = lambda path, _: choose_reply(path, {
-                'problems/': [continue_reply('123')]
+                'problems/': [self.sapi.continue_reply(id='123')]
             })
 
             # on first and second status poll, return pending
@@ -486,13 +487,13 @@ class MockSubmission(_QueryTest):
                 state['count'] += 1
                 if state['count'] < 3:
                     return choose_reply(path, {
-                        'problems/?id=123': [continue_reply('123')],
-                        'problems/123/': continue_reply('123')
+                        'problems/?id=123': [self.sapi.continue_reply(id='123')],
+                        'problems/123/': self.sapi.continue_reply(id='123')
                     })
                 else:
                     return choose_reply(path, {
-                        'problems/?id=123': [complete_no_answer_reply('123')],
-                        'problems/123/': complete_reply('123')
+                        'problems/?id=123': [self.sapi.complete_no_answer_reply(id='123')],
+                        'problems/123/': self.sapi.complete_reply(id='123')
                     })
 
             session.get = continue_then_complete
@@ -503,7 +504,7 @@ class MockSubmission(_QueryTest):
 
         with mock.patch.object(Client, 'create_session', lambda self: session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
                 future = solver.sample_qubo({})
                 future.result()
@@ -519,17 +520,17 @@ class MockSubmission(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda path, _: choose_reply(path, {
-                'problems/': [continue_reply('1')]
+                'problems/': [self.sapi.continue_reply(id='1')]
             })
             session.get = lambda path: choose_reply(path, {
-                'problems/?id=1': [complete_no_answer_reply('1')],
-                'problems/1/': complete_reply('1')
+                'problems/?id=1': [self.sapi.complete_no_answer_reply(id='1')],
+                'problems/1/': self.sapi.complete_reply(id='1')
             })
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
                 def assert_no_delay(s):
                     s and self.assertTrue(
@@ -549,17 +550,17 @@ class MockSubmission(_QueryTest):
             badnow = utcrel(100)
             session = mock.Mock()
             session.post = lambda path, _: choose_reply(path, {
-                'problems/': [continue_reply('1')]
+                'problems/': [self.sapi.continue_reply(id='1')]
             }, date=badnow)
             session.get = lambda path: choose_reply(path, {
-                'problems/?id=1': [complete_no_answer_reply('1')],
-                'problems/1/': complete_reply('1')
+                'problems/?id=1': [self.sapi.complete_no_answer_reply(id='1')],
+                'problems/1/': self.sapi.complete_reply(id='1')
             }, date=badnow)
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
                 def assert_no_delay(s):
                     s and self.assertTrue(
@@ -578,7 +579,7 @@ class MockSubmission(_QueryTest):
 
             # on submit, return status pending
             session.post = lambda path, _: choose_reply(path, {
-                'problems/': [continue_reply('123')]
+                'problems/': [self.sapi.continue_reply(id='123')]
             })
 
             # on first and second status poll, fail with 503 and 504
@@ -588,16 +589,16 @@ class MockSubmission(_QueryTest):
                 state['count'] += 1
                 if state['count'] < 3:
                     return choose_reply(path, replies={
-                        'problems/?id=123': [continue_reply('123')],
-                        'problems/123/': continue_reply('123')
+                        'problems/?id=123': [self.sapi.continue_reply(id='123')],
+                        'problems/123/': self.sapi.continue_reply(id='123')
                     }, statuses={
                         'problems/?id=123': statuses,
                         'problems/123/': statuses
                     })
                 else:
                     return choose_reply(path, {
-                        'problems/?id=123': [complete_no_answer_reply('123')],
-                        'problems/123/': complete_reply('123')
+                        'problems/?id=123': [self.sapi.complete_no_answer_reply(id='123')],
+                        'problems/123/': self.sapi.complete_reply(id='123')
                     })
 
             session.get = continue_then_complete
@@ -608,7 +609,7 @@ class MockSubmission(_QueryTest):
 
         with mock.patch.object(Client, 'create_session', lambda self: session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
                 future = solver.sample_qubo({})
                 future.result()
@@ -635,6 +636,10 @@ class DeleteEvent(Exception):
 class MockCancel(unittest.TestCase):
     """Make sure cancel works at the two points in the process where it should."""
 
+    @classmethod
+    def setUpClass(cls):
+        cls.sapi = StructuredSapiMockResponses()
+
     def test_cancel_with_id(self):
         """Make sure the cancel method submits to the right endpoint.
 
@@ -646,7 +651,7 @@ class MockCancel(unittest.TestCase):
         # the mocked responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
-            reply_body = [continue_reply(submission_id, 'solver')]
+            reply_body = [self.sapi.continue_reply(id=submission_id, solver='solver')]
             session.get = lambda a: choose_reply(a, {
                 'problems/?id={}'.format(submission_id): reply_body})
             session.delete = DeleteEvent.handle
@@ -654,7 +659,7 @@ class MockCancel(unittest.TestCase):
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
                 future = solver._retrieve_problem(submission_id)
                 future.cancel()
 
@@ -679,7 +684,7 @@ class MockCancel(unittest.TestCase):
         # each thread can have its instance of a session because
         # we use a global lock (event) in the mocked responses
         def create_mock_session(client):
-            reply_body = [continue_reply(submission_id)]
+            reply_body = [self.sapi.continue_reply(id=submission_id)]
 
             session = mock.Mock()
             session.get = lambda a: choose_reply(a, {
@@ -696,9 +701,9 @@ class MockCancel(unittest.TestCase):
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
-                linear, quadratic = test_problem(solver)
+                linear, quadratic = self.sapi.problem
 
                 future = solver.sample_ising(linear, quadratic)
                 future.cancel()
@@ -715,6 +720,10 @@ class MockCancel(unittest.TestCase):
 
 
 class TestComputationID(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.sapi = StructuredSapiMockResponses()
 
     def test_id_getter_setter(self):
         """Future.get_id/get_id works in isolation as expected."""
@@ -750,7 +759,7 @@ class TestComputationID(unittest.TestCase):
             # delayed submit; emulates waiting in queue
             def post(path, _):
                 release_reply.wait()
-                reply_body = complete_reply(submission_id, solver_name)
+                reply_body = self.sapi.complete_reply(id=submission_id, solver=solver_name)
                 return choose_reply(path, {'problems/': [reply_body]})
 
             session.post = post
@@ -759,9 +768,9 @@ class TestComputationID(unittest.TestCase):
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data(id=solver_name))
+                solver = Solver(client, self.sapi.solver.data)
 
-                linear, quadratic = test_problem(solver)
+                linear, quadratic = self.sapi.problem
 
                 future = solver.sample_ising(linear, quadratic)
 
@@ -795,6 +804,10 @@ class TestComputationID(unittest.TestCase):
 @mock.patch('time.sleep', lambda *x: None)
 class TestOffsetHandling(_QueryTest):
 
+    @classmethod
+    def setUpClass(cls):
+        cls.sapi = StructuredSapiMockResponses()
+
     def test_submit_offset_answer_includes_it(self):
         """Handle a normal query with offset and response that includes it."""
 
@@ -806,18 +819,18 @@ class TestOffsetHandling(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': [complete_no_answer_reply(
-                    '123', 'abc123')]})
+                'problems/': [self.sapi.complete_no_answer_reply(
+                    id='123')]})
             session.get = lambda a: choose_reply(a, {
-                'problems/123/': complete_reply(
-                    '123', 'abc123', answer=dict(offset=offset))})
+                'problems/123/': self.sapi.complete_reply(
+                    id='123', answer_patch=dict(offset=offset))})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
-                linear, quadratic = test_problem(solver)
+                linear, quadratic = self.sapi.problem
                 params = dict(num_reads=100)
                 results = solver.sample_ising(linear, quadratic, offset, **params)
 
@@ -834,16 +847,16 @@ class TestOffsetHandling(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': [complete_no_answer_reply('123')]})
+                'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
             session.get = lambda a: choose_reply(a, {
-                'problems/123/': complete_reply('123')})
+                'problems/123/': self.sapi.complete_reply(id='123')})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
-                linear, quadratic = test_problem(solver)
+                linear, quadratic = self.sapi.problem
                 params = dict(num_reads=100)
                 results = solver.sample_ising(linear, quadratic, offset, **params)
 
@@ -862,17 +875,17 @@ class TestOffsetHandling(_QueryTest):
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': [complete_no_answer_reply('123')]})
+                'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
             session.get = lambda a: choose_reply(a, {
-                'problems/123/': complete_reply(
-                    id='123', answer=dict(offset=answer_offset))})
+                'problems/123/': self.sapi.complete_reply(
+                    id='123', answer_patch=dict(offset=answer_offset))})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
-                linear, quadratic = test_problem(solver)
+                linear, quadratic = self.sapi.problem
                 params = dict(num_reads=100)
                 results = solver.sample_ising(linear, quadratic, offset, **params)
 
@@ -885,22 +898,26 @@ class TestOffsetHandling(_QueryTest):
 @mock.patch('time.sleep', lambda *x: None)
 class TestComputationDeprecations(_QueryTest):
 
+    @classmethod
+    def setUpClass(cls):
+        cls.sapi = StructuredSapiMockResponses()
+
     def test_deprecations(self):
         """Proper deprecation warnings are raised."""
 
         def create_mock_session(client):
             session = mock.Mock()
             session.post = lambda a, _: choose_reply(a, {
-                'problems/': [complete_no_answer_reply('123')]})
+                'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
             session.get = lambda a: choose_reply(a, {
-                'problems/123/': complete_reply('123')})
+                'problems/123/': self.sapi.complete_reply(id='123')})
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
 
-                linear, quadratic = test_problem(solver)
+                linear, quadratic = self.sapi.problem
                 params = dict(num_reads=100)
                 results = solver.sample_ising(linear, quadratic, **params)
 
@@ -920,6 +937,10 @@ class TestComputationDeprecations(_QueryTest):
 
 
 class TestProblemLabel(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.sapi = StructuredSapiMockResponses()
 
     class PrimaryAssertionSatisfied(Exception):
         """Raised by `on_submit_label_verifier` to signal correct label."""
@@ -949,7 +970,7 @@ class TestProblemLabel(unittest.TestCase):
         return _submit
 
     def generate_sample_problems(self, solver):
-        linear, quadratic = test_problem(solver)
+        linear, quadratic = self.sapi.problem
 
         # test sample_{ising,qubo,bqm}
         problems = [("sample_ising", (linear, quadratic)),
@@ -970,7 +991,7 @@ class TestProblemLabel(unittest.TestCase):
         """Problem label is set on problem submit."""
 
         with Client('endpoint', 'token') as client:
-            solver = Solver(client, solver_data())
+            solver = Solver(client, self.sapi.solver.data)
             problems = self.generate_sample_problems(solver)
 
             for method_name, problem_args in problems:
@@ -994,15 +1015,15 @@ class TestProblemLabel(unittest.TestCase):
             def create_mock_session(client):
                 session = mock.Mock()
                 session.post = lambda a, _: choose_reply(a, {
-                    'problems/': [complete_no_answer_reply('123', label=None)]})
+                    'problems/': [self.sapi.complete_no_answer_reply(id='123', label=None)]})
                 session.get = lambda a: choose_reply(a, {
-                    'problems/123/': complete_reply('123', label=label)})
+                    'problems/123/': self.sapi.complete_reply(id='123', label=label)})
                 return session
             return create_mock_session
 
         with mock.patch.object(Client, 'create_session', make_session_generator(label)):
             with Client('endpoint', 'token') as client:
-                solver = Solver(client, solver_data())
+                solver = Solver(client, self.sapi.solver.data)
                 problems = self.generate_sample_problems(solver)
 
                 for method_name, problem_args in problems:
