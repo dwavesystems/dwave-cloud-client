@@ -30,16 +30,19 @@ class SapiMockResponses:
     def __init__(self,
                  solver: Union[StructuredSolver, UnstructuredSolver],
                  problem: Union[Tuple[dict, dict], 'dimod.BQM'],
-                 type: str,
                  answer: dict,
+                 problem_type: str,
+                 problem_id: str = None,
+                 problem_label: str = None,
                  ):
         self.solver = solver
         self.problem = problem
         self.answer = answer
 
-        self.solver_id = str(uuid.uuid4())
-        self.problem_id = str(uuid.uuid4())
-        self.problem_type = type
+        self.solver_id = solver.id
+        self.problem_type = problem_type
+        self.problem_id = str(uuid.uuid4()) if problem_id is None else problem_id
+        self.problem_label = str(uuid.uuid4()) if problem_label is None else problem_label
 
     def problem_data(self,
                      solver: Union[StructuredSolver, UnstructuredSolver] = None,
@@ -67,7 +70,7 @@ class SapiMockResponses:
             "solved_on": utcrel(-10).isoformat(),
             "status": "COMPLETED",
             "messages": self.problem_messages(),
-            "label": None,
+            "label": self.problem_label,
         }
         metadata.update(**kwargs)
         return metadata
@@ -83,7 +86,7 @@ class SapiMockResponses:
             "data": self.problem_data(),
             "params": {},
             "metadata": self.problem_metadata(),
-            "answer": self.problem_answer(),
+            "answer": self.answer.copy(),
         }
         response.update(**kwargs)
         return response
@@ -99,7 +102,7 @@ class SapiMockResponses:
             "answer": self.answer.copy(),
             "type": self.problem_type,
             "id": self.problem_id,
-            "label": None,
+            "label": self.problem_label,
         }
 
         # optional answer fields override
@@ -121,7 +124,7 @@ class SapiMockResponses:
             "submitted_on": utcrel(-20).isoformat(),
             "type": self.problem_type,
             "id": self.problem_id,
-            "label": None,
+            "label": self.problem_label,
         }
         response.update(**kwargs)
         return response
@@ -136,7 +139,7 @@ class SapiMockResponses:
             "submitted_on": utcrel(-20).isoformat(),
             "type": self.problem_type,
             "id": self.problem_id,
-            "label": None,
+            "label": self.problem_label,
             "error_message": error_message or 'An error message',
         }
         response.update(**kwargs)
@@ -160,7 +163,7 @@ class SapiMockResponses:
             "submitted_on": utcrel(-20).isoformat(),
             "type": self.problem_type,
             "id": self.problem_id,
-            "label": None,
+            "label": self.problem_label,
         }
         response.update(**kwargs)
         return response
@@ -175,7 +178,7 @@ class SapiMockResponses:
             "submitted_on": utcrel(0).isoformat(),
             "type": self.problem_type,
             "id": self.problem_id,
-            "label": None,
+            "label": self.problem_label,
         }
         response.update(**kwargs)
         return response
@@ -201,7 +204,7 @@ class StructuredSapiMockResponses(SapiMockResponses):
     def __init__(self, **kwargs):
         kwargs.setdefault('solver', StructuredSolver(client=None, data=qpu_clique_solver_data(5)))
         kwargs.setdefault('problem', generate_const_ising_problem(kwargs['solver'], h=1, j=-1))
-        kwargs.setdefault('type', 'ising')
+        kwargs.setdefault('problem_type', 'ising')
         kwargs.setdefault('answer', self._problem_answer())
         super().__init__(**kwargs)
 
@@ -225,6 +228,6 @@ class UnstructuredSapiMockResponses(SapiMockResponses):
 
         kwargs.setdefault('solver', solver)
         kwargs.setdefault('problem', bqm)
-        kwargs.setdefault('type', 'bqm')
+        kwargs.setdefault('problem_type', 'bqm')
         kwargs.setdefault('answer', self._problem_answer(sampleset))
         super().__init__(**kwargs)

@@ -314,6 +314,22 @@ class TestMockProblemsStructured(StructuredAnswerVerified,
     token = str(uuid.uuid4())
     endpoint = 'http://test.com/path/'
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.p1 = StructuredSapiMockResponses()
+        self.p2 = StructuredSapiMockResponses()
+        self.p3 = StructuredSapiMockResponses()
+
+        self.linear, self.quadratic = self.p1.problem
+        self.problem_data = models.ProblemData.parse_obj(self.p1.problem_data())
+        self.problem_type = constants.ProblemType(self.p1.problem_type)
+        self.problem_id = self.p1.problem_id
+        self.problem_label = self.p1.problem_label
+
+        self.params = dict(num_reads=100)
+        self.solver_id = self.p1.solver.id
+
     def setUp(self):
         """Define all mock responses for requests issued during
         `ProblemResourcesBaseTests` tests.
@@ -328,41 +344,27 @@ class TestMockProblemsStructured(StructuredAnswerVerified,
         self.mocker.get(requests_mock.ANY, status_code=401)
         self.mocker.get(requests_mock.ANY, status_code=404, request_headers=headers)
 
-        self.sapi = StructuredSapiMockResponses()
-
-        self.solver_id = self.sapi.solver.id
-
-        # mock problem
-        self.linear, self.quadratic = self.sapi.problem
-        problem_data_dict = self.sapi.problem_data()
-        self.problem_data = models.ProblemData.parse_obj(problem_data_dict)
-
-        self.params = dict(num_reads=100)
-
-        all_statuses = {s.value for s in constants.ProblemStatus}
-        all_solvers = [self.solver_id]
-
         # p1 is completed
-        p1_id = str(uuid.uuid4())
-        p1_status = self.sapi.complete_no_answer_reply()
-        p1_status_with_answer = self.sapi.complete_reply()
-        p1_metadata = self.sapi.problem_metadata(submitted_by=self.token)
-        p1_answer = self.sapi.problem_answer()
-        p1_messages = self.sapi.problem_messages()
-        p1_info = self.sapi.problem_info(params=self.params, metadata=p1_metadata)
-        self.problem_id = p1_id
-        self.problem_type = constants.ProblemType(p1_status['type'])
-        self.problem_label = p1_status['label']
+        p1_id = self.p1.problem_id
+        p1_status = self.p1.complete_no_answer_reply()
+        p1_status_with_answer = self.p1.complete_reply()
+        p1_params = self.params
+        p1_metadata = self.p1.problem_metadata(submitted_by=self.token)
+        p1_answer = self.p1.problem_answer()
+        p1_messages = self.p1.problem_messages()
+        p1_info = self.p1.problem_info(params=p1_params, metadata=p1_metadata)
 
         # p2 is submitted (and pending)
-        p2_id = str(uuid.uuid4())
-        p2_status = self.sapi.continue_reply(id=p2_id)
+        p2_id = self.p2.problem_id
+        p2_status = self.p2.continue_reply(id=p2_id)
 
         # p3 is cancelled
-        p3_id = str(uuid.uuid4())
-        p3_status = self.sapi.cancel_reply(id=p3_id)
+        p3_id = self.p3.problem_id
+        p3_status = self.p3.cancel_reply(id=p3_id)
 
         all_problem_ids = {p1_id, p2_id, p3_id}
+        all_solvers = [self.solver_id]
+        all_statuses = {s.value for s in constants.ProblemStatus}
 
         # problem status et al
         self.mocker.get(
@@ -490,14 +492,14 @@ class TestMockProblemsStructured(StructuredAnswerVerified,
         self.mocker.post(
             url('problems/'),
             additional_matcher=match_invalid_batch_submit,
-            json=[self.sapi.immediate_error_reply(code=400, msg='Unknown parameter')],
+            json=[self.p1.immediate_error_reply(code=400, msg='Unknown parameter')],
             request_headers=headers)
 
         # problem cancel
         self.mocker.delete(url(f'problems/{p1_id}'), status_code=409, request_headers=headers)
         self.mocker.delete(
             url('problems/'),
-            json=[self.sapi.immediate_error_reply(code=409, msg='Problem has been finished.')] * 2,
+            json=[self.p1.immediate_error_reply(code=409, msg='Problem has been finished.')] * 2,
             request_headers=headers)
 
         self.mocker.start()
