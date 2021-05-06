@@ -44,8 +44,15 @@ class ProblemResourcesBaseTests(abc.ABC):
     def setUpClass(cls):
         """Create and submit one problem.
 
-        Store as class attributes: `problem_data`, `problem_type`, sampling
-        `params`, submitted `future`, `solver_id`.
+        Set the following attributes:
+        - `linear`/`quadratic` (or `bqm`), `problem_data`
+        - `problem_type`, `problem_id`, `problem_label`
+        - `params`
+        - `solver_id`
+
+        Written to work with:
+        - both mock data and live api
+        - both structured and unstructured problems/answers/solvers
         """
 
     def verify_problem_status(self, status: models.ProblemStatus, solved: bool = False):
@@ -285,7 +292,7 @@ class ProblemResourcesBaseTests(abc.ABC):
             self.assertEqual(status.error_code, 409)
 
 
-class StructuredAnswerVerified:
+class StructuredProblemTestsMixin:
 
     def verify_problem_answer(self, answer: models.ProblemAnswer):
         ans = decode_qp(msg=dict(answer=answer.dict(), type=self.problem_type.value))
@@ -295,7 +302,7 @@ class StructuredAnswerVerified:
         self.assertEqual(sum(ans['num_occurrences']), self.params['num_reads'])
 
 
-class UnstructuredAnswerVerified:
+class UnstructuredProblemTestsMixin:
 
     def verify_problem_answer(self, answer: models.ProblemAnswer):
         ans = decode_bq(msg=dict(answer=answer.dict(), type=self.problem_type.value))
@@ -304,37 +311,15 @@ class UnstructuredAnswerVerified:
         dimod.testing.assert_sampleset_energies(ss, self.bqm)
 
 
-class TestMockProblemsStructured(StructuredAnswerVerified,
-                                 ProblemResourcesBaseTests,
-                                 unittest.TestCase):
-    """Test request formation and response parsing (including error handling)
-    works correctly for all :class:`dwave.cloud.api.resources.Problems` methods.
+class ProblemResourcesMockerMixin:
+    """Define and set up mock responses for all requests issued by
+    `ProblemResourcesBaseTests` tests.
     """
 
     token = str(uuid.uuid4())
     endpoint = 'http://test.com/path/'
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.p1 = StructuredSapiMockResponses()
-        self.p2 = StructuredSapiMockResponses()
-        self.p3 = StructuredSapiMockResponses()
-
-        self.linear, self.quadratic = self.p1.problem
-        self.problem_data = models.ProblemData.parse_obj(self.p1.problem_data())
-        self.problem_type = constants.ProblemType(self.p1.problem_type)
-        self.problem_id = self.p1.problem_id
-        self.problem_label = self.p1.problem_label
-
-        self.params = dict(num_reads=100)
-        self.solver_id = self.p1.solver.id
-
     def setUp(self):
-        """Define all mock responses for requests issued during
-        `ProblemResourcesBaseTests` tests.
-        """
-
         def url(path):
             return urljoin(self.endpoint, path)
 
@@ -510,14 +495,71 @@ class TestMockProblemsStructured(StructuredAnswerVerified,
         self.mocker.stop()
 
 
-@unittest.skipUnless(config, "SAPI access not configured")
-class TestCloudProblemsStructured(StructuredAnswerVerified,
-                                  ProblemResourcesBaseTests,
-                                  unittest.TestCase):
-    """Verify `dwave.cloud.api.resources.Problems` handle structured problems."""
+class TestMockProblemsStructured(StructuredProblemTestsMixin,
+                                 ProblemResourcesMockerMixin,
+                                 ProblemResourcesBaseTests,
+                                 unittest.TestCase):
+    """Verify `dwave.cloud.api.resources.Problems` handle structured problems
+    using mocked SAPI responses.
+    """
 
     @classmethod
     def setUpClass(cls):
+        """Configure attributes required (used) by ProblemResourcesBaseTests."""
+
+        cls.p1 = StructuredSapiMockResponses()
+        cls.p2 = StructuredSapiMockResponses()
+        cls.p3 = StructuredSapiMockResponses()
+
+        cls.linear, cls.quadratic = cls.p1.problem
+        cls.problem_data = models.ProblemData.parse_obj(cls.p1.problem_data())
+        cls.problem_type = constants.ProblemType(cls.p1.problem_type)
+        cls.problem_id = cls.p1.problem_id
+        cls.problem_label = cls.p1.problem_label
+
+        cls.params = dict(num_reads=100)
+        cls.solver_id = cls.p1.solver.id
+
+
+@unittest.skipUnless(dimod, "dimod not installed")
+class TestMockProblemsUnstructured(UnstructuredProblemTestsMixin,
+                                   ProblemResourcesMockerMixin,
+                                   ProblemResourcesBaseTests,
+                                   unittest.TestCase):
+    """Verify `dwave.cloud.api.resources.Problems` handle unstructured problems
+    using mocked SAPI responses.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        """Configure attributes required (used) by ProblemResourcesBaseTests."""
+
+        cls.p1 = UnstructuredSapiMockResponses()
+        cls.p2 = UnstructuredSapiMockResponses()
+        cls.p3 = UnstructuredSapiMockResponses()
+
+        cls.bqm = cls.p1.problem
+        cls.problem_data = models.ProblemData.parse_obj(cls.p1.problem_data())
+        cls.problem_type = constants.ProblemType(cls.p1.problem_type)
+        cls.problem_id = cls.p1.problem_id
+        cls.problem_label = cls.p1.problem_label
+
+        cls.params = dict(time_limit=3)
+        cls.solver_id = cls.p1.solver.id
+
+
+@unittest.skipUnless(config, "SAPI access not configured")
+class TestCloudProblemsStructured(StructuredProblemTestsMixin,
+                                  ProblemResourcesBaseTests,
+                                  unittest.TestCase):
+    """Verify `dwave.cloud.api.resources.Problems` handle structured problems
+    as returned by SAPI.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        """Configure attributes required (used) by ProblemResourcesBaseTests."""
+
         with Client(**config) as client:
             cls.token = config['token']
             cls.api = Problems.from_client_config(client)
@@ -543,13 +585,17 @@ class TestCloudProblemsStructured(StructuredAnswerVerified,
 
 @unittest.skipUnless(dimod, "dimod not installed")
 @unittest.skipUnless(config, "SAPI access not configured")
-class TestCloudProblemsUnstructured(UnstructuredAnswerVerified,
+class TestCloudProblemsUnstructured(UnstructuredProblemTestsMixin,
                                     ProblemResourcesBaseTests,
                                     unittest.TestCase):
-    """Verify `dwave.cloud.api.resources.Problems` handle unstructured problems."""
+    """Verify `dwave.cloud.api.resources.Problems` handle unstructured problems
+    as returned by SAPI.
+    """
 
     @classmethod
     def setUpClass(cls):
+        """Configure attributes required (used) by ProblemResourcesBaseTests."""
+
         with Client(**config) as client:
             cls.token = config['token']
             cls.api = Problems.from_client_config(client)

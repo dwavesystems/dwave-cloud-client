@@ -16,7 +16,7 @@ import json
 import uuid
 from typing import Union, Tuple
 
-from dwave.cloud.coders import encode_problem_as_qp
+from dwave.cloud.coders import encode_problem_as_qp, encode_problem_as_ref
 from dwave.cloud.utils import utcrel, generate_const_ising_problem
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
 from dwave.cloud.testing.mocks import qpu_clique_solver_data, hybrid_bqm_solver_data
@@ -47,12 +47,7 @@ class SapiMockResponses:
     def problem_data(self,
                      solver: Union[StructuredSolver, UnstructuredSolver] = None,
                      problem: Union[Tuple[dict, dict], 'dimod.BQM'] = None) -> dict:
-        if solver is None:
-            solver = self.solver
-        if problem is None:
-            problem = self.problem
-        linear, quadratic = problem
-        return encode_problem_as_qp(solver, linear, quadratic)
+        raise NotImplementedError
 
     def problem_messages(self) -> dict:
         return [{
@@ -201,6 +196,16 @@ class StructuredSapiMockResponses(SapiMockResponses):
         answer.update(**kwargs)
         return answer
 
+    def problem_data(self,
+                     solver: StructuredSolver = None,
+                     problem: Tuple[dict, dict] = None) -> dict:
+        if solver is None:
+            solver = self.solver
+        if problem is None:
+            problem = self.problem
+        linear, quadratic = problem
+        return encode_problem_as_qp(solver, linear, quadratic)
+
     def __init__(self, **kwargs):
         kwargs.setdefault('solver', StructuredSolver(client=None, data=qpu_clique_solver_data(5)))
         kwargs.setdefault('problem', generate_const_ising_problem(kwargs['solver'], h=1, j=-1))
@@ -219,6 +224,11 @@ class UnstructuredSapiMockResponses(SapiMockResponses):
         answer.update(**kwargs)
         return answer
 
+    def problem_data(self,
+                     solver: UnstructuredSolver = None,
+                     problem: 'dimod.BQM' = None) -> dict:
+        return encode_problem_as_ref(self.problem_data_id)
+
     def __init__(self, **kwargs):
         import dimod
 
@@ -231,3 +241,6 @@ class UnstructuredSapiMockResponses(SapiMockResponses):
         kwargs.setdefault('problem_type', 'bqm')
         kwargs.setdefault('answer', self._problem_answer(sampleset))
         super().__init__(**kwargs)
+
+        # unstructured problem specific
+        self.problem_data_id = str(uuid.uuid4())    # mock `self.problem` uploaded
