@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import inspect
 import logging
 
 import requests
@@ -51,18 +50,16 @@ class LoggingSession(BaseUrlSession):
     """
 
     def request(self, method, *args, **kwargs):
-        # log args with and a caller from a correct stack level
-        caller = inspect.stack()[1].function
         callee = type(self).__name__
-        logger.trace("[%s] %s.request(%r, *%r, **%r)",
-                     caller, callee, method, args, kwargs)
+        logger.trace("[%s] request(%r, *%r, **%r)",
+                     callee, method, args, kwargs)
 
         # unify timeout exceptions
         try:
             response = super().request(method, *args, **kwargs)
 
         except Exception as exc:
-            logger.trace("[%s] %s.request failed with %r", caller, callee, exc)
+            logger.trace("[%s] request failed with %r", callee, exc)
 
             if is_caused_by(exc, (requests.exceptions.Timeout,
                                   urllib3.exceptions.TimeoutError)):
@@ -70,8 +67,8 @@ class LoggingSession(BaseUrlSession):
             else:
                 raise
 
-        logger.trace("[%s] %s.request response=(code=%r, body=%r)",
-                     caller, callee, response.status_code, response.text)
+        logger.trace("[%s] request(...) = (code=%r, body=%r)",
+                     callee, response.status_code, response.text)
 
         return response
 
