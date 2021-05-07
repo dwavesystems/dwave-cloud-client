@@ -16,6 +16,7 @@ import uuid
 import unittest
 
 import requests
+import requests_mock
 
 from dwave.cloud.api import exceptions
 from dwave.cloud.api.client import SAPIClient
@@ -62,3 +63,88 @@ class TestConfig(unittest.TestCase):
         # verify Retry object config
         retry = session.get_adapter('https://').max_retries
         self.assertEqual(retry.total, config['retry']['total'])
+
+
+class TestResponseParsing(unittest.TestCase):
+
+    @requests_mock.Mocker()
+    def test_request(self, m):
+        """Config options are respected when making requests."""
+
+        config = dict(endpoint='https://test.com/path/',
+                      token=str(uuid.uuid4()),
+                      headers={'Custom': 'Field 123'})
+
+        auth_headers = {'X-Auth-Token': config['token']}
+        data = dict(answer=123)
+
+        m.get(requests_mock.ANY, status_code=401)
+        m.get(requests_mock.ANY, status_code=404, request_headers=auth_headers)
+        m.get(config['endpoint'], json=data, request_headers=config['headers'])
+
+        client = SAPIClient(**config)
+
+        self.assertEqual(client.session.get('').json(), data)
+
+    @requests_mock.Mocker()
+    def test_non_json(self, m):
+        """Non-JSON OK response is unexpected."""
+
+        m.get(requests_mock.ANY, text='text', status_code=200)
+
+        client = SAPIClient()
+
+        with self.assertRaises(exceptions.ResourceBadResponseError) as exc:
+            client.session.get('test')
+
+    @requests_mock.Mocker()
+    def test_structured_error_response(self, m):
+        """Error response dict correctly initializes exc."""
+
+        error_msg = "I looked, but couldn't find."
+        error_code = 404
+        error = dict(error_msg=error_msg, error_code=error_code)
+
+        m.get(requests_mock.ANY, json=error, status_code=error_code)
+
+        client = SAPIClient()
+
+        with self.assertRaisesRegex(exceptions.ResourceNotFoundError, error_msg) as exc:
+            client.session.get('test')
+
+            self.assertEqual(exc.error_msg, error_msg)
+            self.assertEqual(exc.error_code, error_code)
+
+    @requests_mock.Mocker()
+    def test_plain_text_error(self, m):
+        """Error messages in plain text/body correctly initialize exc."""
+
+        error_msg = "I looked, but couldn't find."
+        error_code = 404
+
+        m.get(requests_mock.ANY, text=error_msg, status_code=error_code)
+
+        client = SAPIClient()
+
+        with self.assertRaisesRegex(exceptions.ResourceNotFoundError, error_msg) as exc:
+            client.session.get('test')
+
+            self.assertEqual(exc.error_msg, error_msg)
+            self.assertEqual(exc.error_code, error_code)
+
+    @requests_mock.Mocker()
+    def test_unknown_errors(self, m):
+        """Unknown status code with plain text msg raised as general req exc."""
+
+        error_msg = "I'm a teapot"
+        error_code = 418
+
+        m.get(requests_mock.ANY, text=error_msg, status_code=error_code)
+
+        client = SAPIClient()
+
+        with self.assertRaisesRegex(exceptions.RequestError, error_msg) as exc:
+            client.session.get('test')
+
+            self.assertEqual(exc.error_msg, error_msg)
+            self.assertEqual(exc.error_code, error_code)
