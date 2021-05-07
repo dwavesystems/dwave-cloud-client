@@ -16,12 +16,15 @@ except SyntaxError:
 python_requires = '>=3.6'
 
 # Package requirements, minimal pinning
-install_requires = ['requests[socks]>=2.18', 'homebase>=1.0',
+install_requires = ['requests[socks]>=2.18', 'pydantic>=1.7.3', 'homebase>=1.0',
                     'click>=7.0', 'python-dateutil>=2.7', 'plucky>=0.4.3']
 
 # Package extras requirements
 extras_require = {
     'test': ['requests_mock', 'mock', 'numpy', 'coverage'],
+
+    # backports
+    ':python_version == "3.6"': ['dataclasses'],
 
     # bqm support
     'bqm': ['dimod>=0.8.15', 'numpy>=1.16'],

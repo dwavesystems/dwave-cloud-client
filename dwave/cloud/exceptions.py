@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from dwave.cloud.api import exceptions as api
+
+
+# alias for backward compatibility
+SAPIError = api.RequestError
+
+
 class ConfigFileError(Exception):
     """Base exception for all config file processing errors."""
 
@@ -22,66 +29,43 @@ class ConfigFileParseError(ConfigFileError):
     """Invalid format of config file."""
 
 
-class SAPIError(Exception):
-    """Generic SAPI error base class."""
+class SolverError(api.RequestError):
+    """Generic solver-related error"""
 
-    def __init__(self, *args, **kwargs):
-        self.error_msg = kwargs.pop('error_msg', None)
-        self.error_code = kwargs.pop('error_code', None)
-        if len(args) < 1:
-            args = (self.error_msg, )
-        super().__init__(*args, **kwargs)
-
-    def __str__(self):
-        return super().__str__() or self.error_msg or ''
-
-class ResourceAuthenticationError(SAPIError):
-    """Access to resource not authorized."""
-
-class ResourceNotFoundError(SAPIError):
-    """Resource not found."""
-
-
-class SolverError(SAPIError):
-    """Generic base class for all solver-related errors."""
-
-class ProblemError(SAPIError):
-    """Generic base class for all problem-related errors."""
+class ProblemError(api.RequestError):
+    """Generic problem-related error"""
 
 
 class SolverFailureError(SolverError):
-    """An exception raised when there is a remote failure calling a solver."""
+    """Remote failure calling a solver"""
 
-class SolverNotFoundError(ResourceNotFoundError, SolverError):
-    """Solver with matching feature set not found / not available."""
+class SolverNotFoundError(api.ResourceNotFoundError, SolverError):
+    """Solver with matching feature set not found / not available"""
 
-class ProblemNotFoundError(ResourceNotFoundError, ProblemError):
-    """Problem not found."""
+class ProblemNotFoundError(api.ResourceNotFoundError, ProblemError):
+    """Problem not found"""
 
 class SolverOfflineError(SolverError):
-    """Action attempted on an offline solver."""
+    """Action attempted on an offline solver"""
 
-class SolverAuthenticationError(ResourceAuthenticationError, SolverError):
-    """An exception raised when there is an authentication error."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__("Invalid token or access denied.", *args, **kwargs)
+class SolverAuthenticationError(api.ResourceAuthenticationError, SolverError):
+    """Invalid token or access denied"""
 
 class UnsupportedSolverError(SolverError):
-    """The solver we received from the API is not supported by the client."""
+    """The solver received from the API is not supported by the client"""
 
 class SolverPropertyMissingError(UnsupportedSolverError):
-    """The solver we received from the API does not have required properties."""
+    """The solver received from the API does not have required properties"""
 
 
-class Timeout(Exception):
-    """General timeout error."""
+class Timeout(api.RequestError):
+    """Deprecated and unused."""
 
-class RequestTimeout(Timeout):
-    """REST API request timed out."""
-
-class PollingTimeout(Timeout):
+class PollingTimeout(Exception):
     """Problem polling timed out."""
+
+# for backward compatibility
+from dwave.cloud.api.exceptions import RequestTimeout
 
 
 class CanceledFutureError(Exception):
@@ -91,8 +75,8 @@ class CanceledFutureError(Exception):
         super().__init__("An error occurred reading results from a canceled request")
 
 
-class InvalidAPIResponseError(SAPIError):
-    """Raised when an invalid/unexpected response from D-Wave Solver API is received."""
+class InvalidAPIResponseError(api.ResourceBadResponseError):
+    """Unexpected response from D-Wave Solver API"""
 
 
 class InvalidProblemError(ValueError):

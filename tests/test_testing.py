@@ -17,7 +17,7 @@ import uuid
 import unittest
 from unittest import mock
 
-from dwave.cloud.testing import isolated_environ, iterable_mock_open
+from dwave.cloud.testing import isolated_environ, iterable_mock_open, mocks
 
 
 @mock.patch.dict(os.environ)
@@ -134,6 +134,44 @@ class TestMockUtils(unittest.TestCase):
             for line in open('filename'):
                 lines.append(line)
         self.assertEqual(''.join(lines), data)
+
+
+class TestSolverDataMocks(unittest.TestCase):
+
+    def test_solver_configuration_data(self):
+        data = mocks.solver_configuration_data()
+        self.assertGreater(len(data['id']), 1)
+        self.assertGreater(len(data['status']), 1)
+        self.assertGreater(len(data['description']), 1)
+        self.assertIsInstance(data['properties'], dict)
+        self.assertIsInstance(data['avg_load'], float)
+
+    def test_structured_solver_data(self):
+        data = mocks.structured_solver_data()
+        self.assertEqual(data['properties']['category'], 'qpu')
+        self.assertIn('topology', data['properties'])
+        self.assertIsInstance(data['properties']['qubits'], list)
+        self.assertIsInstance(data['properties']['qubits'], list)
+        self.assertGreater(len(data['properties']['qubits']), 0)
+
+    def test_qpu_clique_solver_data(self):
+        n = 3
+        data = mocks.qpu_clique_solver_data(n)
+        self.assertEqual(data['id'], 'dw_{}q_mock'.format(n))
+        self.assertEqual(data['properties']['num_qubits'], n)
+        self.assertListEqual(data['properties']['qubits'], list(range(n)))
+
+    def test_unstructured_solver_data(self):
+        data = mocks.unstructured_solver_data()
+        self.assertEqual(data['properties']['category'], 'hybrid')
+        self.assertIn('minimum_time_limit', data['properties'])
+        self.assertListEqual(data['properties']['supported_problem_types'], ['bqm'])
+
+        data = mocks.hybrid_bqm_solver_data()
+        self.assertListEqual(data['properties']['supported_problem_types'], ['bqm'])
+
+        data = mocks.hybrid_dqm_solver_data()
+        self.assertListEqual(data['properties']['supported_problem_types'], ['dqm'])
 
 
 if __name__ == '__main__':
