@@ -1,4 +1,4 @@
-requests[socks]>=2.18
+requests[socks, use_chardet_on_py3]>=2.18
 homebase>=1.0.0
 python-dateutil>=2.7
 click>=7
@@ -6,5 +6,5 @@ plucky>=0.4.3
 
 # optional bqm support
 # note: dqm supported in dimod>0.9.6
-dimod>=0.8.15
+dimod>=0.8.15,<0.10
 numpy>=1.16
