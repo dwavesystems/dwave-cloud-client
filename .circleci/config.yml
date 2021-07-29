@@ -5,6 +5,8 @@ jobs:
     parameters:
       python-version:
         type: string
+      dimod-version:
+        type: string
 
     docker:
       - image: circleci/python:<< parameters.python-version >>
@@ -27,6 +29,16 @@ jobs:
             pip install -U pip
             pip install -r requirements.txt -r tests/requirements.txt
             pip install wheel twine
+
+      - run:
+          name: Install appropriate dimod version
+          command: |
+            . env/bin/activate
+            if [[ "<< parameters.dimod-version >>" ]]; then
+              pip install 'dimod<< parameters.dimod-version >>'
+            else
+              pip uninstall dimod -y
+            fi
 
       - save_cache: &save-cache-env
           key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
@@ -179,6 +191,7 @@ workflows:
           matrix:
             parameters:
               python-version: &python-versions ["3.6.12", "3.7.9", "3.8.6", "3.9.0"]
+              dimod-version: ["", "~=0.8.0,>=0.8.15", "~=0.9.0", "~=0.10.0,>0.10.4"]
 
       - test-macos:
           matrix:
