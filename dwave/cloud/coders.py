@@ -376,22 +376,40 @@ def bqm_as_file(bqm, **options):
         file-like:
             Binary stream with BQM encoded in DIMODBQM format.
     """
-    # This now the preferred way of BQM binary serialization.
-
-    # XXX: temporary implemented here, until something like
-    # dwavesystems/dimod#599 is available.
+    # TODO: replace with `bqm.to_file` when we drop support for dimod 0.9.x
 
     try:
         import dimod
-        from dimod.serialization.fileview import FileView as BQMFileView
     except ImportError: # pragma: no cover
         raise RuntimeError("Can't encode BQM without 'dimod'. "
                            "Re-install the library with 'bqm' support.")
+
+    try:
+        # Using `bqm.to_file()` for serialization is preferred since
+        # dwavesystems/dimod#599, but we need a fallback for older dimods.
+        # Specifically:
+        # - `Adj{Vector,Array,Map}BQM.to_file` was added in dimod 0.9.6.
+        # - `BQM.to_file` method was added in dimod 0.10.0.
+        bqm.to_file
+    except AttributeError: # pragma: no cover
+        pass
+    else:
+        return bqm.to_file(**options)
+
+    try:
+        # we need FileView in dimod < 0.9.6
+        from dimod.serialization.fileview import FileView as BQMFileView
+    except ImportError: # pragma: no cover
+        # this should never happen
+        raise RuntimeError(
+            f"Can't import FileView serializer from dimod=={dimod.__version__}")
 
     if isinstance(bqm, BQMFileView):
         return bqm
 
     # test explicitly to avoid copy on cast if possible
+    # note: it's safe to use Adj*BQMs (removed in dimod 0.10), as we never get
+    # here if dimod 0.10 is used
     fileviewable = (dimod.AdjArrayBQM, dimod.AdjVectorBQM, dimod.AdjMapBQM)
     if not isinstance(bqm, fileviewable):
         bqm = dimod.AdjVectorBQM(bqm)

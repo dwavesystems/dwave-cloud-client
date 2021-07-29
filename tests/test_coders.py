@@ -18,7 +18,11 @@ import struct
 import unittest
 import itertools
 
-import dimod
+try:
+    import dimod
+except ImportError:
+    dimod = None
+
 import numpy as np
 from plucky import pluck
 
@@ -27,6 +31,9 @@ from dwave.cloud.coders import (
     encode_problem_as_bq, decode_bq, encode_problem_as_ref)
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
 from dwave.cloud.utils import generate_const_ising_problem
+
+# parse string version as tuple
+dimod_version = tuple(map(int, dimod.__version__.split('.'))) if dimod else None
 
 
 def get_structured_solver():
@@ -225,8 +232,10 @@ class TestQPDecodersWithOffset(TestQPDecoders):
         self.assertEqual(res.get('offset'), self.res_offset)
 
 
+@unittest.skipUnless(dimod, "dimod required for BQ coders")
 class TestBQCoders(unittest.TestCase):
 
+    @unittest.skipUnless(dimod_version < (0, 10, 0), "dimod < 0.10 required for BQ encoder")
     def test_bq_encodes_empty_bqm(self):
         """Empty BQM has to be trivially encoded."""
 
@@ -238,6 +247,7 @@ class TestBQCoders(unittest.TestCase):
         self.assertEqual(pluck(req, 'data.num_variables'), 0)
         self.assertEqual(pluck(req, 'data.num_interactions'), 0)
 
+    @unittest.skipUnless(dimod_version < (0, 10, 0), "dimod < 0.10 required for BQ encoder")
     def test_bq_encodes_ising_bqm(self):
         """Simple Ising BQM properly encoded."""
 
@@ -250,6 +260,7 @@ class TestBQCoders(unittest.TestCase):
         self.assertEqual(pluck(req, 'data.num_variables'), 2)
         self.assertEqual(pluck(req, 'data.num_interactions'), 1)
 
+    @unittest.skipUnless(dimod_version < (0, 10, 0), "dimod < 0.10 required for BQ encoder")
     def test_bq_encodes_qubo_bqm(self):
         """Simple Qubo BQM properly encoded."""
 
@@ -262,6 +273,7 @@ class TestBQCoders(unittest.TestCase):
         self.assertEqual(pluck(req, 'data.num_variables'), 2)
         self.assertEqual(pluck(req, 'data.num_interactions'), 1)
 
+    @unittest.skipUnless(dimod_version < (0, 10, 0), "dimod < 0.10 required for BQ encoder")
     def test_bq_encodes_bqm_with_named_vars(self):
         """BQM with named variable properly encoded."""
 
