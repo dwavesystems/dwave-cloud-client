@@ -235,7 +235,7 @@ class TestQPDecodersWithOffset(TestQPDecoders):
 @unittest.skipUnless(dimod, "dimod required for BQ coders")
 class TestBQCoders(unittest.TestCase):
 
-    @unittest.skipUnless(dimod_version < (0, 10, 0), "dimod < 0.10 required for BQ encoder")
+    @unittest.skipUnless(dimod and dimod_version < (0, 10, 0), "dimod < 0.10 required for BQ encoder")
     def test_bq_encodes_empty_bqm(self):
         """Empty BQM has to be trivially encoded."""
 
@@ -247,7 +247,7 @@ class TestBQCoders(unittest.TestCase):
         self.assertEqual(pluck(req, 'data.num_variables'), 0)
         self.assertEqual(pluck(req, 'data.num_interactions'), 0)
 
-    @unittest.skipUnless(dimod_version < (0, 10, 0), "dimod < 0.10 required for BQ encoder")
+    @unittest.skipUnless(dimod and dimod_version < (0, 10, 0), "dimod < 0.10 required for BQ encoder")
     def test_bq_encodes_ising_bqm(self):
         """Simple Ising BQM properly encoded."""
 
@@ -260,7 +260,7 @@ class TestBQCoders(unittest.TestCase):
         self.assertEqual(pluck(req, 'data.num_variables'), 2)
         self.assertEqual(pluck(req, 'data.num_interactions'), 1)
 
-    @unittest.skipUnless(dimod_version < (0, 10, 0), "dimod < 0.10 required for BQ encoder")
+    @unittest.skipUnless(dimod and dimod_version < (0, 10, 0), "dimod < 0.10 required for BQ encoder")
     def test_bq_encodes_qubo_bqm(self):
         """Simple Qubo BQM properly encoded."""
 
@@ -273,7 +273,7 @@ class TestBQCoders(unittest.TestCase):
         self.assertEqual(pluck(req, 'data.num_variables'), 2)
         self.assertEqual(pluck(req, 'data.num_interactions'), 1)
 
-    @unittest.skipUnless(dimod_version < (0, 10, 0), "dimod < 0.10 required for BQ encoder")
+    @unittest.skipUnless(dimod and dimod_version < (0, 10, 0), "dimod < 0.10 required for BQ encoder")
     def test_bq_encodes_bqm_with_named_vars(self):
         """BQM with named variable properly encoded."""
 

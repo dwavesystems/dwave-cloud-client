@@ -36,11 +36,6 @@ try:
 except ImportError:
     dimod = None
 
-try:
-    import dimod
-except ImportError:
-    dimod = None
-
 from dwave.cloud.utils import evaluate_ising, generate_const_ising_problem
 from dwave.cloud.client import Client, Solver
 from dwave.cloud.computation import Future
@@ -224,6 +219,10 @@ class _QueryTest(unittest.TestCase):
         # Make sure energies are correct in raw results
         for energy, state in zip(results.energies, results.samples):
             self.assertEqual(energy, evaluate_ising(linear, quad, state, offset=offset))
+
+        # skip sampleset test if dimod is not installed
+        if not dimod:
+            return
 
         # Make sure the sampleset matches raw results
         for record, energy, num_occurrences, state in \
@@ -1154,7 +1153,11 @@ class TestProblemLabel(unittest.TestCase):
                         sample = getattr(solver, method_name)
 
                         future = sample(*problem_args, label=label)
-                        info = future.sampleset.info    # ensure future is resolved
+                        future.result()     # ensure future is resolved
 
                         self.assertEqual(future.label, label)
-                        self.assertEqual(info.get('problem_label'), label)
+
+                        # sampleset will only be available if dimod is installed
+                        if dimod:
+                            info = future.sampleset.info
+                            self.assertEqual(info.get('problem_label'), label)
