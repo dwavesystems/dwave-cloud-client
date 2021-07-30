@@ -858,6 +858,8 @@ class Future(object):
             self, lambda f: f.wait_sampleset())
 
         # propagate id to sampleset as well
+        # note: this requires dimod>=0.8.21 (before that version SampleSet
+        # had slots set which prevented dynamic addition of attributes).
         sampleset.wait_id = self.wait_id
 
         return sampleset
