@@ -552,7 +552,7 @@ def upload(config_file, profile, client_type, solver_def, problem_id, format, in
         # note: `BQM.from_coo` doesn't support files opened in binary (yet);
         # fallback to reopen for now
         with open(input_file.name, 'rt') as fp:
-            bqm = dimod.AdjVectorBQM.from_coo(fp)
+            bqm = dimod.BinaryQuadraticModel.from_coo(fp)
             problem_file = bqm_as_file(bqm)
 
     elif format == 'dimodbqm':
