@@ -25,10 +25,10 @@ extras_require = {
     'test': ['requests_mock', 'mock', 'numpy', 'coverage'],
 
     # bqm support
-    'bqm': ['dimod>=0.8.15', 'numpy>=1.16'],
+    'bqm': ['dimod>=0.8.21,<0.11,!=0.10.0,!=0.10.1,!=0.10.2,!=0.10.3,!=0.10.4', 'numpy>=1.16'],
 
     # dqm support
-    'dqm': ['dimod>=0.9.7', 'numpy>=1.16'],
+    'dqm': ['dimod>=0.9.7,<0.11,!=0.10.0,!=0.10.1,!=0.10.2,!=0.10.3,!=0.10.4', 'numpy>=1.16'],
 }
 
 # Packages provided. Only include packages under the 'dwave' namespace.

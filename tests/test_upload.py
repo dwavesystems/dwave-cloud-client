@@ -23,6 +23,7 @@ from unittest import mock
 from concurrent.futures import ThreadPoolExecutor, wait
 
 from requests.exceptions import HTTPError
+from parameterized import parameterized
 
 from dwave.cloud.utils import tictoc
 from dwave.cloud.client import Client
@@ -347,23 +348,29 @@ class TestChunkedData(unittest.TestCase):
         chunks_expected = [b'012', b'345', b'678', b'9']
         self.verify_chunking(cd, chunks_expected)
 
-    def test_chunks_from_bqm(self):
+    @parameterized.expand([
+        ("BQM",),
+        ("BinaryQuadraticModel",),
+        ("AdjVectorBQM",),
+    ])
+    def test_chunks_from_bqm(self, bqm_cls_name):
         try:
-            from dimod import AdjVectorBQM
-            AdjVectorBQM.to_file
+            import dimod
+            bqm_cls = getattr(dimod, bqm_cls_name)
+            bqm_cls.to_file
         except (ImportError, AttributeError):
-            self.skipTest("dimod.AdjVectorBQM with .to_file() unavailable")
+            self.skipTest(f"dimod.{bqm_cls_name}.to_file() unavailable")
 
         # serialize a BQM via .to_file
-        bqm = AdjVectorBQM.from_ising({'a': 1}, {})
-        bqmfile = bqm.to_file()     # returns dimod's FileView
+        bqm = bqm_cls.from_ising({'a': 1}, {})
+        bqm_file = bqm.to_file()     # returns dimod's FileView
 
         chunk_size = 10
-        cd = ChunkedData(bqmfile, chunk_size=chunk_size)
+        cd = ChunkedData(bqm_file, chunk_size=chunk_size)
 
         # verify chunks
-        bqmfile.seek(0)
-        raw = bqmfile.read()
+        bqm_file.seek(0)
+        raw = bqm_file.read()
         chunks_expected = [raw[i:i+chunk_size] for i in range(0, len(raw), chunk_size)]
         self.verify_chunking(cd, chunks_expected)
 
@@ -376,14 +383,14 @@ class TestChunkedData(unittest.TestCase):
         # serialize a DQM via .to_file
         dqm = DQM()
         dqm.add_variable(1)
-        dqmfile = dqm.to_file()    # returns SpooledTemporaryFile subclass
+        dqm_file = dqm.to_file()    # returns SpooledTemporaryFile subclass
 
         chunk_size = 100
-        cd = ChunkedData(dqmfile, chunk_size=chunk_size)
+        cd = ChunkedData(dqm_file, chunk_size=chunk_size)
 
         # verify chunks
-        dqmfile.seek(0)
-        raw = dqmfile.read()
+        dqm_file.seek(0)
+        raw = dqm_file.read()
         chunks_expected = [raw[i:i+chunk_size] for i in range(0, len(raw), chunk_size)]
         self.verify_chunking(cd, chunks_expected)
 

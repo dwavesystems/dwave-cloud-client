@@ -20,13 +20,17 @@ import unittest
 from unittest import mock
 from parameterized import parameterized
 
-import dimod
 import numpy
 
 from dwave.cloud.client import Client
 from dwave.cloud.solver import (
     BaseUnstructuredSolver, UnstructuredSolver, BQMSolver, DQMSolver)
 from dwave.cloud.concurrency import Present
+
+try:
+    import dimod
+except ImportError:
+    raise unittest.SkipTest("dimod required for unstructured solver tests")
 
 
 def unstructured_solver_data(problem_type='bqm'):

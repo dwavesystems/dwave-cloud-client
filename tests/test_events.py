@@ -66,7 +66,11 @@ class TestEventDispatch(unittest.TestCase):
             "id": "test-unstructured-solver",
             "description": "A test unstructured solver"
         })
-        self.solvers = [self.structured_solver, self.unstructured_solver]
+        self.solvers = [self.structured_solver]
+        # we can't use unstructured solvers without dimod installed,
+        # so don't even try testing it
+        if dimod:
+            self.solvers.append(self.unstructured_solver)
 
         # reset all event handlers
         from dwave.cloud.events import _client_event_hooks_registry as reg
