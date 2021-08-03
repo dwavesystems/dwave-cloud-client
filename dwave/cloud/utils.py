@@ -28,7 +28,6 @@ from dateutil.tz import UTC
 from functools import wraps
 from pkg_resources import iter_entry_points
 
-import click
 import requests
 
 # Use numpy if available for fast decoding
@@ -166,6 +165,8 @@ def strip_tail(sequence, values):
 
 
 def input_with_default(prompt, default, optional):
+    # CLI util; defer click import until actually needed (see #473)
+    import click
     line = ''
     while not line:
         line = input(prompt)
