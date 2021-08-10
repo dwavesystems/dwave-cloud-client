@@ -1,4 +1,4 @@
-requests[socks, use_chardet_on_py3]>=2.18
+requests[socks]>=2.18
 homebase>=1.0.0
 python-dateutil>=2.7
 click>=7
