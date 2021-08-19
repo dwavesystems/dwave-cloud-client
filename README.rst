@@ -1,10 +1,10 @@
 .. image:: https://badge.fury.io/py/dwave-cloud-client.svg
     :target: https://badge.fury.io/py/dwave-cloud-client
-    :alt: Last version on PyPI
+    :alt: Latest version on PyPI
 
-.. image:: https://travis-ci.org/dwavesystems/dwave-cloud-client.svg?branch=master
-    :target: https://travis-ci.org/dwavesystems/dwave-cloud-client
-    :alt: Linux/Mac build status
+.. image:: https://circleci.com/gh/dwavesystems/dwave-cloud-client.svg?style=svg
+    :target: https://circleci.com/gh/dwavesystems/dwave-cloud-client
+    :alt: Linux/MacOS build status
 
 .. image:: https://ci.appveyor.com/api/projects/status/6a2wjq9xtgtr2t2c/branch/master?svg=true
     :target: https://ci.appveyor.com/project/dwave-adtt/dwave-cloud-client/branch/master
@@ -65,7 +65,7 @@ Installation
 
 .. installation-start-marker
 
-Requires Python 3.5+:
+Requires Python 3.6+:
 
 .. code-block:: bash
 
@@ -89,7 +89,28 @@ License
 Released under the Apache License 2.0. See `<LICENSE>`_ file.
 
 
-Contribution
+Contributing
 ------------
 
-See `<CONTRIBUTING.rst>`_ file.
+Ocean's `contributing guide <https://docs.ocean.dwavesys.com/en/stable/contributing.html>`_
+has guidelines for contributing to Ocean packages.
+
+Release Notes
+~~~~~~~~~~~~~
+
+D-Wave Cloud Client uses `reno <https://docs.openstack.org/reno/>`_ to manage
+its release notes.
+
+When making a contribution to D-Wave Cloud Client that will affect users, create
+a new release note file by running
+
+.. code-block:: bash
+
+    reno new your-short-descriptor-here
+
+You can then edit the file created under ``releasenotes/notes/``.
+Remove any sections not relevant to your changes.
+Commit the file along with your changes.
+
+See reno's `user guide <https://docs.openstack.org/reno/latest/user/usage.html>`_
+for details.
