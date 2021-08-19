@@ -36,7 +36,8 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
-    'sphinx.ext.ifconfig'
+    'sphinx.ext.ifconfig',
+    'reno.sphinxext',
 ]
 
 # autodoc_default_flags = ['members']

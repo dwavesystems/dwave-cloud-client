@@ -8,3 +8,6 @@ plucky>=0.4.3
 # note: dqm supported in dimod>0.9.6
 dimod>=0.10.5
 numpy>=1.16
+
+# dev requirements
+reno==3.4.0
