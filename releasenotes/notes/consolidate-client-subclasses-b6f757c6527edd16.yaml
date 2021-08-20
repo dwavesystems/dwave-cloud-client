@@ -1,0 +1,22 @@
+---
+upgrade:
+  - |
+    ``dwave.cloud.client`` module is now a namespace containing all client
+    subclasses as submodules. You should update your imports accordingly::
+
+      dwave.cloud.Client         -->  dwave.cloud.client.base.Client
+      dwave.cloud.hybrid.Client  -->  dwave.cloud.client.hybrid.Client
+      dwave.cloud.qpu.Client     -->  dwave.cloud.client.qpu.Client
+      dwave.cloud.sw.Client      -->  dwave.cloud.client.sw.Client
+
+    For backwards compatibility, old import paths still work, but are
+    deprecated.
+deprecations:
+  - |
+    Import paths ``dwave.cloud.{hybrid,qpu,sw}.Client`` are deprecated and
+    should be replaced with ``dwave.cloud.client.{hybrid,qpu,sw}.Client``.
+fixes:
+  - |
+    Configured client session creation is sped up by caching user-agent
+    construction (per client). Client session is now created ~200x faster,
+    making it on par with ``requests.Session`` creation time (~50us).
