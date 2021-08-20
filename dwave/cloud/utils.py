@@ -23,7 +23,7 @@ import warnings
 
 from collections import abc, OrderedDict
 from urllib.parse import urljoin
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.tz import UTC
 from functools import wraps
 from pkg_resources import iter_entry_points
@@ -215,6 +215,16 @@ def epochnow():
 
     """
     return time.time()
+
+
+def utcrel(offset):
+    """Return a timezone-aware `datetime` relative to now (UTC), shifted by
+    `offset` seconds in to the future.
+
+    Example:
+        a_minute_from_now = utcrel(60)
+    """
+    return utcnow() + timedelta(seconds=offset)
 
 
 def strtrunc(s, maxlen=60):

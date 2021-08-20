@@ -14,7 +14,7 @@
 
 import unittest
 
-from dwave.cloud.exceptions import *
+from dwave.cloud.exceptions import SolverAuthenticationError, CanceledFutureError
 
 
 class TestExceptions(unittest.TestCase):
@@ -23,7 +23,7 @@ class TestExceptions(unittest.TestCase):
         try:
             raise SolverAuthenticationError
         except Exception as e:
-            self.assertEqual(str(e), "Invalid token or access denied.")
+            self.assertEqual(str(e), "Invalid token or access denied")
 
     def test_canceled_future_error_msg(self):
         try:
