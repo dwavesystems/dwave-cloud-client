@@ -1646,6 +1646,13 @@ class Client(object):
         logger.trace("[%s] response: (code=%r, body=%r)",
                      caller, response.status_code, response.text)
 
+        # workaround for charset_normalizer episode in requests>=2.26.0,
+        # where decoding of an empty json object '{}' fails.
+        # see: https://github.com/psf/requests/issues/5871,
+        # https://github.com/dwavesystems/dwave-cloud-client/pull/471, and
+        # https://github.com/dwavesystems/dwave-cloud-client/pull/476.
+        response.encoding = 'utf-8'
+
         # NOTE: the expected behavior is for SAPI to return JSON error on
         # failure. However, that is currently not the case. We need to work
         # around this until it's fixed.

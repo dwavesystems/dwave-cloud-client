@@ -42,7 +42,7 @@ class TestCli(unittest.TestCase):
         profile = 'profile'
         values = 'endpoint token client solver'.split()
 
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
         with runner.isolated_filesystem():
             # create config file through simulated user input in `dwave configure`
             touch(config_file)
@@ -59,7 +59,7 @@ class TestCli(unittest.TestCase):
                     self.assertEqual(config.get(val), val)
 
     def test_config_ls(self):
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
         with runner.isolated_filesystem():
             touch('dwave.conf')
             with mock.patch('dwave.cloud.config.homebase.site_config_dir_list',
@@ -144,7 +144,7 @@ class TestCli(unittest.TestCase):
                                          os.path.join('.', 'dwave.conf'))
 
     def test_configure_inspect(self):
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
         with runner.isolated_filesystem():
             config_file = 'dwave.conf'
             with open(config_file, 'w') as f:
@@ -193,7 +193,7 @@ class TestCli(unittest.TestCase):
             client = m.from_config.return_value
             client.get_solver.return_value.nodes = [5, 7, 3]
 
-            runner = CliRunner()
+            runner = CliRunner(mix_stderr=False)
             with runner.isolated_filesystem():
                 touch(config_file)
                 result = runner.invoke(cli, ['ping',
@@ -221,7 +221,7 @@ class TestCli(unittest.TestCase):
 
     @unittest.skipUnless(config, "No live server configuration available.")
     def test_ping_live(self):
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
         result = runner.invoke(cli, ['ping',
                                      '--config-file', test_config_path,
                                      '--profile', test_config_profile])
@@ -229,7 +229,7 @@ class TestCli(unittest.TestCase):
 
     @unittest.skipUnless(config, "No live server configuration available.")
     def test_ping_json_live(self):
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
         result = runner.invoke(cli, ['ping',
                                      '--config-file', test_config_path,
                                      '--profile', test_config_profile,
@@ -244,7 +244,7 @@ class TestCli(unittest.TestCase):
 
     @unittest.skipUnless(config, "No live server configuration available.")
     def test_ping_json_timeout_error_live(self):
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
         result = runner.invoke(cli, ['ping',
                                      '--config-file', test_config_path,
                                      '--profile', test_config_profile,
@@ -274,7 +274,7 @@ class TestCli(unittest.TestCase):
 
         with mock.patch('dwave.cloud.cli.Client') as m:
 
-            runner = CliRunner()
+            runner = CliRunner(mix_stderr=False)
             with runner.isolated_filesystem():
                 touch(config_file)
                 result = runner.invoke(cli, ['sample',
@@ -317,7 +317,7 @@ class TestCli(unittest.TestCase):
             client = m.from_config.return_value.__enter__.return_value
             client.get_solvers.return_value = solvers
 
-            runner = CliRunner()
+            runner = CliRunner(mix_stderr=False)
             with runner.isolated_filesystem():
                 touch(config_file)
                 result = runner.invoke(cli, ['solvers',
@@ -354,7 +354,7 @@ class TestCli(unittest.TestCase):
 
         with mock.patch('dwave.cloud.cli.Client') as m:
 
-            runner = CliRunner()
+            runner = CliRunner(mix_stderr=False)
             with runner.isolated_filesystem():
                 touch(config_file)
                 touch(filename)
@@ -381,7 +381,7 @@ class TestCli(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
 
     def test_platform(self):
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
         result = runner.invoke(cli, ['--platform'])
 
         # verify exit code and stdout printout
