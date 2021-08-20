@@ -1,0 +1,24 @@
+---
+features:
+  - |
+    A low-level ``dwave.cloud.api.client`` added to abstract SAPI communication
+    details (like authentication, response decoding, error handling, retries,
+    etc).
+  - |
+    All SAPI requests and responses modelled in ``dwave.cloud.api.models.*``.
+    These models are used for data validation and representation.
+  - |
+    Added model-level interfaces to SAPI resources (in a REST sense),
+    ``dwave.cloud.api.resources.Solvers`` and
+    ``dwave.cloud.api.resources.Problems``.
+  - |
+    Added mock solver data generators.
+  - |
+    New layer of exceptions added in ``dwave.cloud.api.exceptions``. Base
+    exception ``RequestError`` subclasses ``requests``'s exception and
+    includes raw ``.response`` object, along with ``.error_msg`` and
+    ``.error_code`` returned by SAPI.
+upgrade:
+  - |
+    ``SAPIError`` exception is now just an alias for
+    ``dwave.cloud.api.exceptions.RequestError``.
