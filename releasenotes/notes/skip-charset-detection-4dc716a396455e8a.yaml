@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Avoid character encoding / charset guessing for speed and
+    `stability <https://github.com/dwavesystems/dwave-cloud-client/pull/476>`_.
