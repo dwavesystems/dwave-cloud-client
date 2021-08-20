@@ -13,7 +13,9 @@
 # limitations under the License.
 
 import os
+import sys
 import logging
+import importlib
 
 from dwave.cloud.client import Client
 from dwave.cloud.solver import Solver
@@ -52,3 +54,13 @@ def _apply_loglevel_from_env(logger):
     set_loglevel(logger, os.getenv('DWAVE_LOG_LEVEL'))
 
 _apply_loglevel_from_env(logger)
+
+
+# alias dwave.cloud.client.{qpu,sw,hybrid} as dwave.cloud.*
+def _alias_old_client_submodules():
+    for name in ('qpu', 'sw', 'hybrid'):
+        # note: create both module and local attribute
+        globals()[name] = sys.modules['dwave.cloud.{}'.format(name)] = \
+            importlib.import_module('dwave.cloud.client.{}'.format(name))
+
+_alias_old_client_submodules()
