@@ -15,8 +15,8 @@
 import enum
 
 
-# Default SAPI endpoint
-DEFAULT_API_ENDPOINT = 'https://cloud.dwavesys.com/sapi/'
+# Default API endpoints
+SOLVER_API_ENDPOINT = 'https://cloud.dwavesys.com/sapi/'
 
 
 class ProblemStatus(str, enum.Enum):

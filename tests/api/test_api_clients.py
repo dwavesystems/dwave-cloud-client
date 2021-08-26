@@ -18,8 +18,8 @@ import unittest
 import requests
 import requests_mock
 
-from dwave.cloud.api import exceptions
-from dwave.cloud.api.client import SAPIClient
+from dwave.cloud.api import exceptions, constants
+from dwave.cloud.api.client import DWaveAPIClient, SolverAPIClient
 from dwave.cloud.package_info import __packagename__, __version__
 
 
@@ -27,14 +27,21 @@ class TestConfig(unittest.TestCase):
     """Session is initiated from config."""
 
     def test_defaults(self):
-        client = SAPIClient()
+        with self.assertRaises(ValueError):
+            DWaveAPIClient()
 
-        self.assertEqual(client.config, SAPIClient.DEFAULTS)
+        endpoint = constants.SOLVER_API_ENDPOINT
+        client = DWaveAPIClient(endpoint=endpoint)
+
+        defaults = DWaveAPIClient.DEFAULTS.copy()
+        defaults.update(endpoint=endpoint)
+
+        self.assertEqual(client.config, defaults)
         self.assertIsInstance(client.session, requests.Session)
 
         # verify Retry object config
         retry = client.session.get_adapter('https://').max_retries
-        conf = SAPIClient.DEFAULTS['retry']
+        conf = DWaveAPIClient.DEFAULTS['retry']
         self.assertEqual(retry.total, conf['total'])
 
     def test_init(self):
@@ -46,7 +53,7 @@ class TestConfig(unittest.TestCase):
                       verify=False,
                       proxies={'https': 'http://proxy.com'})
 
-        client = SAPIClient(**config)
+        client = DWaveAPIClient(**config)
 
         session = client.session
         self.assertIsInstance(session, requests.Session)
@@ -63,6 +70,10 @@ class TestConfig(unittest.TestCase):
         # verify Retry object config
         retry = session.get_adapter('https://').max_retries
         self.assertEqual(retry.total, config['retry']['total'])
+
+    def test_sapi_client(self):
+        client = SolverAPIClient()
+        self.assertEqual(client.session.base_url, constants.SOLVER_API_ENDPOINT)
 
 
 class TestResponseParsing(unittest.TestCase):
@@ -82,7 +93,7 @@ class TestResponseParsing(unittest.TestCase):
         m.get(requests_mock.ANY, status_code=404, request_headers=auth_headers)
         m.get(config['endpoint'], json=data, request_headers=config['headers'])
 
-        client = SAPIClient(**config)
+        client = DWaveAPIClient(**config)
 
         self.assertEqual(client.session.get('').json(), data)
 
@@ -92,7 +103,7 @@ class TestResponseParsing(unittest.TestCase):
 
         m.get(requests_mock.ANY, text='text', status_code=200)
 
-        client = SAPIClient()
+        client = DWaveAPIClient(endpoint='https://mock')
 
         with self.assertRaises(exceptions.ResourceBadResponseError) as exc:
             client.session.get('test')
@@ -107,7 +118,7 @@ class TestResponseParsing(unittest.TestCase):
 
         m.get(requests_mock.ANY, json=error, status_code=error_code)
 
-        client = SAPIClient()
+        client = DWaveAPIClient(endpoint='https://mock')
 
         with self.assertRaisesRegex(exceptions.ResourceNotFoundError, error_msg) as exc:
             client.session.get('test')
@@ -124,7 +135,7 @@ class TestResponseParsing(unittest.TestCase):
 
         m.get(requests_mock.ANY, text=error_msg, status_code=error_code)
 
-        client = SAPIClient()
+        client = DWaveAPIClient(endpoint='https://mock')
 
         with self.assertRaisesRegex(exceptions.ResourceNotFoundError, error_msg) as exc:
             client.session.get('test')
@@ -141,7 +152,7 @@ class TestResponseParsing(unittest.TestCase):
 
         m.get(requests_mock.ANY, text=error_msg, status_code=error_code)
 
-        client = SAPIClient()
+        client = DWaveAPIClient(endpoint='https://mock')
 
         with self.assertRaisesRegex(exceptions.RequestError, error_msg) as exc:
             client.session.get('test')

@@ -16,7 +16,7 @@ from typing import List, Union, Optional, get_type_hints
 
 from pydantic import parse_obj_as
 
-from dwave.cloud.api.client import SAPIClient
+from dwave.cloud.api.client import DWaveAPIClient, SolverAPIClient
 from dwave.cloud.api import constants, models
 
 __all__ = ['Solvers', 'Problems']
@@ -27,25 +27,26 @@ class ResourceBase:
 
     resource_path = None
 
-    def __init__(self, **config):
-        self.client = SAPIClient(**config)
+    def _patch_session(self):
+        # anchor all session requests at the new base path
+        if self.resource_path and self.session:
+            self.session.base_url = self.session.create_url(self.resource_path)
 
-        session = self.client.session
-        if self.resource_path:
-            # append resource_path
-            session.base_url = session.create_url(self.resource_path)
-        self.session = session
+    def __init__(self, **config):
+        self.client = DWaveAPIClient(**config)
+        self.session = self.client.session
+        self._patch_session()
 
     @classmethod
-    def from_client_config(cls, client: Union[SAPIClient, 'dwave.cloud.client.base.Client']):
+    def from_client_config(cls, client: Union[DWaveAPIClient, 'dwave.cloud.client.base.Client']):
         """Create Resource instance configured from a
         :class:`~dwave.cloud.client.base.Client' instance.
         """
         # TODO: also accept configuration dict/dataclass when config/client refactored
-        if isinstance(client, SAPIClient):
+        if isinstance(client, DWaveAPIClient):
             return cls(**client.config)
         else: # assume isinstance(client, dwave.cloud.Client), without importing
-            sapiclient = SAPIClient.from_client_config(client)
+            sapiclient = SolverAPIClient.from_client_config(client)
             return cls(**sapiclient.config)
 
 
