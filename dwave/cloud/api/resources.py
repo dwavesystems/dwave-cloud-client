@@ -68,7 +68,7 @@ class Regions(ResourceBase):
 
     # Content-Type: application/vnd.dwave.metadata.region+json; version=1.0.0
     def get_region(self, code: str) -> models.Region:
-        path = '{}/'.format(code)
+        path = '{}'.format(code)
         response = self.session.get(path)
         region = response.json()
         return parse_obj_as(models.Region, region)
