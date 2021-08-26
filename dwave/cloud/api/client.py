@@ -22,7 +22,7 @@ from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent, is_caused_by)
 
-__all__ = ['DWaveAPIClient', 'SolverAPIClient']
+__all__ = ['DWaveAPIClient', 'SolverAPIClient', 'MetadataAPIClient']
 
 logger = logging.getLogger(__name__)
 
@@ -272,3 +272,9 @@ class SolverAPIClient(DWaveAPIClient):
         )
 
         return cls(**opts)
+
+
+class MetadataAPIClient(DWaveAPIClient):
+    def __init__(self, **config):
+        config.setdefault('endpoint', constants.METADATA_API_ENDPOINT)
+        super().__init__(**config)

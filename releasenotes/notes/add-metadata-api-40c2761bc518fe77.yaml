@@ -1,0 +1,4 @@
+---
+features:
+  - |
+    Added Metadata API client, ``Regions`` model and API resource.

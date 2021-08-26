@@ -16,10 +16,10 @@ from typing import List, Union, Optional, get_type_hints
 
 from pydantic import parse_obj_as
 
-from dwave.cloud.api.client import DWaveAPIClient, SolverAPIClient
+from dwave.cloud.api.client import DWaveAPIClient, SolverAPIClient, MetadataAPIClient
 from dwave.cloud.api import constants, models
 
-__all__ = ['Solvers', 'Problems']
+__all__ = ['Solvers', 'Problems', 'Regions']
 
 
 class ResourceBase:
@@ -48,6 +48,30 @@ class ResourceBase:
         else: # assume isinstance(client, dwave.cloud.Client), without importing
             sapiclient = SolverAPIClient.from_client_config(client)
             return cls(**sapiclient.config)
+
+
+class Regions(ResourceBase):
+
+    resource_path = 'regions/'
+
+    def __init__(self, **config):
+        self.client = MetadataAPIClient(**config)
+        self.session = self.client.session
+        self._patch_session()
+
+    # Content-Type: application/vnd.dwave.metadata.regions+json; version=1.0.0
+    def list_regions(self) -> List[models.Region]:
+        path = ''
+        response = self.session.get(path)
+        regions = response.json()
+        return parse_obj_as(List[models.Region], regions)
+
+    # Content-Type: application/vnd.dwave.metadata.region+json; version=1.0.0
+    def get_region(self, code: str) -> models.Region:
+        path = '{}/'.format(code)
+        response = self.session.get(path)
+        region = response.json()
+        return parse_obj_as(models.Region, region)
 
 
 class Solvers(ResourceBase):
