@@ -116,6 +116,9 @@ class DWaveAPIClient:
 
         self.session = self._create_session(self.config)
 
+    def close(self):
+        self.session.close()
+
     @staticmethod
     def _retry_config(backoff_max=None, **kwargs):
         """Create http idempotent urllib3.Retry config."""

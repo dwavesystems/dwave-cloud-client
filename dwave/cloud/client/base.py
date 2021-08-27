@@ -716,8 +716,8 @@ class Client(object):
 
     @cached(maxage=_REGIONS_CACHE_MAXAGE)
     def _fetch_available_regions(self):
-        regions = Regions(endpoint=self.metadata_api_endpoint)
-        return regions.list_regions()
+        with Regions(endpoint=self.metadata_api_endpoint) as regions:
+            return regions.list_regions()
 
     def get_regions(self, refresh=False):
         """Retrieve available API regions.
