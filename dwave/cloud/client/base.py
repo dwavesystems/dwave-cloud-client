@@ -93,18 +93,23 @@ class Client(object):
     tasks, polling problem status, and retrieving results.
 
     Args:
+        region (str, optional, default='na-west-1'):
+            D-Wave Solver API region. To see available regions use
+            :meth:`.Client.get_regions`.
+
         endpoint (str, optional):
-            D-Wave API endpoint URL.
+            D-Wave Solver API endpoint URL. If undefined, inferred from
+            ``region`` code.
 
         token (str):
             Authentication token for the D-Wave API.
 
         solver (dict/str, optional):
             Default solver features (or simply solver name) to use in
-            :meth:`~dwave.cloud.client.Client.get_solver`.
+            :meth:`.Client.get_solver`.
 
             Defined via dictionary of solver feature constraints
-            (see :meth:`~dwave.cloud.client.Client.get_solvers`).
+            (see :meth:`.Client.get_solvers`).
             For backward compatibility, a solver name, as a string, is also
             accepted and converted to ``{"name": <solver name>}``.
 
@@ -179,18 +184,22 @@ class Client(object):
             Maximum backoff time in seconds.
             See :attr:`~urllib3.util.retry.Retry.BACKOFF_MAX` for details.
 
+        metadata_api_endpoint (str, optional):
+            D-Wave Metadata API endpoint. Central for all regions, used for
+            regional SAPI endpoint discovery.
+
         defaults (dict, optional):
             Defaults for the client instance that override the class
-            :attr:`.DEFAULTS`.
+            :attr:`.Client.DEFAULTS`.
 
     Note:
         Default values of all constructor arguments listed above are kept in
-        a class variable :attr:`~dwave.cloud.client.Client.DEFAULTS`.
+        a class variable :attr:`.Client.DEFAULTS`.
 
         Instance-level defaults can be specified via ``defaults`` argument.
 
     Examples:
-        This example directly initializes a :class:`~dwave.cloud.client.Client`.
+        This example directly initializes a :class:`.Client`.
         Direct initialization uses class constructor arguments, the minimum
         being a value for ``token``.
 
