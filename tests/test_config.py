@@ -19,11 +19,12 @@ import configparser
 from unittest import mock
 from functools import partial
 
+from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import ConfigFileParseError, ConfigFileReadError
 from dwave.cloud.testing import iterable_mock_open
 from dwave.cloud.config import (
     get_configfile_paths, load_config_from_files, load_config,
-    parse_float, parse_int, parse_boolean)
+    parse_float, parse_int, parse_boolean, get_cache_dir)
 
 
 class TestConfigParsing(unittest.TestCase):
@@ -438,3 +439,9 @@ class TestConfigUtils(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             parse_boolean('x')
+
+    def test_cache_dir(self):
+        path = get_cache_dir()
+        self.assertTrue(os.path.isdir(path))
+        self.assertIn(__packagename__, path)
+        self.assertIn(__version__, path)

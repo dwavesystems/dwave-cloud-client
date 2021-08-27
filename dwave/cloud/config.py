@@ -222,6 +222,7 @@ import homebase
 
 from dwave.cloud.utils import uniform_get
 from dwave.cloud.exceptions import ConfigFileReadError, ConfigFileParseError
+from dwave.cloud.package_info import __version__, __packagename__
 
 __all__ = ['get_configfile_paths', 'get_configfile_path', 'get_default_configfile_path',
            'load_config_from_files', 'load_profile_from_files', 'load_config']
@@ -427,6 +428,15 @@ def get_default_configfile_path():
         use_virtualenv=False, create=False)
     path = os.path.join(base, CONF_FILENAME)
     return path
+
+
+def get_cache_dir():
+    """Return a directory path convenient for storing user-local,
+    package-local and version-specific cache data.
+    """
+    return homebase.user_cache_dir(
+        app_name=__packagename__, app_author=CONF_AUTHOR,
+        version=__version__, use_virtualenv=False, create=True)
 
 
 def load_config_from_files(filenames=None):
