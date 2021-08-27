@@ -30,7 +30,7 @@ class TestConfig(unittest.TestCase):
         with self.assertRaises(ValueError):
             DWaveAPIClient()
 
-        endpoint = constants.METADATA_API_ENDPOINT
+        endpoint = constants.DEFAULT_METADATA_API_ENDPOINT
         client = DWaveAPIClient(endpoint=endpoint)
 
         defaults = DWaveAPIClient.DEFAULTS.copy()
@@ -73,11 +73,11 @@ class TestConfig(unittest.TestCase):
 
     def test_sapi_client(self):
         client = SolverAPIClient()
-        self.assertEqual(client.session.base_url, constants.SOLVER_API_ENDPOINT)
+        self.assertEqual(client.session.base_url, constants.DEFAULT_SOLVER_API_ENDPOINT)
 
     def test_metadata_client(self):
         client = MetadataAPIClient()
-        self.assertEqual(client.session.base_url, constants.METADATA_API_ENDPOINT)
+        self.assertEqual(client.session.base_url, constants.DEFAULT_METADATA_API_ENDPOINT)
 
 
 class TestResponseParsing(unittest.TestCase):

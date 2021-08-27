@@ -232,6 +232,7 @@ CONF_FILENAME = "dwave.conf"
 
 ENV_OPTION_MAP = {
     'DWAVE_API_CLIENT': 'client',
+    'DWAVE_API_REGION': 'region',
     'DWAVE_API_ENDPOINT': 'endpoint',
     'DWAVE_API_TOKEN': 'token',
     'DWAVE_API_SOLVER': 'solver',
@@ -718,8 +719,9 @@ def load_config(config_file=None, profile=None, **kwargs):
     an environment variable.
 
     Environment variables: ``DWAVE_CONFIG_FILE``, ``DWAVE_PROFILE``,
-    ``DWAVE_API_CLIENT``, ``DWAVE_API_ENDPOINT``, ``DWAVE_API_TOKEN``,
-    ``DWAVE_API_SOLVER``, ``DWAVE_API_PROXY``, ``DWAVE_API_HEADERS``.
+    ``DWAVE_API_CLIENT``, ``DWAVE_API_REGION``, ``DWAVE_API_ENDPOINT``,
+    ``DWAVE_API_TOKEN``, ``DWAVE_API_SOLVER``, ``DWAVE_API_PROXY``,
+    ``DWAVE_API_HEADERS``.
 
     Environment variables are described in :mod:`dwave.cloud.config`.
 
@@ -755,8 +757,8 @@ def load_config(config_file=None, profile=None, **kwargs):
             Mapping of configuration keys to values for the profile (section),
             as read from the configuration file and optionally overridden by
             environment values and specified keyword arguments. Always contains
-            the `client`, `endpoint`, `token`, `solver`, `proxy` and `headers`
-            keys.
+            the `client`, `region`, `endpoint`, `token`, `solver`, `proxy` and
+            `headers` keys.
 
     Raises:
         :exc:`ValueError`:

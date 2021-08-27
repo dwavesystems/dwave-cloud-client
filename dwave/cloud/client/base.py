@@ -66,6 +66,8 @@ import urllib3
 from dateutil.parser import parse as parse_datetime
 from plucky import pluck
 
+from dwave.cloud.api import constants
+from dwave.cloud.api.resources import Regions
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *
 from dwave.cloud.computation import Future
@@ -211,7 +213,8 @@ class Client(object):
     ANY_STATUS_NO_RESULT = [STATUS_FAILED, STATUS_CANCELLED]
 
     # Default API endpoint
-    DEFAULT_API_ENDPOINT = 'https://cloud.dwavesys.com/sapi/'
+    # TODO: remove when refactored to use `dwave.cloud.api`?
+    DEFAULT_API_ENDPOINT = constants.DEFAULT_SOLVER_API_ENDPOINT
 
     # Class-level defaults for all constructor and factory arguments
     DEFAULTS = {
@@ -220,7 +223,10 @@ class Client(object):
         'profile': None,
         'client': 'base',
         # constructor (and factory)
-        'endpoint': DEFAULT_API_ENDPOINT,
+        'metadata_api_endpoint': constants.DEFAULT_METADATA_API_ENDPOINT,
+        'region': constants.DEFAULT_REGION,
+        # NOTE: should we rename endpoint to solver_api_endpoint for clarity?
+        'endpoint': None,       # defined via region, resolved on client init
         'token': None,
         'solver': None,
         'proxy': None,
@@ -261,7 +267,10 @@ class Client(object):
     _POLL_GROUP_TIMEFRAME = 2
 
     # Downloaded solver definition cache maxage [sec]
-    _SOLVERS_CACHE_MAXAGE = 300
+    _SOLVERS_CACHE_MAXAGE = 300     # 5 min
+
+    # Downloaded region metadata cache maxage [sec]
+    _REGIONS_CACHE_MAXAGE = 86400   # 1 day
 
     # Multipart upload parameters
     _UPLOAD_PART_SIZE_BYTES = 5 * 1024 * 1024
@@ -375,7 +384,19 @@ class Client(object):
 
         logger.debug("Client options with defaults: %r", options)
 
+        # resolve endpoint using region if necessary
+        self.metadata_api_endpoint = options['metadata_api_endpoint']   # for .get_regions()
+
+        region = options['region']
         endpoint = options['endpoint']
+        if not endpoint:
+            regions = self.get_regions()
+            if region not in regions:
+                raise ValueError(f"Region {region!r} unknown. "
+                                 f"Try one of {list(regions.keys())!r}.")
+            endpoint = regions[region]['endpoint']
+
+        # sanity check
         if not endpoint:
             raise ValueError("API endpoint not defined")
 
@@ -436,6 +457,7 @@ class Client(object):
 
         # Store connection/session parameters
         # TODO: consolidate all options under Client.options or similar
+        self.region = region    # for record only
         self.endpoint = endpoint
         self.token = token
         self.default_solver = solver_def
@@ -461,7 +483,7 @@ class Client(object):
         self.http_retry_backoff_max = parse_float(options['http_retry_backoff_max'])
 
         opts = (
-            'endpoint', 'token', 'default_solver',
+            'region', 'endpoint', 'token', 'default_solver',
             'client_cert', 'request_timeout', 'polling_timeout',
             'proxy', 'headers', 'permissive_ssl', 'connection_close',
             'poll_backoff_min', 'poll_backoff_max',
@@ -682,6 +704,25 @@ class Client(object):
 
         """
         return True
+
+    @cached(maxage=_REGIONS_CACHE_MAXAGE)
+    def _fetch_available_regions(self):
+        regions = Regions(endpoint=self.metadata_api_endpoint)
+        return regions.list_regions()
+
+    def get_regions(self, refresh=False):
+        """Retrieve available API regions.
+
+        Args:
+            refresh (bool):
+                Set to force cache refresh.
+
+        Returns:
+            dict[str, dict]:
+                Mapping of region details over region codes.
+        """
+        rs = self._fetch_available_regions(refresh_=refresh)
+        return {r.code: {"name": r.name, "endpoint": r.endpoint} for r in rs}
 
     @cached(maxage=_SOLVERS_CACHE_MAXAGE)
     def _fetch_solvers(self, name=None):

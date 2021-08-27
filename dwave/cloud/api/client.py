@@ -233,7 +233,7 @@ class DWaveAPIClient:
 class SolverAPIClient(DWaveAPIClient):
 
     def __init__(self, **config):
-        config.setdefault('endpoint', constants.SOLVER_API_ENDPOINT)
+        config.setdefault('endpoint', constants.DEFAULT_SOLVER_API_ENDPOINT)
         super().__init__(**config)
 
     @classmethod
@@ -276,5 +276,5 @@ class SolverAPIClient(DWaveAPIClient):
 
 class MetadataAPIClient(DWaveAPIClient):
     def __init__(self, **config):
-        config.setdefault('endpoint', constants.METADATA_API_ENDPOINT)
+        config.setdefault('endpoint', constants.DEFAULT_METADATA_API_ENDPOINT)
         super().__init__(**config)
