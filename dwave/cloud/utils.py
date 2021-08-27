@@ -21,7 +21,8 @@ import itertools
 import numbers
 import warnings
 
-from collections import abc, OrderedDict
+from collections import OrderedDict
+from collections.abc import Mapping, Sequence, MutableMapping
 from urllib.parse import urljoin
 from datetime import datetime, timedelta
 from dateutil.tz import UTC
@@ -29,6 +30,7 @@ from functools import wraps
 from pkg_resources import iter_entry_points
 
 import requests
+import diskcache
 
 # Use numpy if available for fast decoding
 try:
@@ -118,7 +120,7 @@ def uniform_iterator(sequence):
     """Uniform (key, value) iteration on a `dict`,
     or (idx, value) on a `list`."""
 
-    if isinstance(sequence, abc.Mapping):
+    if isinstance(sequence, Mapping):
         return sequence.items()
     else:
         return enumerate(sequence)
@@ -128,7 +130,7 @@ def uniform_get(sequence, index, default=None):
     """Uniform `dict`/`list` item getter, where `index` is interpreted as a key
     for maps and as numeric index for lists."""
 
-    if isinstance(sequence, abc.Mapping):
+    if isinstance(sequence, Mapping):
         return sequence.get(index, default)
     else:
         return sequence[index] if index < len(sequence) else default
@@ -395,7 +397,7 @@ class CLIError(Exception):
         self.code = code
 
 
-class cached(object):
+class cached:
     """Caching decorator with max-age/expiry, forced refresh, and
     per-arguments-combo keys.
 
@@ -430,9 +432,9 @@ class cached(object):
         b = repr(sorted((repr(k), repr(v)) for k, v in kwargs.items()))
         return a + b
 
-    def __init__(self, maxage=None):
+    def __init__(self, maxage=None, cache=None):
         self.maxage = maxage or 0
-        self.cache = {}
+        self.cache = cache or {}
 
     def __call__(self, fn):
         @wraps(fn)
@@ -456,6 +458,14 @@ class cached(object):
         wrapper._maxage = self.maxage
 
         return wrapper
+
+    @classmethod
+    def ondisk(cls, **kwargs):
+        """@cached backed by an on-disk sqlite3-based cache."""
+        from dwave.cloud.config import get_cache_dir
+        directory = kwargs.pop('directory', get_cache_dir())
+        cache = diskcache.Cache(directory=directory)
+        return cls(cache=cache, **kwargs)
 
 
 class retried(object):
@@ -491,7 +501,7 @@ class retried(object):
         # normalize `backoff` to callable
         if isinstance(backoff, numbers.Number):
             self.backoff = lambda retry: backoff
-        elif isinstance(backoff, abc.Sequence):
+        elif isinstance(backoff, Sequence):
             it = iter(backoff)
             self.backoff = lambda retry: next(it)
         else:

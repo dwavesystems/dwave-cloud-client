@@ -4,6 +4,7 @@ homebase>=1.0.0
 python-dateutil>=2.7
 click>=7
 plucky>=0.4.3
+diskcache>=5.2.1
 
 # backports
 dataclasses; python_version == "3.6"
