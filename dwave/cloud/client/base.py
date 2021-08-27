@@ -714,10 +714,18 @@ class Client(object):
         """
         return True
 
-    @cached(maxage=_REGIONS_CACHE_MAXAGE)
-    def _fetch_available_regions(self):
-        with Regions(endpoint=self.metadata_api_endpoint) as regions:
-            return regions.list_regions()
+    @staticmethod
+    @cached.ondisk(maxage=_REGIONS_CACHE_MAXAGE)
+    def _fetch_available_regions(metadata_api_endpoint):
+        logger.info("Fetching available regions from the Metadata API at %r",
+            metadata_api_endpoint)
+
+        with Regions(endpoint=metadata_api_endpoint) as regions:
+            data = regions.list_regions()
+
+        logger.trace("Received region metadata: %r", data)
+
+        return data
 
     def get_regions(self, refresh=False):
         """Retrieve available API regions.
@@ -730,7 +738,11 @@ class Client(object):
             dict[str, dict]:
                 Mapping of region details over region codes.
         """
-        rs = self._fetch_available_regions(refresh_=refresh)
+        rs = Client._fetch_available_regions(
+            metadata_api_endpoint=self.metadata_api_endpoint, refresh_=refresh)
+
+        logger.debug("Using region metadata: %r", rs)
+
         return {r.code: {"name": r.name, "endpoint": r.endpoint} for r in rs}
 
     @cached(maxage=_SOLVERS_CACHE_MAXAGE)
