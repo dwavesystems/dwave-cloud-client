@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dwave.cloud.api import exceptions as api
+from dwave.cloud.api import exceptions as _api
 
 
 # alias for backward compatibility
-SAPIError = api.RequestError
+SAPIError = _api.RequestError
 
 
 class ConfigFileError(Exception):
@@ -29,26 +29,26 @@ class ConfigFileParseError(ConfigFileError):
     """Invalid format of config file."""
 
 
-class SolverError(api.RequestError):
+class SolverError(_api.RequestError):
     """Generic solver-related error"""
 
-class ProblemError(api.RequestError):
+class ProblemError(_api.RequestError):
     """Generic problem-related error"""
 
 
 class SolverFailureError(SolverError):
     """Remote failure calling a solver"""
 
-class SolverNotFoundError(api.ResourceNotFoundError, SolverError):
+class SolverNotFoundError(_api.ResourceNotFoundError, SolverError):
     """Solver with matching feature set not found / not available"""
 
-class ProblemNotFoundError(api.ResourceNotFoundError, ProblemError):
+class ProblemNotFoundError(_api.ResourceNotFoundError, ProblemError):
     """Problem not found"""
 
 class SolverOfflineError(SolverError):
     """Action attempted on an offline solver"""
 
-class SolverAuthenticationError(api.ResourceAuthenticationError, SolverError):
+class SolverAuthenticationError(_api.ResourceAuthenticationError, SolverError):
     """Invalid token or access denied"""
 
 class UnsupportedSolverError(SolverError):
@@ -58,7 +58,7 @@ class SolverPropertyMissingError(UnsupportedSolverError):
     """The solver received from the API does not have required properties"""
 
 
-class Timeout(api.RequestError):
+class Timeout(_api.RequestError):
     """Deprecated and unused."""
 
 class PollingTimeout(Exception):
@@ -75,7 +75,7 @@ class CanceledFutureError(Exception):
         super().__init__("An error occurred reading results from a canceled request")
 
 
-class InvalidAPIResponseError(api.ResourceBadResponseError):
+class InvalidAPIResponseError(_api.ResourceBadResponseError):
     """Unexpected response from D-Wave Solver API"""
 
 

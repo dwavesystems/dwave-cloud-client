@@ -21,5 +21,11 @@ import dwave.cloud.api.exceptions
 import dwave.cloud.api.models
 import dwave.cloud.api.resources
 
+from dwave.cloud.api import client
+from dwave.cloud.api import constants
+from dwave.cloud.api import exceptions
+from dwave.cloud.api import models
+from dwave.cloud.api import resources
+
 from dwave.cloud.api.client import DWaveAPIClient, SolverAPIClient, MetadataAPIClient
 from dwave.cloud.api.resources import Solvers, Problems, Regions

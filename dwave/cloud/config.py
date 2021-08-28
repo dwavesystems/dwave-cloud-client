@@ -54,6 +54,8 @@ Environment variables:
 
     ``DWAVE_API_CLIENT``: API client class. Supported values are ``qpu``, ``sw`` and ``hybrid``.
 
+    ``DWAVE_API_REGION``: API region code.
+
     ``DWAVE_API_ENDPOINT``: API endpoint URL.
 
     ``DWAVE_API_TOKEN``: API authorization token.

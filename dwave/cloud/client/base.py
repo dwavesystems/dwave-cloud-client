@@ -66,10 +66,9 @@ import urllib3
 from dateutil.parser import parse as parse_datetime
 from plucky import pluck
 
-from dwave.cloud.api import constants
-from dwave.cloud.api.resources import Regions
+from dwave.cloud import api
 from dwave.cloud.package_info import __packagename__, __version__
-from dwave.cloud.exceptions import *
+from dwave.cloud.exceptions import *    # TODO: fix
 from dwave.cloud.computation import Future
 from dwave.cloud.config import load_config, parse_float, parse_int, parse_boolean
 from dwave.cloud.solver import Solver, available_solvers
@@ -223,7 +222,8 @@ class Client(object):
 
     # Default API endpoint
     # TODO: remove when refactored to use `dwave.cloud.api`?
-    DEFAULT_API_ENDPOINT = constants.DEFAULT_SOLVER_API_ENDPOINT
+    DEFAULT_API_ENDPOINT = api.constants.DEFAULT_SOLVER_API_ENDPOINT
+    DEFAULT_API_REGION = api.constants.DEFAULT_REGION
 
     # Class-level defaults for all constructor and factory arguments
     DEFAULTS = {
@@ -232,8 +232,8 @@ class Client(object):
         'profile': None,
         'client': 'base',
         # constructor (and factory)
-        'metadata_api_endpoint': constants.DEFAULT_METADATA_API_ENDPOINT,
-        'region': constants.DEFAULT_REGION,
+        'metadata_api_endpoint': api.constants.DEFAULT_METADATA_API_ENDPOINT,
+        'region': DEFAULT_API_REGION,
         # NOTE: should we rename endpoint to solver_api_endpoint for clarity?
         'endpoint': None,       # defined via region, resolved on client init
         'token': None,
@@ -720,7 +720,7 @@ class Client(object):
         logger.info("Fetching available regions from the Metadata API at %r",
             metadata_api_endpoint)
 
-        with Regions(endpoint=metadata_api_endpoint) as regions:
+        with api.Regions(endpoint=metadata_api_endpoint) as regions:
             data = regions.list_regions()
 
         logger.trace("Received region metadata: %r", data)
@@ -738,8 +738,14 @@ class Client(object):
             dict[str, dict]:
                 Mapping of region details over region codes.
         """
-        rs = Client._fetch_available_regions(
-            metadata_api_endpoint=self.metadata_api_endpoint, refresh_=refresh)
+        try:
+            rs = Client._fetch_available_regions(
+                metadata_api_endpoint=self.metadata_api_endpoint,
+                refresh_=refresh)
+        except api.exceptions.RequestError as exc:
+            logger.exception("Metadata API unavailable")
+            raise ValueError(
+                f"Metadata API unavailable at {self.metadata_api_endpoint!r}")
 
         logger.debug("Using region metadata: %r", rs)
 
