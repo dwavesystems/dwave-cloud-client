@@ -28,6 +28,7 @@ from contextlib import contextmanager
 import requests
 from plucky import merge
 
+from dwave.cloud.api import constants
 from dwave.cloud.client import Client
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
 from dwave.cloud.exceptions import (
@@ -36,6 +37,19 @@ from dwave.cloud.testing import iterable_mock_open
 import dwave.cloud
 
 from tests import config
+
+
+DEFAULT_REGIONS = {
+    constants.DEFAULT_REGION: dict(
+        endpoint=constants.DEFAULT_SOLVER_API_ENDPOINT)}
+
+def get_default_regions(*args, **kwargs):
+    return DEFAULT_REGIONS
+
+def make_region_conf(**kwargs):
+    def region_conf(*a, **kw):
+        return {k: dict(endpoint=v) for k,v in kwargs.items()}
+    return region_conf
 
 
 @unittest.skipUnless(config, "No live server configuration available.")
@@ -143,7 +157,8 @@ class SolverLoading(unittest.TestCase):
         """Specialized client returns the correct solver by default."""
         from dwave.cloud import qpu, sw, hybrid
 
-        conf = dict(endpoint=config['endpoint'], token=config['token'])
+        conf = config.copy()
+        del conf['solver']
 
         with Client(**conf) as base_client:
 
@@ -169,6 +184,7 @@ class SolverLoading(unittest.TestCase):
                     self.assertRaises(SolverError, client.get_solver)
 
 
+@mock.patch.multiple(Client, get_regions=get_default_regions)
 class ClientConstruction(unittest.TestCase):
     """Test Client constructor and Client.from_config() factory."""
 
@@ -182,6 +198,30 @@ class ClientConstruction(unittest.TestCase):
                 self.assertNotIsInstance(client, dwave.cloud.sw.Client)
                 self.assertNotIsInstance(client, dwave.cloud.qpu.Client)
                 self.assertNotIsInstance(client, dwave.cloud.hybrid.Client)
+
+    def test_region_default(self):
+        conf = {k: k for k in 'token'.split()}
+        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+            with dwave.cloud.Client.from_config() as client:
+                self.assertEqual(client.region, constants.DEFAULT_REGION)
+                self.assertEqual(client.endpoint, constants.DEFAULT_SOLVER_API_ENDPOINT)
+                self.assertEqual(client.token, 'token')
+                self.assertIsInstance(client, dwave.cloud.client.Client)
+                self.assertNotIsInstance(client, dwave.cloud.sw.Client)
+                self.assertNotIsInstance(client, dwave.cloud.qpu.Client)
+                self.assertNotIsInstance(client, dwave.cloud.hybrid.Client)
+
+    def test_region_selection(self):
+        conf = {k: k for k in 'token'.split()}
+        region = 'mock'
+        endpoint = 'mock-endpoint'
+        region_conf = make_region_conf(**{region: endpoint})
+
+        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+            with mock.patch.multiple("dwave.cloud.Client", get_regions=region_conf):
+                with dwave.cloud.Client.from_config(region=region) as client:
+                    self.assertEqual(client.region, region)
+                    self.assertEqual(client.endpoint, endpoint)
 
     def test_client_type(self):
         conf = {k: k for k in 'endpoint token'.split()}
@@ -343,8 +383,8 @@ class ClientConstruction(unittest.TestCase):
                     # solver: set in defaults, overwritten in file conf
                     self.assertEqual(client.default_solver, solver)
 
-                    # endpoint: used from class defaults
-                    self.assertEqual(client.endpoint, DEFAULTS['endpoint'])
+                    # endpoint: derived from region
+                    self.assertEqual(client.endpoint, constants.DEFAULT_SOLVER_API_ENDPOINT)
 
                     # None kwarg: used from class defaults
                     self.assertEqual(client.request_timeout, request_timeout)
@@ -523,6 +563,7 @@ class ClientConstruction(unittest.TestCase):
                 self._verify_retry_config(retry, retry_kwargs)
 
 
+@mock.patch.multiple(Client, get_regions=get_default_regions)
 class ClientConfigIntegration(unittest.TestCase):
 
     def test_custom_options(self):

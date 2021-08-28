@@ -29,7 +29,7 @@ class TestEventDispatch(unittest.TestCase):
 
     def setUp(self):
         # mock client
-        self.client = Client(token='token', solver=dict(name__contains='test'))
+        self.client = Client(endpoint='e', token='t', solver=dict(name__contains='test'))
         self.client._fetch_solvers = lambda **kw: self.solvers
         self.client._submit = lambda *pa, **kw: None
         self.client.upload_problem_encoded = lambda *pa, **kw: Present(result=mock_problem_id)
@@ -96,7 +96,7 @@ class TestEventDispatch(unittest.TestCase):
         add_handler('after_client_init', handler)
 
         # client init
-        client = Client(token='token', unknown='unknown')
+        client = Client(endpoint='endpoint', token='token', unknown='unknown')
 
         # test entry values
         before = memo['before_client_init']
@@ -112,7 +112,7 @@ class TestEventDispatch(unittest.TestCase):
         self.assertEqual(after['obj'], client)
         self.assertEqual(after['args']['token'], 'token')
         self.assertEqual(after['args']['kwargs']['unknown'], 'unknown')
-        self.assertEqual(after['args']['endpoint'], None)
+        self.assertEqual(after['args']['endpoint'], 'endpoint')
         self.assertEqual(after['return_value'], None)
 
     def test_get_solvers(self):
