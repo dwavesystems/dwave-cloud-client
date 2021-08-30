@@ -46,11 +46,6 @@ DEFAULT_REGIONS = {
 def get_default_regions(*args, **kwargs):
     return DEFAULT_REGIONS
 
-def make_region_conf(**kwargs):
-    def region_conf(*a, **kw):
-        return {k: dict(endpoint=v) for k,v in kwargs.items()}
-    return region_conf
-
 
 @unittest.skipUnless(config, "No live server configuration available.")
 class ConnectivityTests(unittest.TestCase):
@@ -213,12 +208,12 @@ class ClientConstruction(unittest.TestCase):
 
     def test_region_selection(self):
         conf = {k: k for k in 'token'.split()}
-        region = 'mock'
-        endpoint = 'mock-endpoint'
-        region_conf = make_region_conf(**{region: endpoint})
+        region = 'region-code'
+        endpoint = 'region-endpoint'
+        region_conf = {region: {"endpoint": endpoint}}
 
         with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
-            with mock.patch.multiple("dwave.cloud.Client", get_regions=region_conf):
+            with mock.patch("dwave.cloud.Client.get_regions", lambda s: region_conf):
                 with dwave.cloud.Client.from_config(region=region) as client:
                     self.assertEqual(client.region, region)
                     self.assertEqual(client.endpoint, endpoint)
@@ -598,6 +593,71 @@ class ClientConfigIntegration(unittest.TestCase):
 
                 with mock.patch("requests.adapters.HTTPAdapter.send", mock_send):
                     client.get_solvers()
+
+
+class MultiRegionSupport(unittest.TestCase):
+
+    def test_region_selection_mocked_end_to_end(self):
+        """Given `metadata_api_endpoint` and `region` in a config file,
+        when Client is initialized from config,
+        then it is set-up with sapi endpoint retrieved from the metadata api."""
+
+        metadata_api_endpoint = 'metadata-api'
+        regions_response = [
+            {"code": "a", "endpoint": "endpoint-a", "name": "A"},
+            {"code": "b", "endpoint": "endpoint-b", "name": "B"}
+        ]
+        selected_region = regions_response[0]['code']
+        selected_endpoint = regions_response[0]['endpoint']
+
+        config_body = f"""
+            [defaults]
+            metadata_api_endpoint = {metadata_api_endpoint}
+            region = {selected_region}
+            token = token
+        """
+
+        expected_get_regions_return = {
+            r['code']: {"name": r['name'], "endpoint": r['endpoint']}
+            for r in regions_response
+        }
+
+        def _patch_session(resource):
+            self.assertEqual(resource.session.base_url, f"{metadata_api_endpoint}/")
+            session = mock.Mock()
+
+            def get(url, **kwargs):
+                response = mock.Mock(['text', 'json'])
+                response.status_code = 200
+                response.json.side_effect = lambda: regions_response
+                return response
+
+            session.get = get
+            resource.session = session
+
+        with mock.patch("dwave.cloud.config.open", iterable_mock_open(config_body)):
+            with mock.patch.multiple(Client._fetch_available_regions._cached, cache={}):
+                with mock.patch("dwave.cloud.client.base.api.Regions._patch_session", _patch_session):
+                    # note: we specify config_file, otherwise reading from files
+                    # might be skipped altogether if zero config files found on disk
+                    # (i.e. config open mock above fails on CI)
+                    with Client.from_config(config_file='config_file') as client:
+                        # verify get_regions() returns data from metadata_api_endpoint
+                        regions = client.get_regions()
+                        self.assertEqual(regions, expected_get_regions_return)
+
+                        # check region endpoint initialized from custom metadata_api_endpoint
+                        self.assertEqual(client.metadata_api_endpoint, metadata_api_endpoint)
+                        self.assertEqual(client.region, selected_region)
+                        self.assertEqual(client.endpoint, selected_endpoint)
+
+    @unittest.skipUnless(config, "No live server configuration available.")
+    @mock.patch.multiple(Client._fetch_available_regions._cached, cache={})
+    def test_region_selection_live_end_to_end(self):
+        with Client(**config) as client:
+            self.assertEqual(client.region, constants.DEFAULT_REGION)
+            self.assertIn(constants.DEFAULT_REGION, client.endpoint)
+            self.assertGreater(len(client.get_regions()), 0)
 
 
 class FeatureBasedSolverSelection(unittest.TestCase):

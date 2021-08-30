@@ -453,9 +453,8 @@ class cached:
 
             return val
 
-        # expose the cache for testing and debugging
-        wrapper._cache = self.cache
-        wrapper._maxage = self.maxage
+        # expose @cached internals for testing and debugging
+        wrapper._cached = self
 
         return wrapper
 
