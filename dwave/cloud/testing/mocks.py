@@ -78,7 +78,7 @@ def structured_solver_data(id: str = None,
             "h_range": [-2.0, 2.0],
             "j_range": [-1.0, 1.0],
             "num_reads_range": [1, 10000],
-            "annealing_time_range": [1, 2000],
+            "annealing_time_range": [1.0, 2000.0],
             "extended_j_range": [-2.0, 1.0],
             "quota_conversion_rate": 1,
             "parameters": {
