@@ -361,6 +361,34 @@ class Client(object):
         logger.debug("Creating %s.Client() with: %r", _client, config)
         return _clients[_client](**config)
 
+    def _resolve_region_endpoint(self, *, region: str = None, endpoint: str = None):
+        """For a region/endpoint pair from config, return the Solver API
+        endpoint to use (and the matching region).
+
+        Explicit endpoint will override the region (i.e. region extension is
+        backwards-compatible).
+
+        Regional endpoint is fetched from Metadata API. If Metadata API is not
+        available, default global endpoint is used.
+        """
+        if endpoint:
+            return (region, endpoint)
+
+        if not region:
+            return (self.DEFAULT_API_REGION, self.DEFAULT_API_ENDPOINT)
+
+        try:
+            regions = self.get_regions()
+        except (api.exceptions.RequestError, ValueError) as exc:
+            logger.warning("Failed to fetch available regions: %r. "
+                           "Using the default solver API endpoint.", exc)
+            return (self.DEFAULT_API_REGION, self.DEFAULT_API_ENDPOINT)
+
+        if region not in regions:
+            raise ValueError(f"Region {region!r} unknown. "
+                             f"Try one of {list(regions.keys())!r}.")
+        return (region, regions[region]['endpoint'])
+
     @dispatches_events('client_init')
     def __init__(self, endpoint=None, token=None, solver=None, **kwargs):
         # for (reasonable) backwards compatibility, accept only the first few
@@ -393,17 +421,12 @@ class Client(object):
 
         logger.debug("Client options with defaults: %r", options)
 
-        # resolve endpoint using region if necessary
-        self.metadata_api_endpoint = options['metadata_api_endpoint']   # for .get_regions()
+        # configure MetadataAPI access -- needed by Client.get_regions()
+        self.metadata_api_endpoint = options['metadata_api_endpoint']
 
-        region = options['region']
-        endpoint = options['endpoint']
-        if not endpoint:
-            regions = self.get_regions()
-            if region not in regions:
-                raise ValueError(f"Region {region!r} unknown. "
-                                 f"Try one of {list(regions.keys())!r}.")
-            endpoint = regions[region]['endpoint']
+        # resolve endpoint using region
+        region, endpoint = self._resolve_region_endpoint(
+            region=options['region'], endpoint=options['endpoint'])
 
         # sanity check
         if not endpoint:

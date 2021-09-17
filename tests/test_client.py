@@ -651,6 +651,51 @@ class MultiRegionSupport(unittest.TestCase):
                         self.assertEqual(client.region, selected_region)
                         self.assertEqual(client.endpoint, selected_endpoint)
 
+    def test_region_endpoint_fallback_when_no_metadata_api(self):
+        """Given region in config, and endpoint omitted,
+        when Client is initialized from config and MetadataAPI is down,
+        then the client is initialized to use the default (old) endpoint and region.
+        """
+        # test Client._resolve_region_endpoint
+
+        conf = dict(token='token', metadata_api_endpoint='invalid')
+        region = Client.DEFAULT_API_REGION
+
+        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+            with dwave.cloud.Client.from_config(region=region) as client:
+                self.assertEqual(client.region, Client.DEFAULT_API_REGION)
+                self.assertEqual(client.endpoint, Client.DEFAULT_API_ENDPOINT)
+
+    @mock.patch.multiple(Client, get_regions=get_default_regions)
+    def test_region_endpoint_fallback_when_region_unknown(self):
+        """Given invalid region in config, and endpoint omitted,
+        when Client is initialized from config,
+        then ValueError is raised.
+        """
+        # test Client._resolve_region_endpoint
+
+        conf = dict(token='token')
+        region = 'invalid-region-code'
+
+        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+            with self.assertRaises(ValueError):
+                Client.from_config(region=region)
+
+    @mock.patch.multiple(Client, get_regions=get_default_regions)
+    def test_region_endpoint_null_case(self):
+        """Given region as None, and endpoint as None,
+        when Client is initialized from config,
+        then the client is initialized to use the default (old) endpoint and region.
+        """
+        # test Client._resolve_region_endpoint
+
+        conf = dict(token='token', region='')
+
+        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+            with dwave.cloud.Client.from_config() as client:
+                self.assertEqual(client.region, Client.DEFAULT_API_REGION)
+                self.assertEqual(client.endpoint, Client.DEFAULT_API_ENDPOINT)
+
     @unittest.skipUnless(config, "No live server configuration available.")
     @mock.patch.multiple(Client._fetch_available_regions._cached, cache={})
     def test_region_selection_live_end_to_end(self):

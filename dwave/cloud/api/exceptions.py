@@ -55,8 +55,7 @@ class ResourceBadResponseError(RequestError):
     """Unexpected resource response"""
 
 class InternalServerError(RequestError):
-    pass
-
+    """internal server error occurred while request handling."""
 
 class RequestTimeout(RequestError):
     """API request timed out"""
