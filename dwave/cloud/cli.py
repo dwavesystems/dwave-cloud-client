@@ -22,6 +22,9 @@ import pkg_resources
 from functools import partial
 from timeit import default_timer as timer
 
+from typing import Dict
+from configparser import ConfigParser
+
 import click
 import requests.exceptions
 
@@ -176,43 +179,115 @@ def inspect(config_file, profile):
 
 @config.command()
 @config_file_options
-def create(config_file, profile):
+@click.option('--full', 'ask_full', is_flag=True,
+              help='Configure non-essential options (like endpoint and solver).')
+def create(config_file, profile, ask_full):
     """Create and/or update cloud client configuration file."""
-    return _config_create(config_file, profile)
+
+    try:
+        _config_create(config_file, profile, ask_full)
+    except CLIError as error:
+        click.echo(f"Error: {error!s} (code: {error.code})")
+        sys.exit(error.code)
+    except Exception as error:
+        click.echo(f"Unhandled error: {error!s}")
+        sys.exit(127)
 
 
-def _config_create(config_file, profile):
-    """`dwave config create` helper."""
+def _input_config_variables(config: ConfigParser,
+                            profile: str,
+                            prompts: Dict[str, str]) -> ConfigParser:
+    """Update config variables in place with user-provided values."""
+
+    for var, prompt in prompts.items():
+        default_val = config.get(profile, var, fallback=None)
+        val = default_text_input(prompt, default_val)
+        if val:
+            val = os.path.expandvars(val)
+        if val != default_val:
+            config.set(profile, var, val)
+    return config
+
+def _load_config(config_file: str) -> ConfigParser:
+    """Load from config_file, or create new with defaults."""
+
+    try:
+        return load_config_from_files([config_file])
+    except:
+        return get_default_config()
+
+def _write_config(config: ConfigParser, config_file: str):
+    """Write config to config_file."""
+
+    config_base = os.path.dirname(config_file)
+    if config_base and not os.path.exists(config_base):
+        try:
+            os.makedirs(config_base)
+        except Exception as e:
+            raise CLIError(f"Error creating configuration path: {e!r}", code=1)
+
+    try:
+        with open(config_file, 'w') as fp:
+            config.write(fp)
+    except Exception as e:
+        raise CLIError(f"Error writing to configuration file: {e!r}", code=2)
+
+
+def _config_create_simple(config_file, profile):
+    """Simple dwave create flow."""
+
+    click.echo("Using the simplified configuration flow.\n"
+               "Try 'dwave config create --full' for more options.\n")
+
+    # resolve config_file
+    if not config_file:
+        config_file = get_configfile_path()
+        if not config_file:
+            config_file = get_default_configfile_path()
+
+    verb = "Updating existing" if os.path.exists(config_file) else "Creating new"
+    click.echo(f"{verb} configuration file: {config_file}")
+
+    config = _load_config(config_file)
+
+    # resolve profile
+    if not profile:
+        profile = config.default_section
+
+    verb = "Updating" if profile in config else "Creating"
+    click.echo(f"{verb} profile: {profile}")
+
+    if profile != config.default_section and not config.has_section(profile):
+        config.add_section(profile)
+
+    _input_config_variables(config, profile, dict(token="Authentication token"))
+
+    _write_config(config, config_file)
+
+    click.echo("Configuration saved.")
+
+
+def _config_create_full(config_file, profile):
+    """Full dwave create flow."""
 
     # determine the config file path
-    if config_file:
-        click.echo("Using configuration file: {}".format(config_file))
-    else:
-        # path not given, try to detect; or use default, but allow user to override
+    if not config_file:
+        # path not given, try to detect; or use default
+        # allow user to override in `full` mode
         config_file = get_configfile_path()
         if config_file:
             click.echo("Found existing configuration file: {}".format(config_file))
         else:
             config_file = get_default_configfile_path()
             click.echo("Configuration file not found; the default location is: {}".format(config_file))
+
         config_file = default_text_input("Configuration file path", config_file)
         config_file = os.path.expanduser(config_file)
 
-    # create config_file path
-    config_base = os.path.dirname(config_file)
-    if config_base and not os.path.exists(config_base):
-        if click.confirm("Configuration file path does not exist. Create it?", abort=True):
-            try:
-                os.makedirs(config_base)
-            except Exception as e:
-                click.echo("Error creating configuration path: {}".format(e))
-                return 1
+    verb = "Updating existing" if os.path.exists(config_file) else "Creating new"
+    click.echo(f"{verb} configuration file: {config_file}")
 
-    # try loading existing config, or use defaults
-    try:
-        config = load_config_from_files([config_file])
-    except:
-        config = get_default_config()
+    config = _load_config(config_file)
 
     # determine profile
     if profile:
@@ -231,28 +306,71 @@ def _config_create(config_file, profile):
         config.add_section(profile)
 
     # fill out the profile variables
-    variables = 'endpoint token client solver proxy'.split()
-    prompts = ['API endpoint URL',
-               'Authentication token',
-               'Default client class',
-               'Default solver']
-    for var, prompt in zip(variables, prompts):
-        default_val = config.get(profile, var, fallback=None)
-        val = default_text_input(prompt, default_val)
-        if val:
-            val = os.path.expandvars(val)
-        if val != default_val:
-            config.set(profile, var, val)
+    prompts = dict(
+        endpoint="Solver API endpoint URL",
+        token="Authentication token",
+        client="Client class",
+        solver="Solver")
 
-    try:
-        with open(config_file, 'w') as fp:
-            config.write(fp)
-    except Exception as e:
-        click.echo("Error writing to configuration file: {}".format(e))
-        return 2
+    _input_config_variables(config, profile, prompts)
+
+    _write_config(config, config_file)
 
     click.echo("Configuration saved.")
-    return 0
+
+
+def _config_create(config_file, profile, ask_full):
+    """`dwave config create` helper.
+
+    Default flow
+    ---
+
+    ::
+
+        $ dwave config create
+        Using configuration file: /path/to/dwave.conf
+        Authentication token: DEV-...
+        Configuration saved.
+
+    The generated config file looks like this::
+
+        [defaults]
+        token = DEV-...
+
+    Default flow, with custom config file and/or profile
+    ---
+
+    ::
+
+        $ dwave config create --config-file dwave.conf --profile test
+        Using configuration file: ./dwave.conf
+        Using profile: test
+        Authentication token: DEV-...
+        Configuration saved.
+
+    The generated config file looks like this::
+
+        [test]
+        token = DEV-...
+
+    Full/advanced flow
+    ---
+
+    ::
+
+        $ dwave config create --full
+        Using configuration file: /path/to/dwave.conf
+        Profile (create new or choose from: defaults, prod) [defaults]:
+        Solver API endpoint URL: ...
+        Authentication token: ...
+        Client class: ...
+        Solver: ...
+
+    """
+    if ask_full:
+        return _config_create_full(config_file, profile)
+    else:
+        return _config_create_simple(config_file, profile)
 
 
 def _ping(config_file, profile, client_type, solver_def, sampling_params,
