@@ -37,25 +37,28 @@ def touch(path):
 
 class TestCli(unittest.TestCase):
 
-    def test_config_create(self):
+    @parameterized.expand([
+        ("simple", [], ["token"]),
+        ("full", ["--full"], "endpoint token client solver".split()),
+    ])
+    def test_config_create(self, name, extra_opts, inputs):
         config_file = 'dwave.conf'
         profile = 'profile'
-        values = 'endpoint token client solver'.split()
 
         runner = CliRunner(mix_stderr=False)
         with runner.isolated_filesystem():
             # create config file through simulated user input in `dwave configure`
             touch(config_file)
-            with mock.patch("dwave.cloud.utils.input", side_effect=values):
+            with mock.patch("dwave.cloud.utils.input", side_effect=inputs):
                 result = runner.invoke(cli, [
                     'config', 'create', '--config-file', config_file, '--profile', profile
-                ], input='\n'.join(values))
+                ] + extra_opts, input='\n'.join(inputs))
                 self.assertEqual(result.exit_code, 0)
 
             # load and verify config
             with isolated_environ(remove_dwave=True):
                 config = load_config(config_file, profile=profile)
-                for val in values:
+                for val in inputs:
                     self.assertEqual(config.get(val), val)
 
     def test_config_ls(self):
