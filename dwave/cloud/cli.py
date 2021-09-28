@@ -182,7 +182,7 @@ def inspect(config_file, profile):
 @click.option('--full', 'ask_full', is_flag=True,
               help='Configure non-essential options (like endpoint and solver).')
 def create(config_file, profile, ask_full):
-    """Create and/or update cloud client configuration file."""
+    """Create or update cloud client configuration file."""
 
     try:
         _config_create(config_file, profile, ask_full)
@@ -232,14 +232,25 @@ def _write_config(config: ConfigParser, config_file: str):
     except Exception as e:
         raise CLIError(f"Error writing to configuration file: {e!r}", code=2)
 
+def _config_create(config_file, profile, ask_full=False):
+    """Full/simplified dwave create flows."""
 
-def _config_create_simple(config_file, profile):
-    """Simple dwave create flow."""
+    if ask_full:
+        prompts = dict(
+            endpoint="Solver API endpoint URL",
+            token="Authentication token",
+            client="Client class",
+            solver="Solver")
 
-    click.echo("Using the simplified configuration flow.\n"
-               "Try 'dwave config create --full' for more options.\n")
+    else:
+        prompts = dict(
+            token="Authentication token")
 
-    # resolve config_file
+        click.echo("Using the simplified configuration flow.\n"
+                   "Try 'dwave config create --full' for more options.\n")
+
+    # resolve config file path
+    ask_to_confirm_config_path = not config_file
     if not config_file:
         config_file = get_configfile_path()
         if not config_file:
@@ -248,129 +259,35 @@ def _config_create_simple(config_file, profile):
     verb = "Updating existing" if os.path.exists(config_file) else "Creating new"
     click.echo(f"{verb} configuration file: {config_file}")
 
+    if ask_full and ask_to_confirm_config_path:
+        config_file = default_text_input("Confirm configuration file path", config_file)
+        config_file = os.path.expanduser(config_file)
+
     config = _load_config(config_file)
+    default_section = config.default_section
 
     # resolve profile
     if not profile:
-        profile = config.default_section
-
-    verb = "Updating" if profile in config else "Creating"
-    click.echo(f"{verb} profile: {profile}")
-
-    if profile != config.default_section and not config.has_section(profile):
-        config.add_section(profile)
-
-    _input_config_variables(config, profile, dict(token="Authentication token"))
-
-    _write_config(config, config_file)
-
-    click.echo("Configuration saved.")
-
-
-def _config_create_full(config_file, profile):
-    """Full dwave create flow."""
-
-    # determine the config file path
-    if not config_file:
-        # path not given, try to detect; or use default
-        # allow user to override in `full` mode
-        config_file = get_configfile_path()
-        if config_file:
-            click.echo("Found existing configuration file: {}".format(config_file))
-        else:
-            config_file = get_default_configfile_path()
-            click.echo("Configuration file not found; the default location is: {}".format(config_file))
-
-        config_file = default_text_input("Configuration file path", config_file)
-        config_file = os.path.expanduser(config_file)
-
-    verb = "Updating existing" if os.path.exists(config_file) else "Creating new"
-    click.echo(f"{verb} configuration file: {config_file}")
-
-    config = _load_config(config_file)
-
-    # determine profile
-    if profile:
-        click.echo("Using profile: {}".format(profile))
-    else:
         existing = config.sections()
         if existing:
-            profiles = 'create new or choose from: {}'.format(', '.join(existing))
-            default_profile = ''
-        else:
-            profiles = 'create new'
-            default_profile = 'prod'
-        profile = default_text_input("Profile (%s)" % profiles, default_profile, optional=False)
+            if default_section in config:
+                existing.insert(0, default_section)
+            click.echo(f"Found profiles: {', '.join(existing)}.")
+        default_profile = next(iter(existing))
 
-    if not config.has_section(profile):
+        profile = default_text_input(f"Profile (select existing or create new)", default_profile)
+
+    verb = "Updating existing" if profile in config else "Creating new"
+    click.echo(f"{verb} profile: {profile}")
+
+    if profile != default_section and not config.has_section(profile):
         config.add_section(profile)
-
-    # fill out the profile variables
-    prompts = dict(
-        endpoint="Solver API endpoint URL",
-        token="Authentication token",
-        client="Client class",
-        solver="Solver")
 
     _input_config_variables(config, profile, prompts)
 
     _write_config(config, config_file)
 
     click.echo("Configuration saved.")
-
-
-def _config_create(config_file, profile, ask_full):
-    """`dwave config create` helper.
-
-    Default flow
-    ---
-
-    ::
-
-        $ dwave config create
-        Using configuration file: /path/to/dwave.conf
-        Authentication token: DEV-...
-        Configuration saved.
-
-    The generated config file looks like this::
-
-        [defaults]
-        token = DEV-...
-
-    Default flow, with custom config file and/or profile
-    ---
-
-    ::
-
-        $ dwave config create --config-file dwave.conf --profile test
-        Using configuration file: ./dwave.conf
-        Using profile: test
-        Authentication token: DEV-...
-        Configuration saved.
-
-    The generated config file looks like this::
-
-        [test]
-        token = DEV-...
-
-    Full/advanced flow
-    ---
-
-    ::
-
-        $ dwave config create --full
-        Using configuration file: /path/to/dwave.conf
-        Profile (create new or choose from: defaults, prod) [defaults]:
-        Solver API endpoint URL: ...
-        Authentication token: ...
-        Client class: ...
-        Solver: ...
-
-    """
-    if ask_full:
-        return _config_create_full(config_file, profile)
-    else:
-        return _config_create_simple(config_file, profile)
 
 
 def _ping(config_file, profile, client_type, solver_def, sampling_params,
