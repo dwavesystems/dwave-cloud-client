@@ -125,11 +125,11 @@ def qpu_clique_solver_data(size: int, **kwargs) -> dict:
     couplers = list(itertools.combinations(range(len(qubits)), 2))
 
     params = dict(
-        id="dw_{}q_mock".format(size),
-        description="A {}-qubit clique mock QPU solver".format(size),
+        id=f"clique_{size}q_mock",
+        description=f"A {size}-qubit mock QPU solver with clique topology",
         qubits=qubits,
         couplers=couplers,
-        topology={"type": "clique"},
+        topology={"type": "clique", "shape": [size]},
     )
     params.update(**kwargs)
 
@@ -144,7 +144,8 @@ def qpu_chimera_solver_data(m: int,
 
     Args:
         m:
-            Number of rows in the Chimera lattice.
+            Number of rows in the Chimera lattice. See
+            :func:`~dwave_networkx.generators.chimera_graph` for details.
         n:
             Number of columns in the Chimera lattice.
         t:
@@ -159,12 +160,16 @@ def qpu_chimera_solver_data(m: int,
                            "Install with 'dwave-cloud-client[mocks]'.")
 
     graph = dnx.chimera_graph(m, n, t)
+    # we need generated graph's values, so we can set topology.shape
+    m = graph.graph['rows']
+    n = graph.graph['columns']
+    t = graph.graph['tile']
     qubits = list(graph.nodes)
     couplers = list(graph.edges)
     num_qubits = len(qubits)
 
     params = dict(
-        id=f"dw_{num_qubits}q_mock",
+        id=f"chimera_{num_qubits}q_mock",
         description=f"A {num_qubits}-qubit mock QPU solver with chimera topology",
         qubits=qubits,
         couplers=couplers,
@@ -176,14 +181,23 @@ def qpu_chimera_solver_data(m: int,
 
 
 def qpu_pegasus_solver_data(m: int,
+                            fabric_only: bool = True,
                             **kwargs) -> dict:
     """Mock QPU solver data with a custom-sized Pegasus topology.
 
     Args:
         m:
             Size parameter for the Pegasus lattice.
+        fabric_only:
+            Use only nodes from the largest Pegasus graph component. See
+            :func:`~dwave_networkx.generators.pegasus_graph` for details.
         **kwargs:
             Solver properties passed down to :meth:`.structured_solver_data`.
+
+    Note:
+        By default, with ``fabric_only=True``, only a subset of Pegasus graph
+        is used (fabric qubits only), hence num_active_qubits will be less than
+        num_qubits.
     """
     try:
         import dwave_networkx as dnx
@@ -191,17 +205,18 @@ def qpu_pegasus_solver_data(m: int,
         raise RuntimeError("Can't generate Pegasus graph without dwave-networkx. "
                            "Install with 'dwave-cloud-client[mocks]'.")
 
-    graph = dnx.pegasus_graph(m, fabric_only=False)
+    graph = dnx.pegasus_graph(m, fabric_only=fabric_only)
     qubits = list(graph.nodes)
     couplers = list(graph.edges)
-    num_qubits = len(qubits)
+    num_qubits = 24 * m * (m-1)     # includes non-fabric qubits
 
     params = dict(
-        id=f"dw_{num_qubits}q_mock",
+        id=f"pegasus_{num_qubits}q_mock",
         description=f"A {num_qubits}-qubit mock QPU solver with pegasus topology",
         qubits=qubits,
         couplers=couplers,
         topology={"type": "pegasus", "shape": [m]},
+        num_qubits=num_qubits,
     )
     params.update(**kwargs)
 
