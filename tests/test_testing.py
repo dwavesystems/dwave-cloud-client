@@ -181,6 +181,19 @@ class TestSolverDataMocks(unittest.TestCase):
         self.assertEqual(set(nodes), set(range(num_qubits)))
         self.assertEqual(len(nx.find_cycle(nx.Graph(edges))), num_qubits)
 
+    @unittest.skipUnless(dimod, "dimod not installed")
+    def test_qpu_pegasus_solver_data(self):
+        m = 2
+        num_qubits = 24 * m * (m-1)     # includes non-fabric qubits
+        num_edges = 12 * (15 * (m-1)^2 + m - 3)
+        data = mocks.qpu_pegasus_solver_data(m)
+        nodes = data['properties']['qubits']
+        edges = data['properties']['couplers']
+        self.assertEqual(data['id'], f'dw_{num_qubits}q_mock')
+        self.assertEqual(data['properties']['num_qubits'], num_qubits)
+        self.assertEqual(set(nodes), set(range(num_qubits)))
+        self.assertEqual(len(set(edges)), num_edges)
+
     def test_unstructured_solver_data(self):
         data = mocks.unstructured_solver_data()
         self.assertEqual(data['properties']['category'], 'hybrid')

@@ -20,6 +20,7 @@ from typing import List, Tuple, Optional
 __all__ = [
     'solver_configuration_data',
     'structured_solver_data', 'qpu_clique_solver_data',
+    'qpu_chimera_solver_data', 'qpu_pegasus_solver_data',
     'unstructured_solver_data', 'hybrid_bqm_solver_data', 'hybrid_dqm_solver_data',
 ]
 
@@ -153,7 +154,7 @@ def qpu_chimera_solver_data(m: int,
     """
     try:
         import dwave_networkx as dnx
-    except ImportError:
+    except ImportError:     # pragma: no cover
         raise RuntimeError("Can't generate Chimera graph without dwave-networkx. "
                            "Install with 'dwave-cloud-client[mocks]'.")
 
@@ -168,6 +169,39 @@ def qpu_chimera_solver_data(m: int,
         qubits=qubits,
         couplers=couplers,
         topology={"type": "chimera", "shape": [m, n, t]},
+    )
+    params.update(**kwargs)
+
+    return structured_solver_data(**params)
+
+
+def qpu_pegasus_solver_data(m: int,
+                            **kwargs) -> dict:
+    """Mock QPU solver data with a custom-sized Pegasus topology.
+
+    Args:
+        m:
+            Size parameter for the Pegasus lattice.
+        **kwargs:
+            Solver properties passed down to :meth:`.structured_solver_data`.
+    """
+    try:
+        import dwave_networkx as dnx
+    except ImportError:     # pragma: no cover
+        raise RuntimeError("Can't generate Pegasus graph without dwave-networkx. "
+                           "Install with 'dwave-cloud-client[mocks]'.")
+
+    graph = dnx.pegasus_graph(m, fabric_only=False)
+    qubits = list(graph.nodes)
+    couplers = list(graph.edges)
+    num_qubits = len(qubits)
+
+    params = dict(
+        id=f"dw_{num_qubits}q_mock",
+        description=f"A {num_qubits}-qubit mock QPU solver with pegasus topology",
+        qubits=qubits,
+        couplers=couplers,
+        topology={"type": "pegasus", "shape": [m]},
     )
     params.update(**kwargs)
 
