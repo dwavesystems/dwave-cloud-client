@@ -31,6 +31,9 @@ extras_require = {
 
     # dqm support
     'dqm': ['dimod>=0.9.7,<0.11,!=0.10.0,!=0.10.1,!=0.10.2,!=0.10.3,!=0.10.4', 'numpy>=1.16'],
+
+    # testing mocks
+    'mocks': ['dwave-networkx>=0.8.9'],
 }
 
 # Packages provided. Only include packages under the 'dwave' namespace.

@@ -17,6 +17,13 @@ import uuid
 import unittest
 from unittest import mock
 
+import networkx as nx
+
+try:
+    import dimod
+except ImportError:
+    dimod = None
+
 from dwave.cloud.testing import isolated_environ, iterable_mock_open, mocks
 
 
@@ -157,9 +164,35 @@ class TestSolverDataMocks(unittest.TestCase):
     def test_qpu_clique_solver_data(self):
         n = 3
         data = mocks.qpu_clique_solver_data(n)
-        self.assertEqual(data['id'], 'dw_{}q_mock'.format(n))
+        self.assertEqual(data['id'], 'clique_{}q_mock'.format(n))
         self.assertEqual(data['properties']['num_qubits'], n)
-        self.assertListEqual(data['properties']['qubits'], list(range(n)))
+        self.assertEqual(data['properties']['qubits'], list(range(n)))
+
+    @unittest.skipUnless(dimod, "dimod not installed")
+    def test_qpu_chimera_solver_data(self):
+        # 2 x 2 chimera tiles of 1-1 bipartite graphs, overall forming a cycle over 8 qubits
+        m, n, t = 2, 2, 1
+        num_qubits = m * n * 2 * t
+        data = mocks.qpu_chimera_solver_data(m, n, t)
+        nodes = data['properties']['qubits']
+        edges = data['properties']['couplers']
+        self.assertEqual(data['id'], f'chimera_{num_qubits}q_mock')
+        self.assertEqual(data['properties']['num_qubits'], num_qubits)
+        self.assertEqual(set(nodes), set(range(num_qubits)))
+        self.assertEqual(len(nx.find_cycle(nx.Graph(edges))), num_qubits)
+
+    @unittest.skipUnless(dimod, "dimod not installed")
+    def test_qpu_pegasus_solver_data(self):
+        m = 2
+        num_qubits = 24 * m * (m-1)     # includes non-fabric qubits
+        num_edges = 12 * (15 * (m-1)^2 + m - 3)
+        data = mocks.qpu_pegasus_solver_data(m)
+        nodes = data['properties']['qubits']
+        edges = data['properties']['couplers']
+        self.assertEqual(data['id'], f'pegasus_{num_qubits}q_mock')
+        self.assertEqual(data['properties']['num_qubits'], num_qubits)
+        self.assertLessEqual(len(nodes), num_qubits)
+        self.assertLessEqual(len(edges), num_edges)
 
     def test_unstructured_solver_data(self):
         data = mocks.unstructured_solver_data()
