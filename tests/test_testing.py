@@ -17,6 +17,13 @@ import uuid
 import unittest
 from unittest import mock
 
+import networkx as nx
+
+try:
+    import dimod
+except ImportError:
+    dimod = None
+
 from dwave.cloud.testing import isolated_environ, iterable_mock_open, mocks
 
 
@@ -159,7 +166,20 @@ class TestSolverDataMocks(unittest.TestCase):
         data = mocks.qpu_clique_solver_data(n)
         self.assertEqual(data['id'], 'dw_{}q_mock'.format(n))
         self.assertEqual(data['properties']['num_qubits'], n)
-        self.assertListEqual(data['properties']['qubits'], list(range(n)))
+        self.assertEqual(data['properties']['qubits'], list(range(n)))
+
+    @unittest.skipUnless(dimod, "dimod not installed")
+    def test_qpu_chimera_solver_data(self):
+        # 2 x 2 chimera tiles of 1-1 bipartite graphs, overall forming a cycle over 8 qubits
+        m, n, t = (2, 2, 1)
+        num_qubits = m * n * 2 * t
+        data = mocks.qpu_chimera_solver_data(m, n, t)
+        nodes = data['properties']['qubits']
+        edges = data['properties']['couplers']
+        self.assertEqual(data['id'], f'dw_{num_qubits}q_mock')
+        self.assertEqual(data['properties']['num_qubits'], num_qubits)
+        self.assertEqual(set(nodes), set(range(num_qubits)))
+        self.assertEqual(len(nx.find_cycle(nx.Graph(edges))), num_qubits)
 
     def test_unstructured_solver_data(self):
         data = mocks.unstructured_solver_data()
