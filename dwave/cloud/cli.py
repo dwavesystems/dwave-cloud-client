@@ -256,7 +256,8 @@ def _config_create(config_file, profile, ask_full=False):
         if not config_file:
             config_file = get_default_configfile_path()
 
-    verb = "Updating existing" if os.path.exists(config_file) else "Creating new"
+    config_file_exists = os.path.exists(config_file)
+    verb = "Updating existing" if config_file_exists else "Creating new"
     click.echo(f"{verb} configuration file: {config_file}")
 
     if ask_full and ask_to_confirm_config_path:
@@ -269,13 +270,14 @@ def _config_create(config_file, profile, ask_full=False):
     # resolve profile
     if not profile:
         existing = config.sections()
-        if existing:
-            if default_section in config:
-                existing.insert(0, default_section)
-            click.echo(f"Found profiles: {', '.join(existing)}.")
+        if default_section in config:   # not included in sections
+            existing.insert(0, default_section)
+        if config_file_exists:
+            click.echo(f"Available profiles: {', '.join(existing)}")
         default_profile = next(iter(existing))
 
-        profile = default_text_input(f"Profile (select existing or create new)", default_profile)
+        _note = " (select existing or create new)" if config_file_exists else ""
+        profile = default_text_input(f"Profile{_note}", default_profile)
 
     verb = "Updating existing" if profile in config else "Creating new"
     click.echo(f"{verb} profile: {profile}")
