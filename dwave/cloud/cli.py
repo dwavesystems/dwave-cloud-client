@@ -85,23 +85,28 @@ CONFIG_FILE_DEPRECATION_MSG = (
     "in favor of '-f' and it will be removed in 0.10.0")
 
 
-def config_file_options(fn):
-    """Decorate `fn` with `--config-file` and `--profile` options."""
+def config_file_options(exists=True):
+    """Decorate `fn` with `--config-file` and `--profile` options.
 
-    fn = click.option(
-        '--config-file', '-f', default=None, is_eager=True,
-        type=click.Path(exists=True, dir_okay=False),
-        help='Configuration file path')(fn)
-    fn = click.option(
-        '-c', default=None, expose_value=False,
-        type=click.Path(exists=True, dir_okay=False),
-        help="[Deprecated in favor of '-f']",
-        callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))(fn)
-    fn = click.option(
-        '--profile', '-p', default=None,
-        help='Connection profile (section) name')(fn)
+    Optionally skip existency check by click with `exist=False`.
+    """
 
-    return fn
+    def decorator(fn):
+        fn = click.option(
+            '--config-file', '-f', default=None, is_eager=True,
+            type=click.Path(exists=exists, dir_okay=False),
+            help='Configuration file path')(fn)
+        fn = click.option(
+            '-c', default=None, expose_value=False,
+            type=click.Path(exists=exists, dir_okay=False),
+            help="[Deprecated in favor of '-f']",
+            callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))(fn)
+        fn = click.option(
+            '--profile', '-p', default=None,
+            help='Connection profile (section) name')(fn)
+        return fn
+
+    return decorator
 
 
 def solver_options(fn):
@@ -159,7 +164,7 @@ def ls(system, user, local, include_missing):
 
 
 @config.command()
-@config_file_options
+@config_file_options()
 def inspect(config_file, profile):
     """Inspect existing configuration/profile."""
 
@@ -178,7 +183,7 @@ def inspect(config_file, profile):
 
 
 @config.command()
-@config_file_options
+@config_file_options(exists=False)
 @click.option('--full', 'ask_full', is_flag=True,
               help='Configure non-essential options (like endpoint and solver).')
 def create(config_file, profile, ask_full):
@@ -383,7 +388,7 @@ def _ping(config_file, profile, client_type, solver_def, sampling_params,
 
 
 @cli.command()
-@config_file_options
+@config_file_options()
 @solver_options
 @click.option('--sampling-params', '-m', default=None, help='Sampling parameters (JSON encoded)')
 @click.option('--request-timeout', default=None, type=float,
@@ -422,7 +427,7 @@ def ping(config_file, profile, client_type, solver_def, sampling_params, json_ou
 
 
 @cli.command()
-@config_file_options
+@config_file_options()
 @solver_options
 @click.option('--list', '-l', 'list_solvers', default=False, is_flag=True,
               help='Print filtered list of solver names, one per line')
@@ -471,7 +476,7 @@ def solvers(config_file, profile, client_type, solver_def, list_solvers, list_al
 
 
 @cli.command()
-@config_file_options
+@config_file_options()
 @solver_options
 @click.option('--biases', '-h', default=None,
               help='List/dict of biases for Ising model problem formulation')
@@ -551,7 +556,7 @@ def sample(config_file, profile, client_type, solver_def, biases, couplings,
 
 
 @cli.command()
-@config_file_options
+@config_file_options()
 @solver_options
 @click.option('--problem-id', '-i', default=None,
               help='Problem ID (optional)')
