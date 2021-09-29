@@ -22,6 +22,9 @@ import pkg_resources
 from functools import partial
 from timeit import default_timer as timer
 
+from typing import Dict
+from configparser import ConfigParser
+
 import click
 import requests.exceptions
 
@@ -82,23 +85,28 @@ CONFIG_FILE_DEPRECATION_MSG = (
     "in favor of '-f' and it will be removed in 0.10.0")
 
 
-def config_file_options(fn):
-    """Decorate `fn` with `--config-file` and `--profile` options."""
+def config_file_options(exists=True):
+    """Decorate `fn` with `--config-file` and `--profile` options.
 
-    fn = click.option(
-        '--config-file', '-f', default=None, is_eager=True,
-        type=click.Path(exists=True, dir_okay=False),
-        help='Configuration file path')(fn)
-    fn = click.option(
-        '-c', default=None, expose_value=False,
-        type=click.Path(exists=True, dir_okay=False),
-        help="[Deprecated in favor of '-f']",
-        callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))(fn)
-    fn = click.option(
-        '--profile', '-p', default=None,
-        help='Connection profile (section) name')(fn)
+    Optionally skip existency check by click with `exists=False`.
+    """
 
-    return fn
+    def decorator(fn):
+        fn = click.option(
+            '--config-file', '-f', default=None, is_eager=True,
+            type=click.Path(exists=exists, dir_okay=False),
+            help='Configuration file path')(fn)
+        fn = click.option(
+            '-c', default=None, expose_value=False,
+            type=click.Path(exists=exists, dir_okay=False),
+            help="[Deprecated in favor of '-f']",
+            callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))(fn)
+        fn = click.option(
+            '--profile', '-p', default=None,
+            help='Connection profile (section) name')(fn)
+        return fn
+
+    return decorator
 
 
 def solver_options(fn):
@@ -156,7 +164,7 @@ def ls(system, user, local, include_missing):
 
 
 @config.command()
-@config_file_options
+@config_file_options()
 def inspect(config_file, profile):
     """Inspect existing configuration/profile."""
 
@@ -175,84 +183,118 @@ def inspect(config_file, profile):
 
 
 @config.command()
-@config_file_options
-def create(config_file, profile):
-    """Create and/or update cloud client configuration file."""
-    return _config_create(config_file, profile)
+@config_file_options(exists=False)
+@click.option('--full', 'ask_full', is_flag=True,
+              help='Configure non-essential options (such as endpoint and solver).')
+def create(config_file, profile, ask_full):
+    """Create or update cloud client configuration file."""
 
-
-def _config_create(config_file, profile):
-    """`dwave config create` helper."""
-
-    # determine the config file path
-    if config_file:
-        click.echo("Using configuration file: {}".format(config_file))
-    else:
-        # path not given, try to detect; or use default, but allow user to override
-        config_file = get_configfile_path()
-        if config_file:
-            click.echo("Found existing configuration file: {}".format(config_file))
-        else:
-            config_file = get_default_configfile_path()
-            click.echo("Configuration file not found; the default location is: {}".format(config_file))
-        config_file = default_text_input("Configuration file path", config_file)
-        config_file = os.path.expanduser(config_file)
-
-    # create config_file path
-    config_base = os.path.dirname(config_file)
-    if config_base and not os.path.exists(config_base):
-        if click.confirm("Configuration file path does not exist. Create it?", abort=True):
-            try:
-                os.makedirs(config_base)
-            except Exception as e:
-                click.echo("Error creating configuration path: {}".format(e))
-                return 1
-
-    # try loading existing config, or use defaults
     try:
-        config = load_config_from_files([config_file])
-    except:
-        config = get_default_config()
+        _config_create(config_file, profile, ask_full)
+    except CLIError as error:
+        click.echo(f"Error: {error!s} (code: {error.code})")
+        sys.exit(error.code)
+    except Exception as error:
+        click.echo(f"Unhandled error: {error!s}")
+        sys.exit(127)
 
-    # determine profile
-    if profile:
-        click.echo("Using profile: {}".format(profile))
-    else:
-        existing = config.sections()
-        if existing:
-            profiles = 'create new or choose from: {}'.format(', '.join(existing))
-            default_profile = ''
-        else:
-            profiles = 'create new'
-            default_profile = 'prod'
-        profile = default_text_input("Profile (%s)" % profiles, default_profile, optional=False)
 
-    if not config.has_section(profile):
-        config.add_section(profile)
+def _input_config_variables(config: ConfigParser,
+                            profile: str,
+                            prompts: Dict[str, str]) -> ConfigParser:
+    """Update config variables in place with user-provided values."""
 
-    # fill out the profile variables
-    variables = 'endpoint token client solver proxy'.split()
-    prompts = ['API endpoint URL',
-               'Authentication token',
-               'Default client class',
-               'Default solver']
-    for var, prompt in zip(variables, prompts):
+    for var, prompt in prompts.items():
         default_val = config.get(profile, var, fallback=None)
         val = default_text_input(prompt, default_val)
         if val:
             val = os.path.expandvars(val)
         if val != default_val:
             config.set(profile, var, val)
+    return config
+
+def _load_config(config_file: str) -> ConfigParser:
+    """Load from config_file, or create new with defaults."""
+
+    try:
+        return load_config_from_files([config_file])
+    except:
+        return get_default_config()
+
+def _write_config(config: ConfigParser, config_file: str):
+    """Write config to config_file."""
+
+    config_base = os.path.dirname(config_file)
+    if config_base and not os.path.exists(config_base):
+        try:
+            os.makedirs(config_base)
+        except Exception as e:
+            raise CLIError(f"Error creating configuration path: {e!r}", code=1)
 
     try:
         with open(config_file, 'w') as fp:
             config.write(fp)
     except Exception as e:
-        click.echo("Error writing to configuration file: {}".format(e))
-        return 2
+        raise CLIError(f"Error writing to configuration file: {e!r}", code=2)
+
+def _config_create(config_file, profile, ask_full=False):
+    """Full/simplified dwave create flows."""
+
+    if ask_full:
+        prompts = dict(
+            endpoint="Solver API endpoint URL",
+            token="Authentication token",
+            client="Client class",
+            solver="Solver")
+
+    else:
+        prompts = dict(
+            token="Authentication token")
+
+        click.echo("Using the simplified configuration flow.\n"
+                   "Try 'dwave config create --full' for more options.\n")
+
+    # resolve config file path
+    ask_to_confirm_config_path = not config_file
+    if not config_file:
+        config_file = get_configfile_path()
+        if not config_file:
+            config_file = get_default_configfile_path()
+
+    config_file_exists = os.path.exists(config_file)
+    verb = "Updating existing" if config_file_exists else "Creating new"
+    click.echo(f"{verb} configuration file: {config_file}")
+
+    if ask_full and ask_to_confirm_config_path:
+        config_file = default_text_input("Confirm configuration file path", config_file)
+        config_file = os.path.expanduser(config_file)
+
+    config = _load_config(config_file)
+    default_section = config.default_section
+
+    # resolve profile
+    if not profile:
+        existing = config.sections()
+        if default_section in config:   # not included in sections
+            existing.insert(0, default_section)
+        if config_file_exists:
+            click.echo(f"Available profiles: {', '.join(existing)}")
+        default_profile = next(iter(existing))
+
+        _note = " (select existing or create new)" if config_file_exists else ""
+        profile = default_text_input(f"Profile{_note}", default_profile)
+
+    verb = "Updating existing" if profile in config else "Creating new"
+    click.echo(f"{verb} profile: {profile}")
+
+    if profile != default_section and not config.has_section(profile):
+        config.add_section(profile)
+
+    _input_config_variables(config, profile, prompts)
+
+    _write_config(config, config_file)
 
     click.echo("Configuration saved.")
-    return 0
 
 
 def _ping(config_file, profile, client_type, solver_def, sampling_params,
@@ -346,7 +388,7 @@ def _ping(config_file, profile, client_type, solver_def, sampling_params,
 
 
 @cli.command()
-@config_file_options
+@config_file_options()
 @solver_options
 @click.option('--sampling-params', '-m', default=None, help='Sampling parameters (JSON encoded)')
 @click.option('--request-timeout', default=None, type=float,
@@ -385,7 +427,7 @@ def ping(config_file, profile, client_type, solver_def, sampling_params, json_ou
 
 
 @cli.command()
-@config_file_options
+@config_file_options()
 @solver_options
 @click.option('--list', '-l', 'list_solvers', default=False, is_flag=True,
               help='Print filtered list of solver names, one per line')
@@ -434,7 +476,7 @@ def solvers(config_file, profile, client_type, solver_def, list_solvers, list_al
 
 
 @cli.command()
-@config_file_options
+@config_file_options()
 @solver_options
 @click.option('--biases', '-h', default=None,
               help='List/dict of biases for Ising model problem formulation')
@@ -514,7 +556,7 @@ def sample(config_file, profile, client_type, solver_def, biases, couplings,
 
 
 @cli.command()
-@config_file_options
+@config_file_options()
 @solver_options
 @click.option('--problem-id', '-i', default=None,
               help='Problem ID (optional)')
@@ -753,4 +795,4 @@ def setup(install_all, verbose):
             _install_contrib_package(pkg, verbose=verbose, prompt=not install_all)
 
     click.echo("Creating the D-Wave configuration file.")
-    return _config_create(config_file=None, profile=None)
+    return _config_create(config_file=None, profile=None, ask_full=False)

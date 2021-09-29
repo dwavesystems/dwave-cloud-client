@@ -1,0 +1,22 @@
+---
+features:
+  - |
+    Default ``dwave config create`` configuration flow is now simplified to
+    prompt only for essential parameters (at the moment that's only ``token``).
+
+    Interactive configuration of an extended set of non-essential parameters
+    (i.e. the previous default) is now available via a new flag: ``--full``.
+
+    See `#304 <https://github.com/dwavesystems/dwave-cloud-client/issues/304>`_
+fixes:
+  - |
+    When a path to a nonexistent config file is provided to
+    ``dwave config create``, we'll now happily create that file, instead of
+    failing.
+upgrade:
+  - |
+    To configure non-essential parameters such as ``endpoint``, ``client``
+    and ``solver``, configuration create command now has to be called with
+    the ``--full`` option::
+
+      dwave config create --full

@@ -35,28 +35,87 @@ def touch(path):
         os.utime(path, None)
 
 
-class TestCli(unittest.TestCase):
+class TestConfigCreate(unittest.TestCase):
 
-    def test_config_create(self):
-        config_file = 'dwave.conf'
+    @parameterized.expand([
+        ("simple", [], ["token"]),
+        ("full", ["--full"], "endpoint token client solver".split()),
+    ])
+    def test_create(self, name, extra_opts, inputs):
+        config_file = 'path/to/dwave.conf'
         profile = 'profile'
-        values = 'endpoint token client solver'.split()
 
         runner = CliRunner(mix_stderr=False)
         with runner.isolated_filesystem():
-            # create config file through simulated user input in `dwave configure`
-            touch(config_file)
-            with mock.patch("dwave.cloud.utils.input", side_effect=values):
+            with mock.patch("dwave.cloud.utils.input", side_effect=inputs):
                 result = runner.invoke(cli, [
                     'config', 'create', '--config-file', config_file, '--profile', profile
-                ], input='\n'.join(values))
+                ] + extra_opts, input='\n'.join(inputs))
                 self.assertEqual(result.exit_code, 0)
 
             # load and verify config
             with isolated_environ(remove_dwave=True):
                 config = load_config(config_file, profile=profile)
-                for val in values:
+                for val in inputs:
                     self.assertEqual(config.get(val), val)
+
+    @parameterized.expand([
+        ("simple", [], ["", "token"]),
+        ("full", ["--full"], ["", ""] + "endpoint token client solver".split()),
+    ])
+    def test_default_flows(self, name, extra_opts, inputs):
+        runner = CliRunner(mix_stderr=False)
+        with runner.isolated_filesystem():
+            with mock.patch("dwave.cloud.config.get_configfile_paths", lambda: ['dwave.conf']):
+                with mock.patch("dwave.cloud.utils.input", side_effect=inputs):
+                    result = runner.invoke(cli, [
+                        'config', 'create'
+                    ] + extra_opts, input='\n'.join(inputs))
+                    self.assertEqual(result.exit_code, 0)
+
+                # load and verify config
+                with isolated_environ(remove_dwave=True):
+                    config = load_config()
+                    for val in inputs:
+                        if val:   # skip empty default confirmations
+                            self.assertEqual(config.get(val), val)
+
+    @parameterized.expand([
+        ("simple", [], ["token"]),
+        ("full", ["--full"], "endpoint token client solver".split()),
+    ])
+    def test_update(self, name, extra_opts, inputs):
+        config_file = 'dwave.conf'
+        profile = 'profile'
+
+        runner = CliRunner(mix_stderr=False)
+        with runner.isolated_filesystem():
+            # create config
+            config_body = '\n'.join(f"{v} = old-{v}" for v in inputs)
+            with open(config_file, 'w') as fp:
+                fp.write(f"[{profile}]\n{config_body}")
+
+            # verify config before update
+            with isolated_environ(remove_dwave=True):
+                config = load_config(config_file=config_file)
+                for val in inputs:
+                    self.assertEqual(config.get(val), f"old-{val}")
+
+            # update config
+            with mock.patch("dwave.cloud.utils.input", side_effect=inputs):
+                result = runner.invoke(cli, [
+                    'config', 'create', '-f', config_file, '-p', profile,
+                ] + extra_opts, input='\n'.join(inputs))
+                self.assertEqual(result.exit_code, 0)
+
+            # verify config updated
+            with isolated_environ(remove_dwave=True):
+                config = load_config(config_file=config_file)
+                for val in inputs:
+                    self.assertEqual(config.get(val), val)
+
+
+class TestCli(unittest.TestCase):
 
     def test_config_ls(self):
         runner = CliRunner(mix_stderr=False)
