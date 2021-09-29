@@ -88,7 +88,7 @@ CONFIG_FILE_DEPRECATION_MSG = (
 def config_file_options(exists=True):
     """Decorate `fn` with `--config-file` and `--profile` options.
 
-    Optionally skip existency check by click with `exist=False`.
+    Optionally skip existency check by click with `exists=False`.
     """
 
     def decorator(fn):
@@ -185,7 +185,7 @@ def inspect(config_file, profile):
 @config.command()
 @config_file_options(exists=False)
 @click.option('--full', 'ask_full', is_flag=True,
-              help='Configure non-essential options (like endpoint and solver).')
+              help='Configure non-essential options (such as endpoint and solver).')
 def create(config_file, profile, ask_full):
     """Create or update cloud client configuration file."""
 
@@ -795,4 +795,4 @@ def setup(install_all, verbose):
             _install_contrib_package(pkg, verbose=verbose, prompt=not install_all)
 
     click.echo("Creating the D-Wave configuration file.")
-    return _config_create(config_file=None, profile=None)
+    return _config_create(config_file=None, profile=None, ask_full=False)
