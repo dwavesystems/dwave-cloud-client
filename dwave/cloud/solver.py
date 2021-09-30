@@ -31,7 +31,8 @@ You can list all solvers available to a :class:`~dwave.cloud.client.Client` with
 import json
 import logging
 import warnings
-from collections import abc
+from collections.abc import Iterable, Mapping
+from typing import Tuple
 
 from dwave.cloud.exceptions import *
 from dwave.cloud.coders import (
@@ -955,7 +956,7 @@ class StructuredSolver(BaseSolver):
             # that they match because lin can be either a list or a dict. In the future it would be
             # good to check.
             initial_state = params['initial_state']
-            if isinstance(initial_state, abc.Mapping):
+            if isinstance(initial_state, Mapping):
 
                 initial_state_list = [3]*self.properties['num_qubits']
 
@@ -983,7 +984,7 @@ class StructuredSolver(BaseSolver):
                 Quadratic terms of the model (J).
 
         Returns:
-            boolean
+            bool
 
         Examples:
             This example creates a client using the local system's default D-Wave Cloud Client
@@ -1005,13 +1006,11 @@ class StructuredSolver(BaseSolver):
             False
             True
         """
-        for key, value in uniform_iterator(linear):
-            if value != 0 and key not in self.nodes:
-                return False
-        for key, value in uniform_iterator(quadratic):
-            if value != 0 and tuple(key) not in self.edges:
-                return False
-        return True
+        # handle legacy format
+        if not isinstance(linear, Mapping):
+             linear = {idx: val for idx, val in enumerate(linear) if val != 0}
+
+        return self.nodes.issuperset(linear) and self.edges.issuperset(quadratic)
 
 
 # for backwards compatibility:

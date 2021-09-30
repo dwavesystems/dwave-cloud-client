@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Make ``StructuredSolver.check_problem`` faster (15-20%).
+    See `#487 <https://github.com/dwavesystems/dwave-cloud-client/issues/487>`_.
