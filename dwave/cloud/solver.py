@@ -31,10 +31,11 @@ You can list all solvers available to a :class:`~dwave.cloud.client.Client` with
 import json
 import logging
 import warnings
-from collections.abc import Iterable, Mapping
-from typing import Tuple
+from collections.abc import Mapping
 
-from dwave.cloud.exceptions import *
+from dwave.cloud.exceptions import (
+    InvalidAPIResponseError, SolverPropertyMissingError,
+    UnsupportedSolverError, ProblemStructureError)
 from dwave.cloud.coders import (
     encode_problem_as_qp, encode_problem_as_ref,
     decode_qp_numpy, decode_qp, decode_bq, bqm_as_file)
@@ -911,7 +912,8 @@ class StructuredSolver(BaseSolver):
 
         # Check the problem
         if not self.check_problem(linear, quadratic):
-            raise InvalidProblemError("Problem graph incompatible with solver.")
+            raise ProblemStructureError(
+                f"Problem graph incompatible with {self.id} solver")
 
         # Mix the new parameters with the default parameters
         combined_params = dict(self._params)

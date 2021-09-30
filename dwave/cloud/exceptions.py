@@ -82,6 +82,9 @@ class InvalidAPIResponseError(api.ResourceBadResponseError):
 class InvalidProblemError(ValueError):
     """Solver cannot handle the given binary quadratic model."""
 
+class ProblemStructureError(InvalidProblemError):   # inherit for backwards compat
+    """Problem structure incompatible with a structured solver graph."""
+
 
 class ProblemUploadError(Exception):
     """Problem multipart upload failed."""
