@@ -37,7 +37,8 @@ P16 = StructuredSolver(data=mocks.qpu_pegasus_solver_data(16), client=None)
 class TestCheckProblem(unittest.TestCase):
 
     def test_identity(self):
-        bqm = dimod.generators.ran_r(1, (self.solver.nodes, self.solver.edges))
+        # NOTE: cast to list can be removed once we drop support for dimod 0.8.x
+        bqm = dimod.generators.ran_r(1, list(self.solver.edges))
         self.assertTrue(self.solver.check_problem(bqm.linear, bqm.quadratic))
 
     def test_valid_subgraph(self):
@@ -54,11 +55,12 @@ class TestCheckProblem(unittest.TestCase):
 
     def test_supergraph(self):
         n = max(self.solver.nodes)
-        edges = list(self.solver.edges) + [(n+i, n+2*i) for i in range(10)]
+        edges = list(self.solver.edges) + [(n+i, n+2*i) for i in range(1, 10)]
         bqm = dimod.generators.ran_r(1, edges)
         self.assertFalse(self.solver.check_problem(bqm.linear, bqm.quadratic))
 
     def test_legacy_format(self):
-        bqm = dimod.generators.ran_r(1, (self.solver.nodes, self.solver.edges))
+        # NOTE: cast to list can be removed once we drop support for dimod 0.8.x
+        bqm = dimod.generators.ran_r(1, list(self.solver.edges))
         h = list(bqm.linear.values())   # h as list is still supported
         self.assertTrue(self.solver.check_problem(h, bqm.quadratic))
