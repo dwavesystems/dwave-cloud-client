@@ -278,45 +278,6 @@ class TestCli(unittest.TestCase):
 
         self.assertEqual(result.exit_code, 0)
 
-    @unittest.skipUnless(config, "No live server configuration available.")
-    def test_ping_live(self):
-        runner = CliRunner(mix_stderr=False)
-        result = runner.invoke(cli, ['ping',
-                                     '--config-file', test_config_path,
-                                     '--profile', test_config_profile])
-        self.assertEqual(result.exit_code, 0)
-
-    @unittest.skipUnless(config, "No live server configuration available.")
-    def test_ping_json_live(self):
-        runner = CliRunner(mix_stderr=False)
-        result = runner.invoke(cli, ['ping',
-                                     '--config-file', test_config_path,
-                                     '--profile', test_config_profile,
-                                     '--json'])
-
-        res = json.loads(result.output)
-        self.assertIn('timestamp', res)
-        self.assertIn('datetime', res)
-        self.assertIn('solver_id', res)
-        self.assertIn('code', res)
-        self.assertEqual(result.exit_code, 0)
-
-    @unittest.skipUnless(config, "No live server configuration available.")
-    def test_ping_json_timeout_error_live(self):
-        runner = CliRunner(mix_stderr=False)
-        result = runner.invoke(cli, ['ping',
-                                     '--config-file', test_config_path,
-                                     '--profile', test_config_profile,
-                                     '--polling-timeout', '0.00001',
-                                     '--json'])
-
-        res = json.loads(result.output)
-        self.assertIn('timestamp', res)
-        self.assertIn('datetime', res)
-        self.assertIn('code', res)
-        self.assertIn('error', res)
-        self.assertEqual(result.exit_code, 9)
-
     @parameterized.expand([
         ("--config-file", ),
         ("-f", ),
@@ -451,6 +412,62 @@ class TestCli(unittest.TestCase):
         required = ['python', 'machine', 'system', 'platform']
         for key in required:
             self.assertIn(key, result.output)
+
+
+@unittest.skipUnless(config, "No live server configuration available.")
+class TestCliLive(unittest.TestCase):
+
+    def test_ping(self):
+        runner = CliRunner(mix_stderr=False)
+        result = runner.invoke(cli, ['ping',
+                                     '--config-file', test_config_path,
+                                     '--profile', test_config_profile])
+        self.assertEqual(result.exit_code, 0)
+
+    def test_ping_json(self):
+        runner = CliRunner(mix_stderr=False)
+        result = runner.invoke(cli, ['ping',
+                                     '--config-file', test_config_path,
+                                     '--profile', test_config_profile,
+                                     '--json'])
+
+        res = json.loads(result.output)
+        self.assertIn('timestamp', res)
+        self.assertIn('datetime', res)
+        self.assertIn('solver_id', res)
+        self.assertIn('code', res)
+        self.assertEqual(result.exit_code, 0)
+
+    def test_ping_json_timeout_error(self):
+        runner = CliRunner(mix_stderr=False)
+        result = runner.invoke(cli, ['ping',
+                                     '--config-file', test_config_path,
+                                     '--profile', test_config_profile,
+                                     '--polling-timeout', '0.00001',
+                                     '--json'])
+
+        res = json.loads(result.output)
+        self.assertIn('timestamp', res)
+        self.assertIn('datetime', res)
+        self.assertIn('code', res)
+        self.assertIn('error', res)
+        self.assertEqual(result.exit_code, 9)
+
+    @parameterized.expand([
+        ("bqm", 3),
+        ("cqm", 5),
+        ("dqm", 5),
+    ])
+    def test_ping_unstructured_solver(self, problem_type, time_limit):
+        solver = json.dumps({"supported_problem_types__contains": problem_type})
+        params = json.dumps({"time_limit": time_limit})
+        runner = CliRunner(mix_stderr=False)
+        result = runner.invoke(cli, ['ping',
+                                     '--config-file', test_config_path,
+                                     '--profile', test_config_profile,
+                                     '--solver', solver,
+                                     '--sampling-params', params])
+        self.assertEqual(result.exit_code, 0)
 
 
 if __name__ == '__main__':
