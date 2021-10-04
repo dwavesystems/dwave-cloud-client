@@ -24,7 +24,7 @@ import numpy
 
 from dwave.cloud.client import Client
 from dwave.cloud.solver import (
-    BaseUnstructuredSolver, UnstructuredSolver, BQMSolver, DQMSolver)
+    BaseUnstructuredSolver, UnstructuredSolver, BQMSolver, CQMSolver, DQMSolver)
 from dwave.cloud.concurrency import Present
 
 try:
@@ -141,6 +141,51 @@ class TestUnstructuredSolver(unittest.TestCase):
                 numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
                 numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
                 numpy.testing.assert_array_equal(fut.num_occurrences, ss.record.num_occurrences)
+
+    def test_sample_cqm_smoke_test(self):
+        """Construction of and sampling from an unstructured CQM solver works."""
+
+        # construct a small 3-variable CQM of mixed vartypes
+        try:
+            import dimod
+            mixed = dimod.QM()
+            mixed.add_variable('BINARY', 'a')
+            mixed.add_variable('SPIN', 'b')
+            mixed.add_variable('INTEGER', 'c')
+            cqm = dimod.CQM()
+            cqm.set_objective(mixed)
+            cqm.add_constraint(mixed, rhs=1, sense='==')
+        except:
+            # dimod or dimod with CQM support not available, so just use a mock
+            cqm = mock.Mock()
+            cqm.to_file.return_value = io.BytesIO(b'123')
+
+        problem_type = 'cqm'
+
+        # use a global mocked session, so we can modify it on-fly
+        session = mock.Mock()
+
+        # upload is now part of submit, so we need to mock it
+        mock_problem_id = 'mock-problem-id'
+        def mock_upload(self, bqm):
+            return Present(result=mock_problem_id)
+
+        # construct a functional solver by mocking client and api response data
+        with mock.patch.multiple(Client, create_session=lambda self: session,
+                                 upload_problem_encoded=mock_upload):
+            with Client('endpoint', 'token') as client:
+                solver = CQMSolver(client, unstructured_solver_data(problem_type=problem_type))
+
+                # use bqm for mock response (for now)
+                ss = dimod.ExactSolver().sample(dimod.BQM.empty('SPIN'))
+                ss.info.update(problem_id=mock_problem_id)
+                session.post = lambda path, _: choose_reply(
+                    path, {'problems/': complete_reply(ss, id_=mock_problem_id, type_=problem_type)})
+
+                # verify decoding works
+                fut = solver.sample_cqm(cqm)
+                numpy.testing.assert_array_equal(fut.sampleset, ss)
+                numpy.testing.assert_array_equal(fut.problem_type, problem_type)
 
     def test_sample_dqm_smoke_test(self):
         """Construction of and sampling from an unstructured DQM solver works."""
