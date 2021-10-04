@@ -52,8 +52,9 @@ except ImportError:
     _numpy = False
 
 __all__ = [
-    'Solver', 'BaseSolver', 'StructuredSolver',
-    'BaseUnstructuredSolver', 'BQMSolver', 'DQMSolver', 'UnstructuredSolver',
+    'BaseSolver', 'StructuredSolver',
+    'BaseUnstructuredSolver', 'UnstructuredSolver',
+    'Solver', 'BQMSolver', 'CQMSolver', 'DQMSolver',
 ]
 
 logger = logging.getLogger(__name__)
@@ -294,7 +295,7 @@ class BaseUnstructuredSolver(BaseSolver):
             import dimod
         except ImportError: # pragma: no cover
             raise RuntimeError("Can't use unstructured solver without dimod. "
-                               "Re-install the library with 'bqm'/'dqm' support.")
+                               "Re-install the library with bqm/cqm/dqm support.")
 
         bqm = dimod.BinaryQuadraticModel.from_ising(linear, quadratic, offset)
         return self.sample_bqm(bqm, label=label, **params)
@@ -329,7 +330,7 @@ class BaseUnstructuredSolver(BaseSolver):
             import dimod
         except ImportError: # pragma: no cover
             raise RuntimeError("Can't use unstructured solver without dimod. "
-                               "Re-install the library with 'bqm'/'dqm' support.")
+                               "Re-install the library with bqm/cqm/dqm support.")
 
         bqm = dimod.BinaryQuadraticModel.from_qubo(qubo, offset)
         return self.sample_bqm(bqm, label=label, **params)
@@ -353,7 +354,7 @@ class BaseUnstructuredSolver(BaseSolver):
         Args:
             problem (dimod-model-like):
                 Quadratic model handled by the solver, for example
-                :class:`dimod.BQM` or :class:`dimod.DQM`.
+                :class:`dimod.BQM`, :class:`dimod.CQM` or :class:`dimod.DQM`.
 
         Returns:
             :class:`concurrent.futures.Future`[str]:
@@ -412,7 +413,7 @@ class BaseUnstructuredSolver(BaseSolver):
 
         Args:
             problem (dimod-model-like/str):
-                A quadratic model (e.g. :class:`dimod.BQM`/:class:`dimod.DQM`),
+                A quadratic model (e.g. :class:`dimod.BQM`/:class:`dimod.CQM`/:class:`dimod.DQM`),
                 or a reference to one (Problem ID returned by
                 :meth:`.upload_problem` method).
 
@@ -563,6 +564,7 @@ class DQMSolver(BaseUnstructuredSolver):
         return data
 
     def sample_bqm(self, bqm, label=None, **params):
+        """Use for testing."""
         from dwave.cloud.utils import bqm_to_dqm
 
         # to sample BQM problems, we need to convert them to DQM
@@ -615,6 +617,97 @@ class DQMSolver(BaseUnstructuredSolver):
             To use this method, dimod package has to be installed.
         """
         return self.upload_problem(dqm)
+
+
+class CQMSolver(BaseUnstructuredSolver):
+    """Class for D-Wave unstructured constrained quadratic model solvers.
+
+    This class provides a :term:`CQM` sampling method and encapsulates the
+    solver description returned from the D-Wave cloud API.
+
+    Args:
+        client (:class:`~dwave.cloud.client.Client`):
+            Client that manages access to this solver.
+
+        data (`dict`):
+            Data from the server describing this solver.
+
+    Note:
+        Events are not yet dispatched from unstructured solvers.
+    """
+
+    _handled_problem_types = {"cqm"}
+    _handled_encoding_formats = {"bq"}
+
+    def _encode_problem_for_upload(self, cqm):
+        try:
+            data = cqm.to_file()
+        except Exception as e:
+            logger.debug("CQM conversion to file failed with %r, "
+                         "assuming data already encoded.", e)
+            # assume `cqm` given as file, ready for upload
+            data = cqm
+
+        logger.debug("Problem encoded for upload: %r", data)
+        return data
+
+    def sample_bqm(self, bqm, label=None, **params):
+        """Use for testing."""
+        try:
+            import dimod
+        except ImportError: # pragma: no cover
+            raise RuntimeError("Can't sample from 'cqm' without dimod. "
+                               "Re-install the library with 'cqm' support.")
+
+        # to sample BQM problems, we need to set them as objective of a CQM
+        cqm = dimod.CQM.from_bqm(bqm)
+
+        return self.sample_cqm(cqm, label=label, **params)
+
+    def sample_cqm(self, cqm, label=None, **params):
+        """Sample from the specified :term:`CQM`.
+
+        Args:
+            cqm (:class:`~dimod.ConstrainedQuadraticModel`/str):
+                A constrained quadratic model, or a reference to one
+                (Problem ID returned by `.upload_cqm` method).
+
+            label (str, optional):
+                Problem label you can optionally tag submissions with for ease
+                of identification.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
+
+        Returns:
+            :class:`~dwave.cloud.computation.Future`
+
+        Note:
+            To use this method, dimod package has to be installed.
+        """
+        return self.sample_problem(cqm, label=label, **params)
+
+    def upload_cqm(self, cqm):
+        """Upload the specified :term:`CQM` to SAPI, returning a Problem ID
+        that can be used to submit the CQM to this solver (i.e. call the
+        `.sample_cqm` method).
+
+        Args:
+            cqm (:class:`~dimod.ConstrainedQuadraticModel`/bytes-like/file-like):
+                A constrained quadratic model given either as an in-memory
+                :class:`~dimod.ConstrainedQuadraticModel` object, or as raw data
+                (encoded serialized model) in either a file-like or a bytes-like
+                object.
+
+        Returns:
+            :class:`concurrent.futures.Future`[str]:
+                Problem ID in a Future. Problem ID can be used to submit
+                problems by reference.
+
+        Note:
+            To use this method, dimod package has to be installed.
+        """
+        return self.upload_problem(cqm)
 
 
 class StructuredSolver(BaseSolver):
@@ -1021,4 +1114,4 @@ UnstructuredSolver = BQMSolver
 
 # list of all available solvers, ordered according to loading attempt priority
 # (more specific first)
-available_solvers = [StructuredSolver, BQMSolver, DQMSolver]
+available_solvers = [StructuredSolver, BQMSolver, CQMSolver, DQMSolver]

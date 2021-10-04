@@ -1292,6 +1292,7 @@ class Client(object):
 
             # Handle errors in batch mode
             if 'error_code' in message and 'error_msg' in message:
+                logger.debug("Error response received: %r", message)
                 raise SolverFailureError(message['error_msg'])
 
             if 'status' not in message:

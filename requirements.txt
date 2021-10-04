@@ -10,6 +10,7 @@ dataclasses; python_version == "3.6"
 
 # optional bqm support
 # note: dqm supported in dimod>0.9.6
+# note: cqm supported in dimod>=0.10.0
 dimod>=0.10.5
 numpy>=1.16
 
