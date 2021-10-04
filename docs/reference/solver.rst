@@ -35,6 +35,16 @@ Methods
    UnstructuredSolver.sample_bqm
    UnstructuredSolver.upload_bqm
 
+   BQMSolver.sample_ising
+   BQMSolver.sample_qubo
+   BQMSolver.sample_bqm
+   BQMSolver.upload_bqm
+
+   CQMSolver.sample_cqm
+   CQMSolver.upload_cqm
+
+   DQMSolver.sample_dqm
+   DQMSolver.upload_dqm
 
 Properties
 ----------
