@@ -384,6 +384,7 @@ def _ping(config_file, profile, endpoint, region, client_type, solver_def,
 
     try:
         future = solver.sample_ising(*problem, **params)
+        output("Submitted problem ID: {problem_id}", problem_id=future.wait_id())
         timing = future.timing
     except RequestTimeout:
         raise CLIError("API connection timed out.", 8)
@@ -391,7 +392,6 @@ def _ping(config_file, profile, endpoint, region, client_type, solver_def,
         raise CLIError("Polling timeout exceeded.", 9)
     except Exception as e:
         raise CLIError("Sampling error: {!r}".format(e), 10)
-    output("Submitted problem ID: {problem_id}", problem_id=future.id)
 
     t2 = timer()
     output("\nWall clock time:")
