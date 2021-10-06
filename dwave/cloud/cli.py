@@ -567,6 +567,8 @@ def sample(config_file, profile, endpoint, region, client_type, solver_def,
 
     try:
         result = solver.sample_ising(linear, quadratic, num_reads=num_reads)
+        problem_id = result.wait_id()
+        echo(f"Submitted problem ID: {problem_id}")
         result.result()
     except Exception as e:
         click.echo(e)
