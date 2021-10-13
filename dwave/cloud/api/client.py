@@ -59,7 +59,16 @@ class LoggingSession(BaseUrlSession):
             response = super().request(method, *args, **kwargs)
 
         except Exception as exc:
-            logger.trace("[%s] request failed with %r", callee, exc)
+            logger.debug("[%s] request failed with %r", callee, exc)
+
+            if getattr(exc, 'request', None) and getattr(exc, 'response', None):
+                req = exc.request
+                res = exc.response
+                logger.trace("[%s] request=%r, response=%r", callee,
+                             dict(method=req.method, url=req.url,
+                                  headers=req.headers, body=req.body),
+                             dict(status_code=res.status_code,
+                                  headers=res.headers, text=res.text))
 
             if is_caused_by(exc, (requests.exceptions.Timeout,
                                   urllib3.exceptions.TimeoutError)):
@@ -175,7 +184,7 @@ class DWaveAPIClient:
         session.hooks['response'].append(cls._raise_for_status)
 
         # debug log
-        logger.debug("create_session from config={!r}".format(config))
+        logger.debug(f"{cls.__name__} session created using config={config!r}")
 
         return session
 
