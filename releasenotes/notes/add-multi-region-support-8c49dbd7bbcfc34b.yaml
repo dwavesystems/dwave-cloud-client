@@ -12,3 +12,7 @@ upgrade:
   - |
     To access solvers in a non-default region (na-west-1), you can use the
     ``region``/``DWAVE_API_REGION`` config option.
+  - |
+    ``dwave.cloud.config.load_config`` used to return some minimal (but
+    arbitrary) set of always-set options (set to ``None`` if undefined). Now it
+    returns just the options set either in config file, environment, or kwargs.

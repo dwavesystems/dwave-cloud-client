@@ -189,12 +189,12 @@ class TestConfigParsing(unittest.TestCase):
                         self._load_config_from_files):
 
             # don't load from file, use arg or env
-            self.assertEqual(load_config(config_file=False)['endpoint'], None)
+            self.assertNotIn('endpoint', load_config(config_file=False))
             with mock.patch.dict(os.environ, {'DWAVE_API_ENDPOINT': 'test'}):
                 self.assertEqual(load_config(config_file=False)['endpoint'], 'test')
 
             # specifying a profile doesn't affect outcome
-            self.assertEqual(load_config(config_file=False, profile='alpha')['endpoint'], None)
+            self.assertNotIn('endpoint', load_config(config_file=False, profile='alpha'))
             with mock.patch.dict(os.environ, {'DWAVE_API_ENDPOINT': 'test'}):
                 self.assertEqual(load_config(config_file=False, profile='alpha')['endpoint'], 'test')
             with mock.patch.dict(os.environ, {'DWAVE_PROFILE': 'profile'}):
