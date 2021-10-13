@@ -60,6 +60,7 @@ from itertools import chain, zip_longest
 from functools import partial, wraps, lru_cache
 from collections import abc, namedtuple, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
+from typing import Optional, Tuple
 
 import requests
 import urllib3
@@ -70,7 +71,8 @@ from dwave.cloud import api
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *    # TODO: fix
 from dwave.cloud.computation import Future
-from dwave.cloud.config import load_config, parse_float, parse_int, parse_boolean
+from dwave.cloud.config import (
+    load_config, parse_float, parse_int, parse_boolean, update_config)
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.upload import ChunkedData
@@ -341,13 +343,9 @@ class Client(object):
         """
 
         # load configuration from config file(s) and environment
-        config = load_config(config_file=config_file, profile=profile)
-        logger.debug("File/env config loaded: %r", config)
-
-        # manual config override with client constructor options
-        kwargs.update(client=client)
-        config.update({k: v for k, v in kwargs.items() if v is not None})
-        logger.debug("Code config loaded: %r", config)
+        config = load_config(config_file=config_file, profile=profile,
+                             client=client, **kwargs)
+        logger.debug("Config loaded: %r", config)
 
         from dwave.cloud.client import qpu, sw, hybrid
         _clients = {
@@ -361,7 +359,9 @@ class Client(object):
         logger.debug("Creating %s.Client() with: %r", _client, config)
         return _clients[_client](**config)
 
-    def _resolve_region_endpoint(self, *, region: str = None, endpoint: str = None):
+    def _resolve_region_endpoint(self, *,
+                                 region: Optional[str] = None,
+                                 endpoint: Optional[str] = None) -> Tuple[str, str]:
         """For a region/endpoint pair from config, return the Solver API
         endpoint to use (and the matching region).
 
@@ -381,7 +381,7 @@ class Client(object):
             regions = self.get_regions()
         except (api.exceptions.RequestError, ValueError) as exc:
             logger.warning("Failed to fetch available regions: %r. "
-                           "Using the default solver API endpoint.", exc)
+                           "Using the default Solver API endpoint.", exc)
             return (self.DEFAULT_API_REGION, self.DEFAULT_API_ENDPOINT)
 
         if region not in regions:
@@ -408,16 +408,12 @@ class Client(object):
         if defaults is None:
             defaults = {}
         self.defaults = copy.deepcopy(self.DEFAULTS)
-        self.defaults.update(**defaults)
+        update_config(self.defaults, defaults)
 
         # combine instance-level defaults with file/env/kwarg option values
         # note: treat empty string values (e.g. from file/env) as undefined/None
-        # TODO: to avoid the `first_non_empty` hack, we need to parse config
-        # values downstream (immediately after reading from file or env var)
-        first_non_empty = lambda a, b: b if a == '' or a is None else a
-        options = {}
-        for k, v in self.defaults.items():
-            options[k] = first_non_empty(kwargs.get(k), v)
+        options = copy.deepcopy(self.defaults)
+        update_config(options, kwargs)
 
         logger.debug("Client options with defaults: %r", options)
 
@@ -426,7 +422,7 @@ class Client(object):
 
         # resolve endpoint using region
         region, endpoint = self._resolve_region_endpoint(
-            region=options['region'], endpoint=options['endpoint'])
+            region=options.get('region'), endpoint=options.get('endpoint'))
 
         # sanity check
         if not endpoint:
