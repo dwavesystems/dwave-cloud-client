@@ -207,17 +207,42 @@ class ClientConstruction(unittest.TestCase):
                 self.assertNotIsInstance(client, dwave.cloud.qpu.Client)
                 self.assertNotIsInstance(client, dwave.cloud.hybrid.Client)
 
-    def test_region_selection(self):
+    def test_region_selection_over_defaults(self):
         conf = {k: k for k in 'token'.split()}
-        region = 'region-code'
-        endpoint = 'region-endpoint'
-        region_conf = {region: {"endpoint": endpoint}}
+        region_code = 'region-code'
+        region_endpoint = 'region-endpoint'
+        region_conf = {region_code: {"endpoint": region_endpoint}}
 
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with mock.patch("dwave.cloud.Client.get_regions", lambda s: region_conf):
-                with dwave.cloud.Client.from_config(region=region) as client:
-                    self.assertEqual(client.region, region)
-                    self.assertEqual(client.endpoint, endpoint)
+                with dwave.cloud.Client.from_config(region=region_code) as client:
+                    self.assertEqual(client.region, region_code)
+                    self.assertEqual(client.endpoint, region_endpoint)
+
+    def test_region_kwarg_overrides_endpoint_from_config(self):
+        conf = {k: k for k in 'endpoint token'.split()}
+        region_code = 'region-code'
+        region_endpoint = 'region-endpoint'
+        region_conf = {region_code: {"endpoint": region_endpoint}}
+
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
+            with mock.patch("dwave.cloud.Client.get_regions", lambda s: region_conf):
+                with dwave.cloud.Client.from_config(region=region_code) as client:
+                    self.assertEqual(client.region, region_code)
+                    self.assertEqual(client.endpoint, region_endpoint)
+
+    def test_region_from_env_overrides_endpoint_from_config(self):
+        conf = {k: k for k in 'endpoint token'.split()}
+        region_code = 'region-code'
+        region_endpoint = 'region-endpoint'
+        region_conf = {region_code: {"endpoint": region_endpoint}}
+
+        with isolated_environ(add={'DWAVE_API_REGION': region_code}):
+            with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
+                with mock.patch("dwave.cloud.Client.get_regions", lambda s: region_conf):
+                    with dwave.cloud.Client.from_config() as client:
+                        self.assertEqual(client.region, region_code)
+                        self.assertEqual(client.endpoint, region_endpoint)
 
     def test_client_type(self):
         conf = {k: k for k in 'endpoint token'.split()}
