@@ -80,7 +80,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(client.session.base_url, constants.DEFAULT_METADATA_API_ENDPOINT)
 
 
-class TestResponseParsing(unittest.TestCase):
+class TestRequests(unittest.TestCase):
 
     @requests_mock.Mocker()
     def test_request(self, m):
@@ -119,6 +119,31 @@ class TestResponseParsing(unittest.TestCase):
 
         self.assertEqual(client.session.get(path_a).json(), data_a)
         self.assertEqual(client.session.get(path_b).json(), data_b)
+
+    @requests_mock.Mocker()
+    def test_session_history(self, m):
+        """Session history is available."""
+
+        baseurl = 'https://test.com'
+        config = dict(endpoint=baseurl, history_size=1)
+
+        m.get(requests_mock.ANY, status_code=404)
+        m.get(f"{baseurl}/path", json=dict(data=True))
+
+        client = DWaveAPIClient(**config)
+
+        client.session.get('path')
+        self.assertEqual(client.session.history[-1].request.path_url, '/path')
+
+        with self.assertRaises(exceptions.ResourceNotFoundError):
+            client.session.get('unknown')
+            self.assertEqual(client.session.history[-1].exception.error_code, 404)
+
+        client.session.get('/path')
+        self.assertEqual(client.session.history[-1].request.path_url, '/path')
+
+
+class TestResponseParsing(unittest.TestCase):
 
     @requests_mock.Mocker()
     def test_non_json(self, m):
