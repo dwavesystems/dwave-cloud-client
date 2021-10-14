@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from collections import deque, namedtuple
 
 import requests
 import urllib3
@@ -47,16 +48,47 @@ class LazyUserAgentClassProperty:
 class LoggingSession(BaseUrlSession):
     """:class:`.BaseUrlSession` extended to unify timeout exceptions and to log
     all requests (and responses).
+
+    In addition to request logging, a history of responses, including exceptions
+    (up to `history_size`), is kept in :attr:`.history`.
     """
 
-    def request(self, method, *args, **kwargs):
+    def __init__(self, history_size: int = 0, **kwargs):
+        if not isinstance(history_size, int) or history_size < 0:
+            raise ValueError("non-negative integer value required for 'history_size'")
+
+        self.history = deque([], maxlen=history_size)
+
+        super().__init__(**kwargs)
+
+    def _request_unified(self, method: str, *args, **kwargs):
+        # timeout exceptions unified with regular request exceptions
+        try:
+            return super().request(method, *args, **kwargs)
+        except Exception as exc:
+            if is_caused_by(exc, (requests.exceptions.Timeout,
+                                  urllib3.exceptions.TimeoutError)):
+                raise exceptions.RequestTimeout(
+                    request=getattr(exc, 'request', None),
+                    response=getattr(exc, 'response', None)) from exc
+            else:
+                raise
+
+    RequestRecord = namedtuple('RequestRecord',
+                               ('request', 'response', 'exception'),
+                               defaults=(None, None))
+
+    def request(self, method: str, *args, **kwargs):
         callee = type(self).__name__
         logger.trace("[%s] request(%r, *%r, **%r)",
                      callee, method, args, kwargs)
 
-        # unify timeout exceptions
         try:
-            response = super().request(method, *args, **kwargs)
+            response = self._request_unified(method, *args, **kwargs)
+
+            rec = LoggingSession.RequestRecord(
+                request=response.request, response=response)
+            self.history.append(rec)
 
         except Exception as exc:
             logger.debug("[%s] request failed with %r", callee, exc)
@@ -70,11 +102,11 @@ class LoggingSession(BaseUrlSession):
                              dict(status_code=res.status_code,
                                   headers=res.headers, text=res.text))
 
-            if is_caused_by(exc, (requests.exceptions.Timeout,
-                                  urllib3.exceptions.TimeoutError)):
-                raise exceptions.RequestTimeout(request=req, response=res) from exc
-            else:
-                raise
+            rec = LoggingSession.RequestRecord(
+                request=req, response=res, exception=exc)
+            self.history.append(rec)
+
+            raise
 
         logger.trace("[%s] request(...) = (code=%r, body=%r)",
                      callee, response.status_code, response.text)
@@ -107,6 +139,9 @@ class DWaveAPIClient:
 
         # proxy urls, see :attr:`requests.Session.proxies`
         'proxies': None,
+
+        # number of most recent request records to keep in :attr:`.session.history`
+        'history_size': 0,
     }
 
     # client instance config, populated on init from kwargs overridding DEFAULTS
@@ -154,7 +189,8 @@ class DWaveAPIClient:
             endpoint += '/'
 
         # configure request timeout and retries
-        session = LoggingSession(base_url=endpoint)
+        history_size = config['history_size']
+        session = LoggingSession(base_url=endpoint, history_size=history_size)
         timeout = config['timeout']
         retry = config['retry']
         session.mount('http://',
