@@ -61,9 +61,9 @@ class LoggingSession(BaseUrlSession):
         except Exception as exc:
             logger.debug("[%s] request failed with %r", callee, exc)
 
-            if getattr(exc, 'request', None) and getattr(exc, 'response', None):
-                req = exc.request
-                res = exc.response
+            req = getattr(exc, 'request', None)
+            res = getattr(exc, 'response', None)
+            if req and res:
                 logger.trace("[%s] request=%r, response=%r", callee,
                              dict(method=req.method, url=req.url,
                                   headers=req.headers, body=req.body),
@@ -72,7 +72,7 @@ class LoggingSession(BaseUrlSession):
 
             if is_caused_by(exc, (requests.exceptions.Timeout,
                                   urllib3.exceptions.TimeoutError)):
-                raise exceptions.RequestTimeout from exc
+                raise exceptions.RequestTimeout(request=req, response=res) from exc
             else:
                 raise
 
