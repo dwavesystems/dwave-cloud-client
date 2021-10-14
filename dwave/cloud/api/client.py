@@ -94,11 +94,14 @@ class LoggingSession(BaseUrlSession):
             logger.debug("[%s] request failed with %r", callee, exc)
 
             req = getattr(exc, 'request', None)
-            res = getattr(exc, 'response', None)
-            if req and res:
-                logger.trace("[%s] request=%r, response=%r", callee,
+            if req:
+                logger.trace("[%s] failing request=%r", callee,
                              dict(method=req.method, url=req.url,
-                                  headers=req.headers, body=req.body),
+                                  headers=req.headers, body=req.body))
+
+            res = getattr(exc, 'response', None)
+            if res:
+                logger.trace("[%s] failing response=%r", callee,
                              dict(status_code=res.status_code,
                                   headers=res.headers, text=res.text))
 

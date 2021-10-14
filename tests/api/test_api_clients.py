@@ -102,6 +102,25 @@ class TestResponseParsing(unittest.TestCase):
         self.assertEqual(client.session.get('').json(), data)
 
     @requests_mock.Mocker()
+    def test_paths(self, m):
+        """Path translation works."""
+
+        baseurl = 'https://test.com'
+        config = dict(endpoint=baseurl)
+
+        path_a, path_b = 'a', 'b'
+        data_a, data_b = dict(answer='a'), dict(answer='b')
+
+        m.get(requests_mock.ANY, status_code=404)
+        m.get(f"{baseurl}/{path_a}", json=data_a)
+        m.get(f"{baseurl}/{path_b}", json=data_b)
+
+        client = DWaveAPIClient(**config)
+
+        self.assertEqual(client.session.get(path_a).json(), data_a)
+        self.assertEqual(client.session.get(path_b).json(), data_b)
+
+    @requests_mock.Mocker()
     def test_non_json(self, m):
         """Non-JSON OK response is unexpected."""
 
