@@ -75,8 +75,7 @@ class LoggingSession(BaseUrlSession):
                 raise
 
     RequestRecord = namedtuple('RequestRecord',
-                               ('request', 'response', 'exception'),
-                               defaults=(None, None))
+                               ('request', 'response', 'exception'))
 
     def request(self, method: str, *args, **kwargs):
         callee = type(self).__name__
@@ -87,7 +86,7 @@ class LoggingSession(BaseUrlSession):
             response = self._request_unified(method, *args, **kwargs)
 
             rec = LoggingSession.RequestRecord(
-                request=response.request, response=response)
+                request=response.request, response=response, exception=None)
             self.history.append(rec)
 
         except Exception as exc:
