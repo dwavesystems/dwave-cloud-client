@@ -179,7 +179,6 @@ class SolverLoading(unittest.TestCase):
                     self.assertRaises(SolverError, client.get_solver)
 
 
-@isolated_environ(empty=True)
 @mock.patch.multiple(Client, get_regions=get_default_regions)
 class ClientConstruction(unittest.TestCase):
     """Test Client constructor and Client.from_config() factory."""
@@ -231,6 +230,7 @@ class ClientConstruction(unittest.TestCase):
                     self.assertEqual(client.region, region_code)
                     self.assertEqual(client.endpoint, region_endpoint)
 
+    @isolated_environ(empty=True)
     def test_region_from_env_overrides_endpoint_from_config(self):
         conf = {k: k for k in 'endpoint token'.split()}
         region_code = 'region-code'
@@ -243,6 +243,15 @@ class ClientConstruction(unittest.TestCase):
                     with dwave.cloud.Client.from_config() as client:
                         self.assertEqual(client.region, region_code)
                         self.assertEqual(client.endpoint, region_endpoint)
+
+    @isolated_environ(empty=True)
+    def test_metadata_api_endpoint_from_env_accepted(self):
+        metadata_api_endpoint = 'metadata-endpoint'
+        with isolated_environ(add={'DWAVE_METADATA_API_ENDPOINT': metadata_api_endpoint}):
+            conf = {k: k for k in 'endpoint metadata_api_endpoint token'.split()}
+            with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
+                with dwave.cloud.Client.from_config() as client:
+                    self.assertEqual(client.metadata_api_endpoint, metadata_api_endpoint)
 
     def test_client_type(self):
         conf = {k: k for k in 'endpoint token'.split()}

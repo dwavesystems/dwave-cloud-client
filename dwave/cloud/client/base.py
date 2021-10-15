@@ -404,11 +404,11 @@ class Client(object):
         logger.debug("Client init called with: %r", kwargs)
 
         # derive instance-level defaults from class defaults and init defaults
-        defaults = kwargs.pop('defaults', None)
-        if defaults is None:
-            defaults = {}
         self.defaults = copy.deepcopy(self.DEFAULTS)
-        update_config(self.defaults, defaults)
+        user_defaults = kwargs.pop('defaults', None)
+        if user_defaults is None:
+            user_defaults = {}
+        update_config(self.defaults, user_defaults)
 
         # combine instance-level defaults with file/env/kwarg option values
         # note: treat empty string values (e.g. from file/env) as undefined/None

@@ -58,6 +58,8 @@ Environment variables:
 
     ``DWAVE_API_ENDPOINT``: API endpoint URL.
 
+    ``DWAVE_METADATA_API_ENDPOINT``: Metadata API endpoint URL.
+
     ``DWAVE_API_TOKEN``: API authorization token.
 
     ``DWAVE_API_SOLVER``: Default solver.
@@ -244,6 +246,7 @@ ENV_OPTION_MAP = {
     'DWAVE_API_SOLVER': 'solver',
     'DWAVE_API_PROXY': 'proxy',
     'DWAVE_API_HEADERS': 'headers',
+    'DWAVE_METADATA_API_ENDPOINT': 'metadata_api_endpoint',
 }
 """Map of environment variable names to config options."""
 
@@ -746,7 +749,7 @@ def load_config(config_file=None, profile=None, **kwargs):
     Environment variables: ``DWAVE_CONFIG_FILE``, ``DWAVE_PROFILE``,
     ``DWAVE_API_CLIENT``, ``DWAVE_API_REGION``, ``DWAVE_API_ENDPOINT``,
     ``DWAVE_API_TOKEN``, ``DWAVE_API_SOLVER``, ``DWAVE_API_PROXY``,
-    ``DWAVE_API_HEADERS``.
+    ``DWAVE_API_HEADERS``, ``DWAVE_METADATA_API_ENDPOINT``.
 
     Environment variables are described in :mod:`dwave.cloud.config`.
 

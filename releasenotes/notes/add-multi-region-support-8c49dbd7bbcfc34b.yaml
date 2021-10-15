@@ -7,7 +7,7 @@ features:
     variable is called ``DWAVE_API_REGION``.
 
     New config option for specifying Metadata API endpoint URL is exposed as
-    ``metadata_api_endpoint``.
+    ``metadata_api_endpoint`` and ``DWAVE_METADATA_API_ENDPOINT``.
 
     List of available regions available with ``dwave.cloud.Client.get_regions``.
 upgrade:
