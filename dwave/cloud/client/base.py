@@ -60,7 +60,7 @@ from itertools import chain, zip_longest
 from functools import partial, wraps, lru_cache
 from collections import abc, namedtuple, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 
 import requests
 import urllib3
@@ -603,7 +603,6 @@ class Client(object):
 
         # create http idempotent Retry config
         def get_retry_conf():
-
             # need a subclass to override the backoff_max
             class Retry(urllib3.Retry):
                 BACKOFF_MAX = self.http_retry_backoff_max
@@ -746,16 +745,15 @@ class Client(object):
 
         return data
 
-    def get_regions(self, refresh=False):
+    def get_regions(self, refresh: bool = False) -> Dict[str, Dict[str, str]]:
         """Retrieve available API regions.
 
         Args:
-            refresh (bool):
-                Set to force cache refresh.
+            refresh:
+                Force cache refresh.
 
         Returns:
-            dict[str, dict]:
-                Mapping of region details over region codes.
+            Mapping of region details (name and endpoint) over region codes.
         """
         try:
             rs = Client._fetch_available_regions(

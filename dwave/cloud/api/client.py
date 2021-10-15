@@ -117,9 +117,9 @@ class LoggingSession(BaseUrlSession):
 
 
 class DWaveAPIClient:
-    """Low-level D-Wave API client, as a thin wrapper around `requests.Session`,
-    that handles API specifics like authentication, response and error parsing,
-    retrying, etc.
+    """Low-level client for D-Wave APIs. A thin wrapper around
+    `requests.Session` that handles API specifics such as authentication,
+    response and error parsing, retrying, etc.
     """
 
     DEFAULTS = {
@@ -281,6 +281,7 @@ class DWaveAPIClient:
 
 
 class SolverAPIClient(DWaveAPIClient):
+    """Client for D-Wave's Solver API."""
 
     def __init__(self, **config):
         config.setdefault('endpoint', constants.DEFAULT_SOLVER_API_ENDPOINT)
@@ -325,6 +326,8 @@ class SolverAPIClient(DWaveAPIClient):
 
 
 class MetadataAPIClient(DWaveAPIClient):
+    """Client for D-Wave's Metadata API."""
+
     def __init__(self, **config):
         config.setdefault('endpoint', constants.DEFAULT_METADATA_API_ENDPOINT)
         super().__init__(**config)
