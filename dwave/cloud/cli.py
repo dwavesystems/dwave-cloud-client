@@ -22,7 +22,7 @@ import pkg_resources
 from functools import partial
 from timeit import default_timer as timer
 
-from typing import Dict
+from typing import Dict, List
 from configparser import ConfigParser
 
 import click
@@ -44,6 +44,7 @@ from dwave.cloud.config import (
     load_profile_from_files, load_config_from_files, get_default_config,
     get_configfile_path, get_default_configfile_path,
     get_configfile_paths)
+from dwave.cloud.api.constants import DEFAULT_METADATA_API_ENDPOINT
 
 
 def enable_logging(ctx, param, value):
@@ -201,15 +202,16 @@ def create(config_file, profile, ask_full):
 
 def _input_config_variables(config: ConfigParser,
                             profile: str,
-                            prompts: Dict[str, str]) -> ConfigParser:
+                            prompts: Dict[str, Dict[str, str]]) -> ConfigParser:
     """Update config variables in place with user-provided values."""
 
     for var, prompt in prompts.items():
         default_val = config.get(profile, var, fallback=None)
-        val = default_text_input(prompt, default_val)
+        prompt.setdefault('default', default_val)
+        val = default_text_input(**prompt)
         if val:
             val = os.path.expandvars(val)
-        if val != default_val:
+        if val and val != default_val:
             config.set(profile, var, val)
     return config
 
@@ -241,15 +243,17 @@ def _config_create(config_file, profile, ask_full=False):
     """Full/simplified dwave create flows."""
 
     if ask_full:
+        rs = Client._fetch_available_regions(DEFAULT_METADATA_API_ENDPOINT)
         prompts = dict(
-            endpoint="Solver API endpoint URL",
-            token="Authentication token",
-            client="Client class",
-            solver="Solver")
+            region=dict(prompt="Solver API region", choices=[r.code for r in rs]),
+            endpoint=dict(prompt="Solver API endpoint URL (overwrites 'region')"),
+            token=dict(prompt="Authentication token"),
+            client=dict(prompt="Client class", choices='base qpu sw hybrid'.split()),
+            solver=dict(prompt="Solver"))
 
     else:
         prompts = dict(
-            token="Authentication token")
+            token=dict(prompt="Authentication token"))
 
         click.echo("Using the simplified configuration flow.\n"
                    "Try 'dwave config create --full' for more options.\n")

@@ -450,6 +450,7 @@ class cached:
             key = self.argshash(args, kwargs)
             data = self.cache.get(key, {})
 
+            logger.trace("cached: refresh=%r, key=%r, data=%r", refresh_, key, data)
             if not refresh_ and data.get('expires', 0) > now:
                 val = data.get('val')
             else:
