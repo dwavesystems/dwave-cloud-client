@@ -167,21 +167,6 @@ def strip_tail(sequence, values):
     return list(reversed(list(strip_head(reversed(sequence), values))))
 
 
-def input_with_default(prompt, default, optional):
-    # CLI util; defer click import until actually needed (see #473)
-    import click
-    line = ''
-    while not line:
-        line = input(prompt)
-        if not line:
-            line = default
-        if not line:
-            if optional:
-                break
-            click.echo("Input required, please try again.")
-    return line
-
-
 def default_text_input(prompt: str, default: Optional[Any] = None, *,
                        optional: bool = True,
                        choices: Optional[Sequence[Any]] = None) -> Union[str, None]:
