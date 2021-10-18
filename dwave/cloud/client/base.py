@@ -420,6 +420,26 @@ class Client(object):
         # configure MetadataAPI access -- needed by Client.get_regions()
         self.metadata_api_endpoint = options['metadata_api_endpoint']
 
+        # parse headers as they might be needed by Client.get_regions()
+        headers = options['headers']
+        if not headers:
+            headers_dict = {}
+        elif isinstance(headers, abc.Mapping):
+            headers_dict = headers
+        elif isinstance(headers, str):
+            try:
+                # valid  headers = "Field-1: value-1\nField-2: value-2"
+                headers_dict = {key.strip(): val.strip()
+                                for key, val in [line.split(':')
+                                                 for line in headers.strip().split('\n')]}
+            except Exception as e:
+                logger.debug("Invalid headers: %r", headers)
+                headers_dict = {}
+        else:
+            raise ValueError("HTTP headers expected in a dict, or a string")
+        logger.debug("Parsed headers=%r", headers_dict)
+        self.headers = headers_dict
+
         # resolve endpoint using region
         region, endpoint = self._resolve_region_endpoint(
             region=options.get('region'), endpoint=options.get('endpoint'))
@@ -464,25 +484,6 @@ class Client(object):
             raise ValueError("Expecting a features dictionary or a string name for 'solver'")
         logger.debug("Parsed solver=%r", solver_def)
 
-        # parse headers
-        headers = options['headers']
-        if not headers:
-            headers_dict = {}
-        elif isinstance(headers, abc.Mapping):
-            headers_dict = headers
-        elif isinstance(headers, str):
-            try:
-                # valid  headers = "Field-1: value-1\nField-2: value-2"
-                headers_dict = {key.strip(): val.strip()
-                                for key, val in [line.split(':')
-                                                 for line in headers.strip().split('\n')]}
-            except Exception as e:
-                logger.debug("Invalid headers: %r", headers)
-                headers_dict = {}
-        else:
-            raise ValueError("HTTP headers expected in a dict, or a string")
-        logger.debug("Parsed headers=%r", headers_dict)
-
         # Store connection/session parameters
         # TODO: consolidate all options under Client.options or similar
         self.region = region    # for record only
@@ -495,7 +496,6 @@ class Client(object):
         self.polling_timeout = parse_float(options['polling_timeout'])
 
         self.proxy = options['proxy']
-        self.headers = headers_dict
         self.permissive_ssl = parse_boolean(options['permissive_ssl'])
         self.connection_close = parse_boolean(options['connection_close'])
 
@@ -734,11 +734,11 @@ class Client(object):
 
     @staticmethod
     @cached.ondisk(maxage=_REGIONS_CACHE_MAXAGE)
-    def _fetch_available_regions(metadata_api_endpoint):
+    def _fetch_available_regions(metadata_api_endpoint, **config):
         logger.info("Fetching available regions from the Metadata API at %r",
             metadata_api_endpoint)
 
-        with api.Regions(endpoint=metadata_api_endpoint) as regions:
+        with api.Regions(endpoint=metadata_api_endpoint, **config) as regions:
             data = regions.list_regions()
 
         logger.trace("Received region metadata: %r", data)
@@ -758,6 +758,7 @@ class Client(object):
         try:
             rs = Client._fetch_available_regions(
                 metadata_api_endpoint=self.metadata_api_endpoint,
+                headers=self.headers,
                 refresh_=refresh)
         except api.exceptions.RequestError as exc:
             logger.exception("Metadata API unavailable")
