@@ -77,10 +77,25 @@ class TestSimpleUtils(unittest.TestCase):
 
     def test_default_text_input(self):
         val = "value"
-        with mock.patch("dwave.cloud.utils.input", side_effect=[val]):
+        with mock.patch("click.termui.visible_prompt_func", side_effect=[val]):
             self.assertEqual(default_text_input("prompt", val), val)
-        with mock.patch("dwave.cloud.utils.input", side_effect=[val]):
+        with mock.patch("click.termui.visible_prompt_func", side_effect=[val]):
             self.assertEqual(default_text_input("prompt", val+val), val)
+
+    def test_optional_text_input(self):
+        with mock.patch("click.termui.visible_prompt_func", side_effect=[""]):
+            self.assertEqual(default_text_input("prompt", optional=True), None)
+
+    def test_optional_choices_text_input(self):
+        with mock.patch("click.termui.visible_prompt_func", side_effect=[""]):
+            self.assertEqual(
+                default_text_input("prompt", choices='abc', optional=True), None)
+        with mock.patch("click.termui.visible_prompt_func", side_effect=["d", "skip"]):
+            self.assertEqual(
+                default_text_input("prompt", choices='abc', optional=True), None)
+        with mock.patch("click.termui.visible_prompt_func", side_effect=["e", "a"]):
+            self.assertEqual(
+                default_text_input("prompt", choices='abc', optional=True), 'a')
 
     def test_generate_random_ising_problem(self):
         class MockSolver(object):

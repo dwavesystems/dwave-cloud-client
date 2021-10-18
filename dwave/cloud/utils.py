@@ -28,6 +28,7 @@ from datetime import datetime, timedelta
 from dateutil.tz import UTC
 from functools import wraps
 from pkg_resources import iter_entry_points
+from typing import Optional, Sequence, Any, Union
 
 import requests
 import diskcache
@@ -181,16 +182,35 @@ def input_with_default(prompt, default, optional):
     return line
 
 
-def default_text_input(prompt, default=None, optional=True):
+def default_text_input(prompt: str, default: Optional[Any] = None, *,
+                       optional: bool = True,
+                       choices: Optional[Sequence[Any]] = None) -> Union[str, None]:
+    # CLI util; defer click import until actually needed (see #473)
+    import click
+    _skip = 'skip'
+    kwargs = dict(text=prompt)
     if default:
-        prompt = "{} [{}]: ".format(prompt, default)
+        kwargs.update(default=default)
     else:
+        # make click print [skip] next to prompt
         if optional:
-            prompt = "{} [skip]: ".format(prompt)
-        else:
-            prompt = "{}: ".format(prompt)
+            kwargs.update(default=_skip)
+    if choices:
+        _type = click.Choice(choices)
+        kwargs.update(type=_type)
+        # a special case to skip user input instead of forcing input
+        if optional:
+            def allow_skip(value):
+                if value == _skip:
+                    return value
+                return click.types.convert_type(_type)(value)
 
-    return input_with_default(prompt, default, optional)
+            kwargs.update(value_proc=allow_skip)
+
+    value = click.prompt(**kwargs)
+    if optional and value == _skip:
+        value = None
+    return value
 
 
 def datetime_to_timestamp(dt):
