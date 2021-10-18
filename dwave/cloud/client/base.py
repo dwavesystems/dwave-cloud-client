@@ -60,16 +60,19 @@ from itertools import chain, zip_longest
 from functools import partial, wraps, lru_cache
 from collections import abc, namedtuple, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
+from typing import Optional, Tuple, Dict
 
 import requests
 import urllib3
 from dateutil.parser import parse as parse_datetime
 from plucky import pluck
 
+from dwave.cloud import api
 from dwave.cloud.package_info import __packagename__, __version__
-from dwave.cloud.exceptions import *
+from dwave.cloud.exceptions import *    # TODO: fix
 from dwave.cloud.computation import Future
-from dwave.cloud.config import load_config, parse_float, parse_int, parse_boolean
+from dwave.cloud.config import (
+    load_config, parse_float, parse_int, parse_boolean, update_config)
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.upload import ChunkedData
@@ -91,18 +94,23 @@ class Client(object):
     tasks, polling problem status, and retrieving results.
 
     Args:
+        region (str, optional, default='na-west-1'):
+            D-Wave Solver API region. To see available regions use
+            :meth:`.Client.get_regions`.
+
         endpoint (str, optional):
-            D-Wave API endpoint URL.
+            D-Wave Solver API endpoint URL. If undefined, inferred from
+            ``region`` code.
 
         token (str):
             Authentication token for the D-Wave API.
 
         solver (dict/str, optional):
             Default solver features (or simply solver name) to use in
-            :meth:`~dwave.cloud.client.Client.get_solver`.
+            :meth:`.Client.get_solver`.
 
             Defined via dictionary of solver feature constraints
-            (see :meth:`~dwave.cloud.client.Client.get_solvers`).
+            (see :meth:`.Client.get_solvers`).
             For backward compatibility, a solver name, as a string, is also
             accepted and converted to ``{"name": <solver name>}``.
 
@@ -177,18 +185,22 @@ class Client(object):
             Maximum backoff time in seconds.
             See :attr:`~urllib3.util.retry.Retry.BACKOFF_MAX` for details.
 
+        metadata_api_endpoint (str, optional):
+            D-Wave Metadata API endpoint. Central for all regions, used for
+            regional SAPI endpoint discovery.
+
         defaults (dict, optional):
             Defaults for the client instance that override the class
-            :attr:`.DEFAULTS`.
+            :attr:`.Client.DEFAULTS`.
 
     Note:
         Default values of all constructor arguments listed above are kept in
-        a class variable :attr:`~dwave.cloud.client.Client.DEFAULTS`.
+        a class variable :attr:`.Client.DEFAULTS`.
 
         Instance-level defaults can be specified via ``defaults`` argument.
 
     Examples:
-        This example directly initializes a :class:`~dwave.cloud.client.Client`.
+        This example directly initializes a :class:`.Client`.
         Direct initialization uses class constructor arguments, the minimum
         being a value for ``token``.
 
@@ -211,7 +223,9 @@ class Client(object):
     ANY_STATUS_NO_RESULT = [STATUS_FAILED, STATUS_CANCELLED]
 
     # Default API endpoint
-    DEFAULT_API_ENDPOINT = 'https://cloud.dwavesys.com/sapi/'
+    # TODO: remove when refactored to use `dwave.cloud.api`?
+    DEFAULT_API_ENDPOINT = api.constants.DEFAULT_SOLVER_API_ENDPOINT
+    DEFAULT_API_REGION = api.constants.DEFAULT_REGION
 
     # Class-level defaults for all constructor and factory arguments
     DEFAULTS = {
@@ -220,7 +234,10 @@ class Client(object):
         'profile': None,
         'client': 'base',
         # constructor (and factory)
-        'endpoint': DEFAULT_API_ENDPOINT,
+        'metadata_api_endpoint': api.constants.DEFAULT_METADATA_API_ENDPOINT,
+        'region': DEFAULT_API_REGION,
+        # NOTE: should we rename endpoint to solver_api_endpoint for clarity?
+        'endpoint': None,       # defined via region, resolved on client init
         'token': None,
         'solver': None,
         'proxy': None,
@@ -261,7 +278,10 @@ class Client(object):
     _POLL_GROUP_TIMEFRAME = 2
 
     # Downloaded solver definition cache maxage [sec]
-    _SOLVERS_CACHE_MAXAGE = 300
+    _SOLVERS_CACHE_MAXAGE = 300     # 5 min
+
+    # Downloaded region metadata cache maxage [sec]
+    _REGIONS_CACHE_MAXAGE = 86400   # 1 day
 
     # Multipart upload parameters
     _UPLOAD_PART_SIZE_BYTES = 5 * 1024 * 1024
@@ -323,13 +343,9 @@ class Client(object):
         """
 
         # load configuration from config file(s) and environment
-        config = load_config(config_file=config_file, profile=profile)
-        logger.debug("File/env config loaded: %r", config)
-
-        # manual config override with client constructor options
-        kwargs.update(client=client)
-        config.update({k: v for k, v in kwargs.items() if v is not None})
-        logger.debug("Code config loaded: %r", config)
+        config = load_config(config_file=config_file, profile=profile,
+                             client=client, **kwargs)
+        logger.debug("Config loaded: %r", config)
 
         from dwave.cloud.client import qpu, sw, hybrid
         _clients = {
@@ -342,6 +358,36 @@ class Client(object):
 
         logger.debug("Creating %s.Client() with: %r", _client, config)
         return _clients[_client](**config)
+
+    def _resolve_region_endpoint(self, *,
+                                 region: Optional[str] = None,
+                                 endpoint: Optional[str] = None) -> Tuple[str, str]:
+        """For a region/endpoint pair from config, return the Solver API
+        endpoint to use (and the matching region).
+
+        Explicit endpoint will override the region (i.e. region extension is
+        backwards-compatible).
+
+        Regional endpoint is fetched from Metadata API. If Metadata API is not
+        available, default global endpoint is used.
+        """
+        if endpoint:
+            return (region, endpoint)
+
+        if not region:
+            return (self.DEFAULT_API_REGION, self.DEFAULT_API_ENDPOINT)
+
+        try:
+            regions = self.get_regions()
+        except (api.exceptions.RequestError, ValueError) as exc:
+            logger.warning("Failed to fetch available regions: %r. "
+                           "Using the default Solver API endpoint.", exc)
+            return (self.DEFAULT_API_REGION, self.DEFAULT_API_ENDPOINT)
+
+        if region not in regions:
+            raise ValueError(f"Region {region!r} unknown. "
+                             f"Try one of {list(regions.keys())!r}.")
+        return (region, regions[region]['endpoint'])
 
     @dispatches_events('client_init')
     def __init__(self, endpoint=None, token=None, solver=None, **kwargs):
@@ -358,24 +404,47 @@ class Client(object):
         logger.debug("Client init called with: %r", kwargs)
 
         # derive instance-level defaults from class defaults and init defaults
-        defaults = kwargs.pop('defaults', None)
-        if defaults is None:
-            defaults = {}
         self.defaults = copy.deepcopy(self.DEFAULTS)
-        self.defaults.update(**defaults)
+        user_defaults = kwargs.pop('defaults', None)
+        if user_defaults is None:
+            user_defaults = {}
+        update_config(self.defaults, user_defaults)
 
         # combine instance-level defaults with file/env/kwarg option values
         # note: treat empty string values (e.g. from file/env) as undefined/None
-        # TODO: to avoid the `first_non_empty` hack, we need to parse config
-        # values downstream (immediately after reading from file or env var)
-        first_non_empty = lambda a, b: b if a == '' or a is None else a
-        options = {}
-        for k, v in self.defaults.items():
-            options[k] = first_non_empty(kwargs.get(k), v)
+        options = copy.deepcopy(self.defaults)
+        update_config(options, kwargs)
 
         logger.debug("Client options with defaults: %r", options)
 
-        endpoint = options['endpoint']
+        # configure MetadataAPI access -- needed by Client.get_regions()
+        self.metadata_api_endpoint = options['metadata_api_endpoint']
+
+        # parse headers as they might be needed by Client.get_regions()
+        headers = options['headers']
+        if not headers:
+            headers_dict = {}
+        elif isinstance(headers, abc.Mapping):
+            headers_dict = headers
+        elif isinstance(headers, str):
+            try:
+                # valid  headers = "Field-1: value-1\nField-2: value-2"
+                headers_dict = {key.strip(): val.strip()
+                                for key, val in [line.split(':')
+                                                 for line in headers.strip().split('\n')]}
+            except Exception as e:
+                logger.debug("Invalid headers: %r", headers)
+                headers_dict = {}
+        else:
+            raise ValueError("HTTP headers expected in a dict, or a string")
+        logger.debug("Parsed headers=%r", headers_dict)
+        self.headers = headers_dict
+
+        # resolve endpoint using region
+        region, endpoint = self._resolve_region_endpoint(
+            region=options.get('region'), endpoint=options.get('endpoint'))
+
+        # sanity check
         if not endpoint:
             raise ValueError("API endpoint not defined")
 
@@ -415,27 +484,9 @@ class Client(object):
             raise ValueError("Expecting a features dictionary or a string name for 'solver'")
         logger.debug("Parsed solver=%r", solver_def)
 
-        # parse headers
-        headers = options['headers']
-        if not headers:
-            headers_dict = {}
-        elif isinstance(headers, abc.Mapping):
-            headers_dict = headers
-        elif isinstance(headers, str):
-            try:
-                # valid  headers = "Field-1: value-1\nField-2: value-2"
-                headers_dict = {key.strip(): val.strip()
-                                for key, val in [line.split(':')
-                                                 for line in headers.strip().split('\n')]}
-            except Exception as e:
-                logger.debug("Invalid headers: %r", headers)
-                headers_dict = {}
-        else:
-            raise ValueError("HTTP headers expected in a dict, or a string")
-        logger.debug("Parsed headers=%r", headers_dict)
-
         # Store connection/session parameters
         # TODO: consolidate all options under Client.options or similar
+        self.region = region    # for record only
         self.endpoint = endpoint
         self.token = token
         self.default_solver = solver_def
@@ -445,7 +496,6 @@ class Client(object):
         self.polling_timeout = parse_float(options['polling_timeout'])
 
         self.proxy = options['proxy']
-        self.headers = headers_dict
         self.permissive_ssl = parse_boolean(options['permissive_ssl'])
         self.connection_close = parse_boolean(options['connection_close'])
 
@@ -461,7 +511,7 @@ class Client(object):
         self.http_retry_backoff_max = parse_float(options['http_retry_backoff_max'])
 
         opts = (
-            'endpoint', 'token', 'default_solver',
+            'region', 'endpoint', 'token', 'default_solver',
             'client_cert', 'request_timeout', 'polling_timeout',
             'proxy', 'headers', 'permissive_ssl', 'connection_close',
             'poll_backoff_min', 'poll_backoff_max',
@@ -553,7 +603,6 @@ class Client(object):
 
         # create http idempotent Retry config
         def get_retry_conf():
-
             # need a subclass to override the backoff_max
             class Retry(urllib3.Retry):
                 BACKOFF_MAX = self.http_retry_backoff_max
@@ -682,6 +731,43 @@ class Client(object):
 
         """
         return True
+
+    @staticmethod
+    @cached.ondisk(maxage=_REGIONS_CACHE_MAXAGE)
+    def _fetch_available_regions(metadata_api_endpoint, **config):
+        logger.info("Fetching available regions from the Metadata API at %r",
+            metadata_api_endpoint)
+
+        with api.Regions(endpoint=metadata_api_endpoint, **config) as regions:
+            data = regions.list_regions()
+
+        logger.trace("Received region metadata: %r", data)
+
+        return data
+
+    def get_regions(self, refresh: bool = False) -> Dict[str, Dict[str, str]]:
+        """Retrieve available API regions.
+
+        Args:
+            refresh:
+                Force cache refresh.
+
+        Returns:
+            Mapping of region details (name and endpoint) over region codes.
+        """
+        try:
+            rs = Client._fetch_available_regions(
+                metadata_api_endpoint=self.metadata_api_endpoint,
+                headers=self.headers,
+                refresh_=refresh)
+        except api.exceptions.RequestError as exc:
+            logger.exception("Metadata API unavailable")
+            raise ValueError(
+                f"Metadata API unavailable at {self.metadata_api_endpoint!r}")
+
+        logger.debug("Using region metadata: %r", rs)
+
+        return {r.code: {"name": r.name, "endpoint": r.endpoint} for r in rs}
 
     @cached(maxage=_SOLVERS_CACHE_MAXAGE)
     def _fetch_solvers(self, name=None):

@@ -132,3 +132,10 @@ class ProblemSubmitError(BatchItemError):
 
 class ProblemCancelError(BatchItemError):
     pass
+
+
+# region info on metadata api
+class Region(BaseModel):
+    code: str
+    name: str
+    endpoint: str

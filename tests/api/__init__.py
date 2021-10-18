@@ -13,4 +13,4 @@
 # limitations under the License.
 
 from tests.api.resources import *
-from tests.api.test_sapi_client import *
+from tests.api.test_api_clients import *

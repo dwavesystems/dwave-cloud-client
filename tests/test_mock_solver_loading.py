@@ -156,7 +156,7 @@ class MockSolverLoading(unittest.TestCase):
         """Load the list of solver names."""
 
         def spoof_cache(client, clear_val=False, clear_expires=False):
-            cache = client._fetch_solvers._cache
+            cache = client._fetch_solvers._cached.cache
             for args in cache:
                 if clear_val:
                     cache[args]['val'] = []

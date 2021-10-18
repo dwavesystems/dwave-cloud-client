@@ -47,9 +47,14 @@ class TestEnvUtils(unittest.TestCase):
         self.assertEqual(os.getenv(self.var), self.val)
 
         # ensure isolated env stores modified value
-        with isolated_environ():
+        def test():
             os.environ[self.var] = self.alt
             self.assertEqual(os.getenv(self.var), self.alt)
+
+        with isolated_environ():
+            test()
+
+        isolated_environ()(test)()
 
         # ensure "global" env is restored
         self.assertEqual(os.getenv(self.var), self.val)
@@ -60,8 +65,15 @@ class TestEnvUtils(unittest.TestCase):
         self.assertEqual(os.getenv(self.var), self.val)
 
         # ensure isolated env has modified value
-        with isolated_environ({self.var: self.alt}):
+        args = ({self.var: self.alt}, )
+
+        def test():
             self.assertEqual(os.getenv(self.var), self.alt)
+
+        with isolated_environ(*args):
+            test()
+
+        isolated_environ(*args)(test)()
 
         # ensure "global" env is restored
         self.assertEqual(os.getenv(self.var), self.val)
@@ -72,8 +84,15 @@ class TestEnvUtils(unittest.TestCase):
         self.assertEqual(os.getenv(self.var), None)
 
         # ensure isolated env adds var
-        with isolated_environ({self.var: self.val}):
+        args = ({self.var: self.val}, )
+
+        def test():
             self.assertEqual(os.getenv(self.var), self.val)
+
+        with isolated_environ(*args):
+            test()
+
+        isolated_environ(*args)(test)()
 
         # ensure "global" env is restored
         self.assertEqual(os.getenv(self.var), None)
@@ -96,19 +115,16 @@ class TestEnvUtils(unittest.TestCase):
 
     def test_remove_dwave(self):
         # set var to val in "global" env
-        dw1, dw2 = 'DWAVE_TEST', 'DW_INTERNAL__TEST'
+        var = 'DWAVE_TEST'
         val = 'test'
-        os.environ[dw1] = val
-        os.environ[dw2] = val
+        os.environ[var] = val
 
         # ensure isolated env removes dwave var
         with isolated_environ(remove_dwave=True):
-            self.assertEqual(os.getenv(dw1), None)
-            self.assertEqual(os.getenv(dw2), None)
+            self.assertEqual(os.getenv(var), None)
 
         # ensure "global" env is restored
-        self.assertEqual(os.getenv(dw1), val)
-        self.assertEqual(os.getenv(dw2), val)
+        self.assertEqual(os.getenv(var), val)
 
     def test_empty(self):
         # set var to val in "global" env
@@ -116,8 +132,15 @@ class TestEnvUtils(unittest.TestCase):
         self.assertEqual(os.getenv(self.var), self.val)
 
         # ensure isolated env starts empty
-        with isolated_environ(empty=True):
+        kwargs = dict(empty=True)
+
+        def test():
             self.assertEqual(os.getenv(self.var), None)
+
+        with isolated_environ(**kwargs):
+            test()
+
+        isolated_environ(**kwargs)(test)()
 
         # ensure "global" env is restored
         self.assertEqual(os.getenv(self.var), self.val)

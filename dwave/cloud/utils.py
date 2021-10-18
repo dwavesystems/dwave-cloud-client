@@ -21,14 +21,17 @@ import itertools
 import numbers
 import warnings
 
-from collections import abc, OrderedDict
+from collections import OrderedDict
+from collections.abc import Mapping, Sequence, MutableMapping
 from urllib.parse import urljoin
 from datetime import datetime, timedelta
 from dateutil.tz import UTC
 from functools import wraps
 from pkg_resources import iter_entry_points
+from typing import Optional, Sequence, Any, Union
 
 import requests
+import diskcache
 
 # Use numpy if available for fast decoding
 try:
@@ -118,7 +121,7 @@ def uniform_iterator(sequence):
     """Uniform (key, value) iteration on a `dict`,
     or (idx, value) on a `list`."""
 
-    if isinstance(sequence, abc.Mapping):
+    if isinstance(sequence, Mapping):
         return sequence.items()
     else:
         return enumerate(sequence)
@@ -128,7 +131,7 @@ def uniform_get(sequence, index, default=None):
     """Uniform `dict`/`list` item getter, where `index` is interpreted as a key
     for maps and as numeric index for lists."""
 
-    if isinstance(sequence, abc.Mapping):
+    if isinstance(sequence, Mapping):
         return sequence.get(index, default)
     else:
         return sequence[index] if index < len(sequence) else default
@@ -164,31 +167,35 @@ def strip_tail(sequence, values):
     return list(reversed(list(strip_head(reversed(sequence), values))))
 
 
-def input_with_default(prompt, default, optional):
+def default_text_input(prompt: str, default: Optional[Any] = None, *,
+                       optional: bool = True,
+                       choices: Optional[Sequence[Any]] = None) -> Union[str, None]:
     # CLI util; defer click import until actually needed (see #473)
     import click
-    line = ''
-    while not line:
-        line = input(prompt)
-        if not line:
-            line = default
-        if not line:
-            if optional:
-                break
-            click.echo("Input required, please try again.")
-    return line
-
-
-def default_text_input(prompt, default=None, optional=True):
+    _skip = 'skip'
+    kwargs = dict(text=prompt)
     if default:
-        prompt = "{} [{}]: ".format(prompt, default)
+        kwargs.update(default=default)
     else:
+        # make click print [skip] next to prompt
         if optional:
-            prompt = "{} [skip]: ".format(prompt)
-        else:
-            prompt = "{}: ".format(prompt)
+            kwargs.update(default=_skip)
+    if choices:
+        _type = click.Choice(choices)
+        kwargs.update(type=_type)
+        # a special case to skip user input instead of forcing input
+        if optional:
+            def allow_skip(value):
+                if value == _skip:
+                    return value
+                return click.types.convert_type(_type)(value)
 
-    return input_with_default(prompt, default, optional)
+            kwargs.update(value_proc=allow_skip)
+
+    value = click.prompt(**kwargs)
+    if optional and value == _skip:
+        value = None
+    return value
 
 
 def datetime_to_timestamp(dt):
@@ -395,7 +402,7 @@ class CLIError(Exception):
         self.code = code
 
 
-class cached(object):
+class cached:
     """Caching decorator with max-age/expiry, forced refresh, and
     per-arguments-combo keys.
 
@@ -430,9 +437,9 @@ class cached(object):
         b = repr(sorted((repr(k), repr(v)) for k, v in kwargs.items()))
         return a + b
 
-    def __init__(self, maxage=None):
+    def __init__(self, maxage=None, cache=None):
         self.maxage = maxage or 0
-        self.cache = {}
+        self.cache = cache or {}
 
     def __call__(self, fn):
         @wraps(fn)
@@ -443,6 +450,7 @@ class cached(object):
             key = self.argshash(args, kwargs)
             data = self.cache.get(key, {})
 
+            logger.trace("cached: refresh=%r, key=%r, data=%r", refresh_, key, data)
             if not refresh_ and data.get('expires', 0) > now:
                 val = data.get('val')
             else:
@@ -451,11 +459,18 @@ class cached(object):
 
             return val
 
-        # expose the cache for testing and debugging
-        wrapper._cache = self.cache
-        wrapper._maxage = self.maxage
+        # expose @cached internals for testing and debugging
+        wrapper._cached = self
 
         return wrapper
+
+    @classmethod
+    def ondisk(cls, **kwargs):
+        """@cached backed by an on-disk sqlite3-based cache."""
+        from dwave.cloud.config import get_cache_dir
+        directory = kwargs.pop('directory', get_cache_dir())
+        cache = diskcache.Cache(directory=directory)
+        return cls(cache=cache, **kwargs)
 
 
 class retried(object):
@@ -491,7 +506,7 @@ class retried(object):
         # normalize `backoff` to callable
         if isinstance(backoff, numbers.Number):
             self.backoff = lambda retry: backoff
-        elif isinstance(backoff, abc.Sequence):
+        elif isinstance(backoff, Sequence):
             it = iter(backoff)
             self.backoff = lambda retry: next(it)
         else:

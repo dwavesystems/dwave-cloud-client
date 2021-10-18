@@ -12,5 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from tests.api.resources.test_regions import *
 from tests.api.resources.test_solvers import *
 from tests.api.resources.test_problems import *

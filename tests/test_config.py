@@ -19,11 +19,12 @@ import configparser
 from unittest import mock
 from functools import partial
 
+from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import ConfigFileParseError, ConfigFileReadError
 from dwave.cloud.testing import iterable_mock_open
 from dwave.cloud.config import (
     get_configfile_paths, load_config_from_files, load_config,
-    parse_float, parse_int, parse_boolean)
+    parse_float, parse_int, parse_boolean, get_cache_dir)
 
 
 class TestConfigParsing(unittest.TestCase):
@@ -188,12 +189,12 @@ class TestConfigParsing(unittest.TestCase):
                         self._load_config_from_files):
 
             # don't load from file, use arg or env
-            self.assertEqual(load_config(config_file=False)['endpoint'], None)
+            self.assertNotIn('endpoint', load_config(config_file=False))
             with mock.patch.dict(os.environ, {'DWAVE_API_ENDPOINT': 'test'}):
                 self.assertEqual(load_config(config_file=False)['endpoint'], 'test')
 
             # specifying a profile doesn't affect outcome
-            self.assertEqual(load_config(config_file=False, profile='alpha')['endpoint'], None)
+            self.assertNotIn('endpoint', load_config(config_file=False, profile='alpha'))
             with mock.patch.dict(os.environ, {'DWAVE_API_ENDPOINT': 'test'}):
                 self.assertEqual(load_config(config_file=False, profile='alpha')['endpoint'], 'test')
             with mock.patch.dict(os.environ, {'DWAVE_PROFILE': 'profile'}):
@@ -438,3 +439,9 @@ class TestConfigUtils(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             parse_boolean('x')
+
+    def test_cache_dir(self):
+        path = get_cache_dir()
+        self.assertTrue(os.path.isdir(path))
+        self.assertIn(__packagename__, path)
+        self.assertIn(__version__, path)

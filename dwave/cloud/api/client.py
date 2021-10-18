@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from collections import deque, namedtuple
 
 import requests
 import urllib3
@@ -22,7 +23,7 @@ from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent, is_caused_by)
 
-__all__ = ['SAPIClient']
+__all__ = ['DWaveAPIClient', 'SolverAPIClient', 'MetadataAPIClient']
 
 logger = logging.getLogger(__name__)
 
@@ -47,25 +48,67 @@ class LazyUserAgentClassProperty:
 class LoggingSession(BaseUrlSession):
     """:class:`.BaseUrlSession` extended to unify timeout exceptions and to log
     all requests (and responses).
+
+    In addition to request logging, a history of responses, including exceptions
+    (up to `history_size`), is kept in :attr:`.history`.
     """
 
-    def request(self, method, *args, **kwargs):
+    def __init__(self, history_size: int = 0, **kwargs):
+        if not isinstance(history_size, int) or history_size < 0:
+            raise ValueError("non-negative integer value required for 'history_size'")
+
+        self.history = deque([], maxlen=history_size)
+
+        super().__init__(**kwargs)
+
+    def _request_unified(self, method: str, *args, **kwargs):
+        # timeout exceptions unified with regular request exceptions
+        try:
+            return super().request(method, *args, **kwargs)
+        except Exception as exc:
+            if is_caused_by(exc, (requests.exceptions.Timeout,
+                                  urllib3.exceptions.TimeoutError)):
+                raise exceptions.RequestTimeout(
+                    request=getattr(exc, 'request', None),
+                    response=getattr(exc, 'response', None)) from exc
+            else:
+                raise
+
+    RequestRecord = namedtuple('RequestRecord',
+                               ('request', 'response', 'exception'))
+
+    def request(self, method: str, *args, **kwargs):
         callee = type(self).__name__
         logger.trace("[%s] request(%r, *%r, **%r)",
                      callee, method, args, kwargs)
 
-        # unify timeout exceptions
         try:
-            response = super().request(method, *args, **kwargs)
+            response = self._request_unified(method, *args, **kwargs)
+
+            rec = LoggingSession.RequestRecord(
+                request=response.request, response=response, exception=None)
+            self.history.append(rec)
 
         except Exception as exc:
-            logger.trace("[%s] request failed with %r", callee, exc)
+            logger.debug("[%s] request failed with %r", callee, exc)
 
-            if is_caused_by(exc, (requests.exceptions.Timeout,
-                                  urllib3.exceptions.TimeoutError)):
-                raise exceptions.RequestTimeout from exc
-            else:
-                raise
+            req = getattr(exc, 'request', None)
+            if req:
+                logger.trace("[%s] failing request=%r", callee,
+                             dict(method=req.method, url=req.url,
+                                  headers=req.headers, body=req.body))
+
+            res = getattr(exc, 'response', None)
+            if res:
+                logger.trace("[%s] failing response=%r", callee,
+                             dict(status_code=res.status_code,
+                                  headers=res.headers, text=res.text))
+
+            rec = LoggingSession.RequestRecord(
+                request=req, response=res, exception=exc)
+            self.history.append(rec)
+
+            raise
 
         logger.trace("[%s] request(...) = (code=%r, body=%r)",
                      callee, response.status_code, response.text)
@@ -73,13 +116,14 @@ class LoggingSession(BaseUrlSession):
         return response
 
 
-class SAPIClient:
-    """Low-level SAPI client, as a thin wrapper around `requests.Session`,
-    that handles SAPI specifics like authentication and response parsing.
+class DWaveAPIClient:
+    """Low-level client for D-Wave APIs. A thin wrapper around
+    `requests.Session` that handles API specifics such as authentication,
+    response and error parsing, retrying, etc.
     """
 
     DEFAULTS = {
-        'endpoint': constants.DEFAULT_API_ENDPOINT,
+        'endpoint': None,
         'token': None,
         'cert': None,
 
@@ -97,12 +141,15 @@ class SAPIClient:
 
         # proxy urls, see :attr:`requests.Session.proxies`
         'proxies': None,
+
+        # number of most recent request records to keep in :attr:`.session.history`
+        'history_size': 0,
     }
 
     # client instance config, populated on init from kwargs overridding DEFAULTS
     config = None
 
-    # User-Agent string used in SAPI requests, as returned by
+    # User-Agent string used in API requests, as returned by
     # :meth:`~dwave.cloud.utils.user_agent`, computed on first access and
     # cached for the lifespan of the class.
     # TODO: consider exposing "user_agent" config parameter
@@ -115,42 +162,8 @@ class SAPIClient:
 
         self.session = self._create_session(self.config)
 
-    @classmethod
-    def from_client_config(cls, client):
-        """Create SAPI client instance configured from a
-        :class:`~dwave.cloud.client.base.Client' instance.
-        """
-
-        headers = client.headers.copy()
-        if client.connection_close:
-            headers.update({'Connection': 'close'})
-
-        opts = dict(
-            endpoint=client.endpoint,
-            token=client.token,
-            cert=client.client_cert,
-            timeout=client.request_timeout,
-            proxies=dict(
-                http=client.proxy,
-                https=client.proxy,
-            ),
-            retry=dict(
-                total=client.http_retry_total,
-                connect=client.http_retry_connect,
-                read=client.http_retry_read,
-                redirect=client.http_retry_redirect,
-                status=client.http_retry_status,
-                raise_on_redirect=True,
-                raise_on_status=True,
-                respect_retry_after_header=True,
-                backoff_factor=client.http_retry_backoff_factor,
-                backoff_max=client.http_retry_backoff_max,
-            ),
-            headers=client.headers,
-            verify=not client.permissive_ssl,
-        )
-
-        return cls(**opts)
+    def close(self):
+        self.session.close()
 
     @staticmethod
     def _retry_config(backoff_max=None, **kwargs):
@@ -172,11 +185,14 @@ class SAPIClient:
         # allow endpoint path to not end with /
         # (handle incorrect user input when merging paths, see rfc3986, sec 5.2.3)
         endpoint = config['endpoint']
+        if not endpoint:
+            raise ValueError("API endpoint undefined")
         if not endpoint.endswith('/'):
             endpoint += '/'
 
         # configure request timeout and retries
-        session = LoggingSession(base_url=endpoint)
+        history_size = config['history_size']
+        session = LoggingSession(base_url=endpoint, history_size=history_size)
         timeout = config['timeout']
         retry = config['retry']
         session.mount('http://',
@@ -206,7 +222,7 @@ class SAPIClient:
         session.hooks['response'].append(cls._raise_for_status)
 
         # debug log
-        logger.debug("create_session from config={!r}".format(config))
+        logger.debug(f"{cls.__name__} session created using config={config!r}")
 
         return session
 
@@ -262,3 +278,56 @@ class SAPIClient:
                 raise exceptions.InternalServerError(**kw)
             else:
                 raise exceptions.RequestError(**kw)
+
+
+class SolverAPIClient(DWaveAPIClient):
+    """Client for D-Wave's Solver API."""
+
+    def __init__(self, **config):
+        config.setdefault('endpoint', constants.DEFAULT_SOLVER_API_ENDPOINT)
+        super().__init__(**config)
+
+    @classmethod
+    def from_client_config(cls, client):
+        """Create SAPI client instance configured from a
+        :class:`~dwave.cloud.client.base.Client' instance.
+        """
+
+        headers = client.headers.copy()
+        if client.connection_close:
+            headers.update({'Connection': 'close'})
+
+        opts = dict(
+            endpoint=client.endpoint,
+            token=client.token,
+            cert=client.client_cert,
+            timeout=client.request_timeout,
+            proxies=dict(
+                http=client.proxy,
+                https=client.proxy,
+            ),
+            retry=dict(
+                total=client.http_retry_total,
+                connect=client.http_retry_connect,
+                read=client.http_retry_read,
+                redirect=client.http_retry_redirect,
+                status=client.http_retry_status,
+                raise_on_redirect=True,
+                raise_on_status=True,
+                respect_retry_after_header=True,
+                backoff_factor=client.http_retry_backoff_factor,
+                backoff_max=client.http_retry_backoff_max,
+            ),
+            headers=client.headers,
+            verify=not client.permissive_ssl,
+        )
+
+        return cls(**opts)
+
+
+class MetadataAPIClient(DWaveAPIClient):
+    """Client for D-Wave's Metadata API."""
+
+    def __init__(self, **config):
+        config.setdefault('endpoint', constants.DEFAULT_METADATA_API_ENDPOINT)
+        super().__init__(**config)

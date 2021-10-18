@@ -1,0 +1,20 @@
+---
+features:
+  - |
+    Added multi-region support to ``dwave.cloud.Client``.
+
+    New config option for region selection is called ``region``, and environment
+    variable is called ``DWAVE_API_REGION``.
+
+    New config option for specifying Metadata API endpoint URL is exposed as
+    ``metadata_api_endpoint`` and ``DWAVE_METADATA_API_ENDPOINT``.
+
+    List of available regions available with ``dwave.cloud.Client.get_regions``.
+upgrade:
+  - |
+    To access solvers in a non-default region (na-west-1), you can use the
+    ``region`` config option and ``DWAVE_API_REGION`` environment variable.
+  - |
+    ``dwave.cloud.config.load_config`` used to return some minimal (but
+    arbitrary) set of always-set options (set to ``None`` if undefined). Now it
+    returns just the options set either in config file, environment, or kwargs.

@@ -15,7 +15,7 @@
 """Testing utils."""
 
 import os
-import contextlib
+import functools
 from unittest import mock
 
 __all__ = ['mock', 'iterable_mock_open', 'isolated_environ']
@@ -55,13 +55,13 @@ def iterable_mock_open(read_data):
     return m
 
 
-@contextlib.contextmanager
-def isolated_environ(add=None, remove=None, remove_dwave=False, empty=False):
-    """Context manager for modified process environment isolation.
+class isolated_environ:
+    """Context manager and a decorator for modified process environment
+    isolation.
 
     Environment variables can be updated, added and removed. Complete
-    environment can be cleared, or cleared only only of a subset of variables
-    that affect config loading (``DWAVE_*`` and ``DW_INTERNAL__*`` vars).
+    environment can be cleared, or cleared only of a subset of variables
+    that affect config loading (``DWAVE_*`` vars).
 
     On context clear, original `os.environ` is restored.
 
@@ -80,21 +80,66 @@ def isolated_environ(add=None, remove=None, remove_dwave=False, empty=False):
             Return empty environment.
 
     Context:
-        Modified copy of global `os.environ`. Restored on context exit.
+        Modified copy of global `os.environ`. Restored on context/decorator exit.
+
+    Examples:
+        Patch environment in a function scope::
+
+            @isolated_environ(empty=True)
+            def f():
+                assert len(os.environ) == 0
+
+            f()
+            assert len(os.environ) > 0
+
+        Patch environment in a context::
+
+            with isolated_environ(empty=True) as env:
+                assert len(os.environ) == 0
+
+            assert len(os.environ) > 0
     """
 
-    if add is None:
-        add = {}
+    def start(self):
+        self.patcher = mock.patch.dict(os.environ, values=self.add, clear=self.empty)
+        self.patcher.start()
 
-    if remove is None:
-        remove = {}
-
-    with mock.patch.dict(os.environ, values=add, clear=empty):
-        for key in remove:
+        for key in self.remove:
             os.environ.pop(key, None)
 
         for key in frozenset(os.environ.keys()):
-            if remove_dwave and (key.startswith("DWAVE_") or key.startswith("DW_INTERNAL__")):
+            if self.remove_dwave and key.startswith("DWAVE_"):
                 os.environ.pop(key, None)
 
-        yield os.environ
+    def stop(self):
+        self.patcher.stop()
+
+    def __init__(self, add=None, remove=None, remove_dwave=False, empty=False):
+        if add is None:
+            add = {}
+
+        if remove is None:
+            remove = {}
+
+        self.add = add
+        self.remove = remove
+        self.remove_dwave = remove_dwave
+        self.empty = empty
+
+    def __call__(self, fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            self.start()
+            try:
+                return fn(*args, **kwargs)
+            finally:
+                self.stop()
+
+        return wrapper
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.stop()

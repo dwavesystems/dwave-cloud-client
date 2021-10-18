@@ -28,14 +28,23 @@ from contextlib import contextmanager
 import requests
 from plucky import merge
 
+from dwave.cloud.api import constants
 from dwave.cloud.client import Client
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, SolverError, SolverNotFoundError)
-from dwave.cloud.testing import iterable_mock_open
+from dwave.cloud.testing import iterable_mock_open, isolated_environ
 import dwave.cloud
 
 from tests import config
+
+
+DEFAULT_REGIONS = {
+    constants.DEFAULT_REGION: dict(
+        endpoint=constants.DEFAULT_SOLVER_API_ENDPOINT)}
+
+def get_default_regions(*args, **kwargs):
+    return DEFAULT_REGIONS
 
 
 @unittest.skipUnless(config, "No live server configuration available.")
@@ -143,7 +152,8 @@ class SolverLoading(unittest.TestCase):
         """Specialized client returns the correct solver by default."""
         from dwave.cloud import qpu, sw, hybrid
 
-        conf = dict(endpoint=config['endpoint'], token=config['token'])
+        conf = config.copy()
+        del conf['solver']
 
         with Client(**conf) as base_client:
 
@@ -169,6 +179,7 @@ class SolverLoading(unittest.TestCase):
                     self.assertRaises(SolverError, client.get_solver)
 
 
+@mock.patch.multiple(Client, get_regions=get_default_regions)
 class ClientConstruction(unittest.TestCase):
     """Test Client constructor and Client.from_config() factory."""
 
@@ -183,10 +194,69 @@ class ClientConstruction(unittest.TestCase):
                 self.assertNotIsInstance(client, dwave.cloud.qpu.Client)
                 self.assertNotIsInstance(client, dwave.cloud.hybrid.Client)
 
+    def test_region_default(self):
+        conf = {k: k for k in 'token'.split()}
+        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+            with dwave.cloud.Client.from_config() as client:
+                self.assertEqual(client.region, constants.DEFAULT_REGION)
+                self.assertEqual(client.endpoint, constants.DEFAULT_SOLVER_API_ENDPOINT)
+                self.assertEqual(client.token, 'token')
+                self.assertIsInstance(client, dwave.cloud.client.Client)
+                self.assertNotIsInstance(client, dwave.cloud.sw.Client)
+                self.assertNotIsInstance(client, dwave.cloud.qpu.Client)
+                self.assertNotIsInstance(client, dwave.cloud.hybrid.Client)
+
+    def test_region_selection_over_defaults(self):
+        conf = {k: k for k in 'token'.split()}
+        region_code = 'region-code'
+        region_endpoint = 'region-endpoint'
+        region_conf = {region_code: {"endpoint": region_endpoint}}
+
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
+            with mock.patch("dwave.cloud.Client.get_regions", lambda s: region_conf):
+                with dwave.cloud.Client.from_config(region=region_code) as client:
+                    self.assertEqual(client.region, region_code)
+                    self.assertEqual(client.endpoint, region_endpoint)
+
+    def test_region_kwarg_overrides_endpoint_from_config(self):
+        conf = {k: k for k in 'endpoint token'.split()}
+        region_code = 'region-code'
+        region_endpoint = 'region-endpoint'
+        region_conf = {region_code: {"endpoint": region_endpoint}}
+
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
+            with mock.patch("dwave.cloud.Client.get_regions", lambda s: region_conf):
+                with dwave.cloud.Client.from_config(region=region_code) as client:
+                    self.assertEqual(client.region, region_code)
+                    self.assertEqual(client.endpoint, region_endpoint)
+
+    @isolated_environ(empty=True)
+    def test_region_from_env_overrides_endpoint_from_config(self):
+        conf = {k: k for k in 'endpoint token'.split()}
+        region_code = 'region-code'
+        region_endpoint = 'region-endpoint'
+        region_conf = {region_code: {"endpoint": region_endpoint}}
+
+        with isolated_environ(add={'DWAVE_API_REGION': region_code}):
+            with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
+                with mock.patch("dwave.cloud.Client.get_regions", lambda s: region_conf):
+                    with dwave.cloud.Client.from_config() as client:
+                        self.assertEqual(client.region, region_code)
+                        self.assertEqual(client.endpoint, region_endpoint)
+
+    @isolated_environ(empty=True)
+    def test_metadata_api_endpoint_from_env_accepted(self):
+        metadata_api_endpoint = 'metadata-endpoint'
+        with isolated_environ(add={'DWAVE_METADATA_API_ENDPOINT': metadata_api_endpoint}):
+            conf = {k: k for k in 'endpoint metadata_api_endpoint token'.split()}
+            with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
+                with dwave.cloud.Client.from_config() as client:
+                    self.assertEqual(client.metadata_api_endpoint, metadata_api_endpoint)
+
     def test_client_type(self):
         conf = {k: k for k in 'endpoint token'.split()}
 
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 self.assertIsInstance(client, dwave.cloud.client.Client)
 
@@ -216,7 +286,7 @@ class ClientConstruction(unittest.TestCase):
 
     def test_custom_kwargs(self):
         conf = {k: k for k in 'endpoint token'.split()}
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with mock.patch("dwave.cloud.client.Client.__init__", return_value=None) as init:
                 dwave.cloud.Client.from_config(custom='custom')
                 init.assert_called_once_with(
@@ -224,7 +294,7 @@ class ClientConstruction(unittest.TestCase):
 
     def test_custom_kwargs_overrides_config(self):
         conf = {k: k for k in 'endpoint token custom'.split()}
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with mock.patch("dwave.cloud.client.Client.__init__", return_value=None) as init:
                 dwave.cloud.Client.from_config(custom='new-custom')
                 init.assert_called_once_with(
@@ -235,7 +305,7 @@ class ClientConstruction(unittest.TestCase):
         conf = {k: k for k in 'endpoint token'.split()}
         conf.update(solver=json.dumps(solver_def))
 
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 self.assertEqual(client.default_solver, solver_def)
 
@@ -243,7 +313,7 @@ class ClientConstruction(unittest.TestCase):
         solver_def = {"name__eq": "solver"}
         conf = {k: k for k in 'endpoint token solver'.split()}
 
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 self.assertEqual(client.default_solver, solver_def)
 
@@ -251,7 +321,7 @@ class ClientConstruction(unittest.TestCase):
         new_solver_def = {"software": True}
         conf = {k: k for k in 'endpoint token solver'.split()}
 
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config(solver=new_solver_def) as client:
                 self.assertEqual(client.default_solver, new_solver_def)
 
@@ -262,7 +332,7 @@ class ClientConstruction(unittest.TestCase):
         conf.update(solver=solver_json)
         solver = json.loads(solver_json)
 
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config(endpoint=None, solver=None) as client:
                 self.assertEqual(client.endpoint, conf['endpoint'])
                 self.assertEqual(client.default_solver, solver)
@@ -271,14 +341,14 @@ class ClientConstruction(unittest.TestCase):
         conf = {k: k for k in 'endpoint token solver'.split()}
         conf.update(solver=json.dumps({"software": True}))
 
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config(solver='solver') as client:
                 self.assertEqual(client.default_solver, {"name__eq": "solver"})
 
     def test_boolean_options_parsed_from_config(self):
         conf = {'connection_close': 'off', 'permissive_ssl': 'true'}
 
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config(token='token') as client:
                 self.assertFalse(client.connection_close)
                 self.assertTrue(client.permissive_ssl)
@@ -313,7 +383,7 @@ class ClientConstruction(unittest.TestCase):
         token = 'value'
         defaults = dict(token=token)
 
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: {}):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: {}):
             with dwave.cloud.Client.from_config(defaults=defaults) as client:
                 self.assertEqual(client.token, token)
 
@@ -333,7 +403,7 @@ class ClientConstruction(unittest.TestCase):
 
         kwargs = dict(token=token, defaults=defaults, request_timeout=None)
 
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with mock.patch.multiple("dwave.cloud.Client", DEFAULTS=DEFAULTS):
                 with dwave.cloud.Client.from_config(**kwargs) as client:
 
@@ -343,8 +413,8 @@ class ClientConstruction(unittest.TestCase):
                     # solver: set in defaults, overwritten in file conf
                     self.assertEqual(client.default_solver, solver)
 
-                    # endpoint: used from class defaults
-                    self.assertEqual(client.endpoint, DEFAULTS['endpoint'])
+                    # endpoint: derived from region
+                    self.assertEqual(client.endpoint, constants.DEFAULT_SOLVER_API_ENDPOINT)
 
                     # None kwarg: used from class defaults
                     self.assertEqual(client.request_timeout, request_timeout)
@@ -366,12 +436,12 @@ class ClientConstruction(unittest.TestCase):
         conf = dict(token='token')
 
         # headers as dict
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config(headers=headers_dict) as client:
                 self.assertDictEqual(client.headers, headers_dict)
 
         # headers as str
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config(headers=headers_str) as client:
                 self.assertDictEqual(client.headers, headers_dict)
 
@@ -383,7 +453,7 @@ class ClientConstruction(unittest.TestCase):
         client_cert = crt
         conf = dict(token='token', client_cert=crt)
 
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 self.assertEqual(client.client_cert, client_cert)
 
@@ -394,7 +464,7 @@ class ClientConstruction(unittest.TestCase):
         client_cert = (crt, key)
         conf = dict(token='token', client_cert=crt, client_cert_key=key)
 
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 self.assertEqual(client.client_cert, client_cert)
 
@@ -438,14 +508,14 @@ class ClientConstruction(unittest.TestCase):
         conf = dict(token='token', **poll_conf)
 
         # polling params from config file propagated to client object
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 self.assertEqual(client.poll_backoff_min, 0.1)
                 self.assertEqual(client.poll_backoff_max, 1.0)
 
         # test defaults
         conf = dict(token='token')
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 self.assertEqual(client.poll_backoff_min, Client.DEFAULTS['poll_backoff_min'])
                 self.assertEqual(client.poll_backoff_max, Client.DEFAULTS['poll_backoff_max'])
@@ -454,7 +524,7 @@ class ClientConstruction(unittest.TestCase):
         poll_conf = {"poll_backoff_min": "0.1", "poll_backoff_max": "1"}
         conf = dict(token='token', **poll_conf)
 
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config(poll_backoff_min=0.5) as client:
                 self.assertEqual(client.poll_backoff_min, 0.5)
                 self.assertEqual(client.poll_backoff_max, 1.0)
@@ -482,7 +552,7 @@ class ClientConstruction(unittest.TestCase):
         conf = dict(token='token', **retry_conf)
 
         # http retry params from config file propagated to client object
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 for opt, val in retry_opts.items():
                     self.assertEqual(getattr(client, opt), val,
@@ -494,7 +564,7 @@ class ClientConstruction(unittest.TestCase):
 
         # test defaults
         conf = dict(token='token')
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config() as client:
                 for param in retry_conf:
                     self.assertEqual(getattr(client, param), Client.DEFAULTS[param])
@@ -511,7 +581,7 @@ class ClientConstruction(unittest.TestCase):
         }
         conf = dict(token='token')
 
-        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config(**retry_kwargs) as client:
                 # verify client final config
                 for opt, val in retry_kwargs.items():
@@ -523,6 +593,7 @@ class ClientConstruction(unittest.TestCase):
                 self._verify_retry_config(retry, retry_kwargs)
 
 
+@mock.patch.multiple(Client, get_regions=get_default_regions)
 class ClientConfigIntegration(unittest.TestCase):
 
     def test_custom_options(self):
@@ -557,6 +628,116 @@ class ClientConfigIntegration(unittest.TestCase):
 
                 with mock.patch("requests.adapters.HTTPAdapter.send", mock_send):
                     client.get_solvers()
+
+
+class MultiRegionSupport(unittest.TestCase):
+
+    def test_region_selection_mocked_end_to_end(self):
+        """Given `metadata_api_endpoint` and `region` in a config file,
+        when Client is initialized from config,
+        then it is set-up with sapi endpoint retrieved from the metadata api."""
+
+        metadata_api_endpoint = 'metadata-api'
+        regions_response = [
+            {"code": "a", "endpoint": "endpoint-a", "name": "A"},
+            {"code": "b", "endpoint": "endpoint-b", "name": "B"}
+        ]
+        selected_region = regions_response[0]['code']
+        selected_endpoint = regions_response[0]['endpoint']
+
+        config_body = f"""
+            [defaults]
+            metadata_api_endpoint = {metadata_api_endpoint}
+            region = {selected_region}
+            token = token
+        """
+
+        expected_get_regions_return = {
+            r['code']: {"name": r['name'], "endpoint": r['endpoint']}
+            for r in regions_response
+        }
+
+        def _patch_session(resource):
+            self.assertEqual(resource.session.base_url, f"{metadata_api_endpoint}/")
+            session = mock.Mock()
+
+            def get(url, **kwargs):
+                response = mock.Mock(['text', 'json'])
+                response.status_code = 200
+                response.json.side_effect = lambda: regions_response
+                return response
+
+            session.get = get
+            resource.session = session
+
+        with mock.patch("dwave.cloud.config.open", iterable_mock_open(config_body)):
+            with mock.patch.multiple(Client._fetch_available_regions._cached, cache={}):
+                with mock.patch("dwave.cloud.client.base.api.Regions._patch_session", _patch_session):
+                    # note: we specify config_file, otherwise reading from files
+                    # might be skipped altogether if zero config files found on disk
+                    # (i.e. config open mock above fails on CI)
+                    with Client.from_config(config_file='config_file') as client:
+                        # verify get_regions() returns data from metadata_api_endpoint
+                        regions = client.get_regions()
+                        self.assertEqual(regions, expected_get_regions_return)
+
+                        # check region endpoint initialized from custom metadata_api_endpoint
+                        self.assertEqual(client.metadata_api_endpoint, metadata_api_endpoint)
+                        self.assertEqual(client.region, selected_region)
+                        self.assertEqual(client.endpoint, selected_endpoint)
+
+    def test_region_endpoint_fallback_when_no_metadata_api(self):
+        """Given region in config, and endpoint omitted,
+        when Client is initialized from config and MetadataAPI is down,
+        then the client is initialized to use the default (old) endpoint and region.
+        """
+        # test Client._resolve_region_endpoint
+
+        conf = dict(token='token', metadata_api_endpoint='invalid')
+        region = Client.DEFAULT_API_REGION
+
+        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+            with dwave.cloud.Client.from_config(region=region) as client:
+                self.assertEqual(client.region, Client.DEFAULT_API_REGION)
+                self.assertEqual(client.endpoint, Client.DEFAULT_API_ENDPOINT)
+
+    @mock.patch.multiple(Client, get_regions=get_default_regions)
+    def test_region_endpoint_fallback_when_region_unknown(self):
+        """Given invalid region in config, and endpoint omitted,
+        when Client is initialized from config,
+        then ValueError is raised.
+        """
+        # test Client._resolve_region_endpoint
+
+        conf = dict(token='token')
+        region = 'invalid-region-code'
+
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
+            with self.assertRaises(ValueError):
+                Client.from_config(region=region)
+
+    @mock.patch.multiple(Client, get_regions=get_default_regions)
+    def test_region_endpoint_null_case(self):
+        """Given region as None, and endpoint as None,
+        when Client is initialized from config,
+        then the client is initialized to use the default (old) endpoint and region.
+        """
+        # test Client._resolve_region_endpoint
+
+        conf = dict(token='token', region='')
+
+        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
+            with dwave.cloud.Client.from_config() as client:
+                self.assertEqual(client.region, Client.DEFAULT_API_REGION)
+                self.assertEqual(client.endpoint, Client.DEFAULT_API_ENDPOINT)
+
+    @unittest.skipUnless(config, "No live server configuration available.")
+    @mock.patch.multiple(Client._fetch_available_regions._cached, cache={})
+    def test_region_selection_live_end_to_end(self):
+        with Client(**config) as client:
+            self.assertEqual(client.region, constants.DEFAULT_REGION)
+            self.assertIn(constants.DEFAULT_REGION, client.endpoint)
+            self.assertGreater(len(client.get_regions()), 0)
 
 
 class FeatureBasedSolverSelection(unittest.TestCase):

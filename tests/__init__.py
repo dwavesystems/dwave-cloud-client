@@ -35,7 +35,7 @@ try:
 
     # ensure config is complete
     for var in ['token']:
-        if not config[var]:
+        if not config.get(var):
             raise ValueError("Config incomplete, missing: {!r}".format(var))
 
 except (ConfigFileError, ValueError) as e:

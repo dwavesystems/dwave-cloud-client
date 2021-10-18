@@ -17,10 +17,12 @@ import uuid
 import logging
 import unittest
 import warnings
+import tempfile
 from unittest import mock
 from collections import OrderedDict
 from itertools import count
 from datetime import datetime
+from functools import partial
 
 from parameterized import parameterized
 
@@ -75,10 +77,25 @@ class TestSimpleUtils(unittest.TestCase):
 
     def test_default_text_input(self):
         val = "value"
-        with mock.patch("dwave.cloud.utils.input", side_effect=[val]):
+        with mock.patch("click.termui.visible_prompt_func", side_effect=[val]):
             self.assertEqual(default_text_input("prompt", val), val)
-        with mock.patch("dwave.cloud.utils.input", side_effect=[val]):
+        with mock.patch("click.termui.visible_prompt_func", side_effect=[val]):
             self.assertEqual(default_text_input("prompt", val+val), val)
+
+    def test_optional_text_input(self):
+        with mock.patch("click.termui.visible_prompt_func", side_effect=[""]):
+            self.assertEqual(default_text_input("prompt", optional=True), None)
+
+    def test_optional_choices_text_input(self):
+        with mock.patch("click.termui.visible_prompt_func", side_effect=[""]):
+            self.assertEqual(
+                default_text_input("prompt", choices='abc', optional=True), None)
+        with mock.patch("click.termui.visible_prompt_func", side_effect=["d", "skip"]):
+            self.assertEqual(
+                default_text_input("prompt", choices='abc', optional=True), None)
+        with mock.patch("click.termui.visible_prompt_func", side_effect=["e", "a"]):
+            self.assertEqual(
+                default_text_input("prompt", choices='abc', optional=True), 'a')
 
     def test_generate_random_ising_problem(self):
         class MockSolver(object):
@@ -153,12 +170,17 @@ class TestSimpleUtils(unittest.TestCase):
             self.assertIn(key, ua)
 
 
-class TestCachedDecorator(unittest.TestCase):
+class TestCachedInMemoryDecorator(unittest.TestCase):
+    """Test @cached using in-memory store."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.cached = cached
 
     def test_args_hashing(self):
         counter = count()
 
-        @cached(maxage=300)
+        @self.cached(maxage=300)
         def f(*a, **b):
             return next(counter)
 
@@ -181,7 +203,7 @@ class TestCachedDecorator(unittest.TestCase):
     def test_args_collision(self):
         counter = count()
 
-        @cached(maxage=300)
+        @self.cached(maxage=300)
         def f(*a, **b):
             return next(counter)
 
@@ -194,7 +216,7 @@ class TestCachedDecorator(unittest.TestCase):
     def test_expiry(self):
         counter = count()
 
-        @cached(maxage=300)
+        @self.cached(maxage=300)
         def f(*a, **b):
             return next(counter)
 
@@ -219,7 +241,7 @@ class TestCachedDecorator(unittest.TestCase):
     def test_default_maxage(self):
         counter = count()
 
-        @cached()
+        @self.cached()
         def f(*a, **b):
             return next(counter)
 
@@ -231,7 +253,7 @@ class TestCachedDecorator(unittest.TestCase):
     def test_exceptions(self):
         counter = count(0)
 
-        @cached()
+        @self.cached()
         def f():
             # raises ZeroDivisionError only on first call
             # we do not want to cache that!
@@ -241,6 +263,19 @@ class TestCachedDecorator(unittest.TestCase):
             self.assertRaises(ZeroDivisionError, f)
             self.assertEqual(f(), 1)
             self.assertEqual(f(), 0.5)
+
+
+class TestCachedOnDiskDecorator(TestCachedInMemoryDecorator):
+    """Test @cached using on-disk store (via @cached.ondisk)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmpdir = tempfile.TemporaryDirectory()
+        cls.cached = partial(cached.ondisk, directory=cls.tmpdir.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmpdir.cleanup()
 
 
 class TestRetriedDecorator(unittest.TestCase):

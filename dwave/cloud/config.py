@@ -54,7 +54,11 @@ Environment variables:
 
     ``DWAVE_API_CLIENT``: API client class. Supported values are ``qpu``, ``sw`` and ``hybrid``.
 
+    ``DWAVE_API_REGION``: API region code.
+
     ``DWAVE_API_ENDPOINT``: API endpoint URL.
+
+    ``DWAVE_METADATA_API_ENDPOINT``: Metadata API endpoint URL.
 
     ``DWAVE_API_TOKEN``: API authorization token.
 
@@ -215,6 +219,7 @@ Examples:
 
 import os
 import ast
+import logging
 import configparser
 from collections import OrderedDict
 
@@ -222,9 +227,12 @@ import homebase
 
 from dwave.cloud.utils import uniform_get
 from dwave.cloud.exceptions import ConfigFileReadError, ConfigFileParseError
+from dwave.cloud.package_info import __version__, __packagename__
 
 __all__ = ['get_configfile_paths', 'get_configfile_path', 'get_default_configfile_path',
            'load_config_from_files', 'load_profile_from_files', 'load_config']
+
+logger = logging.getLogger(__name__)
 
 CONF_APP = "dwave"
 CONF_AUTHOR = "dwavesystem"
@@ -232,13 +240,25 @@ CONF_FILENAME = "dwave.conf"
 
 ENV_OPTION_MAP = {
     'DWAVE_API_CLIENT': 'client',
+    'DWAVE_API_REGION': 'region',
     'DWAVE_API_ENDPOINT': 'endpoint',
     'DWAVE_API_TOKEN': 'token',
     'DWAVE_API_SOLVER': 'solver',
     'DWAVE_API_PROXY': 'proxy',
     'DWAVE_API_HEADERS': 'headers',
+    'DWAVE_METADATA_API_ENDPOINT': 'metadata_api_endpoint',
 }
 """Map of environment variable names to config options."""
+
+# note: order is important during sequential config inplace update - keep most
+# significant last
+MUTUALLY_EXCLUSIVE_OPTIONS = {
+    'region': ['endpoint'],
+    'endpoint': ['region'],
+}
+"""List of options to be cleared on *lower level*, per each option set on higher
+level, in addition to the option value override (assumed).
+"""
 
 
 def parse_float(s, default=None):
@@ -426,6 +446,15 @@ def get_default_configfile_path():
         use_virtualenv=False, create=False)
     path = os.path.join(base, CONF_FILENAME)
     return path
+
+
+def get_cache_dir():
+    """Return a directory path convenient for storing user-local,
+    package-local and version-specific cache data.
+    """
+    return homebase.user_cache_dir(
+        app_name=__packagename__, app_author=CONF_AUTHOR,
+        version=__version__, use_virtualenv=False, create=True)
 
 
 def load_config_from_files(filenames=None):
@@ -718,8 +747,9 @@ def load_config(config_file=None, profile=None, **kwargs):
     an environment variable.
 
     Environment variables: ``DWAVE_CONFIG_FILE``, ``DWAVE_PROFILE``,
-    ``DWAVE_API_CLIENT``, ``DWAVE_API_ENDPOINT``, ``DWAVE_API_TOKEN``,
-    ``DWAVE_API_SOLVER``, ``DWAVE_API_PROXY``, ``DWAVE_API_HEADERS``.
+    ``DWAVE_API_CLIENT``, ``DWAVE_API_REGION``, ``DWAVE_API_ENDPOINT``,
+    ``DWAVE_API_TOKEN``, ``DWAVE_API_SOLVER``, ``DWAVE_API_PROXY``,
+    ``DWAVE_API_HEADERS``, ``DWAVE_METADATA_API_ENDPOINT``.
 
     Environment variables are described in :mod:`dwave.cloud.config`.
 
@@ -754,9 +784,7 @@ def load_config(config_file=None, profile=None, **kwargs):
         dict:
             Mapping of configuration keys to values for the profile (section),
             as read from the configuration file and optionally overridden by
-            environment values and specified keyword arguments. Always contains
-            the `client`, `endpoint`, `token`, `solver`, `proxy` and `headers`
-            keys.
+            environment values and specified keyword arguments.
 
     Raises:
         :exc:`ValueError`:
@@ -793,6 +821,9 @@ def load_config(config_file=None, profile=None, **kwargs):
 
     """
 
+    logger.trace("load_config(config_file=%r, profile=%r, kwargs=%r)",
+                 config_file, profile, kwargs)
+
     if profile is None:
         profile = os.getenv("DWAVE_PROFILE")
 
@@ -818,12 +849,15 @@ def load_config(config_file=None, profile=None, **kwargs):
 
         section = load_profile_from_files(filenames, profile)
 
+    logger.trace("config (from files) = %r", section)
+
     # override with env
     update_config_from_environment(section)
+    logger.trace("config (from files+env) = %r", section)
 
     # override with supplied kwarg options
-    # NOTE: for backward compatibility only
-    section.update(kwargs)
+    update_config(section, kwargs)
+    logger.trace("config (from files+env+kwargs) = %r", section)
 
     return section
 
@@ -835,7 +869,17 @@ def update_config_from_environment(section):
     :attr:`.ENV_OPTION_MAP`, with corresponding config option names as values.
     """
 
-    for env, option in ENV_OPTION_MAP.items():
-        section[option] = os.getenv(env, section.get(option))
+    envopts = {opt: os.getenv(env) for env, opt in ENV_OPTION_MAP.items()}
 
-    return section
+    update_config(section, envopts)
+
+
+def update_config(config: dict, options: dict) -> None:
+    """Update `config` inplace with `options`, ignoring None and blank string
+    values, clearing mutually exclusive options on different levels.
+    """
+    for key, val in options.items():
+        if val is not None and val != '':
+            for excluded in MUTUALLY_EXCLUSIVE_OPTIONS.get(key, []):
+                config.pop(excluded, None)
+            config[key] = val

@@ -17,7 +17,8 @@ python_requires = '>=3.6'
 
 # Package requirements, minimal pinning
 install_requires = ['requests[socks]>=2.18', 'pydantic>=1.7.3', 'homebase>=1.0',
-                    'click>=7.0', 'python-dateutil>=2.7', 'plucky>=0.4.3']
+                    'click>=7.0', 'python-dateutil>=2.7', 'plucky>=0.4.3',
+                    'diskcache>=5.2.1']
 
 # Package extras requirements
 extras_require = {

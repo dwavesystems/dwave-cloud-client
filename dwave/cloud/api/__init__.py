@@ -12,11 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# NOTE: dwave.cloud.api module and submodules considered private for now!
+
+
 import dwave.cloud.api.client
 import dwave.cloud.api.constants
 import dwave.cloud.api.exceptions
 import dwave.cloud.api.models
 import dwave.cloud.api.resources
 
-from dwave.cloud.api.client import SAPIClient
-from dwave.cloud.api.resources import Solvers, Problems
+from dwave.cloud.api import client
+from dwave.cloud.api import constants
+from dwave.cloud.api import exceptions
+from dwave.cloud.api import models
+from dwave.cloud.api import resources
+
+from dwave.cloud.api.client import DWaveAPIClient, SolverAPIClient, MetadataAPIClient
+from dwave.cloud.api.resources import Solvers, Problems, Regions
