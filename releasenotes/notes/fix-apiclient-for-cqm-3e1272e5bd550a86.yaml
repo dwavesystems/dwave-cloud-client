@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Fix ``dwave.cloud.api.constants.ProblemType`` enumeration to include the CQM
+    problem type.
