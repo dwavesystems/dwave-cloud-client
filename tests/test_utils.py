@@ -173,9 +173,8 @@ class TestSimpleUtils(unittest.TestCase):
 class TestCachedInMemoryDecorator(unittest.TestCase):
     """Test @cached using in-memory store."""
 
-    @classmethod
-    def setUpClass(cls):
-        cls.cached = cached
+    def setUp(self):
+        self.cached = cached
 
     def test_args_hashing(self):
         counter = count()
@@ -238,7 +237,7 @@ class TestCachedInMemoryDecorator(unittest.TestCase):
             self.assertEqual(f(1), 4)
             self.assertEqual(f(a=1, b=2), 5)
 
-    def test_default_maxage(self):
+    def test_default_zero_maxage(self):
         counter = count()
 
         @self.cached()
@@ -268,14 +267,12 @@ class TestCachedInMemoryDecorator(unittest.TestCase):
 class TestCachedOnDiskDecorator(TestCachedInMemoryDecorator):
     """Test @cached using on-disk store (via @cached.ondisk)."""
 
-    @classmethod
-    def setUpClass(cls):
-        cls.tmpdir = tempfile.TemporaryDirectory()
-        cls.cached = partial(cached.ondisk, directory=cls.tmpdir.name)
+    def setUp(self):
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.cached = partial(cached.ondisk, directory=self.tmpdir.name)
 
-    @classmethod
-    def tearDownClass(cls):
-        cls.tmpdir.cleanup()
+    def tearDown(self):
+        self.tmpdir.cleanup()
 
 
 class TestRetriedDecorator(unittest.TestCase):
