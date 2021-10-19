@@ -111,6 +111,8 @@ class isolated_environ:
             if self.remove_dwave and key.startswith("DWAVE_"):
                 os.environ.pop(key, None)
 
+        return self
+
     def stop(self):
         self.patcher.stop()
 
@@ -138,8 +140,7 @@ class isolated_environ:
         return wrapper
 
     def __enter__(self):
-        self.start()
-        return self
+        return self.start()
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.stop()

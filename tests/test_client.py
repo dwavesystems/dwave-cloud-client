@@ -183,6 +183,13 @@ class SolverLoading(unittest.TestCase):
 class ClientConstruction(unittest.TestCase):
     """Test Client constructor and Client.from_config() factory."""
 
+    def setUp(self):
+        # prevent run-time env vars interferring with tests
+        self._env = isolated_environ(empty=True).start()
+
+    def tearDown(self):
+        self._env.stop()
+
     def test_default(self):
         conf = {k: k for k in 'endpoint token'.split()}
         with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: conf):
@@ -230,7 +237,6 @@ class ClientConstruction(unittest.TestCase):
                     self.assertEqual(client.region, region_code)
                     self.assertEqual(client.endpoint, region_endpoint)
 
-    @isolated_environ(empty=True)
     def test_region_from_env_overrides_endpoint_from_config(self):
         conf = {k: k for k in 'endpoint token'.split()}
         region_code = 'region-code'
@@ -244,7 +250,6 @@ class ClientConstruction(unittest.TestCase):
                         self.assertEqual(client.region, region_code)
                         self.assertEqual(client.endpoint, region_endpoint)
 
-    @isolated_environ(empty=True)
     def test_metadata_api_endpoint_from_env_accepted(self):
         metadata_api_endpoint = 'metadata-endpoint'
         with isolated_environ(add={'DWAVE_METADATA_API_ENDPOINT': metadata_api_endpoint}):
