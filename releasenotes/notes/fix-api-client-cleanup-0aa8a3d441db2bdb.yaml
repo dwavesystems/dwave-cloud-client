@@ -1,0 +1,11 @@
+---
+features:
+  - |
+    Add context manager protocol support to
+    ``dwave.cloud.api.client.DWaveAPIClient`` to ensure resources are easily
+    cleaned up (session closed). Note that ``close()`` method is available for
+    cases when context manager pattern is inconvenient.
+
+    Similarly, we add ``close()`` method to resources in
+    ``dwave.cloud.api.resource.*``, in addition to the existing context manager
+    protocol support.

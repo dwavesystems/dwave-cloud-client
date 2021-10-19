@@ -120,6 +120,14 @@ class DWaveAPIClient:
     """Low-level client for D-Wave APIs. A thin wrapper around
     `requests.Session` that handles API specifics such as authentication,
     response and error parsing, retrying, etc.
+
+    Note:
+        To make sure the session is closed, call :meth:`.close`, or use the
+        context manager form (as show in the example below).
+
+    Example:
+        with DWaveAPIClient(endpoint='...', timeout=(5, 600)) as client:
+            client.session.get('...')
     """
 
     DEFAULTS = {
@@ -164,6 +172,12 @@ class DWaveAPIClient:
 
     def close(self):
         self.session.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
 
     @staticmethod
     def _retry_config(backoff_max=None, **kwargs):
