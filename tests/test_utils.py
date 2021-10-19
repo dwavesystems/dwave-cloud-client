@@ -274,6 +274,18 @@ class TestCachedOnDiskDecorator(TestCachedInMemoryDecorator):
     def tearDown(self):
         self.tmpdir.cleanup()
 
+    @mock.patch('dwave.cloud.utils.epochnow', lambda: 0)
+    def test_persistency(self):
+        counter = count()
+        def f():
+            return next(counter)
+
+        f1 = self.cached(maxage=1)(f)
+        self.assertEqual(f1(), 0)
+
+        f2 = self.cached(maxage=1)(f)
+        self.assertEqual(f2(), 0)
+
 
 class TestRetriedDecorator(unittest.TestCase):
 
