@@ -42,6 +42,7 @@ class TestConfig(unittest.TestCase):
         # verify Retry object config
         retry = client.session.get_adapter('https://').max_retries
         conf = DWaveAPIClient.DEFAULTS['retry']
+        client.close()
         self.assertEqual(retry.total, conf['total'])
 
     def test_init(self):
@@ -53,31 +54,32 @@ class TestConfig(unittest.TestCase):
                       verify=False,
                       proxies={'https': 'http://proxy.com'})
 
-        client = DWaveAPIClient(**config)
+        with DWaveAPIClient(**config) as client:
+            session = client.session
+            self.assertIsInstance(session, requests.Session)
 
-        session = client.session
-        self.assertIsInstance(session, requests.Session)
+            self.assertEqual(session.base_url, config['endpoint'])
+            self.assertEqual(session.cert, None)
+            self.assertEqual(session.headers['X-Auth-Token'], config['token'])
+            self.assertEqual(session.headers['Custom'], config['headers']['Custom'])
+            self.assertIn(__packagename__, session.headers['User-Agent'])
+            self.assertIn(__version__, session.headers['User-Agent'])
+            self.assertEqual(session.verify, config['verify'])
+            self.assertEqual(session.proxies, config['proxies'])
 
-        self.assertEqual(session.base_url, config['endpoint'])
-        self.assertEqual(session.cert, None)
-        self.assertEqual(session.headers['X-Auth-Token'], config['token'])
-        self.assertEqual(session.headers['Custom'], config['headers']['Custom'])
-        self.assertIn(__packagename__, session.headers['User-Agent'])
-        self.assertIn(__version__, session.headers['User-Agent'])
-        self.assertEqual(session.verify, config['verify'])
-        self.assertEqual(session.proxies, config['proxies'])
-
-        # verify Retry object config
-        retry = session.get_adapter('https://').max_retries
-        self.assertEqual(retry.total, config['retry']['total'])
+            # verify Retry object config
+            retry = session.get_adapter('https://').max_retries
+            self.assertEqual(retry.total, config['retry']['total'])
 
     def test_sapi_client(self):
-        client = SolverAPIClient()
-        self.assertEqual(client.session.base_url, constants.DEFAULT_SOLVER_API_ENDPOINT)
+        with SolverAPIClient() as client:
+            self.assertEqual(client.session.base_url,
+                             constants.DEFAULT_SOLVER_API_ENDPOINT)
 
     def test_metadata_client(self):
-        client = MetadataAPIClient()
-        self.assertEqual(client.session.base_url, constants.DEFAULT_METADATA_API_ENDPOINT)
+        with MetadataAPIClient() as client:
+            self.assertEqual(client.session.base_url,
+                             constants.DEFAULT_METADATA_API_ENDPOINT)
 
 
 class TestRequests(unittest.TestCase):
@@ -97,9 +99,8 @@ class TestRequests(unittest.TestCase):
         m.get(requests_mock.ANY, status_code=404, request_headers=auth_headers)
         m.get(config['endpoint'], json=data, request_headers=config['headers'])
 
-        client = DWaveAPIClient(**config)
-
-        self.assertEqual(client.session.get('').json(), data)
+        with DWaveAPIClient(**config) as client:
+            self.assertEqual(client.session.get('').json(), data)
 
     @requests_mock.Mocker()
     def test_paths(self, m):
@@ -115,10 +116,9 @@ class TestRequests(unittest.TestCase):
         m.get(f"{baseurl}/{path_a}", json=data_a)
         m.get(f"{baseurl}/{path_b}", json=data_b)
 
-        client = DWaveAPIClient(**config)
-
-        self.assertEqual(client.session.get(path_a).json(), data_a)
-        self.assertEqual(client.session.get(path_b).json(), data_b)
+        with DWaveAPIClient(**config) as client:
+            self.assertEqual(client.session.get(path_a).json(), data_a)
+            self.assertEqual(client.session.get(path_b).json(), data_b)
 
     @requests_mock.Mocker()
     def test_session_history(self, m):
@@ -130,17 +130,16 @@ class TestRequests(unittest.TestCase):
         m.get(requests_mock.ANY, status_code=404)
         m.get(f"{baseurl}/path", json=dict(data=True))
 
-        client = DWaveAPIClient(**config)
+        with DWaveAPIClient(**config) as client:
+            client.session.get('path')
+            self.assertEqual(client.session.history[-1].request.path_url, '/path')
 
-        client.session.get('path')
-        self.assertEqual(client.session.history[-1].request.path_url, '/path')
+            with self.assertRaises(exceptions.ResourceNotFoundError):
+                client.session.get('unknown')
+                self.assertEqual(client.session.history[-1].exception.error_code, 404)
 
-        with self.assertRaises(exceptions.ResourceNotFoundError):
-            client.session.get('unknown')
-            self.assertEqual(client.session.history[-1].exception.error_code, 404)
-
-        client.session.get('/path')
-        self.assertEqual(client.session.history[-1].request.path_url, '/path')
+            client.session.get('/path')
+            self.assertEqual(client.session.history[-1].request.path_url, '/path')
 
 
 class TestResponseParsing(unittest.TestCase):
@@ -151,10 +150,10 @@ class TestResponseParsing(unittest.TestCase):
 
         m.get(requests_mock.ANY, text='text', status_code=200)
 
-        client = DWaveAPIClient(endpoint='https://mock')
+        with DWaveAPIClient(endpoint='https://mock') as client:
 
-        with self.assertRaises(exceptions.ResourceBadResponseError) as exc:
-            client.session.get('test')
+            with self.assertRaises(exceptions.ResourceBadResponseError) as exc:
+                client.session.get('test')
 
     @requests_mock.Mocker()
     def test_structured_error_response(self, m):
@@ -166,13 +165,13 @@ class TestResponseParsing(unittest.TestCase):
 
         m.get(requests_mock.ANY, json=error, status_code=error_code)
 
-        client = DWaveAPIClient(endpoint='https://mock')
+        with DWaveAPIClient(endpoint='https://mock') as client:
 
-        with self.assertRaisesRegex(exceptions.ResourceNotFoundError, error_msg) as exc:
-            client.session.get('test')
+            with self.assertRaisesRegex(exceptions.ResourceNotFoundError, error_msg) as exc:
+                client.session.get('test')
 
-            self.assertEqual(exc.error_msg, error_msg)
-            self.assertEqual(exc.error_code, error_code)
+                self.assertEqual(exc.error_msg, error_msg)
+                self.assertEqual(exc.error_code, error_code)
 
     @requests_mock.Mocker()
     def test_plain_text_error(self, m):
@@ -183,13 +182,13 @@ class TestResponseParsing(unittest.TestCase):
 
         m.get(requests_mock.ANY, text=error_msg, status_code=error_code)
 
-        client = DWaveAPIClient(endpoint='https://mock')
+        with DWaveAPIClient(endpoint='https://mock') as client:
 
-        with self.assertRaisesRegex(exceptions.ResourceNotFoundError, error_msg) as exc:
-            client.session.get('test')
+            with self.assertRaisesRegex(exceptions.ResourceNotFoundError, error_msg) as exc:
+                client.session.get('test')
 
-            self.assertEqual(exc.error_msg, error_msg)
-            self.assertEqual(exc.error_code, error_code)
+                self.assertEqual(exc.error_msg, error_msg)
+                self.assertEqual(exc.error_code, error_code)
 
     @requests_mock.Mocker()
     def test_unknown_errors(self, m):
@@ -200,10 +199,10 @@ class TestResponseParsing(unittest.TestCase):
 
         m.get(requests_mock.ANY, text=error_msg, status_code=error_code)
 
-        client = DWaveAPIClient(endpoint='https://mock')
+        with DWaveAPIClient(endpoint='https://mock') as client:
 
-        with self.assertRaisesRegex(exceptions.RequestError, error_msg) as exc:
-            client.session.get('test')
+            with self.assertRaisesRegex(exceptions.RequestError, error_msg) as exc:
+                client.session.get('test')
 
-            self.assertEqual(exc.error_msg, error_msg)
-            self.assertEqual(exc.error_code, error_code)
+                self.assertEqual(exc.error_msg, error_msg)
+                self.assertEqual(exc.error_code, error_code)

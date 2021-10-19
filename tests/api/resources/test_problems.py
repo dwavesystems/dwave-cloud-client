@@ -494,6 +494,8 @@ class ProblemResourcesMockerMixin:
     def tearDown(self):
         self.mocker.stop()
 
+        self.api.close()
+
 
 class TestMockProblemsStructured(StructuredProblemTestsMixin,
                                  ProblemResourcesMockerMixin,
@@ -582,6 +584,10 @@ class TestCloudProblemsStructured(StructuredProblemTestsMixin,
             # double-check
             assert future.remote_status == constants.ProblemStatus.COMPLETED.value
 
+    @classmethod
+    def tearDownClass(cls):
+        cls.api.close()
+
 
 @unittest.skipUnless(dimod, "dimod not installed")
 @unittest.skipUnless(config, "SAPI access not configured")
@@ -616,3 +622,7 @@ class TestCloudProblemsUnstructured(UnstructuredProblemTestsMixin,
 
             # double-check
             assert future.remote_status == constants.ProblemStatus.COMPLETED.value
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.api.close()

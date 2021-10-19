@@ -37,11 +37,14 @@ class ResourceBase:
         self.session = self.client.session
         self._patch_session()
 
+    def close(self):
+        self.client.close()
+
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.client.close()
+        self.close()
 
     @classmethod
     def from_client_config(cls, client: Union[DWaveAPIClient, 'dwave.cloud.client.base.Client']):
