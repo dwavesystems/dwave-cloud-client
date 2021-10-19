@@ -475,7 +475,9 @@ class cached:
         """@cached backed by an on-disk sqlite3-based cache."""
         from dwave.cloud.config import get_cache_dir
         directory = kwargs.pop('directory', get_cache_dir())
-        cache = diskcache.Cache(directory=directory)
+        # NOTE: use pickle v4 to support <py38
+        # TODO: consider using `diskcache.JSONDisk` if we can serialize `api.models`
+        cache = diskcache.Cache(directory=directory, disk_pickle_protocol=4)
         return cls(cache=cache, **kwargs)
 
 
