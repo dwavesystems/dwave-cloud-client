@@ -438,8 +438,13 @@ class cached:
         return a + b
 
     def __init__(self, maxage=None, cache=None):
-        self.maxage = maxage or 0
-        self.cache = cache or {}
+        if maxage is None:
+            maxage = 0
+        self.maxage = maxage
+
+        if cache is None:
+            cache = {}
+        self.cache = cache
 
     def __call__(self, fn):
         @wraps(fn)
@@ -450,7 +455,8 @@ class cached:
             key = self.argshash(args, kwargs)
             data = self.cache.get(key, {})
 
-            logger.trace("cached: refresh=%r, key=%r, data=%r", refresh_, key, data)
+            logger.trace("cached: refresh=%r, store=%r key=%r, data=%r",
+                         refresh_, self.cache, key, data)
             if not refresh_ and data.get('expires', 0) > now:
                 val = data.get('val')
             else:
