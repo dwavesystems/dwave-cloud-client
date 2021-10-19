@@ -109,6 +109,10 @@ class TestCloudSolvers(unittest.TestCase):
         with Client(**config) as client:
             cls.api = Solvers.from_client_config(client)
 
+    @classmethod
+    def tearDownClass(cls):
+        cls.api.close()
+
     def test_list_solvers(self):
         """List of all available solvers retrieved."""
 

@@ -86,6 +86,10 @@ class TestCloudRegions(unittest.TestCase):
     def setUpClass(cls):
         cls.api = Regions()
 
+    @classmethod
+    def tearDownClass(cls):
+        cls.api.close()
+
     def test_list_solvers(self):
         regions = self.api.list_regions()
 
