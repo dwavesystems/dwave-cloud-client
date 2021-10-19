@@ -57,4 +57,5 @@ class ProblemType(str, enum.Enum):
     ISING = "ising"
     QUBO = "qubo"
     BQM = "bqm"
+    CQM = "cqm"
     DQM = "dqm"
