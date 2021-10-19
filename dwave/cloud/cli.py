@@ -124,6 +124,20 @@ def solver_options(fn):
     return fn
 
 
+def endpoint_options(fn):
+    """Decorate `fn` with `--endpoint` and `--region` options."""
+
+    fn = click.option(
+        '--endpoint', default=None, metavar='URL',
+        help='Solver API endpoint (default: from config)')(fn)
+    # TODO: provide choice for region
+    fn = click.option(
+        '--region', default=None, metavar='CODE',
+        help='Solver API region (default: from config)')(fn)
+
+    return fn
+
+
 @click.group()
 @click.version_option(prog_name=__title__, version=__version__)
 @click.option('--debug', is_flag=True, callback=enable_logging,
@@ -301,8 +315,8 @@ def _config_create(config_file, profile, ask_full=False):
     click.echo("Configuration saved.")
 
 
-def _ping(config_file, profile, client_type, solver_def, sampling_params,
-          request_timeout, polling_timeout, output):
+def _ping(config_file, profile, endpoint, region, client_type, solver_def,
+          sampling_params, request_timeout, polling_timeout, output):
     """Helper method for the ping command that uses `output()` for info output
     and raises `CLIError()` on handled errors.
 
@@ -318,6 +332,7 @@ def _ping(config_file, profile, client_type, solver_def, sampling_params,
                            "map of param names to values", code=99)
 
     config = dict(config_file=config_file, profile=profile,
+                  endpoint=endpoint, region=region,
                   client=client_type, solver=solver_def)
     if request_timeout is not None:
         config.update(request_timeout=request_timeout)
@@ -393,6 +408,7 @@ def _ping(config_file, profile, client_type, solver_def, sampling_params,
 
 @cli.command()
 @config_file_options()
+@endpoint_options
 @solver_options
 @click.option('--sampling-params', '-m', default=None, help='Sampling parameters (JSON encoded)')
 @click.option('--request-timeout', default=None, type=float,
@@ -401,8 +417,8 @@ def _ping(config_file, profile, client_type, solver_def, sampling_params,
               help='Problem polling timeout in seconds (time-to-solution timeout)')
 @click.option('--json', 'json_output', default=False, is_flag=True,
               help='JSON output')
-def ping(config_file, profile, client_type, solver_def, sampling_params, json_output,
-         request_timeout, polling_timeout):
+def ping(config_file, profile, endpoint, region, client_type, solver_def,
+         sampling_params, json_output, request_timeout, polling_timeout):
     """Ping the QPU by submitting a single-qubit problem."""
 
     now = utcnow()
@@ -418,8 +434,8 @@ def ping(config_file, profile, client_type, solver_def, sampling_params, json_ou
             click.echo(json.dumps(info))
 
     try:
-        _ping(config_file, profile, client_type, solver_def, sampling_params,
-              request_timeout, polling_timeout, output)
+        _ping(config_file, profile, endpoint, region, client_type, solver_def,
+              sampling_params, request_timeout, polling_timeout, output)
     except CLIError as error:
         output("Error: {error} (code: {code})", error=str(error), code=error.code)
         sys.exit(error.code)
@@ -432,12 +448,14 @@ def ping(config_file, profile, client_type, solver_def, sampling_params, json_ou
 
 @cli.command()
 @config_file_options()
+@endpoint_options
 @solver_options
 @click.option('--list', '-l', 'list_solvers', default=False, is_flag=True,
               help='Print filtered list of solver names, one per line')
 @click.option('--all', '-a', 'list_all', default=False, is_flag=True,
               help='Ignore solver filter (list/print all solvers)')
-def solvers(config_file, profile, client_type, solver_def, list_solvers, list_all):
+def solvers(config_file, profile, endpoint, region, client_type, solver_def,
+            list_solvers, list_all):
     """Get solver details.
 
     Solver filter is inherited from environment or the specified configuration
@@ -450,6 +468,7 @@ def solvers(config_file, profile, client_type, solver_def, list_solvers, list_al
 
     with Client.from_config(
             config_file=config_file, profile=profile,
+            endpoint=endpoint, region=region,
             client=client_type, solver=solver_def) as client:
 
         try:
@@ -481,6 +500,7 @@ def solvers(config_file, profile, client_type, solver_def, list_solvers, list_al
 
 @cli.command()
 @config_file_options()
+@endpoint_options
 @solver_options
 @click.option('--biases', '-h', default=None,
               help='List/dict of biases for Ising model problem formulation')
@@ -492,8 +512,8 @@ def solvers(config_file, profile, client_type, solver_def, list_solvers, list_al
               help='Number of reads/samples')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Increase output verbosity')
-def sample(config_file, profile, client_type, solver_def, biases, couplings,
-           random_problem, num_reads, verbose):
+def sample(config_file, profile, endpoint, region, client_type, solver_def,
+           biases, couplings, random_problem, num_reads, verbose):
     """Submit Ising-formulated problem and return samples."""
 
     # TODO: de-dup wrt ping
@@ -504,6 +524,7 @@ def sample(config_file, profile, client_type, solver_def, biases, couplings,
     try:
         client = Client.from_config(
             config_file=config_file, profile=profile,
+            endpoint=endpoint, region=region,
             client=client_type, solver=solver_def)
     except Exception as e:
         click.echo("Invalid configuration: {}".format(e))
@@ -561,6 +582,7 @@ def sample(config_file, profile, client_type, solver_def, biases, couplings,
 
 @cli.command()
 @config_file_options()
+@endpoint_options
 @solver_options
 @click.option('--problem-id', '-i', default=None,
               help='Problem ID (optional)')
@@ -568,12 +590,15 @@ def sample(config_file, profile, client_type, solver_def, biases, couplings,
               type=click.Choice(['coo', 'dimodbqm'], case_sensitive=False),
               help='Problem data encoding')
 @click.argument('input_file', metavar='FILE', type=click.File('rb'))
-def upload(config_file, profile, client_type, solver_def, problem_id, format, input_file):
+def upload(config_file, profile, endpoint, region, client_type, solver_def,
+           problem_id, format, input_file):
     """Multipart problem upload with cold restart support."""
 
     try:
         client = Client.from_config(
-            config_file=config_file, profile=profile, client=client_type)
+            config_file=config_file, profile=profile,
+            endpoint=endpoint, region=region,
+            client=client_type)
     except Exception as e:
         click.echo("Invalid configuration: {}".format(e))
         return 1

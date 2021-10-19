@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Add ``--region`` and ``--endpoint`` options to the relevant ``dwave`` CLI
+    subcommands: ``ping``, ``solvers``, ``sample``, ``upload``.
