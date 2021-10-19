@@ -267,6 +267,7 @@ class TestCli(unittest.TestCase):
             # proper arguments passed to Client.from_config?
             m.from_config.assert_called_with(
                 config_file=config_file, profile=profile,
+                endpoint=None, region=None,
                 client=client_type, solver=None,
                 request_timeout=0.5, polling_timeout=30)
 
@@ -309,7 +310,9 @@ class TestCli(unittest.TestCase):
 
             # proper arguments passed to Client.from_config?
             m.from_config.assert_called_with(
-                config_file=config_file, profile=profile, client=client, solver=solver)
+                config_file=config_file, profile=profile,
+                endpoint=None, region=None,
+                client=client, solver=solver)
 
             # get solver called?
             c = m.from_config.return_value
@@ -349,7 +352,9 @@ class TestCli(unittest.TestCase):
 
             # proper arguments passed to Client.from_config?
             m.from_config.assert_called_with(
-                config_file=config_file, profile=profile, client=client_type, solver=solver)
+                config_file=config_file, profile=profile,
+                endpoint=None, region=None,
+                client=client_type, solver=solver)
 
             # get solvers called?
             client.get_solvers.assert_called_with()
@@ -389,7 +394,9 @@ class TestCli(unittest.TestCase):
 
                 # proper arguments passed to Client.from_config?
                 m.from_config.assert_called_with(
-                    config_file=config_file, profile=profile, client=client_type)
+                    config_file=config_file, profile=profile,
+                    endpoint=None, region=None,
+                    client=client_type)
 
                 # upload method called on client?
                 c = m.from_config.return_value
