@@ -761,7 +761,7 @@ class Client(object):
                 headers=self.headers,
                 refresh_=refresh)
         except api.exceptions.RequestError as exc:
-            logger.exception("Metadata API unavailable")
+            logger.debug("Metadata API unavailable", exc_info=True)
             raise ValueError(
                 f"Metadata API unavailable at {self.metadata_api_endpoint!r}")
 
