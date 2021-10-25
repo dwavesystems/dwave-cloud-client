@@ -641,7 +641,7 @@ class Client(object):
             session.headers.update({'Connection': 'close'})
 
         # Debug-log headers
-        logger.debug("create_session(session.headers=%r)", session.headers)
+        logger.trace("create_session(session.headers=%r)", session.headers)
 
         return session
 
@@ -736,12 +736,12 @@ class Client(object):
     @cached.ondisk(maxage=_REGIONS_CACHE_MAXAGE)
     def _fetch_available_regions(metadata_api_endpoint, **config):
         logger.info("Fetching available regions from the Metadata API at %r",
-            metadata_api_endpoint)
+                    metadata_api_endpoint)
 
         with api.Regions(endpoint=metadata_api_endpoint, **config) as regions:
             data = regions.list_regions()
 
-        logger.trace("Received region metadata: %r", data)
+        logger.debug("Received region metadata: %r", data)
 
         return data
 
@@ -765,7 +765,7 @@ class Client(object):
             raise ValueError(
                 f"Metadata API unavailable at {self.metadata_api_endpoint!r}")
 
-        logger.debug("Using region metadata: %r", rs)
+        logger.info("Using region metadata: %r", rs)
 
         return {r.code: {"name": r.name, "endpoint": r.endpoint} for r in rs}
 
@@ -789,7 +789,7 @@ class Client(object):
         if name is not None:
             data = [data]
 
-        logger.debug("Received solver data for %d solver(s).", len(data))
+        logger.info("Received solver data for %d solver(s).", len(data))
         logger.trace("Solver data received for solver name=%r: %r", name, data)
 
         solvers = []
@@ -1224,7 +1224,7 @@ class Client(object):
             >>> client.close() # doctest: +SKIP
 
         """
-        logger.debug("Requested a solver that best matches feature filters=%r", filters)
+        logger.info("Requested a solver that best matches feature filters=%r", filters)
 
         # backward compatibility: name as the first feature
         if name is not None:
@@ -1245,9 +1245,11 @@ class Client(object):
 
         # get the first solver that satisfies all filters
         try:
-            logger.debug("Fetching solvers according to filters=%r, order_by=%r",
-                         filters, order_by)
-            return self.get_solvers(refresh=refresh, order_by=order_by, **filters)[0]
+            logger.info("Fetching solvers according to filters=%r, order_by=%r",
+                        filters, order_by)
+            solvers = self.get_solvers(refresh=refresh, order_by=order_by, **filters)
+            logger.info("Filtered solvers=%r", solvers)
+            return solvers[0]
         except IndexError:
             raise SolverNotFoundError("Solver with the requested features not available")
 
