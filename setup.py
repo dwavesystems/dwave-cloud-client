@@ -62,6 +62,7 @@ setup(
     long_description=open('README.rst', encoding='utf-8').read(),
     url=package_info['__url__'],
     license=package_info['__license__'],
+    license_files=["LICENSE"],
     packages=packages,
     python_requires=python_requires,
     install_requires=install_requires,
