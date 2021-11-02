@@ -33,12 +33,12 @@ class FilteredSecretsFormatter(logging.Formatter):
     a short alphanumeric string, and comprises 40 or more hex digits.
     """
 
-    SECRETS_PATTERN = re.compile(
-        r'([0-9A-Za-z]{2,4})-([0-9A-Fa-f]{3})([0-9A-Fa-f]{34,})([0-9A-Fa-f]{3})')
+    _SECRETS_PATTERN = re.compile(
+        r'\b([0-9A-Za-z]{2,4})-([0-9A-Fa-f]{3})([0-9A-Fa-f]{34,})([0-9A-Fa-f]{3})\b')
 
     def format(self, record):
         output = super().format(record)
-        filtered = re.sub(self.SECRETS_PATTERN, r'\1-\2...\4', output)
+        filtered = re.sub(self._SECRETS_PATTERN, r'\1-\2...\4', output)
         return filtered
 
 # configure logger `dwave.cloud` root logger, inherited in submodules
