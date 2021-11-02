@@ -713,6 +713,9 @@ class TestFilteredSecretsFormatter(unittest.TestCase):
         ctx = 'prefix {}'
         self.assertEqual(self._filter(ctx.format(inp)), ctx.format(out))
 
+        ctx = 'a{}word'
+        self.assertEqual(self._filter(ctx.format(inp)), ctx.format(inp))
+
 
 if __name__ == '__main__':
     unittest.main()
