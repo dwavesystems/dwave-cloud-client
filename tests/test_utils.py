@@ -26,6 +26,7 @@ from functools import partial
 
 from parameterized import parameterized
 
+from dwave.cloud import FilteredSecretsFormatter
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_head, strip_tail,
     active_qubits, generate_random_ising_problem,
@@ -680,6 +681,40 @@ class TestExceptionUtils(unittest.TestCase):
                 self.assertTrue(is_caused_by(exc, typ))
 
             self.assertFalse(is_caused_by(exc, KeyError))
+
+
+class TestFilteredSecretsFormatter(unittest.TestCase):
+
+    def _filter(self, msg):
+        fmt = FilteredSecretsFormatter('%(msg)s')
+        rec = logging.makeLogRecord(dict(msg=msg))
+        return fmt.format(rec)
+
+    @parameterized.expand([
+        ('0123456789012345678901234567890123456789', None),
+        ('A-0123456789012345678901234567890123456789', None),
+        ('AB-0123456789012345678901234567890123456789', 'AB-012...789'),
+        ('ABC-0123456789012345678901234567890123456789', 'ABC-012...789'),
+        ('ABC-c0f3456789012345678901234567890123456fee', 'ABC-c0f...fee'),
+        ('ABC-c0f3456789012345678901234567890123456beeffee', 'ABC-c0f...fee'),
+        ('ABC-c0f3456789012345678901234567890123456beefxfee', None),
+        ('ABCD-0123456789012345678901234567890123456789', 'ABCD-012...789'),
+        ('ABCDE-0123456789012345678901234567890123456789', None),
+    ])
+    def test_sapi_tokens(self, inp, out=None):
+        if out is None:
+            out = inp
+
+        self.assertEqual(self._filter(inp), out)
+
+        ctx = '{} suffix'
+        self.assertEqual(self._filter(ctx.format(inp)), ctx.format(out))
+
+        ctx = 'prefix {}'
+        self.assertEqual(self._filter(ctx.format(inp)), ctx.format(out))
+
+        ctx = 'a{}word'
+        self.assertEqual(self._filter(ctx.format(inp)), ctx.format(inp))
 
 
 if __name__ == '__main__':
