@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import re
 import sys
 import logging
 import importlib
@@ -25,9 +26,24 @@ from dwave.cloud.utils import set_loglevel
 __all__ = ['Client', 'Solver', 'Future']
 
 
+class FilteredSecretsFormatter(logging.Formatter):
+    """Logging formatter that filters out secrets (like Solver API tokens).
+
+    Note: we assume, for easier disambiguation, a secret/token is prefixed with
+    a short alphanumeric string, and comprises 40 or more hex digits.
+    """
+
+    SECRETS_PATTERN = re.compile(
+        r'([0-9A-Za-z]{2,4})-([0-9A-Fa-f]{3})([0-9A-Fa-f]{34,})([0-9A-Fa-f]{3})')
+
+    def format(self, record):
+        output = super().format(record)
+        filtered = re.sub(self.SECRETS_PATTERN, r'\1-\2...\4', output)
+        return filtered
+
 # configure logger `dwave.cloud` root logger, inherited in submodules
 # (write level warning+ to stderr, include timestamp/module/level)
-_formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(threadName)s %(message)s')
+_formatter = FilteredSecretsFormatter('%(asctime)s %(name)s %(levelname)s %(threadName)s %(message)s')
 _handler = logging.StreamHandler()
 _handler.setFormatter(_formatter)
 
