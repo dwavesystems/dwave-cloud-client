@@ -19,6 +19,7 @@ import json
 import subprocess
 import pkg_resources
 
+from collections.abc import Sequence
 from functools import partial, wraps
 from timeit import default_timer as timer
 
@@ -556,9 +557,12 @@ def solvers(config_file, profile, endpoint, region, client_type, solver_def,
               help='Number of reads/samples')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Increase output verbosity')
+@click.option('--json', 'json_output', default=False, is_flag=True,
+              help='JSON output')
 @standardized_output
 def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
-           biases, couplings, random_problem, num_reads, verbose, output):
+           biases, couplings, random_problem, num_reads, verbose, json_output,
+           output):
     """Submit Ising-formulated problem and return samples."""
 
     # we'll limit max line len in non-verbose mode
@@ -576,7 +580,9 @@ def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
         linear, quadratic = generate_random_ising_problem(solver)
     else:
         try:
-            linear = ast.literal_eval(biases) if biases else []
+            linear = ast.literal_eval(biases) if biases else {}
+            if isinstance(linear, Sequence):
+                linear = dict(enumerate(linear))
         except Exception as e:
             raise CLIError(f"Invalid biases: {e}", code=99)
         try:
@@ -584,8 +590,8 @@ def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
         except Exception as e:
             raise CLIError(f"Invalid couplings: {e}", code=99)
 
-    output("Using qubit biases: {linear}", linear=linear, maxlen=maxlen)
-    output("Using qubit couplings: {quadratic}", quadratic=quadratic, maxlen=maxlen)
+    output("Using qubit biases: {linear}", linear=list(linear.items()), maxlen=maxlen)
+    output("Using qubit couplings: {quadratic}", quadratic=list(quadratic.items()), maxlen=maxlen)
     output("Number of samples: {num_reads}", num_reads=num_reads)
 
     response = _sample(

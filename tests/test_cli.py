@@ -320,7 +320,7 @@ class TestCli(unittest.TestCase):
 
             # sampling method called on solver?
             s = c.get_solver.return_value
-            s.sample_ising.assert_called_with([0], {(0, 4): 1}, num_reads=10)
+            s.sample_ising.assert_called_with({0: 0}, {(0, 4): 1}, num_reads=10)
 
         self.assertEqual(result.exit_code, 0)
 

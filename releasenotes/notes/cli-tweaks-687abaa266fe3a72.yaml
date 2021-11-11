@@ -1,4 +1,7 @@
 ---
+features:
+  - |
+    Add ``--json`` output option to ``dwave sample``.
 fixes:
   - |
     Improved error and output handling in ``dwave sample``.
