@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Improved error and output handling in ``dwave sample``.
+    See `#300 <https://github.com/dwavesystems/dwave-cloud-client/issues/300>`_.

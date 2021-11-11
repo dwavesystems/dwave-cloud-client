@@ -405,10 +405,13 @@ def standardized_output(fn):
         now = utcnow()
         info = dict(datetime=now.isoformat(), timestamp=datetime_to_timestamp(now), code=0)
 
-        def output(fmt, **params):
+        def output(fmt, maxlen=None, **params):
             info.update(params)
             if not json_output:
-                click.echo(fmt.format(**params))
+                msg = fmt.format(**params)
+                if maxlen is not None:
+                    msg = strtrunc(msg, maxlen)
+                click.echo(msg)
 
         def flush():
             if json_output:
@@ -553,42 +556,21 @@ def solvers(config_file, profile, endpoint, region, client_type, solver_def,
               help='Number of reads/samples')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Increase output verbosity')
-def sample(config_file, profile, endpoint, region, client_type, solver_def,
-           biases, couplings, random_problem, num_reads, verbose):
+@standardized_output
+def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
+           biases, couplings, random_problem, num_reads, verbose, output):
     """Submit Ising-formulated problem and return samples."""
 
-    # TODO: de-dup wrt ping
+    # we'll limit max line len in non-verbose mode
+    maxlen = None if verbose else 120
 
-    def echo(s, maxlen=100):
-        click.echo(s if verbose else strtrunc(s, maxlen))
+    # TODO: add other params, like timeout?
+    config = dict(
+        config_file=config_file, profile=profile,
+        endpoint=endpoint, region=region,
+        client=client_type, solver=solver_def)
 
-    try:
-        client = Client.from_config(
-            config_file=config_file, profile=profile,
-            endpoint=endpoint, region=region,
-            client=client_type, solver=solver_def)
-    except Exception as e:
-        click.echo("Invalid configuration: {}".format(e))
-        return 1
-    if config_file:
-        echo("Using configuration file: {}".format(config_file))
-    if profile:
-        echo("Using profile: {}".format(profile))
-    echo("Using endpoint: {}".format(client.endpoint))
-
-    try:
-        solver = client.get_solver()
-    except SolverAuthenticationError:
-        click.echo("Authentication error. Check credentials in your configuration file.")
-        return 1
-    except (InvalidAPIResponseError, UnsupportedSolverError):
-        click.echo("Invalid or unexpected API response.")
-        return 2
-    except SolverNotFoundError:
-        click.echo("Solver with the specified features does not exist.")
-        return 3
-
-    echo("Using solver: {}".format(solver.id))
+    client, solver = _get_client_solver(config, output)
 
     if random_problem:
         linear, quadratic = generate_random_ising_problem(solver)
@@ -596,31 +578,26 @@ def sample(config_file, profile, endpoint, region, client_type, solver_def,
         try:
             linear = ast.literal_eval(biases) if biases else []
         except Exception as e:
-            click.echo("Invalid biases: {}".format(e))
+            raise CLIError(f"Invalid biases: {e}", code=99)
         try:
             quadratic = ast.literal_eval(couplings) if couplings else {}
         except Exception as e:
-            click.echo("Invalid couplings: {}".format(e))
+            raise CLIError(f"Invalid couplings: {e}", code=99)
 
-    echo("Using qubit biases: {!r}".format(linear))
-    echo("Using qubit couplings: {!r}".format(quadratic))
-    echo("Number of samples: {}".format(num_reads))
+    output("Using qubit biases: {linear}", linear=linear, maxlen=maxlen)
+    output("Using qubit couplings: {quadratic}", quadratic=quadratic, maxlen=maxlen)
+    output("Number of samples: {num_reads}", num_reads=num_reads)
 
-    try:
-        result = solver.sample_ising(linear, quadratic, num_reads=num_reads)
-        problem_id = result.wait_id()
-        echo(f"Submitted problem ID: {problem_id}")
-        result.result()
-    except Exception as e:
-        click.echo(e)
-        return 4
+    response = _sample(
+        solver, problem=(linear, quadratic),
+        params=dict(num_reads=num_reads), output=output)
 
     if verbose:
-        click.echo("Result: {!r}".format(result))
+        output("Result: {response!r}", response=response.result())
 
-    echo("Samples: {!r}".format(result.samples))
-    echo("Occurrences: {!r}".format(result.occurrences))
-    echo("Energies: {!r}".format(result.energies))
+    output("Samples: {samples!r}", samples=response.samples, maxlen=maxlen)
+    output("Occurrences: {num_occurrences!r}", num_occurrences=response.num_occurrences, maxlen=maxlen)
+    output("Energies: {energies!r}", energies=response.energies, maxlen=maxlen)
 
 
 @cli.command()
