@@ -315,40 +315,32 @@ def _config_create(config_file, profile, ask_full=False):
     click.echo("Configuration saved.")
 
 
-def _ping(config_file, profile, endpoint, region, client_type, solver_def,
-          sampling_params, request_timeout, polling_timeout, output):
-    """Helper method for the ping command that uses `output()` for info output
-    and raises `CLIError()` on handled errors.
-
-    This function is invariant to output format and/or error signaling mechanism.
+def _get_client_solver(config, output=None):
+    """Helper function to return an instantiated client, and solver, validating
+    parameters in the process, while wrapping errors in `CLIError` and using
+    `output` writer as a centralized printer.
     """
-    params = {}
-    if sampling_params is not None:
-        try:
-            params = json.loads(sampling_params)
-            assert isinstance(params, dict)
-        except:
-            raise CLIError("sampling parameters required as JSON-encoded "
-                           "map of param names to values", code=99)
+    if output is None:
+        output = click.echo
 
-    config = dict(config_file=config_file, profile=profile,
-                  endpoint=endpoint, region=region,
-                  client=client_type, solver=solver_def)
-    if request_timeout is not None:
-        config.update(request_timeout=request_timeout)
-    if polling_timeout is not None:
-        config.update(polling_timeout=polling_timeout)
+    # get client
     try:
         client = Client.from_config(**config)
     except Exception as e:
         raise CLIError("Invalid configuration: {}".format(e), code=1)
+
+    config_file = config.get('config_file')
     if config_file:
         output("Using configuration file: {config_file}", config_file=config_file)
+
+    profile = config.get('profile')
     if profile:
         output("Using profile: {profile}", profile=profile)
-    output("Using endpoint: {endpoint}", endpoint=client.endpoint)
 
-    t0 = timer()
+    output("Using endpoint: {endpoint}", endpoint=client.endpoint)
+    output("Using region: {region}", region=client.region)
+
+    # get solver
     try:
         solver = client.get_solver()
     except SolverAuthenticationError:
@@ -372,6 +364,54 @@ def _ping(config_file, profile, endpoint, region, client_type, solver_def,
     except Exception as e:
         raise CLIError("Unexpected error while fetching solver: {!r}".format(e), 5)
 
+    output("Using solver: {solver_id}", solver_id=solver.id)
+
+    return (client, solver)
+
+def _sample(solver, problem, params, output):
+    """Blocking sample call with error handling and using custom printer."""
+
+    try:
+        response = solver.sample_ising(*problem, **params)
+        problem_id = response.wait_id()
+        output("Submitted problem ID: {problem_id}", problem_id=problem_id)
+        response.wait()
+    except RequestTimeout:
+        raise CLIError("API connection timed out.", 8)
+    except PollingTimeout:
+        raise CLIError("Polling timeout exceeded.", 9)
+    except Exception as e:
+        raise CLIError("Sampling error: {!r}".format(e), 10)
+
+    return response
+
+def _ping(config_file, profile, endpoint, region, client_type, solver_def,
+          sampling_params, request_timeout, polling_timeout, output):
+    """Helper method for the ping command that uses `output()` for info output
+    and raises `CLIError()` on handled errors.
+
+    This function is invariant to output format and/or error signaling mechanism.
+    """
+    # parse params (TODO: move to click validator)
+    params = {}
+    if sampling_params is not None:
+        try:
+            params = json.loads(sampling_params)
+            assert isinstance(params, dict)
+        except:
+            raise CLIError("sampling parameters required as JSON-encoded "
+                           "map of param names to values", code=99)
+
+    config = dict(
+        config_file=config_file, profile=profile,
+        endpoint=endpoint, region=region,
+        client=client_type, solver=solver_def,
+        request_timeout=request_timeout, polling_timeout=polling_timeout)
+
+    t0 = timer()
+    client, solver = _get_client_solver(config, output)
+
+    # generate problem
     if hasattr(solver, 'nodes'):
         # structured solver: use the first existing node
         problem = ({min(solver.nodes): 0}, {})
@@ -380,27 +420,16 @@ def _ping(config_file, profile, endpoint, region, client_type, solver_def,
         problem = ({0: 1}, {})
 
     t1 = timer()
-    output("Using solver: {solver_id}", solver_id=solver.id)
-
-    try:
-        future = solver.sample_ising(*problem, **params)
-        output("Submitted problem ID: {problem_id}", problem_id=future.wait_id())
-        timing = future.timing
-    except RequestTimeout:
-        raise CLIError("API connection timed out.", 8)
-    except PollingTimeout:
-        raise CLIError("Polling timeout exceeded.", 9)
-    except Exception as e:
-        raise CLIError("Sampling error: {!r}".format(e), 10)
+    response = _sample(solver, problem, params, output)
 
     t2 = timer()
     output("\nWall clock time:")
     output(" * Solver definition fetch: {wallclock_solver_definition:.3f} ms", wallclock_solver_definition=(t1-t0)*1000.0)
     output(" * Problem submit and results fetch: {wallclock_sampling:.3f} ms", wallclock_sampling=(t2-t1)*1000.0)
     output(" * Total: {wallclock_total:.3f} ms", wallclock_total=(t2-t0)*1000.0)
-    if timing:
+    if response.timing:
         output("\nQPU timing:")
-        for component, duration in sorted(timing.items()):
+        for component, duration in sorted(response.timing.items()):
             output(" * %(name)s = {%(name)s} us" % {"name": component}, **{component: duration})
     else:
         output("\nQPU timing data not available.")
@@ -417,7 +446,7 @@ def _ping(config_file, profile, endpoint, region, client_type, solver_def,
               help='Problem polling timeout in seconds (time-to-solution timeout)')
 @click.option('--json', 'json_output', default=False, is_flag=True,
               help='JSON output')
-def ping(config_file, profile, endpoint, region, client_type, solver_def,
+def ping(*, config_file, profile, endpoint, region, client_type, solver_def,
          sampling_params, json_output, request_timeout, polling_timeout):
     """Ping the QPU by submitting a single-qubit problem."""
 
