@@ -19,7 +19,7 @@ import json
 import subprocess
 import pkg_resources
 
-from functools import partial
+from functools import partial, wraps
 from timeit import default_timer as timer
 
 from typing import Dict, List
@@ -368,6 +368,7 @@ def _get_client_solver(config, output=None):
 
     return (client, solver)
 
+
 def _sample(solver, problem, params, output):
     """Blocking sample call with error handling and using custom printer."""
 
@@ -385,13 +386,64 @@ def _sample(solver, problem, params, output):
 
     return response
 
-def _ping(config_file, profile, endpoint, region, client_type, solver_def,
-          sampling_params, request_timeout, polling_timeout, output):
-    """Helper method for the ping command that uses `output()` for info output
-    and raises `CLIError()` on handled errors.
 
-    This function is invariant to output format and/or error signaling mechanism.
+def standardized_output(fn):
+    """Decorator that captures `CLIError`s from `fn` and formats output.
+
+    The decorated function (cli command) receives `output()` for info output
+    and should raise `CLIError()` (for handled errors) to output error messages.
+
+    The function itself can be invariant to output format and/or error signaling
+    mechanism.
     """
+
+    @wraps(fn)
+    def wrapped(*args, **kwargs):
+        # text/json output taken from callee args
+        json_output = kwargs.get('json_output', False)
+
+        now = utcnow()
+        info = dict(datetime=now.isoformat(), timestamp=datetime_to_timestamp(now), code=0)
+
+        def output(fmt, **params):
+            info.update(params)
+            if not json_output:
+                click.echo(fmt.format(**params))
+
+        def flush():
+            if json_output:
+                click.echo(json.dumps(info))
+
+        try:
+            fn(*args, output=output, **kwargs)
+        except CLIError as error:
+            output("Error: {error} (code: {code})", error=str(error), code=error.code)
+            sys.exit(error.code)
+        except Exception as error:
+            output("Unhandled error: {error}", error=str(error))
+            sys.exit(127)
+        finally:
+            flush()
+
+    return wrapped
+
+
+@cli.command()
+@config_file_options()
+@endpoint_options
+@solver_options
+@click.option('--sampling-params', '-m', default=None, help='Sampling parameters (JSON encoded)')
+@click.option('--request-timeout', default=None, type=float,
+              help='Connection and read timeouts (in seconds) for all API requests')
+@click.option('--polling-timeout', default=None, type=float,
+              help='Problem polling timeout in seconds (time-to-solution timeout)')
+@click.option('--json', 'json_output', default=False, is_flag=True,
+              help='JSON output')
+@standardized_output
+def ping(*, config_file, profile, endpoint, region, client_type, solver_def,
+         sampling_params, json_output, request_timeout, polling_timeout, output):
+    """Ping the QPU by submitting a single-qubit problem."""
+
     # parse params (TODO: move to click validator)
     params = {}
     if sampling_params is not None:
@@ -433,46 +485,6 @@ def _ping(config_file, profile, endpoint, region, client_type, solver_def,
             output(" * %(name)s = {%(name)s} us" % {"name": component}, **{component: duration})
     else:
         output("\nQPU timing data not available.")
-
-
-@cli.command()
-@config_file_options()
-@endpoint_options
-@solver_options
-@click.option('--sampling-params', '-m', default=None, help='Sampling parameters (JSON encoded)')
-@click.option('--request-timeout', default=None, type=float,
-              help='Connection and read timeouts (in seconds) for all API requests')
-@click.option('--polling-timeout', default=None, type=float,
-              help='Problem polling timeout in seconds (time-to-solution timeout)')
-@click.option('--json', 'json_output', default=False, is_flag=True,
-              help='JSON output')
-def ping(*, config_file, profile, endpoint, region, client_type, solver_def,
-         sampling_params, json_output, request_timeout, polling_timeout):
-    """Ping the QPU by submitting a single-qubit problem."""
-
-    now = utcnow()
-    info = dict(datetime=now.isoformat(), timestamp=datetime_to_timestamp(now), code=0)
-
-    def output(fmt, **kwargs):
-        info.update(kwargs)
-        if not json_output:
-            click.echo(fmt.format(**kwargs))
-
-    def flush():
-        if json_output:
-            click.echo(json.dumps(info))
-
-    try:
-        _ping(config_file, profile, endpoint, region, client_type, solver_def,
-              sampling_params, request_timeout, polling_timeout, output)
-    except CLIError as error:
-        output("Error: {error} (code: {code})", error=str(error), code=error.code)
-        sys.exit(error.code)
-    except Exception as error:
-        output("Unhandled error: {error}", error=str(error))
-        sys.exit(127)
-    finally:
-        flush()
 
 
 @cli.command()
