@@ -2,6 +2,9 @@
 features:
   - |
     Add ``--json`` output option to ``dwave sample``.
+  - |
+    Add ``--sampling-params`` option to ``dwave sample``. ``--num-reads`` has
+    been kept, and it now overwrites value given in sampling params.
 fixes:
   - |
     Improved error and output handling in ``dwave sample``.

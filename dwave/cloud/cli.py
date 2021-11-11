@@ -553,20 +553,35 @@ def solvers(config_file, profile, endpoint, region, client_type, solver_def,
               help='List/dict of couplings for Ising model problem formulation')
 @click.option('--random-problem', '-r', default=False, is_flag=True,
               help='Submit a valid random problem using all qubits')
-@click.option('--num-reads', '-n', default=1, type=int,
+@click.option('--num-reads', '-n', default=None, type=int,
               help='Number of reads/samples')
+@click.option('--sampling-params', '-m', default=None,
+              help='Sampling parameters, JSON encoded')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Increase output verbosity')
 @click.option('--json', 'json_output', default=False, is_flag=True,
               help='JSON output')
 @standardized_output
 def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
-           biases, couplings, random_problem, num_reads, verbose, json_output,
-           output):
+           biases, couplings, random_problem, num_reads, sampling_params,
+           verbose, json_output, output):
     """Submit Ising-formulated problem and return samples."""
 
     # we'll limit max line len in non-verbose mode
     maxlen = None if verbose else 120
+
+    # parse params (TODO: move to click validator)
+    params = {}
+    if sampling_params is not None:
+        try:
+            params = json.loads(sampling_params)
+            assert isinstance(params, dict)
+        except:
+            raise CLIError("sampling parameters required as JSON-encoded "
+                           "map of param names to values", code=99)
+
+    if num_reads is not None:
+        params.update(num_reads=num_reads)
 
     # TODO: add other params, like timeout?
     config = dict(
@@ -592,11 +607,10 @@ def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
 
     output("Using qubit biases: {linear}", linear=list(linear.items()), maxlen=maxlen)
     output("Using qubit couplings: {quadratic}", quadratic=list(quadratic.items()), maxlen=maxlen)
-    output("Number of samples: {num_reads}", num_reads=num_reads)
+    output("Sampling parameters: {sampling_params}", sampling_params=params)
 
     response = _sample(
-        solver, problem=(linear, quadratic),
-        params=dict(num_reads=num_reads), output=output)
+        solver, problem=(linear, quadratic), params=params, output=output)
 
     if verbose:
         output("Result: {response!r}", response=response.result())
