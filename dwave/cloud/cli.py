@@ -441,11 +441,13 @@ def standardized_output(fn):
               help='Connection and read timeouts (in seconds) for all API requests')
 @click.option('--polling-timeout', default=None, type=float,
               help='Problem polling timeout in seconds (time-to-solution timeout)')
+@click.option('--label', default='dwave ping', type=str, help='Problem label')
 @click.option('--json', 'json_output', default=False, is_flag=True,
               help='JSON output')
 @standardized_output
 def ping(*, config_file, profile, endpoint, region, client_type, solver_def,
-         sampling_params, json_output, request_timeout, polling_timeout, output):
+         sampling_params, request_timeout, polling_timeout, label, json_output,
+         output):
     """Ping the QPU by submitting a single-qubit problem."""
 
     # parse params (TODO: move to click validator)
@@ -457,6 +459,9 @@ def ping(*, config_file, profile, endpoint, region, client_type, solver_def,
         except:
             raise CLIError("sampling parameters required as JSON-encoded "
                            "map of param names to values", code=99)
+
+    if label:
+        params.update(label=label)
 
     config = dict(
         config_file=config_file, profile=profile,
@@ -555,6 +560,7 @@ def solvers(config_file, profile, endpoint, region, client_type, solver_def,
               help='Submit a valid random problem using all qubits')
 @click.option('--num-reads', '-n', default=None, type=int,
               help='Number of reads/samples')
+@click.option('--label', default='dwave sample', type=str, help='Problem label')
 @click.option('--sampling-params', '-m', default=None,
               help='Sampling parameters, JSON encoded')
 @click.option('--verbose', '-v', default=False, is_flag=True,
@@ -563,7 +569,7 @@ def solvers(config_file, profile, endpoint, region, client_type, solver_def,
               help='JSON output')
 @standardized_output
 def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
-           biases, couplings, random_problem, num_reads, sampling_params,
+           biases, couplings, random_problem, num_reads, label, sampling_params,
            verbose, json_output, output):
     """Submit Ising-formulated problem and return samples."""
 
@@ -582,6 +588,9 @@ def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
 
     if num_reads is not None:
         params.update(num_reads=num_reads)
+
+    if label:
+        params.update(label=label)
 
     # TODO: add other params, like timeout?
     config = dict(

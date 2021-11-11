@@ -5,6 +5,9 @@ features:
   - |
     Add ``--sampling-params`` option to ``dwave sample``. ``--num-reads`` has
     been kept, and it now overwrites value given in sampling params.
+  - |
+    Add ``--label`` option to ``dwave ping`` and ``dwave sample``, with a
+    default value set. See `#481 <https://github.com/dwavesystems/dwave-cloud-client/issues/481>`_.
 fixes:
   - |
     Improved error and output handling in ``dwave sample``.
