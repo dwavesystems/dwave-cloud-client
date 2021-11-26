@@ -845,10 +845,16 @@ def _install_contrib_package(name, verbose=0, prompt=True):
 @click.option('--install-all', '--all', '-a', default=False, is_flag=True,
               help='Install all non-open-source packages '\
                    'available and accept licenses without prompting')
+@click.option('--full', 'ask_full', default=False, is_flag=True,
+              help='Configure non-essential options (such as endpoint and solver).')
 @click.option('--verbose', '-v', count=True,
               help='Increase output verbosity (additive, up to 4 times)')
-def setup(install_all, verbose):
-    """Setup optional Ocean packages and configuration file(s)."""
+def setup(install_all, ask_full, verbose):
+    """Setup optional Ocean packages and configuration file(s).
+
+    Equivalent to running `dwave install [--all]`, followed by
+    `dwave config create [--full]`.
+    """
 
     contrib = get_contrib_packages()
     packages = list(contrib)
@@ -873,4 +879,4 @@ def setup(install_all, verbose):
             _install_contrib_package(pkg, verbose=verbose, prompt=not install_all)
 
     click.echo("Creating the D-Wave configuration file.")
-    return _config_create(config_file=None, profile=None, ask_full=False)
+    return _config_create(config_file=None, profile=None, ask_full=ask_full)
