@@ -85,6 +85,20 @@ jobs:
           keys:
             - v1-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-<< parameters.xcode >>
 
+      - when:
+          # backport https://github.com/python/cpython/pull/21113 to support macOS 11 when building py36
+          # see also: https://github.com/pyenv/pyenv/issues/1737.
+          condition:
+            matches:
+              pattern: "^3\\.6.*$"
+              value: << parameters.python-version >>
+          steps:
+            - run:
+                name: Install Python 3.6 with a patch for macOS 11
+                command: |
+                  curl -LO https://github.com/python/cpython/commit/8ea6353.patch
+                  pyenv install << parameters.python-version>> -s -p < 8ea6353.patch
+
       - run: &pyenv-install-python
           name: Install python
           command: pyenv install << parameters.python-version >> -s
