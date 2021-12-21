@@ -92,8 +92,10 @@ jobs:
       - run: &pyenv-set-system-python
           name: Set system python
           command: |
-            pyenv global << parameters.python-version >>
+            echo -e '\n\n# Initialize pyenv' >> ~/.bash_profile
+            echo 'eval "$(pyenv init --path 2>/dev/null || true)"' >> ~/.bash_profile
             echo 'eval "$(pyenv init -)"' >> ~/.bash_profile
+            pyenv global << parameters.python-version >>
 
       - save_cache: &save-cache-pyenv
           key: v1-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-<< parameters.xcode >>
@@ -161,7 +163,7 @@ jobs:
 
   pypi-deploy:
     docker:
-      - image: circleci/python:3.7
+      - image: circleci/python:3.9
 
     steps:
       - checkout
@@ -191,15 +193,21 @@ workflows:
           name: test-linux-py<< matrix.python-version >><<# matrix.dimod-version >>-dimod<< matrix.dimod-version >><</ matrix.dimod-version >>
           matrix:
             parameters:
-              python-version: &python-versions ["3.6.12", "3.7.9", "3.8.6", "3.9.0"]
+              python-version: &python-versions ["3.6.12", "3.7.9", "3.8.6", "3.9.0", "3.10.0"]
               dimod-version: ["", "~=0.8.0,>=0.8.21", "~=0.9.0", "~=0.10.0,>0.10.4"]
+            exclude:
+              # dimod < 0.10 not supported on py310
+              - python-version: "3.10.0"
+                dimod-version: "~=0.8.0,>=0.8.21"
+              - python-version: "3.10.0"
+                dimod-version: "~=0.9.0"
 
       - test-macos:
           name: test-macos-py<< matrix.python-version >>
           matrix:
             parameters:
               python-version: *python-versions
-              xcode: ["12.3.0"]
+              xcode: ["13.2.0"]
 
       - test-docs
 
