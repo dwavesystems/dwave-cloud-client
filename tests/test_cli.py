@@ -247,6 +247,7 @@ class TestCli(unittest.TestCase):
         profile = 'profile'
         client_type = 'qpu'
         params = dict(num_reads=10)
+        label = 'label'
 
         with mock.patch('dwave.cloud.cli.Client') as m:
             # mock returned solver
@@ -262,7 +263,8 @@ class TestCli(unittest.TestCase):
                                              '--client', client_type,
                                              '--sampling-params', json.dumps(params),
                                              '--request-timeout', '.5',
-                                             '--polling-timeout', '30'])
+                                             '--polling-timeout', '30',
+                                             '--label', label])
 
             # proper arguments passed to Client.from_config?
             m.from_config.assert_called_with(
@@ -276,7 +278,8 @@ class TestCli(unittest.TestCase):
 
             # sampling method called on solver with correct params?
             solver = client.get_solver.return_value
-            solver.sample_ising.assert_called_with({3: 0}, {}, **params)
+            solver.sample_ising.assert_called_with(
+                {3: 0}, {}, label=label, **params)
 
         self.assertEqual(result.exit_code, 0)
 
@@ -293,6 +296,7 @@ class TestCli(unittest.TestCase):
         biases = '[0]'
         couplings = '{(0, 4): 1}'
         num_reads = '10'
+        label = 'label'
 
         with mock.patch('dwave.cloud.cli.Client') as m:
 
@@ -304,6 +308,7 @@ class TestCli(unittest.TestCase):
                                              '--profile', profile,
                                              '--client', client,
                                              '--solver', solver,
+                                             '--label', label,
                                              '-h', biases,
                                              '-j', couplings,
                                              '-n', num_reads])
@@ -320,7 +325,8 @@ class TestCli(unittest.TestCase):
 
             # sampling method called on solver?
             s = c.get_solver.return_value
-            s.sample_ising.assert_called_with([0], {(0, 4): 1}, num_reads=10)
+            s.sample_ising.assert_called_with(
+                {0: 0}, {(0, 4): 1}, num_reads=10, label=label)
 
         self.assertEqual(result.exit_code, 0)
 

@@ -1,0 +1,17 @@
+---
+features:
+  - |
+    Add ``--json`` output option to ``dwave sample``.
+  - |
+    Add ``--sampling-params`` option to ``dwave sample``. ``--num-reads`` has
+    been kept, and it now overwrites value given in sampling params.
+  - |
+    Add ``--label`` option to ``dwave ping`` and ``dwave sample``, with a
+    default value set. See `#481 <https://github.com/dwavesystems/dwave-cloud-client/issues/481>`_.
+  - |
+    Add ``--full`` option to ``dwave setup``, propagated to
+    ``dwave config create``. Clarified ``dwave setup`` operation in CLI help.
+fixes:
+  - |
+    Improved error and output handling in ``dwave sample``.
+    See `#300 <https://github.com/dwavesystems/dwave-cloud-client/issues/300>`_.

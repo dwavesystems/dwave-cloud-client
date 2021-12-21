@@ -19,7 +19,8 @@ import json
 import subprocess
 import pkg_resources
 
-from functools import partial
+from collections.abc import Sequence
+from functools import partial, wraps
 from timeit import default_timer as timer
 
 from typing import Dict, List
@@ -315,40 +316,32 @@ def _config_create(config_file, profile, ask_full=False):
     click.echo("Configuration saved.")
 
 
-def _ping(config_file, profile, endpoint, region, client_type, solver_def,
-          sampling_params, request_timeout, polling_timeout, output):
-    """Helper method for the ping command that uses `output()` for info output
-    and raises `CLIError()` on handled errors.
-
-    This function is invariant to output format and/or error signaling mechanism.
+def _get_client_solver(config, output=None):
+    """Helper function to return an instantiated client, and solver, validating
+    parameters in the process, while wrapping errors in `CLIError` and using
+    `output` writer as a centralized printer.
     """
-    params = {}
-    if sampling_params is not None:
-        try:
-            params = json.loads(sampling_params)
-            assert isinstance(params, dict)
-        except:
-            raise CLIError("sampling parameters required as JSON-encoded "
-                           "map of param names to values", code=99)
+    if output is None:
+        output = click.echo
 
-    config = dict(config_file=config_file, profile=profile,
-                  endpoint=endpoint, region=region,
-                  client=client_type, solver=solver_def)
-    if request_timeout is not None:
-        config.update(request_timeout=request_timeout)
-    if polling_timeout is not None:
-        config.update(polling_timeout=polling_timeout)
+    # get client
     try:
         client = Client.from_config(**config)
     except Exception as e:
         raise CLIError("Invalid configuration: {}".format(e), code=1)
+
+    config_file = config.get('config_file')
     if config_file:
         output("Using configuration file: {config_file}", config_file=config_file)
+
+    profile = config.get('profile')
     if profile:
         output("Using profile: {profile}", profile=profile)
-    output("Using endpoint: {endpoint}", endpoint=client.endpoint)
 
-    t0 = timer()
+    output("Using endpoint: {endpoint}", endpoint=client.endpoint)
+    output("Using region: {region}", region=client.region)
+
+    # get solver
     try:
         solver = client.get_solver()
     except SolverAuthenticationError:
@@ -372,38 +365,71 @@ def _ping(config_file, profile, endpoint, region, client_type, solver_def,
     except Exception as e:
         raise CLIError("Unexpected error while fetching solver: {!r}".format(e), 5)
 
-    if hasattr(solver, 'nodes'):
-        # structured solver: use the first existing node
-        problem = ({min(solver.nodes): 0}, {})
-    else:
-        # unstructured solver doesn't constrain problem graph
-        problem = ({0: 1}, {})
-
-    t1 = timer()
     output("Using solver: {solver_id}", solver_id=solver.id)
 
+    return (client, solver)
+
+
+def _sample(solver, problem, params, output):
+    """Blocking sample call with error handling and using custom printer."""
+
     try:
-        future = solver.sample_ising(*problem, **params)
-        timing = future.timing
+        response = solver.sample_ising(*problem, **params)
+        problem_id = response.wait_id()
+        output("Submitted problem ID: {problem_id}", problem_id=problem_id)
+        response.wait()
     except RequestTimeout:
         raise CLIError("API connection timed out.", 8)
     except PollingTimeout:
         raise CLIError("Polling timeout exceeded.", 9)
     except Exception as e:
         raise CLIError("Sampling error: {!r}".format(e), 10)
-    output("Submitted problem ID: {problem_id}", problem_id=future.id)
 
-    t2 = timer()
-    output("\nWall clock time:")
-    output(" * Solver definition fetch: {wallclock_solver_definition:.3f} ms", wallclock_solver_definition=(t1-t0)*1000.0)
-    output(" * Problem submit and results fetch: {wallclock_sampling:.3f} ms", wallclock_sampling=(t2-t1)*1000.0)
-    output(" * Total: {wallclock_total:.3f} ms", wallclock_total=(t2-t0)*1000.0)
-    if timing:
-        output("\nQPU timing:")
-        for component, duration in sorted(timing.items()):
-            output(" * %(name)s = {%(name)s} us" % {"name": component}, **{component: duration})
-    else:
-        output("\nQPU timing data not available.")
+    return response
+
+
+def standardized_output(fn):
+    """Decorator that captures `CLIError`s from `fn` and formats output.
+
+    The decorated function (cli command) receives `output()` for info output
+    and should raise `CLIError()` (for handled errors) to output error messages.
+
+    The function itself can be invariant to output format and/or error signaling
+    mechanism.
+    """
+
+    @wraps(fn)
+    def wrapped(*args, **kwargs):
+        # text/json output taken from callee args
+        json_output = kwargs.get('json_output', False)
+
+        now = utcnow()
+        info = dict(datetime=now.isoformat(), timestamp=datetime_to_timestamp(now), code=0)
+
+        def output(fmt, maxlen=None, **params):
+            info.update(params)
+            if not json_output:
+                msg = fmt.format(**params)
+                if maxlen is not None:
+                    msg = strtrunc(msg, maxlen)
+                click.echo(msg)
+
+        def flush():
+            if json_output:
+                click.echo(json.dumps(info))
+
+        try:
+            fn(*args, output=output, **kwargs)
+        except CLIError as error:
+            output("Error: {error} (code: {code})", error=str(error), code=error.code)
+            sys.exit(error.code)
+        except Exception as error:
+            output("Unhandled error: {error}", error=str(error))
+            sys.exit(127)
+        finally:
+            flush()
+
+    return wrapped
 
 
 @cli.command()
@@ -415,35 +441,59 @@ def _ping(config_file, profile, endpoint, region, client_type, solver_def,
               help='Connection and read timeouts (in seconds) for all API requests')
 @click.option('--polling-timeout', default=None, type=float,
               help='Problem polling timeout in seconds (time-to-solution timeout)')
+@click.option('--label', default='dwave ping', type=str, help='Problem label')
 @click.option('--json', 'json_output', default=False, is_flag=True,
               help='JSON output')
-def ping(config_file, profile, endpoint, region, client_type, solver_def,
-         sampling_params, json_output, request_timeout, polling_timeout):
+@standardized_output
+def ping(*, config_file, profile, endpoint, region, client_type, solver_def,
+         sampling_params, request_timeout, polling_timeout, label, json_output,
+         output):
     """Ping the QPU by submitting a single-qubit problem."""
 
-    now = utcnow()
-    info = dict(datetime=now.isoformat(), timestamp=datetime_to_timestamp(now), code=0)
+    # parse params (TODO: move to click validator)
+    params = {}
+    if sampling_params is not None:
+        try:
+            params = json.loads(sampling_params)
+            assert isinstance(params, dict)
+        except:
+            raise CLIError("sampling parameters required as JSON-encoded "
+                           "map of param names to values", code=99)
 
-    def output(fmt, **kwargs):
-        info.update(kwargs)
-        if not json_output:
-            click.echo(fmt.format(**kwargs))
+    if label:
+        params.update(label=label)
 
-    def flush():
-        if json_output:
-            click.echo(json.dumps(info))
+    config = dict(
+        config_file=config_file, profile=profile,
+        endpoint=endpoint, region=region,
+        client=client_type, solver=solver_def,
+        request_timeout=request_timeout, polling_timeout=polling_timeout)
 
-    try:
-        _ping(config_file, profile, endpoint, region, client_type, solver_def,
-              sampling_params, request_timeout, polling_timeout, output)
-    except CLIError as error:
-        output("Error: {error} (code: {code})", error=str(error), code=error.code)
-        sys.exit(error.code)
-    except Exception as error:
-        output("Unhandled error: {error}", error=str(error))
-        sys.exit(127)
-    finally:
-        flush()
+    t0 = timer()
+    client, solver = _get_client_solver(config, output)
+
+    # generate problem
+    if hasattr(solver, 'nodes'):
+        # structured solver: use the first existing node
+        problem = ({min(solver.nodes): 0}, {})
+    else:
+        # unstructured solver doesn't constrain problem graph
+        problem = ({0: 1}, {})
+
+    t1 = timer()
+    response = _sample(solver, problem, params, output)
+
+    t2 = timer()
+    output("\nWall clock time:")
+    output(" * Solver definition fetch: {wallclock_solver_definition:.3f} ms", wallclock_solver_definition=(t1-t0)*1000.0)
+    output(" * Problem submit and results fetch: {wallclock_sampling:.3f} ms", wallclock_sampling=(t2-t1)*1000.0)
+    output(" * Total: {wallclock_total:.3f} ms", wallclock_total=(t2-t0)*1000.0)
+    if response.timing:
+        output("\nQPU timing:")
+        for component, duration in sorted(response.timing.items()):
+            output(" * %(name)s = {%(name)s} us" % {"name": component}, **{component: duration})
+    else:
+        output("\nQPU timing data not available.")
 
 
 @cli.command()
@@ -508,76 +558,75 @@ def solvers(config_file, profile, endpoint, region, client_type, solver_def,
               help='List/dict of couplings for Ising model problem formulation')
 @click.option('--random-problem', '-r', default=False, is_flag=True,
               help='Submit a valid random problem using all qubits')
-@click.option('--num-reads', '-n', default=1, type=int,
+@click.option('--num-reads', '-n', default=None, type=int,
               help='Number of reads/samples')
+@click.option('--label', default='dwave sample', type=str, help='Problem label')
+@click.option('--sampling-params', '-m', default=None,
+              help='Sampling parameters, JSON encoded')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Increase output verbosity')
-def sample(config_file, profile, endpoint, region, client_type, solver_def,
-           biases, couplings, random_problem, num_reads, verbose):
+@click.option('--json', 'json_output', default=False, is_flag=True,
+              help='JSON output')
+@standardized_output
+def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
+           biases, couplings, random_problem, num_reads, label, sampling_params,
+           verbose, json_output, output):
     """Submit Ising-formulated problem and return samples."""
 
-    # TODO: de-dup wrt ping
+    # we'll limit max line len in non-verbose mode
+    maxlen = None if verbose else 120
 
-    def echo(s, maxlen=100):
-        click.echo(s if verbose else strtrunc(s, maxlen))
+    # parse params (TODO: move to click validator)
+    params = {}
+    if sampling_params is not None:
+        try:
+            params = json.loads(sampling_params)
+            assert isinstance(params, dict)
+        except:
+            raise CLIError("sampling parameters required as JSON-encoded "
+                           "map of param names to values", code=99)
 
-    try:
-        client = Client.from_config(
-            config_file=config_file, profile=profile,
-            endpoint=endpoint, region=region,
-            client=client_type, solver=solver_def)
-    except Exception as e:
-        click.echo("Invalid configuration: {}".format(e))
-        return 1
-    if config_file:
-        echo("Using configuration file: {}".format(config_file))
-    if profile:
-        echo("Using profile: {}".format(profile))
-    echo("Using endpoint: {}".format(client.endpoint))
+    if num_reads is not None:
+        params.update(num_reads=num_reads)
 
-    try:
-        solver = client.get_solver()
-    except SolverAuthenticationError:
-        click.echo("Authentication error. Check credentials in your configuration file.")
-        return 1
-    except (InvalidAPIResponseError, UnsupportedSolverError):
-        click.echo("Invalid or unexpected API response.")
-        return 2
-    except SolverNotFoundError:
-        click.echo("Solver with the specified features does not exist.")
-        return 3
+    if label:
+        params.update(label=label)
 
-    echo("Using solver: {}".format(solver.id))
+    # TODO: add other params, like timeout?
+    config = dict(
+        config_file=config_file, profile=profile,
+        endpoint=endpoint, region=region,
+        client=client_type, solver=solver_def)
+
+    client, solver = _get_client_solver(config, output)
 
     if random_problem:
         linear, quadratic = generate_random_ising_problem(solver)
     else:
         try:
-            linear = ast.literal_eval(biases) if biases else []
+            linear = ast.literal_eval(biases) if biases else {}
+            if isinstance(linear, Sequence):
+                linear = dict(enumerate(linear))
         except Exception as e:
-            click.echo("Invalid biases: {}".format(e))
+            raise CLIError(f"Invalid biases: {e}", code=99)
         try:
             quadratic = ast.literal_eval(couplings) if couplings else {}
         except Exception as e:
-            click.echo("Invalid couplings: {}".format(e))
+            raise CLIError(f"Invalid couplings: {e}", code=99)
 
-    echo("Using qubit biases: {!r}".format(linear))
-    echo("Using qubit couplings: {!r}".format(quadratic))
-    echo("Number of samples: {}".format(num_reads))
+    output("Using qubit biases: {linear}", linear=list(linear.items()), maxlen=maxlen)
+    output("Using qubit couplings: {quadratic}", quadratic=list(quadratic.items()), maxlen=maxlen)
+    output("Sampling parameters: {sampling_params}", sampling_params=params)
 
-    try:
-        result = solver.sample_ising(linear, quadratic, num_reads=num_reads)
-        result.result()
-    except Exception as e:
-        click.echo(e)
-        return 4
+    response = _sample(
+        solver, problem=(linear, quadratic), params=params, output=output)
 
     if verbose:
-        click.echo("Result: {!r}".format(result))
+        output("Result: {response!r}", response=response.result())
 
-    echo("Samples: {!r}".format(result.samples))
-    echo("Occurrences: {!r}".format(result.occurrences))
-    echo("Energies: {!r}".format(result.energies))
+    output("Samples: {samples!r}", samples=response.samples, maxlen=maxlen)
+    output("Occurrences: {num_occurrences!r}", num_occurrences=response.num_occurrences, maxlen=maxlen)
+    output("Energies: {energies!r}", energies=response.energies, maxlen=maxlen)
 
 
 @cli.command()
@@ -796,10 +845,16 @@ def _install_contrib_package(name, verbose=0, prompt=True):
 @click.option('--install-all', '--all', '-a', default=False, is_flag=True,
               help='Install all non-open-source packages '\
                    'available and accept licenses without prompting')
+@click.option('--full', 'ask_full', default=False, is_flag=True,
+              help='Configure non-essential options (such as endpoint and solver).')
 @click.option('--verbose', '-v', count=True,
               help='Increase output verbosity (additive, up to 4 times)')
-def setup(install_all, verbose):
-    """Setup optional Ocean packages and configuration file(s)."""
+def setup(install_all, ask_full, verbose):
+    """Setup optional Ocean packages and configuration file(s).
+
+    Equivalent to running `dwave install [--all]`, followed by
+    `dwave config create [--full]`.
+    """
 
     contrib = get_contrib_packages()
     packages = list(contrib)
@@ -824,4 +879,4 @@ def setup(install_all, verbose):
             _install_contrib_package(pkg, verbose=verbose, prompt=not install_all)
 
     click.echo("Creating the D-Wave configuration file.")
-    return _config_create(config_file=None, profile=None, ask_full=False)
+    return _config_create(config_file=None, profile=None, ask_full=ask_full)
