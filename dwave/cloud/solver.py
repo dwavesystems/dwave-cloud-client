@@ -28,8 +28,10 @@ You can list all solvers available to a :class:`~dwave.cloud.client.Client` with
 
 """
 
+import copy
 import json
 import logging
+import typing
 import warnings
 from collections.abc import Mapping
 
@@ -51,6 +53,11 @@ try:
 except ImportError:
     _numpy = False
 
+try:
+    import dimod
+except ImportError:
+    dimod = None
+
 __all__ = [
     'BaseSolver', 'StructuredSolver',
     'BaseUnstructuredSolver', 'UnstructuredSolver',
@@ -58,6 +65,19 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+
+
+if typing.TYPE_CHECKING:
+    # do a bit of fiddling
+    try:
+        _Type = typing.Literal['qubo', 'ising']
+    except ImportError:  # Python < 3.8
+        _Type = str
+
+    try:
+        _Vartype = typing.Union[_Type, dimod.typing.VartypeLike]
+    except AttributeError:  # dimod not installed or too old
+        _Vartype = _Type
 
 
 class BaseSolver(object):
@@ -1043,19 +1063,62 @@ class StructuredSolver(BaseSolver):
 
         return computation
 
+    # kept for internal backwards compatibility and in case it's being
+    # used externally anywhere.
     def _format_params(self, type_, params):
         """Reformat some of the parameters for sapi."""
-        if 'initial_state' in params:
-            # NB: at this moment the error raised when initial_state does not match lin/quad (in
-            # active qubits) is not very informative, but there is also no clean way to check here
-            # that they match because lin can be either a list or a dict. In the future it would be
-            # good to check.
-            initial_state = params['initial_state']
-            if isinstance(initial_state, Mapping):
+        self.reformat_parameters(type_, params, self.properties, inplace=True)
 
-                initial_state_list = [3]*self.properties['num_qubits']
+    @staticmethod
+    def reformat_parameters(vartype: '_Vartype',
+                            parameters: typing.MutableMapping[str, typing.Any],
+                            properties: typing.Mapping[str, typing.Any],
+                            inplace: bool = False,
+                            ) -> typing.MutableMapping[str, typing.Any]:
+        """Reformat some solver parameters for SAPI.
 
-                low = -1 if type_ == 'ising' else 0
+        Currently the only reformatted parameter is ``initial_state``. This
+        method allows ``initial_state`` to be submitted as a dictionary
+        mapping the qubits to their initial value.
+
+        Args:
+            vartype: One of ``'ising'`` or ``'qubo'``. If :mod:`dimod` is
+                installed, this can also be any
+                :class:`~dimod.typing.VartypeLike`.
+            parameters: The parameters to submit to ths solver.
+            properties: The solver's properties. Note that this will
+                work with either :attr:`StructuredSolver.properties`
+                or :attr:`dwave.systems.DWaveSampler.properties`.
+
+        Returns:
+            The reformatted solver parameters.
+            If ``inplace`` this will be the ``parameters``, modified.
+            If ``not inplace`` then this will be a deep copy of ``parameters``,
+            with the relevant fields updated.
+
+        """
+        # whether to copy or not
+        parameters = parameters if inplace else copy.deepcopy(parameters)
+
+        # handle the vartype
+        if vartype not in ('ising', 'qubo'):
+            try:
+                vartype = 'ising' if dimod.as_vartype(vartype) is dimod.SPIN else 'qubo'
+            except (TypeError, AttributeError):
+                msg = "expected vartype to be one of: 'ising', 'qubo'"
+                if dimod:
+                    msg += ", 'BINARY', 'SPIN', dimod.BINARY, dimod.SPIN"
+                msg += f"; {vartype!r} provided"
+                raise ValueError(msg) from None
+
+        # update the parameters
+        if 'initial_state' in parameters:
+            initial_state = parameters['initial_state']
+            if isinstance(initial_state, typing.Mapping):
+
+                initial_state_list = [3]*properties['num_qubits']
+
+                low = -1 if vartype == 'ising' else 0
 
                 for v, val in initial_state.items():
                     if val == 3:
@@ -1065,8 +1128,10 @@ class StructuredSolver(BaseSolver):
                     else:
                         initial_state_list[v] = 1
 
-                params['initial_state'] = initial_state_list
+                parameters['initial_state'] = initial_state_list
             # else: support old format
+
+        return parameters
 
     def check_problem(self, linear, quadratic):
         """Test if an Ising model matches the graph provided by the solver.

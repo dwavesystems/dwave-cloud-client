@@ -29,6 +29,7 @@ Methods
    StructuredSolver.sample_ising
    StructuredSolver.sample_qubo
    StructuredSolver.sample_bqm
+   StructuredSolver.reformat_parameters
 
    UnstructuredSolver.sample_ising
    UnstructuredSolver.sample_qubo

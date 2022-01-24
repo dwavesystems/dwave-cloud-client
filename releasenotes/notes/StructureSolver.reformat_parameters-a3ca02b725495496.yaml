@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Add ``StructuredSolver.reformat_parameters()`` method. This method can
+    be used to format solver parameters for SAPI.
+    See `#465 <https://github.com/dwavesystems/dwave-cloud-client/issues/465>`_.
