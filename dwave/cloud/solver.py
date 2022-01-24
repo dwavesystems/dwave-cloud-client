@@ -1085,16 +1085,19 @@ class StructuredSolver(BaseSolver):
             vartype: One of ``'ising'`` or ``'qubo'``. If :mod:`dimod` is
                 installed, this can also be any
                 :class:`~dimod.typing.VartypeLike`.
-            parameters: The parameters to submit to ths solver.
-            properties: The solver's properties. Note that this will
-                work with either :attr:`StructuredSolver.properties`
-                or :attr:`dwave.systems.DWaveSampler.properties`.
+            parameters: The parameters to submit to this solver.
+            properties: The solver's properties. Either
+                :attr:`StructuredSolver.properties` or
+                :attr:`dwave.systems.DWaveSampler.properties` can be
+                provided.
+            inplace: Whether to modify the ``parameters`` in-place or return
+                a copy.
 
         Returns:
             The reformatted solver parameters.
-            If ``inplace`` this will be the ``parameters``, modified.
-            If ``not inplace`` then this will be a deep copy of ``parameters``,
-            with the relevant fields updated.
+            If ``inplace`` is true the modified ``parameters`` is returned.
+            If ``inplace`` is false then a deep copy of ``parameters``
+            with the relevant fields updated is returned.
 
         """
         # whether to copy or not
