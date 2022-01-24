@@ -25,18 +25,15 @@ except ImportError:
 from dwave.cloud.solver import StructuredSolver
 from dwave.cloud.testing import mocks
 
-
 try:
     C16 = StructuredSolver(data=mocks.qpu_chimera_solver_data(16), client=None)
     P16 = StructuredSolver(data=mocks.qpu_pegasus_solver_data(16), client=None)
+    solvers = [(C16,), (P16,)]
 except RuntimeError:
-    raise unittest.SkipTest("missing installs")
+    solvers = []
 
 
-@parameterized_class(("solver", ), [
-    (C16, ),
-    (P16, ),
-])
+@parameterized_class(("solver", ), solvers)
 @unittest.skipUnless(dimod, "dimod not installed")
 class TestCheckProblem(unittest.TestCase):
 

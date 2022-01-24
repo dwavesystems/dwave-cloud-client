@@ -37,7 +37,7 @@ jobs:
             if [[ "<< parameters.dimod-version >>" ]]; then
               pip install 'dimod<< parameters.dimod-version >>'
             else
-              pip uninstall dimod -y
+              pip uninstall dimod dwave-networkx -y
             fi
 
       - save_cache: &save-cache-env
