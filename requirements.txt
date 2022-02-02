@@ -16,7 +16,7 @@ dimod>=0.10.5
 numpy>=1.16
 
 # for solver mocks
-dwave-networkx>=0.8.9
+dwave-networkx==0.8.9
 
 # dev requirements
 reno==3.4.0
