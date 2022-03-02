@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 import copy
 import base64
 import struct
@@ -33,7 +34,14 @@ from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
 from dwave.cloud.utils import generate_const_ising_problem
 
 # parse string version as tuple
-dimod_version = tuple(map(int, dimod.__version__.split('.'))) if dimod else None
+if dimod:
+    # python version strings are a lot more permissive, but this covers
+    # all the patterns we've used in dimod
+    match = re.match('^([0-9]+).([0-9]+).([0-9]+)(?:rc[0-9]*|.dev[0-9]*)*$',
+                     dimod.__version__)
+    dimod_version = tuple(map(int, match.groups()))
+else:
+    dimod_version = None
 
 
 def get_structured_solver():

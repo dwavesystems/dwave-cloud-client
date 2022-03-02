@@ -1,0 +1,4 @@
+---
+features:
+  - |
+    Support ``dimod<0.13.0``
