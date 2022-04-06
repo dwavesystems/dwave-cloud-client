@@ -302,6 +302,11 @@ class MockSubmission(_QueryTest):
                 linear, quadratic = self.sapi.problem
                 results = solver.sample_ising(linear, quadratic)
 
+                # waiting should be canceled on exception (i.e. NOT timeout)
+                self.assertTrue(results.wait(timeout=1))
+                self.assertIsNone(results.wait_id(timeout=1))
+
+                # resolving result should raise exception
                 with self.assertRaises(SolverFailureError):
                     results.samples
 
