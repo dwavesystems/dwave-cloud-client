@@ -230,6 +230,7 @@ class Future(object):
     def _signal_ready(self):
         """Signal all the events waiting on this future."""
         self.time_resolved = utcnow()
+        self._id_ready_event.set()
         self._results_ready_event.set()
         [ev.set() for ev in self._other_events]
 

@@ -1,0 +1,8 @@
+---
+fixes:
+  - |
+    Make sure `Future.wait_id()` fails deterministically in a case of problem
+    submit error. Previously it would hang if SAPI didn't return problem_id for
+    whatever reason.
+    See `#469 <https://github.com/dwavesystems/dwave-cloud-client/issues/469>`_
+    and `#511 <https://github.com/dwavesystems/dwave-cloud-client/issues/511>`_.
