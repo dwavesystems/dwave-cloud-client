@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Preemptively resolve sampling answer during `dwave ping` and `dwave sample`,
+    as to capture and properly output/format eventual errors.
+    See `#517 <https://github.com/dwavesystems/dwave-cloud-client/issues/517>`_.
