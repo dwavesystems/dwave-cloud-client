@@ -377,7 +377,7 @@ def _sample(solver, problem, params, output):
         response = solver.sample_ising(*problem, **params)
         problem_id = response.wait_id()
         output("Submitted problem ID: {problem_id}", problem_id=problem_id)
-        response.wait()
+        response.result()
     except RequestTimeout:
         raise CLIError("API connection timed out.", 8)
     except PollingTimeout:
@@ -424,7 +424,7 @@ def standardized_output(fn):
             output("Error: {error} (code: {code})", error=str(error), code=error.code)
             sys.exit(error.code)
         except Exception as error:
-            output("Unhandled error: {error}", error=str(error))
+            output("Unhandled error: {error}", error=repr(error))
             sys.exit(127)
         finally:
             flush()
