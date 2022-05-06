@@ -515,7 +515,9 @@ class MockSubmission(_QueryTest):
                 future.result()
 
                 # after third poll, back-off interval should be 4 x initial back-off
-                self.assertEqual(future._poll_backoff, client.poll_backoff_min * 2**2)
+                self.assertAlmostEqual(
+                    future._poll_backoff,
+                    client.poll_backoff_min * client.poll_backoff_base**2)
 
     def test_immediate_polling(self):
         "First poll happens with minimal delay"
@@ -620,7 +622,9 @@ class MockSubmission(_QueryTest):
                 future.result()
 
                 # after third poll, back-off interval should be 4 x initial back-off
-                self.assertEqual(future._poll_backoff, client.poll_backoff_min * 2**2)
+                self.assertAlmostEqual(
+                    future._poll_backoff,
+                    client.poll_backoff_min * client.poll_backoff_base**2)
 
 
 class DeleteEvent(Exception):

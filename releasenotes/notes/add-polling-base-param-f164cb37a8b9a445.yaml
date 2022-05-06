@@ -1,0 +1,11 @@
+---
+features:
+  - |
+    Add ``poll_backoff_base`` configuration option to control the exponential
+    base of the (problem status) polling schedule. Available as a config file
+    option and ``dwave.cloud.Client`` keyword argument.
+upgrade:
+  - |
+    Make polling schedule denser in the beginning (by lowering the exponential
+    base from ``2`` to ``1.3``), thus enabling much faster answer download for
+    SAPI response times under two minutes.

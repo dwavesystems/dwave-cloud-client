@@ -151,6 +151,15 @@ class Client(object):
             Problem status is polled with exponential back-off schedule.
             Maximum back-off period is limited to ``poll_backoff_max`` seconds.
 
+        poll_backoff_base (float, default=1.3):
+            Problem status is polled with exponential back-off schedule.
+            The exponential function base is defined with ``poll_backoff_base``.
+            Interval between ``poll_idx`` and ``poll_idx + 1`` is given with::
+
+                poll_backoff_min * poll_backoff_base ** poll_idx
+
+            with upper bound set to ``poll_backoff_max``.
+
         http_retry_total (int, default=10):
             Total number of retries of failing idempotent HTTP requests to
             allow. Takes precedence over other counts.
@@ -251,6 +260,7 @@ class Client(object):
         # poll back-off schedule defaults [sec]
         'poll_backoff_min': 0.05,
         'poll_backoff_max': 60,
+        'poll_backoff_base': 1.3,
         # idempotent http requests retry params
         'http_retry_total': 10,
         'http_retry_connect': None,
@@ -501,6 +511,7 @@ class Client(object):
 
         self.poll_backoff_min = parse_float(options['poll_backoff_min'])
         self.poll_backoff_max = parse_float(options['poll_backoff_max'])
+        self.poll_backoff_base = parse_float(options['poll_backoff_base'])
 
         self.http_retry_total = parse_int(options['http_retry_total'])
         self.http_retry_connect = parse_int(options['http_retry_connect'])
@@ -514,7 +525,7 @@ class Client(object):
             'region', 'endpoint', 'token', 'default_solver',
             'client_cert', 'request_timeout', 'polling_timeout',
             'proxy', 'headers', 'permissive_ssl', 'connection_close',
-            'poll_backoff_min', 'poll_backoff_max',
+            'poll_backoff_min', 'poll_backoff_max', 'poll_backoff_base',
             'http_retry_total', 'http_retry_connect', 'http_retry_read',
             'http_retry_redirect', 'http_retry_status',
             'http_retry_backoff_factor', 'http_retry_backoff_max')
@@ -1511,7 +1522,8 @@ class Client(object):
             # on subsequent polls, do exponential back-off, clipped to a range
             future._poll_backoff = \
                 max(self.poll_backoff_min,
-                    min(future._poll_backoff * 2, self.poll_backoff_max))
+                    min(future._poll_backoff * self.poll_backoff_base,
+                        self.poll_backoff_max))
 
         # for poll priority we use timestamp of next scheduled poll
         at = time.time() + future._poll_backoff
