@@ -1173,17 +1173,6 @@ class Client(object):
 
         return solvers
 
-    def solvers(self, refresh=False, **filters):
-        """Deprecated in favor of :meth:`.get_solvers`.
-
-        Scheduled for removal in 0.9.0.
-        """
-        warnings.warn(
-            "'solvers' is deprecated, and it will be removed "
-            "in 0.9.0. please convert your code to use 'get_solvers'",
-            DeprecationWarning)
-        return self.get_solvers(refresh=refresh, **filters)
-
     def get_solver(self, name=None, refresh=False, **filters):
         """Load the configuration for a single solver.
 

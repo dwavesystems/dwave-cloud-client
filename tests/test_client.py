@@ -1074,13 +1074,6 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.get_solvers(anneal_schedule__available=True), [self.qpu2])
         self.assertSolvers(self.client.get_solvers(anneal_schedule=True), [self.qpu2])
 
-    def test_solvers_deprecation(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            self.client.solvers()
-            self.assertEqual(len(w), 1)
-            self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
-
     def test_order_by_edgecases(self):
         # default: sort by avg_load
         self.assertEqual(self.client.get_solvers(), [self.qpu1, self.qpu2, self.software, self.hybrid])
