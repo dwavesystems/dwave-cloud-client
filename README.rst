@@ -65,7 +65,7 @@ Installation
 
 .. installation-start-marker
 
-Requires Python 3.6+:
+Requires Python 3.7+:
 
 .. code-block:: bash
 
