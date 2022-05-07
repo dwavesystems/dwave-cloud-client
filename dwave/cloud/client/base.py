@@ -40,7 +40,6 @@ Examples:
 """
 
 import re
-import sys
 import time
 import json
 import copy
@@ -58,7 +57,7 @@ import concurrent.futures
 
 from itertools import chain, zip_longest
 from functools import partial, wraps, lru_cache
-from collections import abc, namedtuple, OrderedDict
+from collections import abc, namedtuple
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Tuple, Dict
 
@@ -79,7 +78,7 @@ from dwave.cloud.upload import ChunkedData
 from dwave.cloud.events import dispatches_events
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent,
-    datetime_to_timestamp, utcnow, epochnow, cached, retried, is_caused_by)
+    datetime_to_timestamp, utcnow, cached, retried, is_caused_by)
 
 __all__ = ['Client']
 

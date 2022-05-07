@@ -17,7 +17,6 @@
 import time
 import json
 import unittest
-import itertools
 import threading
 import warnings
 import collections
@@ -36,7 +35,7 @@ except ImportError:
 from dwave.cloud.client import Client
 from dwave.cloud.solver import Solver
 from dwave.cloud.computation import Future
-from dwave.cloud.utils import evaluate_ising, generate_const_ising_problem, utcrel
+from dwave.cloud.utils import evaluate_ising, utcrel
 from dwave.cloud.exceptions import (
     SolverFailureError, CanceledFutureError, SolverError,
     InvalidAPIResponseError)

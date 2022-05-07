@@ -22,7 +22,7 @@ import numbers
 import warnings
 
 from collections import OrderedDict
-from collections.abc import Mapping, Sequence, MutableMapping
+from collections.abc import Mapping, Sequence
 from urllib.parse import urljoin
 from datetime import datetime, timedelta
 from dateutil.tz import UTC

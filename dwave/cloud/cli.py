@@ -23,7 +23,7 @@ from collections.abc import Sequence
 from functools import partial, wraps
 from timeit import default_timer as timer
 
-from typing import Dict, List
+from typing import Dict
 from configparser import ConfigParser
 
 import click
