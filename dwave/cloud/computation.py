@@ -158,20 +158,6 @@ class Future(object):
         # XXX: energy offset carried via Future, until implemented in SAPI
         self._offset = 0
 
-    # TODO: remove in 0.9.0
-    @property
-    def error(self):
-        """Deprecated in favor of :meth:`.exception`.
-
-        Scheduled for removal in 0.9.0.
-        """
-        warnings.warn(
-            "'Future.error' is deprecated, and it will be removed "
-            "in 0.9.0. please convert your code to use 'Future.exception()'",
-            DeprecationWarning)
-
-        return self._exception
-
     # TODO: remove in 0.10.0
     @property
     def eta_min(self):

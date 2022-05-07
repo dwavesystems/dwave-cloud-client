@@ -935,10 +935,6 @@ class TestComputationDeprecations(_QueryTest):
                 with self.assertWarns(DeprecationWarning):
                     results['occurrences']
 
-                # .error is deprecated in 0.7.x, scheduled for removal in 0.9.0
-                with self.assertWarns(DeprecationWarning):
-                    results.error
-
                 # .occurrences is deprecated in 0.8.0, scheduled for removal in 0.10.0+
                 with self.assertWarns(DeprecationWarning):
                     results.occurrences

@@ -3,3 +3,7 @@ upgrade:
   - |
     Remove ``Client.solvers()`` method in favor of ``Client.get_solvers()``. It
     was previously deprecated in ``dwave-cloud-client==0.5.0``.
+  - |
+    Remove ``dwave.cloud.computation.Future.error`` property in favor of
+    ``dwave.cloud.computation.future.exception()`` method. The property
+    was previously deprecated in ``dwave-cloud-client==0.7.3``.
