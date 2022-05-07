@@ -1,0 +1,4 @@
+---
+upgrade:
+  - |
+    Upgrade your python to 3.7+. We no longer support python 3.6 and below.

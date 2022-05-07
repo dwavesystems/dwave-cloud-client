@@ -7,13 +7,10 @@ from setuptools import setup, find_packages
 basedir = os.path.dirname(os.path.abspath(__file__))
 package_info_path = os.path.join(basedir, "dwave", "cloud", "package_info.py")
 package_info = {}
-try:
-    with open(package_info_path, encoding='utf-8') as f:
-        exec(f.read(), package_info)
-except SyntaxError:
-    execfile(package_info_path, package_info)
+with open(package_info_path, encoding='utf-8') as f:
+    exec(f.read(), package_info)
 
-python_requires = '>=3.6'
+python_requires = '>=3.7'
 
 # Package requirements, minimal pinning
 install_requires = ['requests[socks]>=2.18', 'pydantic>=1.7.3', 'homebase>=1.0',
@@ -23,9 +20,6 @@ install_requires = ['requests[socks]>=2.18', 'pydantic>=1.7.3', 'homebase>=1.0',
 # Package extras requirements
 extras_require = {
     'test': ['requests_mock', 'mock', 'numpy', 'coverage'],
-
-    # backports
-    ':python_version == "3.6"': ['dataclasses'],
 
     # bqm support
     'bqm': ['dimod>=0.8.21,<0.13,!=0.10.0,!=0.10.1,!=0.10.2,!=0.10.3,!=0.10.4', 'numpy>=1.16'],
@@ -48,7 +42,6 @@ classifiers = [
     'License :: OSI Approved :: Apache Software License',
     'Operating System :: OS Independent',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.6',
     'Programming Language :: Python :: 3.7',
     'Programming Language :: Python :: 3.8',
     'Programming Language :: Python :: 3.9',
