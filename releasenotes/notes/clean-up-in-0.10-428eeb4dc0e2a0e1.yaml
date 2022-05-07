@@ -15,3 +15,9 @@ upgrade:
     Remove ``dwave.cloud.computation.Future.occurrences`` alias in favor of
     ``dwave.cloud.computation.Future.num_occurrences`` property. The alias was
     previously deprecated in ``dwave-cloud-client==0.8.0``.
+deprecations:
+  - |
+    Alias keys (``samples`` and ``occurrences``) in
+    ``dwave.cloud.computation.Future.result()``-returned dictionary are
+    deprecated since ``dwave-cloud-client==0.8.0`` and will be removed in
+    ``dwave-cloud-client==0.12.0``.

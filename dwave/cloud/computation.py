@@ -553,6 +553,21 @@ class Future(object):
             `'num_occurrences'`. Better yet, use :meth:`Future.samples` and
             :meth:`Future.num_occurrences` instead.
 
+        .. deprecated:: 0.8.0
+
+            Alias keys ``samples`` and ``occurrences`` in the result dict are
+            deprecated and will be removed in 0.12.0. We'll try to keep the
+            result dict as close to raw data returned by SAPI as possible.
+            Postprocessed data is available via
+            :class:`~dwave.cloud.computation.Future` properties.
+
+        .. versionchanged:: 0.8.0
+
+            Instead of adding copies of ``solutions`` and ``num_occurrences``
+            keys (as ``samples`` and ``occurrences``), we alias them using
+            :class:`~dwave.cloud.utils.aliasdict`. Values are available under
+            alias keys, but the keys themselves are not stored or visible.
+
         Examples:
             This example creates a solver using the local system's default
             D-Wave Cloud Client configuration file, submits a simple QUBO
@@ -906,11 +921,12 @@ class Future(object):
         self.parse_time = time.time() - start
         return self._result
 
-    # TODO: schedule for removal
     def _alias_result(self):
         """Alias `solutions` and `num_occurrences`.
 
         Deprecated in version 0.8.0.
+
+        Scheduled for removal in 0.12.0.
         """
         if not self._result:
             return
