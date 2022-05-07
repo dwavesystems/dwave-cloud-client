@@ -7,3 +7,7 @@ upgrade:
     Remove ``dwave.cloud.computation.Future.error`` property in favor of
     ``dwave.cloud.computation.future.exception()`` method. The property
     was previously deprecated in ``dwave-cloud-client==0.7.3``.
+  - |
+    Remove ``dwave.cloud.computation.Future.{eta_min,eta_max}``. These
+    properties were previously deprecated in ``dwave-cloud-client==0.8.5`` when
+    the underlying SAPI feature/field was removed.

@@ -158,28 +158,6 @@ class Future(object):
         # XXX: energy offset carried via Future, until implemented in SAPI
         self._offset = 0
 
-    # TODO: remove in 0.10.0
-    @property
-    def eta_min(self):
-        warnings.warn(
-            "'Future.eta_min' is deprecated, since the underlying "
-            "'earliest_estimated_completion' field has been removed from SAPI. "
-            "The eta_min attribute will be removed in 0.10.0.",
-            DeprecationWarning)
-
-        return None
-
-    # TODO: remove in 0.10.0
-    @property
-    def eta_max(self):
-        warnings.warn(
-            "'Future.eta_max' is deprecated, since the underlying "
-            "'latest_estimated_completion' field has been removed from SAPI. "
-            "The eta_max attribute will be removed in 0.10.0.",
-            DeprecationWarning)
-
-        return None
-
     # make Future ordered
 
     def __lt__(self, other):
