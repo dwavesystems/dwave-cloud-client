@@ -86,10 +86,8 @@ class _QueryTest(unittest.TestCase):
         # Did we get the right number of samples?
         self.assertEqual(num_reads, sum(results.num_occurrences))
 
-        # verify .occurrences property still works, although is deprecated
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            self.assertEqual(100, sum(results.occurrences))
+        # verify num_occurrences sum corresponds to num_reads
+        self.assertEqual(100, sum(results.num_occurrences))
 
         # Make sure energies are correct in raw results
         for energy, state in zip(results.energies, results.samples):
@@ -934,10 +932,6 @@ class TestComputationDeprecations(_QueryTest):
                     results['samples']
                 with self.assertWarns(DeprecationWarning):
                     results['occurrences']
-
-                # .occurrences is deprecated in 0.8.0, scheduled for removal in 0.10.0+
-                with self.assertWarns(DeprecationWarning):
-                    results.occurrences
 
 
 class TestProblemLabel(unittest.TestCase):

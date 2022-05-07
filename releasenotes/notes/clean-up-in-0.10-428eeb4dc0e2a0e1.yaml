@@ -11,3 +11,7 @@ upgrade:
     Remove ``dwave.cloud.computation.Future.{eta_min,eta_max}``. These
     properties were previously deprecated in ``dwave-cloud-client==0.8.5`` when
     the underlying SAPI feature/field was removed.
+  - |
+    Remove ``dwave.cloud.computation.Future.occurrences`` alias in favor of
+    ``dwave.cloud.computation.Future.num_occurrences`` property. The alias was
+    previously deprecated in ``dwave-cloud-client==0.8.0``.

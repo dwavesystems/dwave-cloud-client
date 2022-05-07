@@ -30,7 +30,6 @@ Some :class:`Future` methods are blocking.
 import time
 import threading
 import functools
-import warnings
 
 from operator import itemgetter
 from dateutil.parser import parse
@@ -542,9 +541,9 @@ class Future(object):
             Helper properties on :class:`Future` object are preferred to reading
             raw results, as they abstract away the differences in response
             between some solvers like. Available methods are: :meth:`samples`,
-            :meth:`energies`, :meth:`occurrences`, :meth:`variables`,
-            :meth:`timing`, :meth:`problem_type`, :meth:`sampleset` (only if
-            dimod package is installed).
+            :meth:`energies`, :meth:`variables`, :meth:`timing`,
+            :meth:`problem_type`, :meth:`sampleset` (only if dimod package is
+            installed).
 
         Warning:
             The dictionary returned by :meth:`result` depends on the solver
@@ -688,7 +687,7 @@ class Future(object):
 
         Returns:
             list or NumPy matrix of doubles: number of occurrences. When
-            returned results are ordered in a histogram, `num_occurrences`
+            returned results are ordered in a histogram, ``num_occurrences``
             indicates the number of times a particular solution recurred.
 
         Examples:
@@ -697,7 +696,7 @@ class Future(object):
             problem with several ground states to a remote D-Wave resource for
             20 samples, and prints the returned results, which are ordered as a
             histogram. The problem's ground states tend to recur frequently,
-            and so those solutions have `occurrences` greater than 1.
+            and so those solutions have ``num_occurrences`` greater than 1.
 
             >>> from dwave.cloud import Client
             >>> with Client.from_config() as client:  # doctest: +SKIP
@@ -733,20 +732,6 @@ class Future(object):
             return np.ones((len(result['solutions']),))
         else:
             return [1] * len(result['solutions'])
-
-    # TODO: remove in 0.10.0+
-    @property
-    def occurrences(self):
-        """Deprecated in favor of Future.num_occurrences property.
-
-        Scheduled for removal in 0.10.0.
-        """
-        warnings.warn(
-            "'Future.occurrences' is deprecated, and it will be removed "
-            "in 0.10.0+. Please convert your code to use 'Future.num_occurrences'",
-            DeprecationWarning)
-
-        return self.num_occurrences
 
     def wait_sampleset(self):
         """Blocking sampleset getter."""
