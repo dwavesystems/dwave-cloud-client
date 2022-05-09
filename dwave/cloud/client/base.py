@@ -40,7 +40,6 @@ Examples:
 """
 
 import re
-import sys
 import time
 import json
 import copy
@@ -58,7 +57,7 @@ import concurrent.futures
 
 from itertools import chain, zip_longest
 from functools import partial, wraps, lru_cache
-from collections import abc, namedtuple, OrderedDict
+from collections import abc, namedtuple
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Tuple, Dict
 
@@ -79,7 +78,7 @@ from dwave.cloud.upload import ChunkedData
 from dwave.cloud.events import dispatches_events
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent,
-    datetime_to_timestamp, utcnow, epochnow, cached, retried, is_caused_by)
+    datetime_to_timestamp, utcnow, cached, retried, is_caused_by)
 
 __all__ = ['Client']
 
@@ -207,6 +206,11 @@ class Client(object):
         a class variable :attr:`.Client.DEFAULTS`.
 
         Instance-level defaults can be specified via ``defaults`` argument.
+
+    .. deprecated:: 0.10.0
+
+        Positional arguments in :class:`.Client` constructor are deprecated and
+        will be removed in 0.12.0.
 
     Examples:
         This example directly initializes a :class:`.Client`.
@@ -400,16 +404,26 @@ class Client(object):
         return (region, regions[region]['endpoint'])
 
     @dispatches_events('client_init')
-    def __init__(self, endpoint=None, token=None, solver=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         # for (reasonable) backwards compatibility, accept only the first few
         # positional args.
-        # TODO: deprecate the use of positional args
-        if endpoint is not None:
-            kwargs.setdefault('endpoint', endpoint)
-        if token is not None:
-            kwargs.setdefault('token', token)
-        if solver is not None:
-            kwargs.setdefault('solver', solver)
+        if len(args) > 3:
+            raise TypeError(
+                "Client constructor takes up to 3 positional "
+                f"arguments, but {len(args)} were given")
+
+        if len(args) > 0:
+            warnings.warn(
+                "Positional arguments in Client constructor are deprecated "
+                "since dwave-cloud-client 0.10.0, and will be removed in 0.12.0. "
+                "Use keyword arguments instead.",
+                DeprecationWarning, stacklevel=3)
+
+            argsdict = dict(zip(('endpoint', 'token', 'solver'), args))
+            intersection = argsdict.keys() & kwargs
+            if intersection:
+                raise TypeError(f"Client() got multiple values for {intersection}")
+            kwargs.update(argsdict)
 
         logger.debug("Client init called with: %r", kwargs)
 
@@ -1173,17 +1187,6 @@ class Client(object):
             solvers.reverse()
 
         return solvers
-
-    def solvers(self, refresh=False, **filters):
-        """Deprecated in favor of :meth:`.get_solvers`.
-
-        Scheduled for removal in 0.9.0.
-        """
-        warnings.warn(
-            "'solvers' is deprecated, and it will be removed "
-            "in 0.9.0. please convert your code to use 'get_solvers'",
-            DeprecationWarning)
-        return self.get_solvers(refresh=refresh, **filters)
 
     def get_solver(self, name=None, refresh=False, **filters):
         """Load the configuration for a single solver.

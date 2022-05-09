@@ -597,6 +597,34 @@ class ClientConstruction(unittest.TestCase):
                 retry = client.session.get_adapter('https://').max_retries
                 self._verify_retry_config(retry, retry_kwargs)
 
+    def test_positional_args(self):
+        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: {}):
+
+            # up to 3 positional args are allowed
+            endpoint, token, solver = 'endpoint token solver'.split()
+            with dwave.cloud.Client(endpoint, token, solver) as client:
+                self.assertEqual(client.endpoint, endpoint)
+                self.assertEqual(client.token, token)
+                self.assertEqual(client.default_solver, {'name__eq': solver})
+
+            # but they are deprecated
+            with self.assertWarns(DeprecationWarning):
+                with dwave.cloud.Client(endpoint, token):
+                    pass
+
+            # and more than 3 are not allowed
+            with self.assertRaises(TypeError):
+                dwave.cloud.Client(endpoint, token, solver, 'another')
+
+            # with clashes between pargs and kwargs not allowed as well
+            with self.assertRaises(TypeError):
+                dwave.cloud.Client(endpoint, endpoint=endpoint)
+
+            # even though non-conflicting combination is allowed
+            with dwave.cloud.Client(endpoint, token=token) as client:
+                self.assertEqual(client.endpoint, endpoint)
+                self.assertEqual(client.token, token)
+
 
 @mock.patch.multiple(Client, get_regions=get_default_regions)
 class ClientConfigIntegration(unittest.TestCase):
@@ -846,7 +874,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.solvers = self.structured_solvers + self.unstructured_solvers
 
         # mock client
-        self.client = Client('endpoint', 'token')
+        self.client = Client(endpoint='endpoint', token='token')
         self.client._fetch_solvers = lambda **kw: self.solvers
 
     def shutDown(self):
@@ -1074,13 +1102,6 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.get_solvers(anneal_schedule__available=True), [self.qpu2])
         self.assertSolvers(self.client.get_solvers(anneal_schedule=True), [self.qpu2])
 
-    def test_solvers_deprecation(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            self.client.solvers()
-            self.assertEqual(len(w), 1)
-            self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
-
     def test_order_by_edgecases(self):
         # default: sort by avg_load
         self.assertEqual(self.client.get_solvers(), [self.qpu1, self.qpu2, self.software, self.hybrid])
@@ -1102,7 +1123,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
     def test_order_by_respects_default_solver(self):
         """order_by used in isolation should not affect default_solver filters (issue #401)"""
 
-        with Client('endpoint', 'token', solver=dict(name='qpu2')) as client:
+        with Client(endpoint='endpoint', token='token', solver=dict(name='qpu2')) as client:
             # mock the network call to fetch all solvers
             client._fetch_solvers = lambda **kw: self.solvers
 
@@ -1112,7 +1133,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             # the default solver should not change when we add order_by
             self.assertEqual(client.get_solver(order_by='id'), self.qpu2)
 
-        with Client('endpoint', 'token', solver=dict(category='qpu')) as client:
+        with Client(endpoint='endpoint', token='token', solver=dict(category='qpu')) as client:
             # mock the network call to fetch all solvers
             client._fetch_solvers = lambda **kw: self.solvers
 
@@ -1125,7 +1146,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
     def test_order_by_in_default_solver(self):
         """order_by can be specified as part of default_solver filters (issue #407)"""
 
-        with Client('endpoint', 'token', solver=dict(order_by='id')) as client:
+        with Client(endpoint='endpoint', token='token', solver=dict(order_by='id')) as client:
             # mock the network call to fetch all solvers
             client._fetch_solvers = lambda **kw: self.solvers
 
@@ -1135,7 +1156,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             # the default solver can be overridden
             self.assertEqual(client.get_solver(order_by='-id'), self.software)
 
-        with Client('endpoint', 'token', solver=dict(qpu=True, order_by='-num_active_qubits')) as client:
+        with Client(endpoint='endpoint', token='token', solver=dict(qpu=True, order_by='-num_active_qubits')) as client:
             # mock the network call to fetch all solvers
             client._fetch_solvers = lambda **kw: self.solvers
 

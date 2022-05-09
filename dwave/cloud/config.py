@@ -221,11 +221,9 @@ import os
 import ast
 import logging
 import configparser
-from collections import OrderedDict
 
 import homebase
 
-from dwave.cloud.utils import uniform_get
 from dwave.cloud.exceptions import ConfigFileReadError, ConfigFileParseError
 from dwave.cloud.package_info import __version__, __packagename__
 

@@ -14,20 +14,17 @@
 
 """Try to load solver data from mock servers."""
 
-import os
 import json
 import unittest
-from unittest import mock
 
 import requests_mock
 
 from dwave.cloud.client import Client
-from dwave.cloud.qpu import Client as QPUClient
-from dwave.cloud.sw import Client as SoftwareClient
-from dwave.cloud.hybrid import Client as HybridClient
+from dwave.cloud.client.qpu import Client as QPUClient
+from dwave.cloud.client.sw import Client as SoftwareClient
+from dwave.cloud.client.hybrid import Client as HybridClient
 from dwave.cloud.solver import Solver
 from dwave.cloud.exceptions import *
-from dwave.cloud.config import load_config
 
 
 url = 'https://dwavesys.com'
@@ -97,7 +94,7 @@ class MockConnectivityTests(unittest.TestCase):
         with requests_mock.Mocker() as m:
             setup_server(m)
             with self.assertRaises(SAPIError) as err:
-                with Client(bad_url, token) as client:
+                with Client(endpoint=bad_url, token=token) as client:
                     client.get_solvers()
             # TODO: fix when exceptions/sapi call generalized
             self.assertEqual(err.exception.error_code, 404)
@@ -107,14 +104,14 @@ class MockConnectivityTests(unittest.TestCase):
         with requests_mock.Mocker() as m:
             setup_server(m)
             with self.assertRaises(SolverAuthenticationError) as err:
-                with Client(url, bad_token) as client:
+                with Client(endpoint=url, token=bad_token) as client:
                     client.get_solvers()
 
     def test_good_connection(self):
         """Connect with a valid URL and token."""
         with requests_mock.mock() as m:
             setup_server(m)
-            with Client(url, token) as client:
+            with Client(endpoint=url, token=token) as client:
                 self.assertTrue(len(client.get_solvers()) > 0)
 
 
@@ -139,7 +136,7 @@ class MockSolverLoading(unittest.TestCase):
             setup_server(m)
 
             # test default, cached solver get
-            with Client(url, token) as client:
+            with Client(endpoint=url, token=token) as client:
                 # fetch solver not present in cache
                 solver = client.get_solver(solver1_name)
                 self.assertEqual(solver.id, solver1_name)
@@ -167,7 +164,7 @@ class MockSolverLoading(unittest.TestCase):
             setup_server(m)
 
             # test default case, fetch all solvers for the first time
-            with Client(url, token) as client:
+            with Client(endpoint=url, token=token) as client:
                 solvers = client.get_solvers()
 
                 self.assertEqual(len(solvers), 2)
@@ -187,7 +184,7 @@ class MockSolverLoading(unittest.TestCase):
         """Try to load a solver that does not exist."""
         with requests_mock.mock() as m:
             m.get(requests_mock.ANY, status_code=404)
-            with Client(url, token) as client:
+            with Client(endpoint=url, token=token) as client:
                 with self.assertRaises(SolverNotFoundError):
                     client.get_solver(solver1_name)
 
@@ -195,7 +192,7 @@ class MockSolverLoading(unittest.TestCase):
         """Try to load a solver that has incomplete data."""
         with requests_mock.mock() as m:
             m.get(solver1_url, json=structured_solver_data(solver1_name, incomplete=True))
-            with Client(url, token) as client:
+            with Client(endpoint=url, token=token) as client:
                 with self.assertRaises(SolverNotFoundError):
                     client.get_solver(solver1_name)
 
@@ -204,7 +201,7 @@ class MockSolverLoading(unittest.TestCase):
         with requests_mock.mock() as m:
             body = json.dumps(structured_solver_data(solver1_name))
             m.get(solver1_url, text=body[0:len(body)//2])
-            with Client(url, token) as client:
+            with Client(endpoint=url, token=token) as client:
                 with self.assertRaises(InvalidAPIResponseError):
                     client.get_solver(solver1_name)
 
@@ -217,7 +214,7 @@ class MockSolverLoading(unittest.TestCase):
             # prefer solvers with longer name: that's our second solver
             defaults = dict(solver=dict(order_by=lambda s: -len(s.id)))
 
-            with Client(url, token, defaults=defaults) as client:
+            with Client(endpoint=url, token=token, defaults=defaults) as client:
                 solver = client.get_solver()
                 self.assertEqual(solver.id, solver2_name)
 

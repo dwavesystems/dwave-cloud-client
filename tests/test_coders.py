@@ -17,7 +17,6 @@ import copy
 import base64
 import struct
 import unittest
-import itertools
 
 try:
     import dimod

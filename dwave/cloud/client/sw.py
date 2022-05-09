@@ -21,8 +21,7 @@ classical software resources generating samples.
 """
 
 from dwave.cloud.client import Client as BaseClient
-from dwave.cloud.solver import UnstructuredSolver as Solver
-from dwave.cloud.computation import Future
+from dwave.cloud.solver import StructuredSolver as Solver
 
 __all__ = ['Client']
 

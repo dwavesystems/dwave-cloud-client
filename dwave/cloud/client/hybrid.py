@@ -19,7 +19,6 @@ Interface to hybrid :term:`sampler`\ s available through the D-Wave Solver API
 
 from dwave.cloud.client import Client as BaseClient
 from dwave.cloud.solver import UnstructuredSolver as Solver
-from dwave.cloud.computation import Future
 
 __all__ = ['Client']
 

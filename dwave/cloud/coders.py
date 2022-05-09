@@ -12,14 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import zlib
-import json
 import struct
 import base64
-import codecs
 
-from dwave.cloud.utils import (
-    uniform_iterator, uniform_get, strip_tail, active_qubits)
+from dwave.cloud.utils import uniform_get, active_qubits
 
 __all__ = [
     'encode_problem_as_qp', 'decode_qp', 'decode_qp_numpy',

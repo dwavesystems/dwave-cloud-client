@@ -17,7 +17,6 @@
 import time
 import json
 import unittest
-import itertools
 import threading
 import warnings
 import collections
@@ -36,7 +35,7 @@ except ImportError:
 from dwave.cloud.client import Client
 from dwave.cloud.solver import Solver
 from dwave.cloud.computation import Future
-from dwave.cloud.utils import evaluate_ising, generate_const_ising_problem, utcrel
+from dwave.cloud.utils import evaluate_ising, utcrel
 from dwave.cloud.exceptions import (
     SolverFailureError, CanceledFutureError, SolverError,
     InvalidAPIResponseError)
@@ -87,10 +86,8 @@ class _QueryTest(unittest.TestCase):
         # Did we get the right number of samples?
         self.assertEqual(num_reads, sum(results.num_occurrences))
 
-        # verify .occurrences property still works, although is deprecated
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            self.assertEqual(100, sum(results.occurrences))
+        # verify num_occurrences sum corresponds to num_reads
+        self.assertEqual(100, sum(results.num_occurrences))
 
         # Make sure energies are correct in raw results
         for energy, state in zip(results.energies, results.samples):
@@ -133,7 +130,7 @@ class MockSubmission(_QueryTest):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 linear, quadratic = self.sapi.problem
@@ -156,7 +153,7 @@ class MockSubmission(_QueryTest):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 linear, quadratic = self.sapi.problem
@@ -180,7 +177,7 @@ class MockSubmission(_QueryTest):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 h, J = self.sapi.problem
@@ -213,7 +210,7 @@ class MockSubmission(_QueryTest):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 qubo = {(0, 0): 4.0, (0, 4): -4, (4, 4): 4.0}
@@ -249,7 +246,7 @@ class MockSubmission(_QueryTest):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 qubo = {(0, 0): 4.0, (0, 4): -4, (4, 4): 4.0}
@@ -274,7 +271,7 @@ class MockSubmission(_QueryTest):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 linear, quadratic = self.sapi.problem
@@ -296,7 +293,7 @@ class MockSubmission(_QueryTest):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 linear, quadratic = self.sapi.problem
@@ -322,7 +319,7 @@ class MockSubmission(_QueryTest):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 linear, quadratic = self.sapi.problem
@@ -352,7 +349,7 @@ class MockSubmission(_QueryTest):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 linear, quadratic = self.sapi.problem
@@ -380,7 +377,7 @@ class MockSubmission(_QueryTest):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 linear, quadratic = self.sapi.problem
@@ -403,7 +400,7 @@ class MockSubmission(_QueryTest):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 linear, quadratic = self.sapi.problem
@@ -461,7 +458,7 @@ class MockSubmission(_QueryTest):
         session = global_mock_session()
 
         with mock.patch.object(Client, 'create_session', lambda self: session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 linear, quadratic = self.sapi.problem
@@ -508,7 +505,7 @@ class MockSubmission(_QueryTest):
         session = global_mock_session()
 
         with mock.patch.object(Client, 'create_session', lambda self: session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 future = solver.sample_qubo({})
@@ -536,7 +533,7 @@ class MockSubmission(_QueryTest):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 def assert_no_delay(s):
@@ -566,7 +563,7 @@ class MockSubmission(_QueryTest):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 def assert_no_delay(s):
@@ -615,7 +612,7 @@ class MockSubmission(_QueryTest):
         session = global_mock_session()
 
         with mock.patch.object(Client, 'create_session', lambda self: session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 future = solver.sample_qubo({})
@@ -667,7 +664,7 @@ class MockCancel(unittest.TestCase):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
                 future = solver._retrieve_problem(submission_id)
                 future.cancel()
@@ -709,7 +706,7 @@ class MockCancel(unittest.TestCase):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 linear, quadratic = self.sapi.problem
@@ -776,7 +773,7 @@ class TestComputationID(unittest.TestCase):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 linear, quadratic = self.sapi.problem
@@ -836,7 +833,7 @@ class TestOffsetHandling(_QueryTest):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 linear, quadratic = self.sapi.problem
@@ -862,7 +859,7 @@ class TestOffsetHandling(_QueryTest):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 linear, quadratic = self.sapi.problem
@@ -891,7 +888,7 @@ class TestOffsetHandling(_QueryTest):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 linear, quadratic = self.sapi.problem
@@ -923,7 +920,7 @@ class TestComputationDeprecations(_QueryTest):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 linear, quadratic = self.sapi.problem
@@ -935,14 +932,6 @@ class TestComputationDeprecations(_QueryTest):
                     results['samples']
                 with self.assertWarns(DeprecationWarning):
                     results['occurrences']
-
-                # .error is deprecated in 0.7.x, scheduled for removal in 0.9.0
-                with self.assertWarns(DeprecationWarning):
-                    results.error
-
-                # .occurrences is deprecated in 0.8.0, scheduled for removal in 0.10.0+
-                with self.assertWarns(DeprecationWarning):
-                    results.occurrences
 
 
 class TestProblemLabel(unittest.TestCase):
@@ -999,7 +988,7 @@ class TestProblemLabel(unittest.TestCase):
     def test_label_is_sent(self, name, label):
         """Problem label is set on problem submit."""
 
-        with Client('endpoint', 'token') as client:
+        with Client(endpoint='endpoint', token='token') as client:
             solver = Solver(client, self.sapi.solver.data)
             problems = self.generate_sample_problems(solver)
 
@@ -1031,7 +1020,7 @@ class TestProblemLabel(unittest.TestCase):
             return create_mock_session
 
         with mock.patch.object(Client, 'create_session', make_session_generator(label)):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = Solver(client, self.sapi.solver.data)
                 problems = self.generate_sample_problems(solver)
 

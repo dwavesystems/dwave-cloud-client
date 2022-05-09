@@ -14,7 +14,6 @@
 
 import os
 import json
-import tempfile
 import unittest
 from unittest import mock
 
@@ -240,7 +239,6 @@ class TestCli(unittest.TestCase):
     @parameterized.expand([
         ("--config-file", ),
         ("-f", ),
-        ("-c", ),
     ])
     def test_ping(self, config_file_option):
         config_file = 'dwave.conf'
@@ -286,7 +284,6 @@ class TestCli(unittest.TestCase):
     @parameterized.expand([
         ("--config-file", ),
         ("-f", ),
-        ("-c", ),
     ])
     def test_sample(self, config_file_option):
         config_file = 'dwave.conf'
@@ -333,7 +330,6 @@ class TestCli(unittest.TestCase):
     @parameterized.expand([
         ("--config-file", ),
         ("-f", ),
-        ("-c", ),
     ])
     def test_solvers(self, config_file_option):
         config_file = 'dwave.conf'
@@ -374,7 +370,6 @@ class TestCli(unittest.TestCase):
     @parameterized.expand([
         ("--config-file", ),
         ("-f", ),
-        ("-c", ),
     ])
     def test_upload(self, config_file_option):
         config_file = 'dwave.conf'

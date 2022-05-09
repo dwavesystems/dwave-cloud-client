@@ -30,7 +30,6 @@ Some :class:`Future` methods are blocking.
 import time
 import threading
 import functools
-import warnings
 
 from operator import itemgetter
 from dateutil.parser import parse
@@ -157,42 +156,6 @@ class Future(object):
 
         # XXX: energy offset carried via Future, until implemented in SAPI
         self._offset = 0
-
-    # TODO: remove in 0.9.0
-    @property
-    def error(self):
-        """Deprecated in favor of :meth:`.exception`.
-
-        Scheduled for removal in 0.9.0.
-        """
-        warnings.warn(
-            "'Future.error' is deprecated, and it will be removed "
-            "in 0.9.0. please convert your code to use 'Future.exception()'",
-            DeprecationWarning)
-
-        return self._exception
-
-    # TODO: remove in 0.10.0
-    @property
-    def eta_min(self):
-        warnings.warn(
-            "'Future.eta_min' is deprecated, since the underlying "
-            "'earliest_estimated_completion' field has been removed from SAPI. "
-            "The eta_min attribute will be removed in 0.10.0.",
-            DeprecationWarning)
-
-        return None
-
-    # TODO: remove in 0.10.0
-    @property
-    def eta_max(self):
-        warnings.warn(
-            "'Future.eta_max' is deprecated, since the underlying "
-            "'latest_estimated_completion' field has been removed from SAPI. "
-            "The eta_max attribute will be removed in 0.10.0.",
-            DeprecationWarning)
-
-        return None
 
     # make Future ordered
 
@@ -578,9 +541,9 @@ class Future(object):
             Helper properties on :class:`Future` object are preferred to reading
             raw results, as they abstract away the differences in response
             between some solvers like. Available methods are: :meth:`samples`,
-            :meth:`energies`, :meth:`occurrences`, :meth:`variables`,
-            :meth:`timing`, :meth:`problem_type`, :meth:`sampleset` (only if
-            dimod package is installed).
+            :meth:`energies`, :meth:`variables`, :meth:`timing`,
+            :meth:`problem_type`, :meth:`sampleset` (only if dimod package is
+            installed).
 
         Warning:
             The dictionary returned by :meth:`result` depends on the solver
@@ -589,6 +552,21 @@ class Future(object):
             `'samples'` with `'solutions'` and `'occurrences'` with
             `'num_occurrences'`. Better yet, use :meth:`Future.samples` and
             :meth:`Future.num_occurrences` instead.
+
+        .. deprecated:: 0.8.0
+
+            Alias keys ``samples`` and ``occurrences`` in the result dict are
+            deprecated and will be removed in 0.12.0. We'll try to keep the
+            result dict as close to raw data returned by SAPI as possible.
+            Postprocessed data is available via
+            :class:`~dwave.cloud.computation.Future` properties.
+
+        .. versionchanged:: 0.8.0
+
+            Instead of adding copies of ``solutions`` and ``num_occurrences``
+            keys (as ``samples`` and ``occurrences``), we alias them using
+            :class:`~dwave.cloud.utils.aliasdict`. Values are available under
+            alias keys, but the keys themselves are not stored or visible.
 
         Examples:
             This example creates a solver using the local system's default
@@ -724,7 +702,7 @@ class Future(object):
 
         Returns:
             list or NumPy matrix of doubles: number of occurrences. When
-            returned results are ordered in a histogram, `num_occurrences`
+            returned results are ordered in a histogram, ``num_occurrences``
             indicates the number of times a particular solution recurred.
 
         Examples:
@@ -733,7 +711,7 @@ class Future(object):
             problem with several ground states to a remote D-Wave resource for
             20 samples, and prints the returned results, which are ordered as a
             histogram. The problem's ground states tend to recur frequently,
-            and so those solutions have `occurrences` greater than 1.
+            and so those solutions have ``num_occurrences`` greater than 1.
 
             >>> from dwave.cloud import Client
             >>> with Client.from_config() as client:  # doctest: +SKIP
@@ -769,20 +747,6 @@ class Future(object):
             return np.ones((len(result['solutions']),))
         else:
             return [1] * len(result['solutions'])
-
-    # TODO: remove in 0.10.0+
-    @property
-    def occurrences(self):
-        """Deprecated in favor of Future.num_occurrences property.
-
-        Scheduled for removal in 0.10.0.
-        """
-        warnings.warn(
-            "'Future.occurrences' is deprecated, and it will be removed "
-            "in 0.10.0+. Please convert your code to use 'Future.num_occurrences'",
-            DeprecationWarning)
-
-        return self.num_occurrences
 
     def wait_sampleset(self):
         """Blocking sampleset getter."""
@@ -957,11 +921,12 @@ class Future(object):
         self.parse_time = time.time() - start
         return self._result
 
-    # TODO: schedule for removal
     def _alias_result(self):
         """Alias `solutions` and `num_occurrences`.
 
         Deprecated in version 0.8.0.
+
+        Scheduled for removal in 0.12.0.
         """
         if not self._result:
             return
