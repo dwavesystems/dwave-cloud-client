@@ -597,6 +597,34 @@ class ClientConstruction(unittest.TestCase):
                 retry = client.session.get_adapter('https://').max_retries
                 self._verify_retry_config(retry, retry_kwargs)
 
+    def test_positional_args(self):
+        with mock.patch("dwave.cloud.client.base.load_config", lambda **kw: {}):
+
+            # up to 3 positional args are allowed
+            endpoint, token, solver = 'endpoint token solver'.split()
+            with dwave.cloud.Client(endpoint, token, solver) as client:
+                self.assertEqual(client.endpoint, endpoint)
+                self.assertEqual(client.token, token)
+                self.assertEqual(client.default_solver, {'name__eq': solver})
+
+            # but they are deprecated
+            with self.assertWarns(DeprecationWarning):
+                with dwave.cloud.Client(endpoint, token):
+                    pass
+
+            # and more than 3 are not allowed
+            with self.assertRaises(TypeError):
+                dwave.cloud.Client(endpoint, token, solver, 'another')
+
+            # with clashes between pargs and kwargs not allowed as well
+            with self.assertRaises(TypeError):
+                dwave.cloud.Client(endpoint, endpoint=endpoint)
+
+            # even though non-conflicting combination is allowed
+            with dwave.cloud.Client(endpoint, token=token) as client:
+                self.assertEqual(client.endpoint, endpoint)
+                self.assertEqual(client.token, token)
+
 
 @mock.patch.multiple(Client, get_regions=get_default_regions)
 class ClientConfigIntegration(unittest.TestCase):
