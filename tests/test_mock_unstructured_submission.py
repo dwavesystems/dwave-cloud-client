@@ -91,7 +91,7 @@ class TestUnstructuredSolver(unittest.TestCase):
         # construct a functional solver by mocking client and api response data
         with mock.patch.multiple(Client, create_session=lambda self: session,
                                  upload_problem_encoded=mock_upload):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = BQMSolver(client, unstructured_solver_data())
 
                 # make sure this still works
@@ -173,7 +173,7 @@ class TestUnstructuredSolver(unittest.TestCase):
         # construct a functional solver by mocking client and api response data
         with mock.patch.multiple(Client, create_session=lambda self: session,
                                  upload_problem_encoded=mock_upload):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = CQMSolver(client, unstructured_solver_data(problem_type=problem_type))
 
                 # use bqm for mock response (for now)
@@ -215,7 +215,7 @@ class TestUnstructuredSolver(unittest.TestCase):
         # construct a functional solver by mocking client and api response data
         with mock.patch.multiple(Client, create_session=lambda self: session,
                                  upload_problem_encoded=mock_upload):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = DQMSolver(client, unstructured_solver_data(problem_type=problem_type))
 
                 # use bqm for mock response (for now)
@@ -245,7 +245,7 @@ class TestUnstructuredSolver(unittest.TestCase):
 
         # construct a functional solver by mocking client and api response data
         with mock.patch.object(Client, 'create_session', lambda self: session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 with mock.patch.object(BaseUnstructuredSolver, 'upload_problem', mock_upload):
                     solver = UnstructuredSolver(client, unstructured_solver_data())
 
@@ -275,7 +275,7 @@ class TestUnstructuredSolver(unittest.TestCase):
 
         # construct a functional solver by mocking client and api response data
         with mock.patch.object(Client, 'create_session', lambda self: session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 with mock.patch.object(BaseUnstructuredSolver, 'upload_problem', mock_upload):
                     solver = BQMSolver(client, unstructured_solver_data())
 
@@ -337,7 +337,7 @@ class TestProblemLabel(unittest.TestCase):
         # construct a functional solver by mocking client and api response data
         with mock.patch.multiple(Client, create_session=lambda self: session,
                                  upload_problem_encoded=mock_upload):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = BQMSolver(client, unstructured_solver_data())
 
                 problems = [("sample_ising", (bqm.linear, bqm.quadratic)),
@@ -375,7 +375,7 @@ class TestProblemLabel(unittest.TestCase):
         # construct a functional solver by mocking client and api response data
         with mock.patch.multiple(Client, create_session=lambda self: session,
                                  upload_problem_encoded=mock_upload):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
                 solver = BQMSolver(client, unstructured_solver_data())
 
                 # construct mock response

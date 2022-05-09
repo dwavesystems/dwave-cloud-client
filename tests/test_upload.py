@@ -524,7 +524,7 @@ class TestMockedMultipartUpload(unittest.TestCase):
         session = global_mock_session()
 
         with mock.patch.object(Client, 'create_session', lambda self: session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
 
                 future = client.upload_problem_encoded(upload_data)
                 try:
@@ -610,7 +610,7 @@ class TestMockedMultipartUpload(unittest.TestCase):
         session = global_mock_session()
 
         with mock.patch.object(Client, 'create_session', lambda self: session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
 
                 future = client.upload_problem_encoded(upload_data)
                 try:
@@ -702,7 +702,7 @@ class TestMockedMultipartUpload(unittest.TestCase):
         # problem upload must recover
         session = global_mock_session(n_failures=Client._UPLOAD_PART_RETRIES)
         with mock.patch.object(Client, 'create_session', lambda self: session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
 
                 future = client.upload_problem_encoded(upload_data)
                 try:
@@ -716,7 +716,7 @@ class TestMockedMultipartUpload(unittest.TestCase):
         # problem upload will also fail
         session = global_mock_session(n_failures=Client._UPLOAD_PART_RETRIES + 1)
         with mock.patch.object(Client, 'create_session', lambda self: session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
 
                 with self.assertRaises(ProblemUploadError):
                     client.upload_problem_encoded(upload_data).result()
@@ -791,7 +791,7 @@ class TestMockedMultipartUpload(unittest.TestCase):
         session = global_mock_session()
 
         with mock.patch.object(Client, 'create_session', lambda self: session):
-            with Client('endpoint', 'token') as client:
+            with Client(endpoint='endpoint', token='token') as client:
 
                 future = client.upload_problem_encoded(
                     upload_data, problem_id=upload_problem_id)

@@ -846,7 +846,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.solvers = self.structured_solvers + self.unstructured_solvers
 
         # mock client
-        self.client = Client('endpoint', 'token')
+        self.client = Client(endpoint='endpoint', token='token')
         self.client._fetch_solvers = lambda **kw: self.solvers
 
     def shutDown(self):
@@ -1095,7 +1095,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
     def test_order_by_respects_default_solver(self):
         """order_by used in isolation should not affect default_solver filters (issue #401)"""
 
-        with Client('endpoint', 'token', solver=dict(name='qpu2')) as client:
+        with Client(endpoint='endpoint', token='token', solver=dict(name='qpu2')) as client:
             # mock the network call to fetch all solvers
             client._fetch_solvers = lambda **kw: self.solvers
 
@@ -1105,7 +1105,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             # the default solver should not change when we add order_by
             self.assertEqual(client.get_solver(order_by='id'), self.qpu2)
 
-        with Client('endpoint', 'token', solver=dict(category='qpu')) as client:
+        with Client(endpoint='endpoint', token='token', solver=dict(category='qpu')) as client:
             # mock the network call to fetch all solvers
             client._fetch_solvers = lambda **kw: self.solvers
 
@@ -1118,7 +1118,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
     def test_order_by_in_default_solver(self):
         """order_by can be specified as part of default_solver filters (issue #407)"""
 
-        with Client('endpoint', 'token', solver=dict(order_by='id')) as client:
+        with Client(endpoint='endpoint', token='token', solver=dict(order_by='id')) as client:
             # mock the network call to fetch all solvers
             client._fetch_solvers = lambda **kw: self.solvers
 
@@ -1128,7 +1128,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             # the default solver can be overridden
             self.assertEqual(client.get_solver(order_by='-id'), self.software)
 
-        with Client('endpoint', 'token', solver=dict(qpu=True, order_by='-num_active_qubits')) as client:
+        with Client(endpoint='endpoint', token='token', solver=dict(qpu=True, order_by='-num_active_qubits')) as client:
             # mock the network call to fetch all solvers
             client._fetch_solvers = lambda **kw: self.solvers
 
