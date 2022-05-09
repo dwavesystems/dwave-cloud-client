@@ -1,0 +1,4 @@
+---
+upgrade:
+  - |
+    Remove support for dimod 0.8.x. Upgrade dimod to 0.9.0+.
