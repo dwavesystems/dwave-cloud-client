@@ -387,10 +387,11 @@ class Submission(_QueryTest):
             linear, quad = generate_random_ising_problem(solver)
 
             max_num_reads = max(solver.properties.get('num_reads_range', [1, 100]))
+            num_reads = min(max_num_reads, 50)
 
             result_list = []
-            for _ in range(1000):
-                results = solver.sample_ising(linear, quad, num_reads=max_num_reads)
+            for _ in range(100):
+                results = solver.sample_ising(linear, quad, num_reads=num_reads)
                 result_list.append([results, linear, quad])
 
             [r[0].cancel() for r in result_list]
@@ -399,7 +400,7 @@ class Submission(_QueryTest):
                 # Responses must be canceled or correct
                 try:
                     # Did we get the right number of samples?
-                    self.assertEqual(max_num_reads, sum(results.num_occurrences))
+                    self.assertEqual(num_reads, sum(results.num_occurrences))
 
                     # Make sure the number of occurrences and energies are all correct
                     for energy, state in zip(results.energies, results.samples):
