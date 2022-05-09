@@ -20,7 +20,7 @@ import subprocess
 import pkg_resources
 
 from collections.abc import Sequence
-from functools import partial, wraps
+from functools import wraps
 from timeit import default_timer as timer
 
 from typing import Dict
@@ -61,31 +61,6 @@ def show_platform(ctx, param, value):
         click.echo(user_agent())
         sys.exit()
 
-def deprecated_option(msg=None, update=None):
-    """Generate click callback function that will print a deprecation notice
-    to stderr with a customized message and copy option value to new option.
-
-    Note: if you provide the `update` option name, make sure that option is
-    processed before the deprecated one (set `is_eager`).
-    """
-
-    def _print_deprecation(ctx, param, value, msg=None, update=None):
-        if msg is None:
-            msg = "DeprecationWarning: The following options are deprecated: {opts!r}."
-        if value and not ctx.resilient_parsing:
-            click.echo(click.style(msg.format(opts=param.opts), fg="red"), err=True)
-            if update:
-                ctx.params[update] = value
-
-    # click seems to strip closure variables in calls to `callback`,
-    # so we pass `msg` and `update` via partial application
-    return partial(_print_deprecation, msg=msg, update=update)
-
-
-CONFIG_FILE_DEPRECATION_MSG = (
-    "DeprecationWarning: Use of '-c' for '--config-file' has been deprecated "
-    "in favor of '-f' and it will be removed in 0.10.0")
-
 
 def config_file_options(exists=True):
     """Decorate `fn` with `--config-file` and `--profile` options.
@@ -98,11 +73,6 @@ def config_file_options(exists=True):
             '--config-file', '-f', default=None, is_eager=True,
             type=click.Path(exists=exists, dir_okay=False),
             help='Configuration file path')(fn)
-        fn = click.option(
-            '-c', default=None, expose_value=False,
-            type=click.Path(exists=exists, dir_okay=False),
-            help="[Deprecated in favor of '-f']",
-            callback=deprecated_option(CONFIG_FILE_DEPRECATION_MSG, update='config_file'))(fn)
         fn = click.option(
             '--profile', '-p', default=None,
             help='Connection profile (section) name')(fn)

@@ -26,7 +26,7 @@ from collections.abc import Mapping, Sequence
 from urllib.parse import urljoin
 from datetime import datetime, timedelta
 from dateutil.tz import UTC
-from functools import wraps
+from functools import partial, wraps
 from pkg_resources import iter_entry_points
 from typing import Optional, Sequence, Any, Union
 
@@ -581,6 +581,41 @@ class deprecated(object):
             return fn(*args, **kwargs)
 
         return wrapped
+
+
+def deprecated_option(msg=None, update=None):
+    """Generate a Click callback function that will print a deprecation notice
+    to stderr with a customized message and copy option value to new option.
+
+    Note: if you provide the ``update`` option name, make sure that option is
+    processed before the deprecated one (set ``is_eager``).
+
+    Example::
+
+        @click.option('--config-file', '-f', default=None, is_eager=True)
+        @click.option(
+            '-c', default=None, expose_value=False,
+            help="[Deprecated in favor of '-f']",
+            callback=deprecated_option(DEPRECATION_MSG, update='config_file'))
+        ...
+        def ping(config_file, ...):
+            pass
+
+    """
+    # CLI util; defer click import until actually needed (see #473)
+    import click
+
+    def _print_deprecation(ctx, param, value, msg=None, update=None):
+        if msg is None:
+            msg = "DeprecationWarning: The following options are deprecated: {opts!r}."
+        if value and not ctx.resilient_parsing:
+            click.echo(click.style(msg.format(opts=param.opts), fg="red"), err=True)
+            if update:
+                ctx.params[update] = value
+
+    # click seems to strip closure variables in calls to `callback`,
+    # so we pass `msg` and `update` via partial application
+    return partial(_print_deprecation, msg=msg, update=update)
 
 
 def parse_loglevel(level_name, default=logging.NOTSET):

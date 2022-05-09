@@ -1,0 +1,6 @@
+---
+upgrade:
+  - |
+    CLI: use of ``-c`` for ``--config-file`` has been deprecated since
+    ``dwave-cloud-client==0.8.5`` in favor of ``-f``, and the option is now
+    removed in 0.10.0. Use ``--config-file`` or ``-f`` instead.
