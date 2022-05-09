@@ -207,6 +207,11 @@ class Client(object):
 
         Instance-level defaults can be specified via ``defaults`` argument.
 
+    .. deprecated:: 0.10.0
+
+        Positional arguments in :class:`.Client` constructor are deprecated and
+        will be removed in 0.12.0.
+
     Examples:
         This example directly initializes a :class:`.Client`.
         Direct initialization uses class constructor arguments, the minimum
@@ -399,16 +404,26 @@ class Client(object):
         return (region, regions[region]['endpoint'])
 
     @dispatches_events('client_init')
-    def __init__(self, endpoint=None, token=None, solver=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         # for (reasonable) backwards compatibility, accept only the first few
         # positional args.
-        # TODO: deprecate the use of positional args
-        if endpoint is not None:
-            kwargs.setdefault('endpoint', endpoint)
-        if token is not None:
-            kwargs.setdefault('token', token)
-        if solver is not None:
-            kwargs.setdefault('solver', solver)
+        if len(args) > 3:
+            raise TypeError(
+                "Client constructor takes up to 3 positional "
+                f"arguments, but {len(args)} were given")
+
+        if len(args) > 0:
+            warnings.warn(
+                "Positional arguments in Client constructor are deprecated "
+                "since dwave-cloud-client 0.10.0, and will be removed in 0.12.0. "
+                "Use keyword arguments instead.",
+                DeprecationWarning, stacklevel=3)
+
+            argsdict = dict(zip(('endpoint', 'token', 'solver'), args))
+            intersection = argsdict.keys() & kwargs
+            if intersection:
+                raise TypeError(f"Client() got multiple values for {intersection}")
+            kwargs.update(argsdict)
 
         logger.debug("Client init called with: %r", kwargs)
 
