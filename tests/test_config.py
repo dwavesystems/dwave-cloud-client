@@ -24,7 +24,7 @@ from dwave.cloud.exceptions import ConfigFileParseError, ConfigFileReadError
 from dwave.cloud.testing import iterable_mock_open
 from dwave.cloud.config import (
     get_configfile_paths, load_config_from_files, load_config,
-    parse_float, parse_int, parse_boolean, get_cache_dir)
+    parse_float, parse_int, parse_boolean, get_cache_dir, update_config)
 
 
 class TestConfigParsing(unittest.TestCase):
@@ -445,3 +445,59 @@ class TestConfigUtils(unittest.TestCase):
         self.assertTrue(os.path.isdir(path))
         self.assertIn(__packagename__, path)
         self.assertIn(__version__, path)
+
+    def test_config_update_simple_override(self):
+        config = {'token': 1}
+        update = {'token': 2, 'solver': 2}
+        update_config(config, update)
+        self.assertEqual(config, {'token': 2, 'solver': 2})
+
+        config = {'endpoint': 1}
+        update = {'endpoint': 2}
+        update_config(config, update)
+        self.assertEqual(config, {'endpoint': 2})
+
+        config = {'region': 1}
+        update = {'region': 2}
+        update_config(config, update)
+        self.assertEqual(config, {'region': 2})
+
+    def test_config_update_mutually_exclusive_on_different_levels(self):
+        # region/endpoint on higher level override the lower level
+        config = {'endpoint': 1}
+        update = {'region': 2}
+        update_config(config, update)
+        self.assertEqual(config, {'region': 2})
+
+        config = {'region': 1}
+        update = {'endpoint': 2}
+        update_config(config, update)
+        self.assertEqual(config, {'endpoint': 2})
+
+        config = {'endpoint': 1, 'region': 1}
+        update = {'region': 2}
+        update_config(config, update)
+        self.assertEqual(config, {'region': 2})
+
+        config = {'endpoint': 1, 'region': 1}
+        update = {'endpoint': 2}
+        update_config(config, update)
+        self.assertEqual(config, {'endpoint': 2})
+
+    def test_config_update_mutually_exclusive_on_same_level(self):
+        # config update should not conflate same-level mutually exclusive options
+        # updates should be minimal, only when options are in direct conflict
+        config = {'endpoint': 1}
+        update = {'endpoint': 2, 'region': 2}
+        update_config(config, update)
+        self.assertEqual(config, update)
+
+        config = {'region': 1}
+        update = {'endpoint': 2, 'region': 2}
+        update_config(config, update)
+        self.assertEqual(config, update)
+
+        config = {'endpoint': 1, 'region': 1}
+        update = {'endpoint': 2, 'region': 2}
+        update_config(config, update)
+        self.assertEqual(config, update)
