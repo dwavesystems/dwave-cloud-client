@@ -1,0 +1,8 @@
+---
+fixes:
+  - |
+    Previously it was possible for mutually exclusive config options, if all
+    specified on the same level, and depending on the order used, to not be
+    correctly combined with options from a lower level.
+    See `#524 <https://github.com/dwavesystems/dwave-cloud-client/issues/524>`_,
+    now fixed.

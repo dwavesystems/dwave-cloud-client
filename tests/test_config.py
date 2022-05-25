@@ -501,3 +501,8 @@ class TestConfigUtils(unittest.TestCase):
         update = {'endpoint': 2, 'region': 2}
         update_config(config, update)
         self.assertEqual(config, update)
+
+        config = {}
+        update = {'endpoint': 2, 'region': 2}
+        update_config(config, update)
+        self.assertEqual(config, update)
