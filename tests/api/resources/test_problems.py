@@ -81,11 +81,7 @@ class ProblemResourcesBaseTests(abc.ABC):
         p = ps.pop()
         self.assertIsInstance(p, models.ProblemStatus)
 
-    # XXX: disable filter tests because the feature is currently broken on SAPI!
-    # TODO: enable as soon as the fix is deployed to SAPI prod. See #516.
-    # note: we don't actually use filtering anywhere in client's "public" API,
-    #       so the feature is not critical.
-    def disabled_test_list_filter(self):
+    def test_list_filter(self):
         """Problem filtering works (on edges as well)."""
 
         # 404 on non-existing problem id
