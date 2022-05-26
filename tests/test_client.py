@@ -237,6 +237,18 @@ class ClientConstruction(unittest.TestCase):
                     self.assertEqual(client.region, region_code)
                     self.assertEqual(client.endpoint, region_endpoint)
 
+    def test_region_endpoint_pair_kwarg_overrides_region_endpoint_pair_from_config(self):
+        conf = {k: k for k in 'region endpoint token'.split()}
+        region_code = 'region-code'
+        region_endpoint = 'region-endpoint'
+        region_conf = {region_code: {"endpoint": region_endpoint}}
+
+        with mock.patch("dwave.cloud.config.load_profile_from_files", lambda *pa, **kw: conf):
+            with mock.patch("dwave.cloud.Client.get_regions", lambda s: region_conf):
+                with dwave.cloud.Client.from_config(region=region_code, endpoint=region_endpoint) as client:
+                    self.assertEqual(client.region, region_code)
+                    self.assertEqual(client.endpoint, region_endpoint)
+
     def test_region_from_env_overrides_endpoint_from_config(self):
         conf = {k: k for k in 'endpoint token'.split()}
         region_code = 'region-code'

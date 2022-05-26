@@ -248,11 +248,8 @@ ENV_OPTION_MAP = {
 }
 """Map of environment variable names to config options."""
 
-# note: order is important during sequential config inplace update - keep most
-# significant last
 MUTUALLY_EXCLUSIVE_OPTIONS = {
-    'region': ['endpoint'],
-    'endpoint': ['region'],
+    'region-endpoint-group': {'endpoint', 'region'},
 }
 """List of options to be cleared on *lower level*, per each option set on higher
 level, in addition to the option value override (assumed).
@@ -876,8 +873,14 @@ def update_config(config: dict, options: dict) -> None:
     """Update `config` inplace with `options`, ignoring None and blank string
     values, clearing mutually exclusive options on different levels.
     """
-    for key, val in options.items():
-        if val is not None and val != '':
-            for excluded in MUTUALLY_EXCLUSIVE_OPTIONS.get(key, []):
+    # skip null and empty option values
+    # TODO: not needed when we switch to structured/typed config (like YAML)
+    updates = {k: v for k,v in options.items() if v is not None and v != ''}
+
+    # handle mutually exclusive options first (so it's order invariant)
+    for group, optionset in MUTUALLY_EXCLUSIVE_OPTIONS.items():
+        if updates.keys() & optionset:
+            for excluded in optionset:
                 config.pop(excluded, None)
-            config[key] = val
+
+    config.update(updates)
