@@ -26,7 +26,7 @@ from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent, is_caused_by)
 
-__all__ = ['DWaveAPIClient', 'SolverAPIClient', 'MetadataAPIClient']
+__all__ = ['DWaveAPIClient', 'SolverAPIClient', 'MetadataAPIClient', 'LeapAPIClient']
 
 logger = logging.getLogger(__name__)
 
@@ -327,6 +327,13 @@ class DWaveAPIClient:
         return retry
 
     @classmethod
+    def _add_auth(cls, session, config):
+        if config['token']:
+            session.headers.update({'X-Auth-Token': config['token']})
+        if config['cert']:
+            session.cert = config['cert']
+
+    @classmethod
     def _create_session(cls, config):
         # allow endpoint path to not end with /
         # (handle incorrect user input when merging paths, see rfc3986, sec 5.2.3)
@@ -356,10 +363,7 @@ class DWaveAPIClient:
             session.headers.update(config['headers'])
 
         # auth
-        if config['token']:
-            session.headers.update({'X-Auth-Token': config['token']})
-        if config['cert']:
-            session.cert = config['cert']
+        cls._add_auth(session, config)
 
         if config['proxies']:
             session.proxies = config['proxies']
@@ -478,4 +482,17 @@ class MetadataAPIClient(DWaveAPIClient):
 
     def __init__(self, **config):
         config.setdefault('endpoint', constants.DEFAULT_METADATA_API_ENDPOINT)
+        super().__init__(**config)
+
+
+class LeapAPIClient(DWaveAPIClient):
+    """Client for D-Wave's Leap API."""
+
+    @classmethod
+    def _add_auth(cls, session, config):
+        if config['token']:
+            session.headers.update({'Authorization': f"Bearer {config['token']}"})
+
+    def __init__(self, **config):
+        config.setdefault('endpoint', constants.DEFAULT_LEAP_API_ENDPOINT)
         super().__init__(**config)
