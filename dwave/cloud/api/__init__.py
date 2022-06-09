@@ -27,5 +27,5 @@ from dwave.cloud.api import exceptions
 from dwave.cloud.api import models
 from dwave.cloud.api import resources
 
-from dwave.cloud.api.client import DWaveAPIClient, SolverAPIClient, MetadataAPIClient
-from dwave.cloud.api.resources import Solvers, Problems, Regions
+from dwave.cloud.api.client import DWaveAPIClient, SolverAPIClient, MetadataAPIClient, LeapAPIClient
+from dwave.cloud.api.resources import Solvers, Problems, Regions, LeapAccount

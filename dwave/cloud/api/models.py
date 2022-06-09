@@ -150,3 +150,32 @@ class Region(BaseModel):
     code: str
     name: str
     endpoint: str
+
+
+# LeapAPI types, provisional
+
+class LeapProject(BaseModel):
+    id: int
+    name: str
+    code: str
+
+class _LeapProjectWrapper(BaseModel):
+    project: LeapProject
+
+# LeapAPI / account / active project response
+class _LeapActiveProjectResponse(BaseModel):
+    data: _LeapProjectWrapper
+
+# LeapAPI / account / projects response
+class _LeapProjectsWrapper(BaseModel):
+    projects: List[_LeapProjectWrapper]
+
+class _LeapProjectsResponse(BaseModel):
+    data: _LeapProjectsWrapper
+
+# LeapAPI / account / token response
+class _LeapTokenWrapper(BaseModel):
+    token: str
+
+class _LeapProjectTokenResponse(BaseModel):
+    data: _LeapTokenWrapper
