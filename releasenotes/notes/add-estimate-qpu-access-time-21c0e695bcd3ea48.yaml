@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Added ``estimate_qpu_access_time`` method to ``dwave.cloud.solver.StructuredSolver``
+    to estimate quantum processing unit (QPU) access time for a submission to the 
+    selected solver.

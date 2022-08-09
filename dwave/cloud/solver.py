@@ -1197,21 +1197,7 @@ class StructuredSolver(BaseSolver):
 
         Requires that you provide the number of qubits to be used for your
         problem submission. :term:`Embedding` is typically heuristic and the number
-        of required qubits can vary between executions. If you are using a heuristic
-        embedding tool such as
-        :std:doc:`minorminer <oceandocs:docs_minorminer/source/sdk_index>` indirectly
-        through your sampler (e.g., by using the
-        :class:`~dwave.system.composites.EmbeddingComposite` or :class:`~dwave.system.samplers.DWaveCliqueSampler` classes), you can use
-        the same tool on your problem to estimate the expected number of qubits:
-        for large, complex problems you might run the tool several times and take
-        the number of qubits from the produced average or worst-case embedding;
-        for small, simple problems even a single run might be sufficient. If you
-        are using such a tool directly (e.g., in conjunction with the
-        :class:`~dwave.system.composites.FixedEmbeddingComposite`)
-        or otherwise generating a heuristic or non-heuristic embedding, take
-        the required number of qubits from your embedding. Because embedding
-        depends on a QPU’s working graph, such embeddings should be for
-        the particular QPU for which you are estimating the access time.
+        of required qubits can vary between executions.
 
         Args:
             num_qubits:
@@ -1287,12 +1273,12 @@ class StructuredSolver(BaseSolver):
         try:
             problem_timing_data = self.properties['problem_timing_data']
         except:
-            raise ValueError("selected solver is missing required property ``problem_timing_data``")
+            raise KeyError("selected solver is missing required property ``problem_timing_data``")
 
         try:
             version_timing_model = problem_timing_data['version']
         except:
-            raise ValueError("selected solver is missing ``problem_timing_data`` field ``version``")
+            raise KeyError("selected solver is missing ``problem_timing_data`` field ``version``")
 
         try:
             typical_programming_time = problem_timing_data['typical_programming_time']
