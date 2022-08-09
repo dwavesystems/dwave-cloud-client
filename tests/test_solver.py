@@ -120,6 +120,41 @@ class _QueryTest(unittest.TestCase):
 
         return results
 
+@unittest.skipUnless(config, "No live server configuration available.")
+class Utilities(_QueryTest):
+    """Test solver utility methods."""
+
+    def test_qpu_access_time_estimate(self):
+        with Client(**config) as client:
+            solver = client.get_solver(qpu=True)
+
+            runtime_q1000 = solver.estimate_qpu_access_time(num_qubits=1000)
+            # results for num_qubits=1000: Advanatge4.1 15341, DW_2000Q_6 11775
+            self.assertGreater(runtime_q1000, 5000)
+            self.assertGreater(50000, runtime_q1000)
+            # increase number of reads
+            runtime_q1000_r500 = solver.estimate_qpu_access_time(num_qubits=1000, num_reads=500)
+            runtime_q1000_r600 = solver.estimate_qpu_access_time(num_qubits=1000, num_reads=600)
+            self.assertGreater(runtime_q1000_r500, runtime_q1000)
+            self.assertGreater(runtime_q1000_r600, runtime_q1000_r500)
+            # anneal schedules/time
+            runtime_q1000_at400 = solver.estimate_qpu_access_time(num_qubits=1000, annealing_time=400)
+            runtime_q1000_as800 = solver.estimate_qpu_access_time(num_qubits=1000, anneal_schedule=[[0.0, 0.0], [800.0, 0.5]])
+            self.assertGreater(runtime_q1000_as800, runtime_q1000_at400)
+            # reverse annealing
+            runtime_q1000_ra100 = solver.estimate_qpu_access_time(num_qubits=1000,
+                anneal_schedule=[[0.0, 1.0], [2, 0.45], [102, 0.45], [102, 1.0]],
+                initial_state={node: 0 for node in solver.nodes})
+            self.assertGreater(runtime_q1000_ra100, runtime_q1000)
+            # Check parameter checking
+            with self.assertRaises(ValueError):
+                solver.estimate_qpu_access_time(num_qubits=1000,
+                                                anneal_schedule=[[0.0, 0.0], [50.0, 0.5]],
+                                                annealing_time=150)
+            with self.assertRaises(ValueError):
+                solver.estimate_qpu_access_time(num_qubits=1000,
+                                                anneal_schedule=[[0.0, 1.0], [2.75, 0.45], [82.75, 0.45], [82.761, 1.0]])
+
 
 @unittest.skipUnless(config, "No live server configuration available.")
 class Submission(_QueryTest):
