@@ -1274,8 +1274,15 @@ class StructuredSolver(BaseSolver):
 
         try:
             problem_timing_data = self.properties['problem_timing_data']
+        except:
+            raise ValueError("selected solver is missing required property ``problem_timing_data``")
 
+        try:
             version_timing_model = problem_timing_data['version']
+        except:
+            raise ValueError("selected solver is missing ``problem_timing_data`` field ``version``")
+
+        try:
             typical_programming_time = problem_timing_data['typical_programming_time']
             ra_with_reinit_prog_time_delta = problem_timing_data['reverse_annealing_with_reinit_prog_time_delta']
             ra_without_reinit_prog_time_delta = problem_timing_data['reverse_annealing_without_reinit_prog_time_delta']
@@ -1291,18 +1298,12 @@ class StructuredSolver(BaseSolver):
             default_readout_thermalization = problem_timing_data['default_readout_thermalization']
 
         except KeyError as err:
-            if err == 'problem_timing_data':
-                err_msg = f"selected solver is missing required property {err}"
-            elif err == 'version':
-                err_msg = f"selected solver is missing ``problem_timing_data`` field {err}"
-            else:
-                err_msg = f"selected solver is missing ``problem_timing_data`` field " + \
-                          f"{err} required by timing model version {version_timing_model}"
+            err_msg = f"selected solver is missing ``problem_timing_data`` field " + \
+                      f"{err} required by timing model version {version_timing_model}"
             raise ValueError(err_msg)
 
         # Support for sapi timing model versions: 1.0.x
-        version_tuple = tuple(int(i) for i in version_timing_model.split("."))
-        if not version_tuple[0] == 1 and not version_tuple[1] == 0:
+        if not version_timing_model.startswith("1.0."):
             raise ValueError(f"``estimate_qpu_access_time`` does not currently "
                              f"support timing model {version_timing_model} "
                              "used by the selected solver")
@@ -1328,7 +1329,6 @@ class StructuredSolver(BaseSolver):
         anneal_time = default_annealing_time
         if annealing_time:
             anneal_time = annealing_time
-            print(anneal_time)
         elif anneal_schedule:
             anneal_time = anneal_schedule[-1][0]
 
@@ -1339,8 +1339,8 @@ class StructuredSolver(BaseSolver):
                               f"is not of an even length as required by timing "
                               f"model version {version_timing_model}")
 
-        q = readout_time_model_parameters[:int(n/2)]
-        t = readout_time_model_parameters[int(n/2):]
+        q = readout_time_model_parameters[:n//2]
+        t = readout_time_model_parameters[n//2:]
         if readout_time_model == 'pwl_log_log':
             readout_time = pow(10, np.interp(np.emath.log10(num_qubits), q, t))
         elif readout_time_model == 'pwl_linear':
