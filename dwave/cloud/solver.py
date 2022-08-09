@@ -1200,19 +1200,18 @@ class StructuredSolver(BaseSolver):
         of required qubits can vary between executions. If you are using a heuristic
         embedding tool such as
         :std:doc:`minorminer <oceandocs:docs_minorminer/source/sdk_index>` indirectly
-        through your sampler (e.g., by using the :class:`~dwave.system.composites.EmbeddingComposite`
-        or :class:`~DWaveCliqueSampler` classes), you can use the same tool on
-        your problem to estimate the expected number of qubits: for large, complex
-        problems you might run the tool several times and take the number of qubits
-        from the produced average or worst-case embedding; for small, simple
-        problems even a single run might be sufficient. If you are using such a
-        tool directly (e.g., in conjunction with the
+        through your sampler (e.g., by using the
+        :class:`~dwave.system.composites.EmbeddingComposite` or :class:`~dwave.system.samplers.DWaveCliqueSampler` classes), you can use
+        the same tool on your problem to estimate the expected number of qubits:
+        for large, complex problems you might run the tool several times and take
+        the number of qubits from the produced average or worst-case embedding;
+        for small, simple problems even a single run might be sufficient. If you
+        are using such a tool directly (e.g., in conjunction with the
         :class:`~dwave.system.composites.FixedEmbeddingComposite`)
         or otherwise generating a heuristic or non-heuristic embedding, take
         the required number of qubits from your embedding. Because embedding
         depends on a QPU’s working graph, such embeddings should be for
         the particular QPU for which you are estimating the access time.
-        See examples below.
 
         Args:
             num_qubits:
@@ -1253,17 +1252,30 @@ class StructuredSolver(BaseSolver):
 
         Examples:
 
-            This example estimates the QPU access time for a selected quantum computer
-            for a problem that uses 500 qubits and is sampled with 100 anneals.
+            This example estimates the QPU access time for a ferromagnetic problem
+            using all the selected QPU's qubits before deciding whether to submit
+            the problem.
 
-            >>> from dwave.cloud.utils import estimate_qpu_access_time
+            .. testsetup::
+
+                estimated_runtime = 42657   # to test solver.sample_bqm()
+
+            >>> from dimod import BinaryQuadraticModel
             >>> from dwave.cloud import Client
-            ...
+            >>> reads = 100
+            >>> max_time = 100000
             >>> with Client.from_config() as client:
-            ...     solver = client.get_solver()
-            ...     estimated_runtime = estimate_qpu_access_time(solver, 500, num_reads=100) # doctest: +SKIP
-            ...     print("%.0f" % estimated_runtime) # doctest: +SKIP
-            42657
+            ...    solver = client.get_solver(qpu=True)
+            ...    bqm = BinaryQuadraticModel({}, {edge: -1 for edge in solver.edges}, "BINARY")
+            ...    num_qubits = len(solver.nodes)
+            ...    estimated_runtime = solver.estimate_qpu_access_time(num_qubits, num_reads=reads) # doctest: +SKIP
+            ...    print("Estimate of {:.0f}us on {}".format(estimated_runtime, solver.name)) # doctest: +SKIP
+            ...    if estimated_runtime < max_time:
+            ...       computation = solver.sample_bqm(bqm, num_reads=reads)
+            Estimate of 42657us on Advantage_system4.1
+            >>> print("QPU access time: {:.0f}us".format(computation.timing["qpu_access_time"]))  # doctest: +SKIP
+            QPU access time: 42640us
+
         """
         if anneal_schedule and annealing_time:
             raise ValueError("set only one of ``anneal_schedule`` or ``annealing_time``")

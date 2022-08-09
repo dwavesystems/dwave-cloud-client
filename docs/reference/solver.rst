@@ -25,11 +25,14 @@ Methods
    :toctree: generated
 
    StructuredSolver.check_problem
+   StructuredSolver.estimate_qpu_access_time
    StructuredSolver.max_num_reads
+   StructuredSolver.reformat_parameters
+   StructuredSolver.sample_bqm
    StructuredSolver.sample_ising
    StructuredSolver.sample_qubo
-   StructuredSolver.sample_bqm
-   StructuredSolver.reformat_parameters
+
+
 
    UnstructuredSolver.sample_ising
    UnstructuredSolver.sample_qubo
