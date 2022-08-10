@@ -222,6 +222,70 @@ def qpu_pegasus_solver_data(m: int,
 
     return structured_solver_data(**params)
 
+def qpu_access_time_data(qpu: str = 'Advantage_system4.1', **kwargs) -> dict:
+    """Mock QPU solver data with qpu_access_time.
+
+    Args:
+        qpu:
+            Name of the original solver that provided timing data used here.
+        **kwargs:
+            Solver properties passed down to :meth:`.structured_solver_data`.
+
+    """
+
+    timing_data_advantage41_2022_8 = {'version': '1.0.0',
+        'typical_programming_time': 14072.88,
+        'reverse_annealing_with_reinit_prog_time_delta': 0.0,
+        'reverse_annealing_without_reinit_prog_time_delta': 5.55,
+        'default_programming_thermalization': 1000.0,
+        'default_annealing_time': 20.0,
+        'readout_time_model': 'pwl_log_log',
+        'readout_time_model_parameters': [0.0, 0.7699665876947938, 1.7242758696010096,
+                2.711975459489206, 3.1639057672764026, 3.750276915153992, 1.539131714800995,
+                1.8726623164229292, 2.125631787097315, 2.332672340068556, 2.371606651233025,
+                2.3716219271760215],
+        'qpu_delay_time_per_sample': 20.54,
+        'reverse_annealing_with_reinit_delay_time_delta': -4.5,
+        'reverse_annealing_without_reinit_delay_time_delta': -1.5,
+        'default_readout_thermalization': 0.0,
+        'decorrelation_max_nominal_anneal_time': 2000.0,
+        'decorrelation_time_range': [500.0, 10000.0]}
+
+    timing_data_2000q6_2022_8 = {'version': '1.0.0',
+        'typical_programming_time': 10536.81,
+        'reverse_annealing_with_reinit_prog_time_delta': 0.0,
+        'reverse_annealing_without_reinit_prog_time_delta': 359.58,
+        'default_programming_thermalization': 1000.0,
+        'default_annealing_time': 20.0,
+        'readout_time_model': 'pwl_log_log',
+        'readout_time_model_parameters': [0.0, 3.30984300471607, 2.2975416678181597,
+            2.2975416678181597],
+        'qpu_delay_time_per_sample': 20.54,
+        'reverse_annealing_with_reinit_delay_time_delta': 586.38,
+        'reverse_annealing_without_reinit_delay_time_delta': -5.0,
+        'default_readout_thermalization': 0.0,
+        'decorrelation_max_nominal_anneal_time': 2000.0,
+        'decorrelation_time_range': [500.0, 10000.0]}
+
+    if qpu == 'Advantage_system4.1':
+        problem_timing_data = timing_data_advantage41_2022_8
+    elif qpu == 'DW_2000Q_6':
+        problem_timing_data = timing_data_2000q6_2022_8
+    elif qpu == 'version_1_1_0':
+        problem_timing_data = timing_data_advantage41_2022_8
+        problem_timing_data["version"] = '1.1.0'
+    elif qpu == 'no_version':
+        problem_timing_data = timing_data_advantage41_2022_8
+        del problem_timing_data['version']
+
+    params = dict(
+        chip_id='Advantage_system4.1_mock',
+        problem_timing_data=problem_timing_data,
+    )
+    params.update(**kwargs)
+
+    return structured_solver_data(**params)
+
 
 def unstructured_solver_data(id: str = None,
                              status: str = None,
