@@ -37,8 +37,6 @@ from dwave.cloud.exceptions import (
     CanceledFutureError, SolverFailureError, InvalidProblemError)
 import dwave.cloud.computation
 
-from dwave.cloud.solver import StructuredSolver
-from dwave.cloud.testing import mocks
 
 from tests import config
 
