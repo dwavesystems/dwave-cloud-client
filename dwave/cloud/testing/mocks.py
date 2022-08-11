@@ -20,7 +20,7 @@ from typing import List, Tuple, Optional
 __all__ = [
     'solver_configuration_data',
     'structured_solver_data', 'qpu_clique_solver_data',
-    'qpu_chimera_solver_data', 'qpu_pegasus_solver_data',
+    'qpu_chimera_solver_data', 'qpu_pegasus_solver_data', 'qpu_problem_timing_data',
     'unstructured_solver_data', 'hybrid_bqm_solver_data', 'hybrid_dqm_solver_data',
 ]
 
@@ -222,14 +222,14 @@ def qpu_pegasus_solver_data(m: int,
 
     return structured_solver_data(**params)
 
-def qpu_access_time_data(qpu: str = 'Advantage_system4.1', **kwargs) -> dict:
-    """Mock QPU solver data with qpu_access_time.
+def qpu_problem_timing_data(qpu: str = 'advantage') -> dict:
+    """Mock QPU solver proprty problem_timing_data.
 
     Args:
         qpu:
-            Name of the original solver that provided timing data used here.
-        **kwargs:
-            Solver properties passed down to :meth:`.structured_solver_data`.
+            Type of QPU that provided timing data, as it was in
+            August 2022 on a particular system, used here. Currently supported
+            values are: ``advantage`` and ``2000q``.
 
     """
 
@@ -267,25 +267,10 @@ def qpu_access_time_data(qpu: str = 'Advantage_system4.1', **kwargs) -> dict:
         'decorrelation_max_nominal_anneal_time': 2000.0,
         'decorrelation_time_range': [500.0, 10000.0]}
 
-    if qpu == 'Advantage_system4.1':
-        problem_timing_data = timing_data_advantage41_2022_8
-    elif qpu == 'DW_2000Q_6':
-        problem_timing_data = timing_data_2000q6_2022_8
-    elif qpu == 'version_1_1_0':
-        problem_timing_data = timing_data_advantage41_2022_8
-        problem_timing_data["version"] = '1.1.0'
-    elif qpu == 'no_version':
-        problem_timing_data = timing_data_advantage41_2022_8
-        del problem_timing_data['version']
+    name_dict = {'advantage': timing_data_advantage41_2022_8,
+                 '2000q': timing_data_2000q6_2022_8}
 
-    params = dict(
-        chip_id='Advantage_system4.1_mock',
-        problem_timing_data=problem_timing_data,
-    )
-    params.update(**kwargs)
-
-    return structured_solver_data(**params)
-
+    return name_dict[qpu]
 
 def unstructured_solver_data(id: str = None,
                              status: str = None,

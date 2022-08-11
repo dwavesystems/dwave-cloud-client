@@ -14,6 +14,7 @@
 
 import unittest
 
+import copy
 import networkx as nx
 from parameterized import parameterized_class
 
@@ -22,6 +23,7 @@ try:
 except ImportError:
     dimod = None
 
+from dwave.cloud.client import Client
 from dwave.cloud.solver import StructuredSolver
 from dwave.cloud.testing import mocks
 
@@ -32,6 +34,7 @@ try:
 except RuntimeError:
     solvers = []
 
+from tests import config
 
 @parameterized_class(("solver", ), solvers)
 @unittest.skipUnless(dimod, "dimod not installed")
@@ -113,3 +116,68 @@ class TestReformatParameters(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             StructuredSolver.reformat_parameters("INTEGER", {}, {})
+
+class QpuAccessTimeEstimate(unittest.TestCase):
+    """Test QPU access time estimation method."""
+
+    def test_qpu_access_time_estimate_mock(self):
+        solver_mock = StructuredSolver(data=mocks.qpu_pegasus_solver_data(16,
+            problem_timing_data=mocks.qpu_problem_timing_data(qpu='advantage')), client=None)
+
+        # not allowed annealing_time together with anneal_schedule
+        with self.assertRaises(ValueError):
+            solver_mock.estimate_qpu_access_time(num_qubits=1000,
+                                            anneal_schedule=[[0.0, 0.0], [50.0, 0.5]],
+                                            annealing_time=150)
+        # reverse anneal without required initial state
+        with self.assertRaises(ValueError):
+            solver_mock.estimate_qpu_access_time(num_qubits=1000,
+                                            anneal_schedule=[[0.0, 1.0], [2.75, 0.45], [82.75, 0.45], [82.761, 1.0]])
+
+        # currently support is for version 1.0.x
+        with self.assertRaises(ValueError):
+            solver_mock_ver = copy.deepcopy(solver_mock)
+            solver_mock_ver.properties["problem_timing_data"]["version"] = '1.1.0'
+            solver_mock_ver.estimate_qpu_access_time(num_qubits=1000)
+
+        with self.assertRaises(KeyError):
+            solver_mock_ver = copy.deepcopy(solver_mock)
+            solver_mock_ver.properties["problem_timing_data"].pop("version")
+            solver_mock_ver.estimate_qpu_access_time(num_qubits=1000)
+
+        for d, t in [({'num_qubits': 1000}, 15341),
+                     ({'num_qubits': 1000, 'num_reads': 500}, 149225),
+                     ({'num_qubits': 1000, 'annealing_time': 400}, 15721),
+                     ({'num_qubits': 1000, 'anneal_schedule': [[0.0, 0.0], [800.0, 0.5]]}, 16121),
+                     ({'num_qubits': 1000, 'anneal_schedule': [[0.0, 1.0], [2, 0.45], [102, 0.45], [102, 1.0]], 'initial_state': {node: 0 for node in solver_mock.nodes}}, 15427),
+                     ]:
+            self.assertEqual(int(solver_mock.estimate_qpu_access_time(**d)), t)
+
+        # increase number of reads
+        runtime_r500 = solver_mock.estimate_qpu_access_time(num_qubits=1000, num_reads=500)
+        runtime_r600 = solver_mock.estimate_qpu_access_time(num_qubits=1000, num_reads=600)
+        self.assertGreater(runtime_r600, runtime_r500)
+
+    @unittest.skipUnless(config, "No live server configuration available.")
+    def test_qpu_access_time_estimate_live(self):
+        with Client(**config) as client:
+            solver = client.get_solver(topology__type='pegasus')
+            try:
+                self.assertEqual(solver.name, 'test')
+            except:
+                print(solver.name)
+
+            # test live qpu is in a somewhat reasonable range
+            # results for num_qubits=1000: Advanatge4.1 15341, DW_2000Q_6 11775
+            runtime_q1000 = solver.estimate_qpu_access_time(num_qubits=1000)
+            self.assertGreater(runtime_q1000, 5000)
+            self.assertGreater(20000, runtime_q1000)
+
+            # compare for most qubits in use (best model accuracy in version 1.0.0)
+            h = {node: 0.5 for node in list(solver.nodes)[:5000]}
+            computation = solver.sample_ising(h, {}, num_reads=1000)
+            result = computation.result()
+            qpu_access_time = result["timing"]["qpu_access_time"]
+            runtime_q5000_r1000 = solver.estimate_qpu_access_time(num_qubits=5000, num_reads=1000)
+            miss = abs(qpu_access_time - runtime_q5000_r1000)/max(qpu_access_time, runtime_q5000_r1000)
+            self.assertLess(miss, 0.05)
