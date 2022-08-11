@@ -16,7 +16,7 @@ import unittest
 
 import copy
 import networkx as nx
-from parameterized import parameterized_class
+from parameterized import parameterized, parameterized_class
 
 try:
     import dimod
@@ -149,14 +149,13 @@ class QpuAccessTimeEstimate(unittest.TestCase):
             solver_mock_ver.properties["problem_timing_data"].pop("version")
             solver_mock_ver.estimate_qpu_access_time(num_qubits=1000)
 
-    def test_mock_estimations(self):
-        for d, t in [({'num_qubits': 1000}, 15341),
-                     ({'num_qubits': 1000, 'num_reads': 500}, 149225),
-                     ({'num_qubits': 1000, 'annealing_time': 400}, 15721),
-                     ({'num_qubits': 1000, 'anneal_schedule': [[0.0, 0.0], [800.0, 0.5]]}, 16121),
-                     ({'num_qubits': 1000, 'anneal_schedule': [[0.0, 1.0], [2, 0.45], [102, 0.45], [102, 1.0]], 'initial_state': {node: 0 for node in self.solver_mock.nodes}}, 15427),
-                     ]:
-            self.assertEqual(int(self.solver_mock.estimate_qpu_access_time(**d)), t)
+    @parameterized.expand([({'num_qubits': 1000}, 15341),
+                 ({'num_qubits': 1000, 'num_reads': 500}, 149225),
+                 ({'num_qubits': 1000, 'annealing_time': 400}, 15721),
+                 ({'num_qubits': 1000, 'anneal_schedule': [[0.0, 0.0], [800.0, 0.5]]}, 16121),
+                 ({'num_qubits': 1000, 'anneal_schedule': [[0.0, 1.0], [2, 0.45], [102, 0.45], [102, 1.0]], 'initial_state': "dummy"}, 15427),])
+    def test_mock_estimations(self, d, t):
+        self.assertEqual(int(self.solver_mock.estimate_qpu_access_time(**d)), t)
 
     def test_mock_estimations_increase_with_reads(self):
         # increase number of reads
