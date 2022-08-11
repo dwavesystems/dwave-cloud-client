@@ -17,12 +17,6 @@ import itertools
 import random
 from typing import List, Tuple, Optional
 
-try:
-    import dwave_networkx as dnx
-except ImportError:     # pragma: no cover
-    raise RuntimeError("Can't generate Chimera graph without dwave-networkx. "
-                       "Install with 'dwave-cloud-client[mocks]'.")
-
 __all__ = [
     'solver_configuration_data',
     'structured_solver_data', 'qpu_clique_solver_data',
