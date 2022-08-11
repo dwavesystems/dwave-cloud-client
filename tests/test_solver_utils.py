@@ -122,6 +122,9 @@ class QpuAccessTimeEstimate(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        if not dimod:
+            raise unittest.TestCase.skipTest(cls, "dimod unavailable so no dwave_networkx required for mock")
+
         cls.solver_mock = StructuredSolver(data=mocks.qpu_pegasus_solver_data(16,
             problem_timing_data=mocks.qpu_problem_timing_data(qpu='advantage')), client=None)
 
