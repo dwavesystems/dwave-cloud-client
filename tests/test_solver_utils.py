@@ -120,46 +120,52 @@ class TestReformatParameters(unittest.TestCase):
 class QpuAccessTimeEstimate(unittest.TestCase):
     """Test QPU access time estimation method."""
 
-    def test_qpu_access_time_estimate_mock(self):
-        solver_mock = StructuredSolver(data=mocks.qpu_pegasus_solver_data(16,
+    @classmethod
+    def setUpClass(cls):
+        cls.solver_mock = StructuredSolver(data=mocks.qpu_pegasus_solver_data(16,
             problem_timing_data=mocks.qpu_problem_timing_data(qpu='advantage')), client=None)
+
+    def test_mock_conflicting_params(self):
 
         # not allowed annealing_time together with anneal_schedule
         with self.assertRaises(ValueError):
-            solver_mock.estimate_qpu_access_time(num_qubits=1000,
-                                            anneal_schedule=[[0.0, 0.0], [50.0, 0.5]],
-                                            annealing_time=150)
+            self.solver_mock.estimate_qpu_access_time(num_qubits=1000,
+                anneal_schedule=[[0.0, 0.0], [50.0, 0.5]],
+                annealing_time=150)
         # reverse anneal without required initial state
         with self.assertRaises(ValueError):
-            solver_mock.estimate_qpu_access_time(num_qubits=1000,
-                                            anneal_schedule=[[0.0, 1.0], [2.75, 0.45], [82.75, 0.45], [82.761, 1.0]])
-
+            self.solver_mock.estimate_qpu_access_time(num_qubits=1000,
+                anneal_schedule=[[0.0, 1.0], [2.75, 0.45], [82.75, 0.45], [82.761, 1.0]])
+    def test_mock_version(self):
         # currently support is for version 1.0.x
         with self.assertRaises(ValueError):
-            solver_mock_ver = copy.deepcopy(solver_mock)
+            solver_mock_ver = copy.deepcopy(self.solver_mock)
             solver_mock_ver.properties["problem_timing_data"]["version"] = '1.1.0'
             solver_mock_ver.estimate_qpu_access_time(num_qubits=1000)
 
+    def test_mock_missing_params(self):
         with self.assertRaises(KeyError):
-            solver_mock_ver = copy.deepcopy(solver_mock)
+            solver_mock_ver = copy.deepcopy(self.solver_mock)
             solver_mock_ver.properties["problem_timing_data"].pop("version")
             solver_mock_ver.estimate_qpu_access_time(num_qubits=1000)
 
+    def test_mock_estimations(self):
         for d, t in [({'num_qubits': 1000}, 15341),
                      ({'num_qubits': 1000, 'num_reads': 500}, 149225),
                      ({'num_qubits': 1000, 'annealing_time': 400}, 15721),
                      ({'num_qubits': 1000, 'anneal_schedule': [[0.0, 0.0], [800.0, 0.5]]}, 16121),
-                     ({'num_qubits': 1000, 'anneal_schedule': [[0.0, 1.0], [2, 0.45], [102, 0.45], [102, 1.0]], 'initial_state': {node: 0 for node in solver_mock.nodes}}, 15427),
+                     ({'num_qubits': 1000, 'anneal_schedule': [[0.0, 1.0], [2, 0.45], [102, 0.45], [102, 1.0]], 'initial_state': {node: 0 for node in self.solver_mock.nodes}}, 15427),
                      ]:
-            self.assertEqual(int(solver_mock.estimate_qpu_access_time(**d)), t)
+            self.assertEqual(int(self.solver_mock.estimate_qpu_access_time(**d)), t)
 
+    def test_mock_estimations_increase_with_reads(self):
         # increase number of reads
-        runtime_r500 = solver_mock.estimate_qpu_access_time(num_qubits=1000, num_reads=500)
-        runtime_r600 = solver_mock.estimate_qpu_access_time(num_qubits=1000, num_reads=600)
+        runtime_r500 = self.solver_mock.estimate_qpu_access_time(num_qubits=1000, num_reads=500)
+        runtime_r600 = self.solver_mock.estimate_qpu_access_time(num_qubits=1000, num_reads=600)
         self.assertGreater(runtime_r600, runtime_r500)
 
     @unittest.skipUnless(config, "No live server configuration available.")
-    def test_qpu_access_time_estimate_live(self):
+    def test_live_qpu_access_time_estimate(self):
         with Client(**config) as client:
             solver = client.get_solver(topology__type='pegasus')
             try:
