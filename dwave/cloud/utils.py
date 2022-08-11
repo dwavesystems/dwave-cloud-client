@@ -28,7 +28,7 @@ from datetime import datetime, timedelta
 from dateutil.tz import UTC
 from functools import partial, wraps
 from pkg_resources import iter_entry_points
-from typing import Optional, Sequence, Any, Union
+from typing import Any, Optional, Sequence, Union
 
 import requests
 import diskcache

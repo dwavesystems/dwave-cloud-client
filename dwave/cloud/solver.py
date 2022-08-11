@@ -1174,6 +1174,198 @@ class StructuredSolver(BaseSolver):
 
         return self.nodes.issuperset(linear) and self.edges.issuperset(quadratic)
 
+    def estimate_qpu_access_time(self,
+                                 num_qubits: int,
+                                 num_reads: int = 1,
+                                 annealing_time: typing.Optional[float] = None,
+                                 anneal_schedule: typing.Optional[typing.List[typing.Tuple[float, float]]] = None,
+                                 initial_state:  typing.Optional[typing.List[typing.Tuple[float, float]]] = None,
+                                 reverse_anneal: bool = False,
+                                 reinitialize_state: bool = False,
+                                 programming_thermalization: typing.Optional[float] = None,
+                                 readout_thermalization: typing.Optional[float] = None,
+                                 reduce_intersample_correlation: bool = False,
+                                 **kwargs) -> float:
+        """Estimates QPU access time for a submission to the selected solver.
+
+        Estimates a problem’s quantum processing unit (QPU) access time from the
+        parameter values you specify, timing data provided in the ``problem_timing_data``
+        `solver property <https://docs.dwavesys.com/docs/latest/c_solver_properties.html>`_,
+        and the number of qubits used to embed the problem on the selected QPU, as
+        described in the
+        `system documentation <https://docs.dwavesys.com/docs/latest/c_qpu_timing.html>`_.
+
+        Requires that you provide the number of qubits to be used for your
+        problem submission. :term:`Embedding` is typically heuristic and the number
+        of required qubits can vary between executions.
+
+        Args:
+            num_qubits:
+                Number of qubits required to represent your binary quadratic model
+                on the selected solver.
+            num_reads:
+                Number of reads. Provide this value if you explictly set ``num_reads``
+                in your submission.
+            annealing_time:
+                Annealing duration. Provide this value of if you set
+                ``annealing_time`` in your submission.
+            anneal_schedule:
+                Anneal schedule. Provide the ``anneal_schedule`` if you set it in
+                your submission.
+            initial_state:
+                Initial state. Provide the ``initial_state`` if your submission
+                uses reverse annealing.
+            reinitialize_state:
+                Set to ``True`` if your submission sets ``reinitialize_state``.
+            programming_thermalization:
+                programming thermalization time. Provide this value if you explictly
+                set a value for ``programming_thermalization`` in your submission.
+            readout_thermalization:
+                Set to ``True`` if your submission sets ``readout_thermalization``.
+            reduce_intersample_correlation:
+                Set to ``True`` if your submission sets ``reduce_intersample_correlation``.
+
+        Returns:
+            Estimated QPU access time, in microseconds.
+
+        Raises:
+            KeyError: If a solver property, or a field in the ``problem_timing_data``
+                solver property, required by the timing model is missing for the
+                selected solver.
+
+            ValueError: If conflicting parameters are set or the selected solver
+                uses an unsupported timing model.
+
+        Examples:
+
+            This example estimates the QPU access time for a ferromagnetic problem
+            using all the selected QPU's qubits before deciding whether to submit
+            the problem.
+
+            .. testsetup::
+
+                estimated_runtime = 42657   # to test solver.sample_bqm()
+
+            >>> from dimod import BinaryQuadraticModel
+            >>> from dwave.cloud import Client
+            >>> reads = 100
+            >>> max_time = 100000
+            >>> with Client.from_config() as client:
+            ...    solver = client.get_solver(qpu=True)
+            ...    bqm = BinaryQuadraticModel({}, {edge: -1 for edge in solver.edges}, "BINARY")
+            ...    num_qubits = len(solver.nodes)
+            ...    estimated_runtime = solver.estimate_qpu_access_time(num_qubits, num_reads=reads) # doctest: +SKIP
+            ...    print("Estimate of {:.0f}us on {}".format(estimated_runtime, solver.name)) # doctest: +SKIP
+            ...    if estimated_runtime < max_time:
+            ...       computation = solver.sample_bqm(bqm, num_reads=reads)
+            Estimate of 42657us on Advantage_system4.1
+            >>> print("QPU access time: {:.0f}us".format(computation.timing["qpu_access_time"]))  # doctest: +SKIP
+            QPU access time: 42640us
+
+        """
+        if anneal_schedule and annealing_time:
+            raise ValueError("set only one of ``anneal_schedule`` or ``annealing_time``")
+
+        if anneal_schedule and anneal_schedule[0][1] == 1 and not initial_state:
+            raise ValueError("reverse annealing requested (``anneal_schedule`` "
+                             "starts with s==1) but ``initial_state`` not provided")
+
+        try:
+            problem_timing_data = self.properties['problem_timing_data']
+        except:
+            raise KeyError("selected solver is missing required property ``problem_timing_data``")
+
+        try:
+            version_timing_model = problem_timing_data['version']
+        except:
+            raise KeyError("selected solver is missing ``problem_timing_data`` field ``version``")
+
+        try:
+            typical_programming_time = problem_timing_data['typical_programming_time']
+            ra_with_reinit_prog_time_delta = problem_timing_data['reverse_annealing_with_reinit_prog_time_delta']
+            ra_without_reinit_prog_time_delta = problem_timing_data['reverse_annealing_without_reinit_prog_time_delta']
+            default_programming_thermalization = problem_timing_data['default_programming_thermalization']
+            default_annealing_time = problem_timing_data['default_annealing_time']
+            readout_time_model = problem_timing_data['readout_time_model']
+            readout_time_model_parameters = problem_timing_data['readout_time_model_parameters']
+            qpu_delay_time_per_sample = problem_timing_data['qpu_delay_time_per_sample']
+            ra_with_reinit_delay_time_delta = problem_timing_data['reverse_annealing_with_reinit_delay_time_delta']
+            ra_without_reinit_delay_time_delta = problem_timing_data['reverse_annealing_without_reinit_delay_time_delta']
+            decorrelation_max_nominal_anneal_time = problem_timing_data['decorrelation_max_nominal_anneal_time']
+            decorrelation_time_range = problem_timing_data['decorrelation_time_range']
+            default_readout_thermalization = problem_timing_data['default_readout_thermalization']
+
+        except KeyError as err:
+            err_msg = f"selected solver is missing ``problem_timing_data`` field " + \
+                      f"{err} required by timing model version {version_timing_model}"
+            raise ValueError(err_msg)
+
+        # Support for sapi timing model versions: 1.0.x
+        if not version_timing_model.startswith("1.0."):
+            raise ValueError(f"``estimate_qpu_access_time`` does not currently "
+                             f"support timing model {version_timing_model} "
+                             "used by the selected solver")
+
+        ra_programming_time = 0
+        ra_delay_time = 0
+        if anneal_schedule and anneal_schedule[0][1] == 1:
+            if reinitialize_state:
+                ra_programming_time = ra_with_reinit_prog_time_delta
+                ra_delay_time = ra_with_reinit_delay_time_delta
+            else:
+                ra_programming_time = ra_without_reinit_prog_time_delta
+                ra_delay_time = ra_without_reinit_delay_time_delta
+
+        if programming_thermalization:
+            programming_thermalization_time = programming_thermalization
+        else:
+            programming_thermalization_time = default_programming_thermalization
+
+        programming_time = typical_programming_time + ra_programming_time + \
+                           programming_thermalization_time
+
+        anneal_time = default_annealing_time
+        if annealing_time:
+            anneal_time = annealing_time
+        elif anneal_schedule:
+            anneal_time = anneal_schedule[-1][0]
+
+        n = len(readout_time_model_parameters)
+        if n % 2:
+             raise ValueError(f"for the selected solver, ``problem_timing_data`` "
+                              f"property field ``readout_time_model_parameters`` "
+                              f"is not of an even length as required by timing "
+                              f"model version {version_timing_model}")
+
+        q = readout_time_model_parameters[:n//2]
+        t = readout_time_model_parameters[n//2:]
+        if readout_time_model == 'pwl_log_log':
+            readout_time = pow(10, np.interp(np.emath.log10(num_qubits), q, t))
+        elif readout_time_model == 'pwl_linear':
+            readout_time = np.interp(num_qubits, q, t)
+        else:
+            raise ValueError("``estimate_qpu_access_time`` does not support "
+                             f"``readout_time_model`` value {readout_time_model} "
+                             f"in version {version_timing_model}")
+
+        if readout_thermalization:
+            readout_thermalization_time = readout_thermalization
+        else:
+            readout_thermalization_time = default_readout_thermalization
+
+        decorrelation_time = 0
+        if reduce_intersample_correlation:
+            r_min = decorrelation_time_range[0]
+            r_max = decorrelation_time_range[1]
+            decorrelation_time = anneal_time/decorrelation_max_nominal_anneal_time * (r_max - r_min) + r_min
+
+        sampling_time_per_read = anneal_time + readout_time + qpu_delay_time_per_sample + \
+            ra_delay_time + max(readout_thermalization_time, decorrelation_time)
+
+        sampling_time = num_reads * sampling_time_per_read
+
+        return sampling_time + programming_time
+
 
 # for backwards compatibility:
 Solver = StructuredSolver

@@ -37,6 +37,7 @@ from dwave.cloud.exceptions import (
     CanceledFutureError, SolverFailureError, InvalidProblemError)
 import dwave.cloud.computation
 
+
 from tests import config
 
 
@@ -119,7 +120,6 @@ class _QueryTest(unittest.TestCase):
             self.assertEqual(results.label, label)
 
         return results
-
 
 @unittest.skipUnless(config, "No live server configuration available.")
 class Submission(_QueryTest):
