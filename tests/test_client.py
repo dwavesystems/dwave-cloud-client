@@ -85,7 +85,8 @@ class TestTimeouts(unittest.TestCase):
     def test_polling_timeout(self):
         with self.assertRaises(dwave.cloud.exceptions.PollingTimeout):
             with Client(polling_timeout=0.00001, **config) as client:
-                client.get_solver().sample_qubo({}).result()
+                solver = client.get_solver()
+                solver.sample_qubo({next(iter(solver.edges)): 0}).result()
 
 
 @unittest.skipUnless(config, "No live server configuration available.")

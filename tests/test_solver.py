@@ -128,7 +128,8 @@ class Submission(_QueryTest):
     def test_result_structure(self):
         with Client(**config) as client:
             solver = client.get_solver()
-            computation = solver.sample_ising({}, {}, answer_mode='histogram')
+            h = {next(iter(solver.nodes)): 0}
+            computation = solver.sample_ising(h, {}, answer_mode='histogram')
             result = computation.result()
             self.assertIn('solutions', result)
             self.assertIn('energies', result)
@@ -138,7 +139,8 @@ class Submission(_QueryTest):
     def test_future_structure(self):
         with Client(**config) as client:
             solver = client.get_solver()
-            computation = solver.sample_ising({}, {})
+            h = {next(iter(solver.nodes)): 0}
+            computation = solver.sample_ising(h, {})
             _ = computation.result()
             self.assertIsInstance(computation.id, str)
             self.assertEqual(computation.remote_status, Client.STATUS_COMPLETE)
