@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import sys
+import json
 import time
 import random
 import logging
@@ -35,7 +36,7 @@ import diskcache
 
 # Use numpy if available for fast decoding
 try:
-    import numpy as np
+    import numpy
     _numpy = True
 except ImportError:  # pragma: no cover
     _numpy = False
@@ -43,7 +44,8 @@ except ImportError:  # pragma: no cover
 __all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
            'default_text_input', 'datetime_to_timestamp',
            'datetime_to_timestamp', 'utcnow', 'epochnow', 'tictoc',
-           'hasinstance', 'exception_chain', 'is_caused_by']
+           'hasinstance', 'exception_chain', 'is_caused_by', 'NumpyEncoder',
+           ]
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +64,7 @@ def evaluate_ising(linear, quad, state, offset=0):
     """
 
     # If we were given a numpy array cast to list
-    if _numpy and isinstance(state, np.ndarray):
+    if _numpy and isinstance(state, numpy.ndarray):
         return evaluate_ising(linear, quad, state.tolist(), offset=offset)
 
     # Accumulate the linear and quadratic values
@@ -237,6 +239,30 @@ def utcrel(offset):
 def strtrunc(s, maxlen=60):
     s = str(s)
     return s[:(maxlen-3)]+'...' if len(s) > maxlen else s
+
+
+# copied from dwave-hybrid utils
+# (https://github.com/dwavesystems/dwave-hybrid/blob/b9025b5bb3d88dce98ec70e28cfdb25400a10e4a/hybrid/utils.py#L43-L61)
+# TODO: switch to `dwave.common` if and when we create it
+class NumpyEncoder(json.JSONEncoder):
+    """JSON encoder for numpy types.
+
+    Supported types:
+     - basic numeric types: booleans, integers, floats
+     - arrays: ndarray, recarray
+    """
+
+    def default(self, obj):
+        if isinstance(obj, numpy.integer):
+            return int(obj)
+        elif isinstance(obj, numpy.floating):
+            return float(obj)
+        elif isinstance(obj, numpy.bool_):
+            return bool(obj)
+        elif isinstance(obj, numpy.ndarray):
+            return obj.tolist()
+
+        return super().default(obj)
 
 
 class TimeoutingHTTPAdapter(requests.adapters.HTTPAdapter):
@@ -797,7 +823,7 @@ def bqm_to_dqm(bqm):
         dqm.set_linear(v, [-bias, bias])
 
     for (u, v), bias in ising.quadratic.items():
-        biases = np.array([[bias, -bias], [-bias, bias]], dtype=np.float64)
+        biases = numpy.array([[bias, -bias], [-bias, bias]], dtype=numpy.float64)
         dqm.set_quadratic(u, v, biases)
 
     return dqm
