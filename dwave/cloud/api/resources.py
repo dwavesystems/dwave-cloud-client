@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 from typing import List, Union, Optional, get_type_hints
 
 from pydantic import parse_obj_as
 
 from dwave.cloud.api.client import DWaveAPIClient, SolverAPIClient, MetadataAPIClient
 from dwave.cloud.api import constants, models
+from dwave.cloud.utils import NumpyEncoder
 
 __all__ = ['Solvers', 'Problems', 'Regions']
 
@@ -204,7 +206,9 @@ class Problems(ResourceBase):
         path = ''
         body = dict(data=data.dict(), params=params, solver=solver,
                     type=type, label=label)
-        response = self.session.post(path, json=body)
+        data = json.dumps(body, cls=NumpyEncoder)
+        response = self.session.post(
+            path, data=data, headers={'Content-Type': 'application/json'})
         rtype = get_type_hints(self.submit_problem)['return']
         return parse_obj_as(rtype, response.json())
 

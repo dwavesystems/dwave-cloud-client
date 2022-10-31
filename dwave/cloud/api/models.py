@@ -15,9 +15,20 @@
 from typing import List, Union, Optional
 from datetime import datetime
 
+import numpy
 from pydantic import BaseModel
 
 from dwave.cloud.api import constants
+
+
+class BaseModelWithEncoders(BaseModel):
+    class Config:
+        json_encoders = {
+            numpy.integer: int,
+            numpy.floating: float,
+            numpy.bool_: bool,
+            numpy.ndarray: lambda obj: obj.tolist(),
+        }
 
 
 class SolverConfiguration(BaseModel):
@@ -115,7 +126,7 @@ class ProblemInfo(BaseModel):
     answer: ProblemAnswer
 
 
-class ProblemJob(BaseModel):
+class ProblemJob(BaseModelWithEncoders):
     data: ProblemData
     params: dict
     solver: str
