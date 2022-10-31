@@ -421,7 +421,7 @@ class BaseUnstructuredSolver(BaseSolver):
         }
         if label is not None:
             body['label'] = label
-        body_data = json.dumps(body)
+        body_data = json.dumps(body, cls=NumpyEncoder)
         logger.trace("Sampling request encoded as: %s", body_data)
 
         return body_data
