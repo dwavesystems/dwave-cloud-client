@@ -13,13 +13,16 @@
 # limitations under the License.
 
 import abc
+import json
 import uuid
 import unittest
-import random
 from urllib.parse import urljoin, urlparse, parse_qs
 from itertools import chain
 
+import numpy
 import requests_mock
+
+from parameterized import parameterized
 
 try:
     import dimod
@@ -35,6 +38,10 @@ from dwave.cloud.api import exceptions, models, constants
 
 from tests import config
 from tests.api.mocks import StructuredSapiMockResponses, UnstructuredSapiMockResponses
+
+
+class AssertionSatisfied(Exception):
+    """Raise it to quickly unwrap the stack and signal assertion satisfied."""
 
 
 class ProblemResourcesBaseTests(abc.ABC):
@@ -626,3 +633,84 @@ class TestCloudProblemsUnstructured(UnstructuredProblemTestsMixin,
     @classmethod
     def tearDownClass(cls):
         cls.api.close()
+
+
+class NumpyParamsSerialization(unittest.TestCase):
+
+    # basic scalar types we support for parameter values
+    NUMPY_TYPES_AS_PYTHON = [
+        (numpy.bool_(1), True), (numpy.bool8(1), True),
+        (numpy.byte(1), 1), (numpy.int8(1), 1),
+        (numpy.ubyte(1), 1), (numpy.uint8(1), 1),
+        (numpy.short(1), 1), (numpy.int16(1), 1),
+        (numpy.ushort(1), 1), (numpy.uint16(1), 1),
+        (numpy.intc(1), 1), (numpy.int32(1), 1),
+        (numpy.uintc(1), 1), (numpy.uint32(1), 1),
+        (numpy.int_(1), 1), (numpy.int32(1), 1),
+        (numpy.uint(1), 1), (numpy.uint32(1), 1),
+        (numpy.longlong(1), 1), (numpy.int64(1), 1),
+        (numpy.ulonglong(1), 1), (numpy.uint64(1), 1),
+        (numpy.half(1.0), 1.0), (numpy.float16(1.0), 1.0),
+        (numpy.single(1.0), 1.0), (numpy.float32(1.0), 1.0),
+        (numpy.double(1.0), 1.0), (numpy.float64(1.0), 1.0),
+        (numpy.longdouble(1.0), 1.0)
+    ] + ([
+        (numpy.float128(1.0), 1.0)      # unavailable on windows
+    ] if hasattr(numpy, 'float128') else [
+    ])
+
+    @classmethod
+    def setUpClass(cls):
+        _p = StructuredSapiMockResponses()
+        cls.linear, cls.quadratic = _p.problem
+        cls.problem_data = models.ProblemData.parse_obj(_p.problem_data())
+        cls.problem_type = constants.ProblemType(_p.problem_type)
+        cls.problem_id = _p.problem_id
+        cls.problem_label = _p.problem_label
+        cls.params = {}
+        cls.solver_id = _p.solver.id
+        cls.api = Problems(token='token', endpoint='http://end.point/')
+
+    @parameterized.expand(NUMPY_TYPES_AS_PYTHON)
+    def test_problem_submit(self, np_val, py_val):
+        user_params = dict(num_reads=np_val)
+        expected_params = dict(num_reads=py_val)
+
+        def verify_params(*args, **kwargs):
+            body = json.loads(kwargs.get('data'))
+            params = body.get('params')
+            if params != expected_params:
+                raise AssertionError("params don't match")
+            raise AssertionSatisfied
+
+        with unittest.mock.patch.object(self.api.session, 'post', verify_params):
+            with self.assertRaises(AssertionSatisfied):
+                self.api.submit_problem(
+                    data=self.problem_data,
+                    params=user_params,
+                    solver=self.solver_id,
+                    type=self.problem_type,
+                )
+
+    @parameterized.expand(NUMPY_TYPES_AS_PYTHON)
+    def test_problem_batch_submit(self, np_val, py_val):
+        user_params = dict(num_reads=np_val)
+        expected_params = dict(num_reads=py_val)
+
+        def verify_params(*args, **kwargs):
+            body = json.loads(kwargs.get('data'))
+            params = body[0].get('params')
+            if params != expected_params:
+                raise AssertionError("params don't match")
+            raise AssertionSatisfied
+
+        job = models.ProblemJob(
+            data=self.problem_data,
+            params=user_params,
+            solver=self.solver_id,
+            type=self.problem_type,
+        )
+
+        with unittest.mock.patch.object(self.api.session, 'post', verify_params):
+            with self.assertRaises(AssertionSatisfied):
+                self.api.submit_problems([job])

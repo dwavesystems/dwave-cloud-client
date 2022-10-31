@@ -14,11 +14,9 @@
 
 """Test problem submission against hard-coded replies with unittest.mock."""
 
-import time
 import json
 import unittest
 import threading
-import warnings
 import collections
 
 from unittest import mock
@@ -26,6 +24,8 @@ from requests.structures import CaseInsensitiveDict
 from requests.exceptions import HTTPError
 from concurrent.futures import TimeoutError
 from parameterized import parameterized
+
+import numpy
 
 try:
     import dimod
@@ -1037,3 +1037,80 @@ class TestProblemLabel(unittest.TestCase):
                         if dimod:
                             info = future.sampleset.info
                             self.assertEqual(info.get('problem_label'), label)
+
+
+class TestSerialization(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.sapi = StructuredSapiMockResponses()
+
+    class AssertionSatisfied(Exception):
+        """Raised by `on_submit_data_verifier` to signal correct serialization."""
+
+    def on_submit_data_verifier(self, expected_params):
+        """Factory for mock Client._submit() that will validate parameter values."""
+
+        # replacement for Client._submit(), called with exact network request data
+        def _submit(client, body_data, computation):
+            body = json.loads(body_data.result())
+
+            params = body.get('params')
+            if params != expected_params:
+                raise AssertionError("params don't match")
+
+            raise TestSerialization.AssertionSatisfied
+
+        return _submit
+
+    def generate_sample_problems(self, solver):
+        linear, quadratic = self.sapi.problem
+
+        # test sample_{ising,qubo,bqm}
+        problems = [("sample_ising", (linear, quadratic)),
+                    ("sample_qubo", (quadratic,))]
+        if dimod:
+            bqm = dimod.BQM.from_ising(linear, quadratic)
+            problems.append(("sample_bqm", (bqm,)))
+
+        return problems
+
+    @parameterized.expand([
+        (numpy.bool_(1), True), (numpy.bool8(1), True),
+        (numpy.byte(1), 1), (numpy.int8(1), 1),
+        (numpy.ubyte(1), 1), (numpy.uint8(1), 1),
+        (numpy.short(1), 1), (numpy.int16(1), 1),
+        (numpy.ushort(1), 1), (numpy.uint16(1), 1),
+        (numpy.intc(1), 1), (numpy.int32(1), 1),
+        (numpy.uintc(1), 1), (numpy.uint32(1), 1),
+        (numpy.int_(1), 1), (numpy.int32(1), 1),
+        (numpy.uint(1), 1), (numpy.uint32(1), 1),
+        (numpy.longlong(1), 1), (numpy.int64(1), 1),
+        (numpy.ulonglong(1), 1), (numpy.uint64(1), 1),
+        (numpy.half(1.0), 1.0), (numpy.float16(1.0), 1.0),
+        (numpy.single(1.0), 1.0), (numpy.float32(1.0), 1.0),
+        (numpy.double(1.0), 1.0), (numpy.float64(1.0), 1.0),
+        (numpy.longdouble(1.0), 1.0)
+    ] + ([
+        (numpy.float128(1.0), 1.0)      # unavailable on windows
+    ] if hasattr(numpy, 'float128') else [
+    ]))
+    @mock.patch.object(Client, 'create_session', lambda client: mock.Mock())
+    def test_params_are_serialized(self, np_val, py_val):
+        """Parameters supplied as NumPy types are correctly serialized."""
+
+        user_params = dict(num_reads=np_val)
+        expected_params = dict(num_reads=py_val)
+
+        with Client(endpoint='endpoint', token='token') as client:
+            solver = Solver(client, self.sapi.solver.data)
+            problems = self.generate_sample_problems(solver)
+
+            for method_name, problem_args in problems:
+                with self.subTest(method_name=method_name, np_val=np_val, py_val=py_val):
+                    sample = getattr(solver, method_name)
+
+                    with mock.patch.object(
+                            Client, '_submit', self.on_submit_data_verifier(expected_params)):
+
+                        with self.assertRaises(self.AssertionSatisfied):
+                            sample(*problem_args, **user_params).result()

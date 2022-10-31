@@ -40,7 +40,7 @@ from dwave.cloud.exceptions import (
 from dwave.cloud.coders import (
     encode_problem_as_qp, encode_problem_as_ref,
     decode_qp_numpy, decode_qp, decode_bq, bqm_as_file)
-from dwave.cloud.utils import reformat_qubo_as_ising
+from dwave.cloud.utils import reformat_qubo_as_ising, NumpyEncoder
 from dwave.cloud.computation import Future
 from dwave.cloud.concurrency import Present
 from dwave.cloud.events import dispatches_events
@@ -421,7 +421,7 @@ class BaseUnstructuredSolver(BaseSolver):
         }
         if label is not None:
             body['label'] = label
-        body_data = json.dumps(body)
+        body_data = json.dumps(body, cls=NumpyEncoder)
         logger.trace("Sampling request encoded as: %s", body_data)
 
         return body_data
@@ -1048,7 +1048,7 @@ class StructuredSolver(BaseSolver):
         }
         if label is not None:
             body_dict['label'] = label
-        body_data = json.dumps(body_dict)
+        body_data = json.dumps(body_dict, cls=NumpyEncoder)
         logger.trace("Encoded sample request: %s", body_data)
 
         body = Present(result=body_data)
