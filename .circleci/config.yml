@@ -9,13 +9,13 @@ jobs:
         type: string
 
     docker:
-      - image: circleci/python:<< parameters.python-version >>
+      - image: cimg/python:<< parameters.python-version >>
 
     steps:
       - checkout
 
       - restore_cache: &restore-cache-env
-          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
+          key: v2-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
 
       - run: &create-virtualenv
           name: Create virtual environment
@@ -41,7 +41,7 @@ jobs:
             fi
 
       - save_cache: &save-cache-env
-          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
+          key: v2-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
           paths:
             - env
 
@@ -117,13 +117,13 @@ jobs:
 
   test-docs:
     docker:
-      - image: circleci/python:3.7
+      - image: cimg/python:3.7
 
     steps:
       - checkout
 
       - restore_cache:
-          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ checksum "docs/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
+          key: v2-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ checksum "docs/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
 
       - run: *create-virtualenv
 
@@ -134,7 +134,7 @@ jobs:
           command: env/bin/pip install -r docs/requirements.txt
 
       - save_cache:
-          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ checksum "docs/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
+          key: v2-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ checksum "docs/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
           paths:
             - env
 
@@ -163,7 +163,7 @@ jobs:
 
   pypi-deploy:
     docker:
-      - image: circleci/python:3.9
+      - image: cimg/python:3.9
 
     steps:
       - checkout
@@ -190,15 +190,25 @@ workflows:
   test:
     jobs:
       - test-linux:
-          name: test-linux-py<< matrix.python-version >><<# matrix.dimod-numpy-version >>-<< matrix.dimod-numpy-version >><</ matrix.dimod-numpy-version >>
+          name: test-linux-py<< matrix.python-version >><<# matrix.dimod-numpy-version >> | << matrix.dimod-numpy-version >><</ matrix.dimod-numpy-version >>
           matrix:
             parameters:
-              python-version: &python-versions ["3.7.9", "3.8.6", "3.9.0", "3.10.0"]
-              dimod-numpy-version: ["", "dimod~=0.9.0 'numpy<1.24'", "'dimod~=0.10.0,>0.10.4'", "dimod~=0.11.0"]
+              python-version: &python-versions ["3.7.9", "3.8.6", "3.9.0", "3.10.0", "3.11.0"]
+              dimod-numpy-version: ["", "dimod~=0.9.0 numpy~=1.23.0", "dimod~=0.10.0", "dimod~=0.11.0"]
             exclude:
-              # dimod < 0.10 not supported on py310
+              # dimod < 0.10 not supported on py310+
               - python-version: "3.10.0"
-                dimod-numpy-version: "dimod~=0.9.0 'numpy<1.24'"
+                dimod-numpy-version: "dimod~=0.9.0 numpy~=1.23.0"
+              - python-version: "3.11.0"
+                dimod-numpy-version: "dimod~=0.9.0 numpy~=1.23.0"
+              # dimod < 0.12 not supported on py311+
+              - python-version: "3.11.0"
+                dimod-numpy-version: "dimod~=0.10.0"
+              - python-version: "3.11.0"
+                dimod-numpy-version: "dimod~=0.11.0"
+              # numpy 1.23.x supports only py38-py310
+              - python-version: "3.7.9"
+                dimod-numpy-version: "dimod~=0.9.0 numpy~=1.23.0"
 
       - test-macos:
           name: test-macos-py<< matrix.python-version >>
