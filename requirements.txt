@@ -10,7 +10,7 @@ diskcache>=5.2.1
 # note: dqm supported in dimod>0.9.6
 # note: cqm supported in dimod>=0.10.0
 dimod>=0.10.5,!=0.11.4
-numpy>=1.16
+numpy>=1.17.3
 
 # for solver mocks
 dwave-networkx>=0.8.9
