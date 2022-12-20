@@ -22,13 +22,15 @@ extras_require = {
     'test': ['requests_mock', 'mock', 'numpy', 'coverage'],
 
     # bqm support
-    'bqm': ['dimod>=0.9.0,<0.13,!=0.10.0,!=0.10.1,!=0.10.2,!=0.10.3,!=0.10.4,!=0.11.4', 'numpy>=1.16'],
+    'bqm': ['dimod>=0.10.5,<0.13,!=0.11.4', 'numpy>=1.17.3'],
+    'bqm-legacy': ['dimod~=0.9.0', 'numpy>=1.16,<1.24'],
 
     # dqm support
-    'dqm': ['dimod>=0.9.7,<0.13,!=0.10.0,!=0.10.1,!=0.10.2,!=0.10.3,!=0.10.4,!=0.11.4', 'numpy>=1.16'],
+    'dqm': ['dimod>=0.10.5,<0.13,!=0.11.4', 'numpy>=1.17.3'],
+    'dqm-legacy': ['dimod~=0.9.7,<0.10', 'numpy>=1.16,<1.24'],
 
     # cqm support
-    'cqm': ['dimod>=0.10.5,<0.13,!=0.11.4', 'numpy>=1.16'],
+    'cqm': ['dimod>=0.10.5,<0.13,!=0.11.4', 'numpy>=1.17.3'],
 
     # testing mocks
     'mocks': ['dwave-networkx>=0.8.9'],

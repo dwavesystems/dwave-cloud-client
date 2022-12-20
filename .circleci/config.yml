@@ -5,7 +5,7 @@ jobs:
     parameters:
       python-version:
         type: string
-      dimod-version:
+      dimod-numpy-version:
         type: string
 
     docker:
@@ -34,8 +34,8 @@ jobs:
           name: Install appropriate dimod version
           command: |
             . env/bin/activate
-            if [[ "<< parameters.dimod-version >>" ]]; then
-              pip install 'dimod<< parameters.dimod-version >>'
+            if [[ "<< parameters.dimod-numpy-version >>" ]]; then
+              pip install << parameters.dimod-numpy-version >>
             else
               pip uninstall dimod dwave-networkx -y
             fi
@@ -190,15 +190,15 @@ workflows:
   test:
     jobs:
       - test-linux:
-          name: test-linux-py<< matrix.python-version >><<# matrix.dimod-version >>-dimod<< matrix.dimod-version >><</ matrix.dimod-version >>
+          name: test-linux-py<< matrix.python-version >><<# matrix.dimod-numpy-version >>-<< matrix.dimod-numpy-version >><</ matrix.dimod-numpy-version >>
           matrix:
             parameters:
               python-version: &python-versions ["3.7.9", "3.8.6", "3.9.0", "3.10.0"]
-              dimod-version: ["", "~=0.9.0", "~=0.10.0,>0.10.4", "~=0.11.0"]
+              dimod-numpy-version: ["", "dimod~=0.9.0 'numpy<1.24'", "'dimod~=0.10.0,>0.10.4'", "dimod~=0.11.0"]
             exclude:
               # dimod < 0.10 not supported on py310
               - python-version: "3.10.0"
-                dimod-version: "~=0.9.0"
+                dimod-numpy-version: "dimod~=0.9.0 'numpy<1.24'"
 
       - test-macos:
           name: test-macos-py<< matrix.python-version >>
