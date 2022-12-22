@@ -1,0 +1,5 @@
+---
+features:
+  - Add Python 3.11 support
+  - Add dimod 0.12.x support
+  - Add numpy 1.24.x support
