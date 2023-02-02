@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Add basic support for Leap API access with ``dwave.cloud.api.client.LeapAPIClient``
+    and ``dwave.cloud.api.resources.LeapAccount``.
