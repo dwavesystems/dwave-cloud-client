@@ -703,8 +703,7 @@ class MultiRegionSupport(unittest.TestCase):
             for r in regions_response
         }
 
-        def _patch_session(resource):
-            self.assertEqual(resource.session.base_url, f"{metadata_api_endpoint}/")
+        def _mocked_session():
             session = mock.Mock()
 
             def get(url, **kwargs):
@@ -712,13 +711,13 @@ class MultiRegionSupport(unittest.TestCase):
                 response.status_code = 200
                 response.json.side_effect = lambda: regions_response
                 return response
-
             session.get = get
-            resource.session = session
+
+            return session
 
         with mock.patch("dwave.cloud.config.open", iterable_mock_open(config_body)):
             with mock.patch.multiple(Client._fetch_available_regions._cached, cache={}):
-                with mock.patch("dwave.cloud.client.base.api.Regions._patch_session", _patch_session):
+                with mock.patch("dwave.cloud.client.base.api.Regions._session", _mocked_session()):
                     # note: we specify config_file, otherwise reading from files
                     # might be skipped altogether if zero config files found on disk
                     # (i.e. config open mock above fails on CI)

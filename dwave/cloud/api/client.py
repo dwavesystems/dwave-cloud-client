@@ -125,6 +125,11 @@ class DWaveAPIClient:
         To make sure the session is closed, call :meth:`.close`, or use the
         context manager form (as show in the example below).
 
+    Note:
+        Since `requests.Session` is **not thread-safe**, neither is
+        :class:`DWaveAPIClient`. It's best to create (and dispose) a new client
+        on demand, in each thread.
+
     Example:
         with DWaveAPIClient(endpoint='...', timeout=(5, 600)) as client:
             client.session.get('...')

@@ -15,6 +15,7 @@
 import json
 from typing import List, Union, Optional, get_type_hints
 
+import requests
 from pydantic import parse_obj_as
 
 from dwave.cloud.api.client import DWaveAPIClient, SolverAPIClient, MetadataAPIClient
@@ -27,17 +28,26 @@ __all__ = ['Solvers', 'Problems', 'Regions']
 class ResourceBase:
     """A class for interacting with a SAPI resource."""
 
-    resource_path = None
+    resource_path: str = None
 
-    def _patch_session(self):
-        # anchor all session requests at the new base path
-        if self.resource_path and self.session:
-            self.session.base_url = self.session.create_url(self.resource_path)
+    # session is fetched/updated on demand via `session` getter
+    _session = None
 
     def __init__(self, **config):
         self.client = DWaveAPIClient(**config)
-        self.session = self.client.session
-        self._patch_session()
+
+    def _set_session_base_path(self, session: requests.Session, path: str):
+        # anchor all session requests at the new base path
+        if session and path:
+            session.base_url = session.create_url(path)
+        return session
+
+    @property
+    def session(self):
+        if self._session is None:
+            self._session = self.client.session
+            self._session = self._set_session_base_path(self._session, self.resource_path)
+        return self._session
 
     def close(self):
         self.client.close()
@@ -67,8 +77,6 @@ class Regions(ResourceBase):
 
     def __init__(self, **config):
         self.client = MetadataAPIClient(**config)
-        self.session = self.client.session
-        self._patch_session()
 
     # Content-Type: application/vnd.dwave.metadata.regions+json; version=1.0.0
     def list_regions(self) -> List[models.Region]:
