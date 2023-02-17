@@ -5,6 +5,7 @@ python-dateutil>=2.7
 click>=7
 plucky>=0.4.3
 diskcache>=5.2.1
+packaging>=19
 
 # optional bqm support
 # note: dqm supported in dimod>0.9.6

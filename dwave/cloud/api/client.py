@@ -247,14 +247,14 @@ class DWaveAPIClient:
 
     @staticmethod
     def _raise_for_status(response, **kwargs):
-        """Raises :class:`~dwave.cloud.exceptions.SAPIRequestError`, if one
+        """Raises :class:`~dwave.cloud.api.exceptions.RequestError`, if one
         occurred, with message populated from SAPI error response.
 
         See:
             :meth:`requests.Response.raise_for_status`.
 
         Raises:
-            :class:`dwave.cloud.exceptions.SAPIRequestError` subclass
+            :class:`dwave.cloud.api.exceptions.RequestError` subclass
         """
         # NOTE: the expected behavior is for SAPI to return JSON error on
         # failure. However, that is currently not the case. We need to work

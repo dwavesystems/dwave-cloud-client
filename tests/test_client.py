@@ -24,6 +24,7 @@ import warnings
 import unittest
 from unittest import mock
 from contextlib import contextmanager
+from collections import defaultdict
 
 import requests
 from plucky import merge
@@ -705,6 +706,8 @@ class MultiRegionSupport(unittest.TestCase):
 
         def _mocked_session():
             session = mock.Mock()
+            session.headers = {}
+            session.hooks = defaultdict(list)
 
             def get(url, **kwargs):
                 response = mock.Mock(['text', 'json'])

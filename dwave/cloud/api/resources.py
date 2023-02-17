@@ -13,16 +13,47 @@
 # limitations under the License.
 
 import json
-from typing import List, Union, Optional, get_type_hints
+from typing import List, Union, Optional, Callable, get_type_hints
+from functools import wraps
 
 import requests
 from pydantic import parse_obj_as
+from packaging.specifiers import SpecifierSet
 
 from dwave.cloud.api.client import DWaveAPIClient, SolverAPIClient, MetadataAPIClient
-from dwave.cloud.api import constants, models
+from dwave.cloud.api import constants, models, exceptions
 from dwave.cloud.utils import NumpyEncoder
 
 __all__ = ['Solvers', 'Problems', 'Regions']
+
+
+class accepts:
+    def __init__(self,
+                 media_type: Optional[str] = constants.DEFAULT_API_MEDIA_TYPE,
+                 ask_version: Optional[str] = None,
+                 accept_version: Optional[str] = None,
+                 **params):
+        self.media_type = media_type
+        self.ask_version = ask_version
+        self.accept_version = accept_version
+        self.params = params
+
+    def __call__(self, fn: Callable):
+        @wraps(fn)
+        def wrapper(obj, *args, **kwargs):
+            # set media_type and params on Resource object's session context
+            key = '_session_context'
+            ctx = obj.__dict__.get(key, {})
+            ctx.update(
+                media_type=self.media_type,
+                ask_version=self.ask_version,
+                accept_version=self.accept_version,
+                params=self.params)
+            obj.__dict__[key] = ctx
+
+            return fn(obj, *args, **kwargs)
+
+        return wrapper
 
 
 class ResourceBase:
@@ -42,11 +73,65 @@ class ResourceBase:
             session.base_url = session.create_url(path)
         return session
 
+    def _handle_api_version(self, session: requests.Session,
+                            media_type: Optional[str] = None,
+                            ask_version: Optional[str] = None,
+                            accept_version: Optional[str] = None,
+                            **params):
+        # (1) communicate lower bound on version handled in the outgoing request, and
+        # (2) validate version supported in the incoming response
+        if media_type is not None:
+            components = [media_type]
+            if ask_version:
+                components.append(f'version={ask_version}')
+            for k,v in params.items():
+                components.append(f'{k}={v}')
+            session.headers['Accept'] = '; '.join(components)
+
+        if accept_version is not None:
+            ss = SpecifierSet(accept_version, prereleases=True)
+
+            def _validate_version(response: requests.Response, **kwargs):
+                if not response.ok:
+                    return
+                content_type = response.headers.get('Content-Type')
+                # TODO: use `werkzeug.http.parse_options_header` for parsing
+                if not content_type:
+                    # TODO: impl strict mode? (fail when media type / version unknown)
+                    return
+                parts = [p.strip() for p in content_type.split(';')]
+                if not parts:
+                    # TODO: impl strict mode?
+                    return
+                res_media_type = parts.pop(0).lower()
+                if res_media_type != media_type:
+                    raise exceptions.ResourceBadResponseError(
+                        f'Received media type {res_media_type!r} while '
+                        f'expecting {media_type!r}')
+                params = {k.strip(): v.strip() for k, v in (p.split('=') for p in parts)}
+                version = params.pop('version', None)
+                if version is not None:
+                    if not ss.contains(version):
+                        raise exceptions.ResourceBadResponseError(
+                            f'API response format version {version!r} not compliant '
+                            f'with supported version {accept_version!r}. '
+                            'Try upgrading "dwave-cloud-client".')
+
+            if _validate_version not in session.hooks['response']:
+                session.hooks['response'].append(_validate_version)
+
+        return session
+
+
     @property
     def session(self):
         if self._session is None:
             self._session = self.client.session
             self._session = self._set_session_base_path(self._session, self.resource_path)
+
+        if self.__dict__.get('_session_context'):
+            self._session = self._handle_api_version(self._session, **self._session_context)
+
         return self._session
 
     def close(self):
@@ -79,6 +164,7 @@ class Regions(ResourceBase):
         self.client = MetadataAPIClient(**config)
 
     # Content-Type: application/vnd.dwave.metadata.regions+json; version=1.0.0
+    @accepts(media_type='application/vnd.dwave.metadata.regions+json', accept_version='>=1,<2')
     def list_regions(self) -> List[models.Region]:
         path = ''
         response = self.session.get(path)
@@ -86,6 +172,7 @@ class Regions(ResourceBase):
         return parse_obj_as(List[models.Region], regions)
 
     # Content-Type: application/vnd.dwave.metadata.region+json; version=1.0.0
+    @accepts(media_type='application/vnd.dwave.metadata.region+json', accept_version='>=1,<2')
     def get_region(self, code: str) -> models.Region:
         path = '{}'.format(code)
         response = self.session.get(path)
