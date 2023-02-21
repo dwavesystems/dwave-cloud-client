@@ -25,7 +25,7 @@ from tests import config
 
 class TestMockRegions(unittest.TestCase):
     """Test request formation and response parsing (including error handling)
-    works correctly for all :class:`dwave.cloud.api.resources.Solvers` methods.
+    works correctly for all :class:`dwave.cloud.api.resources.Regions` methods.
     """
 
     endpoint = 'http://test.com/path/'

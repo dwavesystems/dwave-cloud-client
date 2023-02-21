@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import uuid
 from typing import Union, Tuple
 
@@ -151,7 +150,7 @@ class SapiMockResponses:
     def cancel_reply(self, **kwargs) -> dict:
         """A reply saying a problem was canceled."""
 
-        return {
+        response = {
             "status": "CANCELLED",
             "solved_on": utcrel(-10).isoformat(),
             "solver": self.solver_id,
