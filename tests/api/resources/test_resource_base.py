@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 import unittest
 from urllib.parse import urljoin
 
+import requests
 import requests_mock
 from pydantic import parse_obj_as, BaseModel
 
@@ -43,8 +45,9 @@ class MathResource(ResourceBase):
     def format(self, subpath: str) -> dict:
         return self.session.get(f'format/{subpath}').json()
 
-    @accepts(media_type='application/vnd.dwave.api.mock+json', accept_version='>=1.1,<2')
-    def version(self, v: str) -> dict:
+    @accepts(media_type='application/vnd.dwave.api.mock+json',
+             ask_version='1.1', accept_version='>=1.1,<2')
+    def version(self, v: str = '') -> dict:
         return self.session.get(f'version/{v}').json()
 
 
@@ -76,7 +79,7 @@ class TestMockResource(unittest.TestCase):
             resource.nonexisting()
 
     @requests_mock.Mocker()
-    def test_media_type_matching(self, m):
+    def test_media_type(self, m):
         # note: media_type is matched only if `accept_version` is specified!
         m.get(urljoin(self.base_uri, 'format/ok'), json=dict(works=True),
               headers={'Content-Type': 'application/vnd.dwave.api.mock+json'})
@@ -94,7 +97,7 @@ class TestMockResource(unittest.TestCase):
             resource.format(subpath='wrong')
 
     @requests_mock.Mocker()
-    def test_version_matching(self, m):
+    def test_accept_version(self, m):
         m.get(urljoin(self.base_uri, 'version/1.0'), json=dict(v='1.0'),
               headers={'Content-Type': 'application/vnd.dwave.api.mock+json; version=1.0'})
         m.get(urljoin(self.base_uri, 'version/1.1'), json=dict(v='1.1'),
@@ -116,3 +119,18 @@ class TestMockResource(unittest.TestCase):
             resource.version('1.0')
         with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'^API response format version'):
             resource.version('2.0')
+
+    @requests_mock.Mocker()
+    def test_ask_version(self, m):
+        # return exactly version asked for
+        def json_callback(request: requests.Request, context):
+            accept = request.headers['Accept']
+            version = re.search('version=(\d+(\.\d+)?)', accept).group(1)
+            context.headers['Content-Type'] = f'application/vnd.dwave.api.mock+json; version={version}'
+            return dict(v=version)
+        m.get(urljoin(self.base_uri, 'version/'), json=json_callback)
+
+        resource = MathResource(endpoint=self.endpoint)
+
+        # ask_version is set to 1.1; ensure that's actually sent
+        self.assertEqual(resource.version()['v'], '1.1')
