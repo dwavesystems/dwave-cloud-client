@@ -19,7 +19,7 @@ import requests_mock
 from pydantic import parse_obj_as, BaseModel
 
 from dwave.cloud.api import exceptions
-from dwave.cloud.api.resources import ResourceBase
+from dwave.cloud.api.resources import ResourceBase, accepts
 
 
 class MathResource(ResourceBase):
@@ -39,6 +39,14 @@ class MathResource(ResourceBase):
     def nonexisting(self):
         return self.session.get('nonexisting')
 
+    @accepts(media_type='application/vnd.dwave.api.mock+json', accept_version='>0')
+    def format(self, subpath: str) -> dict:
+        return self.session.get(f'format/{subpath}').json()
+
+    @accepts(media_type='application/vnd.dwave.api.mock+json', accept_version='>=1.1,<2')
+    def version(self, v: str) -> dict:
+        return self.session.get(f'version/{v}').json()
+
 
 class TestMockResource(unittest.TestCase):
     """Test request formation and response parsing (including error
@@ -49,11 +57,11 @@ class TestMockResource(unittest.TestCase):
     endpoint = 'http://test.com/path/'
 
     def setUp(self):
-        self.add_uri = urljoin(urljoin(self.endpoint, MathResource.resource_path), 'add/')
+        self.base_uri = urljoin(self.endpoint, MathResource.resource_path)
 
     @requests_mock.Mocker()
     def test_basic_flow(self, m):
-        m.get(urljoin(self.add_uri, '?in1=1&in2=2'), json=dict(out=3))
+        m.get(urljoin(self.base_uri, 'add/?in1=1&in2=2'), json=dict(out=3))
 
         resource = MathResource(endpoint=self.endpoint)
         res = resource.add(1, 2)
@@ -66,3 +74,45 @@ class TestMockResource(unittest.TestCase):
         resource = MathResource(endpoint=self.endpoint)
         with self.assertRaises(exceptions.ResourceNotFoundError):
             resource.nonexisting()
+
+    @requests_mock.Mocker()
+    def test_media_type_matching(self, m):
+        # note: media_type is matched only if `accept_version` is specified!
+        m.get(urljoin(self.base_uri, 'format/ok'), json=dict(works=True),
+              headers={'Content-Type': 'application/vnd.dwave.api.mock+json'})
+        m.get(urljoin(self.base_uri, 'format/wrong'), json={},
+              headers={'Content-Type': 'unknown'})
+
+        resource = MathResource(endpoint=self.endpoint)
+
+        # media_type is set and correct
+        res = resource.format(subpath='ok')
+        self.assertEqual(res['works'], True)
+
+        # media_type is set and incorrect
+        with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'^Received media type'):
+            resource.format(subpath='wrong')
+
+    @requests_mock.Mocker()
+    def test_version_matching(self, m):
+        m.get(urljoin(self.base_uri, 'version/1.0'), json=dict(v='1.0'),
+              headers={'Content-Type': 'application/vnd.dwave.api.mock+json; version=1.0'})
+        m.get(urljoin(self.base_uri, 'version/1.1'), json=dict(v='1.1'),
+              headers={'Content-Type': 'application/vnd.dwave.api.mock+json; version=1.1'})
+        m.get(urljoin(self.base_uri, 'version/1.2'), json=dict(v='1.2'),
+              headers={'Content-Type': 'application/vnd.dwave.api.mock+json; version=1.2'})
+        m.get(urljoin(self.base_uri, 'version/2.0'), json=dict(v='2.0'),
+              headers={'Content-Type': 'application/vnd.dwave.api.mock+json; version=2.0'})
+
+        resource = MathResource(endpoint=self.endpoint)
+
+        # accept_version is `>=1.1,<2`
+        # versions 1.1 and 1.2 work
+        self.assertEqual(resource.version('1.1')['v'], '1.1')
+        self.assertEqual(resource.version('1.2')['v'], '1.2')
+
+        # versions 1.0 and 2.0 fail
+        with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'^API response format version'):
+            resource.version('1.0')
+        with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'^API response format version'):
+            resource.version('2.0')
