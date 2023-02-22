@@ -20,7 +20,7 @@ import requests
 import requests_mock
 from pydantic import parse_obj_as, BaseModel
 
-from dwave.cloud.api import exceptions
+from dwave.cloud.api import exceptions, constants
 from dwave.cloud.api.resources import ResourceBase, accepts
 
 
@@ -49,6 +49,10 @@ class MathResource(ResourceBase):
              ask_version='1.1', accept_version='>=1.1,<2')
     def version(self, v: str = '') -> dict:
         return self.session.get(f'version/{v}').json()
+
+    @accepts(a='1', b='2')
+    def params(self) -> dict:
+        return self.session.get(f'params/').json()
 
 
 class TestMockResource(unittest.TestCase):
@@ -134,3 +138,16 @@ class TestMockResource(unittest.TestCase):
 
         # ask_version is set to 1.1; ensure that's actually sent
         self.assertEqual(resource.version()['v'], '1.1')
+
+    @requests_mock.Mocker()
+    def test_accepts_params(self, m):
+        # return exactly version asked for
+        def json_callback(request: requests.Request, context):
+            return dict(accept=request.headers['Accept'])
+        m.get(urljoin(self.base_uri, 'params/'), json=json_callback)
+
+        resource = MathResource(endpoint=self.endpoint)
+
+        # ask_version is set to 1.1; ensure that's actually sent
+        expected_accept = f"{constants.DEFAULT_API_MEDIA_TYPE}; a=1; b=2"
+        self.assertEqual(resource.params()['accept'], expected_accept)

@@ -77,15 +77,16 @@ class ResourceBase:
                             media_type: Optional[str] = None,
                             ask_version: Optional[str] = None,
                             accept_version: Optional[str] = None,
-                            **params):
+                            params: Optional[dict] = None):
         # (1) communicate lower bound on version handled in the outgoing request, and
         # (2) validate version supported in the incoming response
         if media_type is not None:
             components = [media_type]
             if ask_version:
                 components.append(f'version={ask_version}')
-            for k,v in params.items():
-                components.append(f'{k}={v}')
+            if params is not None:
+                for k,v in params.items():
+                    components.append(f'{k}={v}')
             session.headers['Accept'] = '; '.join(components)
 
         if accept_version is not None:
