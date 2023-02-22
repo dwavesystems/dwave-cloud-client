@@ -1,0 +1,8 @@
+---
+features:
+  - |
+    Add ``accepts`` decorator for declaring accepted media type and response
+    format version (range) on ``dwave.cloud.api.Resource`` methods.
+upgrade:
+  - |
+    Enforce D-Wave API response format version on all ``cloud.api`` resources.
