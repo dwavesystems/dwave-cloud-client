@@ -19,6 +19,7 @@ from functools import wraps
 import requests
 from pydantic import parse_obj_as
 from packaging.specifiers import SpecifierSet
+from werkzeug.http import parse_options_header
 
 from dwave.cloud.api.client import DWaveAPIClient, SolverAPIClient, MetadataAPIClient
 from dwave.cloud.api import constants, models, exceptions
@@ -96,7 +97,6 @@ class ResourceBase:
                 if not response.ok:
                     return
                 content_type = response.headers.get('Content-Type')
-                # TODO: use `werkzeug.http.parse_options_header` for parsing
                 if not content_type:
                     # TODO: impl strict mode? (fail when media type / version unknown)
                     return
@@ -104,13 +104,12 @@ class ResourceBase:
                 if not parts:
                     # TODO: impl strict mode?
                     return
-                res_media_type = parts.pop(0).lower()
+                res_media_type, res_params = parse_options_header(content_type)
                 if res_media_type != media_type:
                     raise exceptions.ResourceBadResponseError(
                         f'Received media type {res_media_type!r} while '
                         f'expecting {media_type!r}')
-                params = {k.strip(): v.strip() for k, v in (p.split('=') for p in parts)}
-                version = params.pop('version', None)
+                version = res_params.pop('version', None)
                 if version is not None:
                     if not ss.contains(version):
                         raise exceptions.ResourceBadResponseError(
@@ -122,7 +121,6 @@ class ResourceBase:
                 session.hooks['response'].append(_validate_version)
 
         return session
-
 
     @property
     def session(self):
