@@ -169,8 +169,7 @@ class Regions(ResourceBase):
         regions = response.json()
         return parse_obj_as(List[models.Region], regions)
 
-    # XXX: currently, API returns a wrong media-type (regions, instead of region)
-    @accepts(media_type='application/vnd.dwave.metadata.regions+json', accept_version='~=1.0')
+    @accepts(media_type='application/vnd.dwave.metadata.region+json', accept_version='~=1.0')
     def get_region(self, code: str) -> models.Region:
         path = '{}'.format(code)
         response = self.session.get(path)
