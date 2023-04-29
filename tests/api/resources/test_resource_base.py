@@ -129,7 +129,7 @@ class TestMockResource(unittest.TestCase):
         # return exactly version asked for
         def json_callback(request: requests.Request, context):
             accept = request.headers['Accept']
-            version = re.search('version=(\d+(\.\d+)?)', accept).group(1)
+            version = re.search(r'version=(\d+(\.\d+)?)', accept).group(1)
             context.headers['Content-Type'] = f'application/vnd.dwave.api.mock+json; version={version}'
             return dict(v=version)
         m.get(urljoin(self.base_uri, 'version/'), json=json_callback)
