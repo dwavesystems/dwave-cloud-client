@@ -18,11 +18,9 @@ from functools import wraps
 
 import requests
 from pydantic import parse_obj_as
-from packaging.specifiers import SpecifierSet
-from werkzeug.http import parse_options_header
 
 from dwave.cloud.api.client import DWaveAPIClient, SolverAPIClient, MetadataAPIClient
-from dwave.cloud.api import constants, models, exceptions
+from dwave.cloud.api import constants, models
 from dwave.cloud.utils import NumpyEncoder
 
 __all__ = ['Solvers', 'Problems', 'Regions']
@@ -33,11 +31,11 @@ class accepts:
                  media_type: Optional[str] = constants.DEFAULT_API_MEDIA_TYPE,
                  ask_version: Optional[str] = None,
                  accept_version: Optional[str] = None,
-                 **params):
+                 **media_type_params):
         self.media_type = media_type
         self.ask_version = ask_version
         self.accept_version = accept_version
-        self.params = params
+        self.media_type_params = media_type_params
 
     def __call__(self, fn: Callable):
         @wraps(fn)
@@ -49,7 +47,7 @@ class accepts:
                 media_type=self.media_type,
                 ask_version=self.ask_version,
                 accept_version=self.accept_version,
-                params=self.params)
+                media_type_params=self.media_type_params)
             obj.__dict__[key] = ctx
 
             return fn(obj, *args, **kwargs)
@@ -74,62 +72,19 @@ class ResourceBase:
             session.base_url = session.create_url(path)
         return session
 
-    def _handle_api_version(self, session: requests.Session,
-                            media_type: Optional[str] = None,
-                            ask_version: Optional[str] = None,
-                            accept_version: Optional[str] = None,
-                            params: Optional[dict] = None):
-        # (1) communicate lower bound on version handled in the outgoing request, and
-        # (2) validate version supported in the incoming response
-        if media_type is not None:
-            components = [media_type]
-            if ask_version:
-                components.append(f'version={ask_version}')
-            if params is not None:
-                for k,v in params.items():
-                    components.append(f'{k}={v}')
-            session.headers['Accept'] = '; '.join(components)
-
-        if accept_version is not None:
-            ss = SpecifierSet(accept_version, prereleases=True)
-
-            def _validate_version(response: requests.Response, **kwargs):
-                if not response.ok:
-                    return
-                content_type = response.headers.get('Content-Type')
-                if not content_type:
-                    # TODO: impl strict mode? (fail when media type / version unknown)
-                    return
-                parts = [p.strip() for p in content_type.split(';')]
-                if not parts:
-                    # TODO: impl strict mode?
-                    return
-                res_media_type, res_params = parse_options_header(content_type)
-                if res_media_type != media_type:
-                    raise exceptions.ResourceBadResponseError(
-                        f'Received media type {res_media_type!r} while '
-                        f'expecting {media_type!r}')
-                version = res_params.pop('version', None)
-                if version is not None:
-                    if not ss.contains(version):
-                        raise exceptions.ResourceBadResponseError(
-                            f'API response format version {version!r} not compliant '
-                            f'with supported version {accept_version!r}. '
-                            'Try upgrading "dwave-cloud-client".')
-
-            if _validate_version not in session.hooks['response']:
-                session.hooks['response'].append(_validate_version)
-
-        return session
-
     @property
     def session(self):
         if self._session is None:
             self._session = self.client.session
             self._session = self._set_session_base_path(self._session, self.resource_path)
 
-        if self.__dict__.get('_session_context'):
-            self._session = self._handle_api_version(self._session, **self._session_context)
+        ctx = getattr(self, '_session_context', None)
+        if ctx is not None:
+            self._session.set_accept(
+                media_type=ctx.get('media_type'),
+                ask_version=ctx.get('ask_version'),
+                accept_version=ctx.get('accept_version'),
+                media_type_params=ctx.get('media_type_params'))
 
         return self._session
 
