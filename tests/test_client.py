@@ -720,7 +720,7 @@ class MultiRegionSupport(unittest.TestCase):
 
         with mock.patch("dwave.cloud.config.open", iterable_mock_open(config_body)):
             with mock.patch.multiple(Client._fetch_available_regions._cached, cache={}):
-                with mock.patch("dwave.cloud.client.base.api.Regions._session", _mocked_session()):
+                with mock.patch("dwave.cloud.client.base.api.Regions._session", _mocked_session(), create=True):
                     # note: we specify config_file, otherwise reading from files
                     # might be skipped altogether if zero config files found on disk
                     # (i.e. config open mock above fails on CI)

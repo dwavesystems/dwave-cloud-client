@@ -58,35 +58,35 @@ class accepts:
 class ResourceBase:
     """A class for interacting with a SAPI resource."""
 
+    # api client used by the resource class
+    client_class: DWaveAPIClient = DWaveAPIClient
+
+    # endpoint path prefix (base path) specific to all methods on the resource
     resource_path: str = None
 
-    # session is fetched/updated on demand via `session` getter
-    _session = None
-
     def __init__(self, **config):
-        self.client = DWaveAPIClient(**config)
-
-    def _set_session_base_path(self, session: requests.Session, path: str):
-        # anchor all session requests at the new base path
-        if session and path:
-            session.base_url = session.create_url(path)
-        return session
+        self.client = self.client_class(**config)
 
     @property
     def session(self):
-        if self._session is None:
-            self._session = self.client.session
-            self._session = self._set_session_base_path(self._session, self.resource_path)
+        session = getattr(self, '_session', None)
 
+        # set path prefix on first access only
+        if session is None:
+            session = self._session = self.client.session
+            if self.resource_path:
+                session.base_url = session.create_url(self.resource_path)
+
+        # set accepted media range on every access
         ctx = getattr(self, '_session_context', None)
         if ctx is not None:
-            self._session.set_accept(
+            session.set_accept(
                 media_type=ctx.get('media_type'),
                 ask_version=ctx.get('ask_version'),
                 accept_version=ctx.get('accept_version'),
                 media_type_params=ctx.get('media_type_params'))
 
-        return self._session
+        return session
 
     def close(self):
         self.client.close()
@@ -113,9 +113,7 @@ class ResourceBase:
 class Regions(ResourceBase):
 
     resource_path = 'regions/'
-
-    def __init__(self, **config):
-        self.client = MetadataAPIClient(**config)
+    client_class = MetadataAPIClient
 
     @accepts(media_type='application/vnd.dwave.metadata.regions+json', accept_version='~=1.0')
     def list_regions(self) -> List[models.Region]:
@@ -135,6 +133,7 @@ class Regions(ResourceBase):
 class Solvers(ResourceBase):
 
     resource_path = 'solvers/'
+    client_class = SolverAPIClient
 
     @accepts(media_type='application/vnd.dwave.sapi.solver-definition-list+json', accept_version='~=2.0')
     def list_solvers(self) -> List[models.SolverConfiguration]:
@@ -154,6 +153,7 @@ class Solvers(ResourceBase):
 class Problems(ResourceBase):
 
     resource_path = 'problems/'
+    client_class = SolverAPIClient
 
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', accept_version='>=2.1,<3')
     def list_problems(self, *,
