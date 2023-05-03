@@ -178,8 +178,9 @@ class VersionedAPISession(LoggingSession):
                         f'with supported version {self._accept_version!r}. '
                         'Try upgrading "dwave-cloud-client".')
 
-    def request(self, method, url, *args, **kwargs):
-        headers = kwargs.pop('headers', {})
+    def request(self, method: str, url: str, *args, **kwargs):
+        headers = kwargs.pop('headers', None)
+        headers = {} if headers is None else headers.copy()
 
         # (1) communicate lower bound on version handled in the outgoing request
         #     (set `Accept` header if `media_type` or `ask_version` defined)
