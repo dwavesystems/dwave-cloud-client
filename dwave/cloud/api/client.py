@@ -19,7 +19,7 @@ from typing import Optional
 import requests
 import urllib3
 from packaging.specifiers import SpecifierSet
-from werkzeug.http import parse_options_header
+from werkzeug.http import parse_options_header, dump_options_header
 
 from dwave.cloud.api import constants, exceptions
 from dwave.cloud.package_info import __packagename__, __version__
@@ -137,34 +137,30 @@ class VersionedAPISession(LoggingSession):
                    media_type: Optional[str] = None,
                    ask_version: Optional[str] = None,
                    accept_version: Optional[str] = None,
-                   media_type_params: Optional[dict] = None):
+                   media_type_params: Optional[dict] = None) -> None:
         self._media_type = media_type
         self._ask_version = ask_version
         self._accept_version = accept_version
         self._media_type_params = media_type_params
 
-    def _validate_response_content_type(self, response: requests.Response):
+    def _validate_response_content_type(self, response: requests.Response) -> None:
         """Validate response's `Content-Type` matches the expected media type
         and version range.
         """
-        if not response.ok:
+        if self._media_type is None or not response.ok:
             return
+
         content_type = response.headers.get('Content-Type')
         if not content_type:
-            # XXX: should we have strict mode? (fail when media type / version unknown)
-            return
-        parts = [p.strip() for p in content_type.split(';')]
-        if not parts:
-            # XXX: should we have strict mode?
+            # TODO: implement strict mode (fail when media type / version unknown)
             return
 
         media_type, params = parse_options_header(content_type)
 
-        if self._media_type is not None:
-            if media_type != self._media_type:
-                raise exceptions.ResourceBadResponseError(
-                    f'Received media type {media_type!r} while '
-                    f'expecting {self._media_type!r}')
+        if media_type != self._media_type:
+            raise exceptions.ResourceBadResponseError(
+                f'Received media type {media_type!r} while '
+                f'expecting {self._media_type!r}')
 
         if self._accept_version is not None:
             # todo: move parsing level up?
@@ -178,25 +174,23 @@ class VersionedAPISession(LoggingSession):
                         f'with supported version {self._accept_version!r}. '
                         'Try upgrading "dwave-cloud-client".')
 
-    def request(self, method: str, url: str, *args, **kwargs):
-        headers = kwargs.pop('headers', None)
-        headers = {} if headers is None else headers.copy()
-
+    def request(self, *args, headers: Optional[dict] = None, **kwargs) -> requests.Response:
         # (1) communicate lower bound on version handled in the outgoing request
-        #     (set `Accept` header if `media_type` or `ask_version` defined)
+        #     (via media type in `Accept` header field)
         if self._media_type is not None:
-            components = [self._media_type]
+            params = {} if self._media_type_params is None else self._media_type_params.copy()
             if self._ask_version:
-                components.append(f'version={self._ask_version}')
-            if self._media_type_params:
-                components.extend(f'{k}={v}' for k,v in self._media_type_params.items())
-            headers['Accept'] = '; '.join(components)
+                params['version'] = self._ask_version
 
-        response = super().request(method, url, *args, headers=headers, **kwargs)
+            headers = {} if headers is None else headers.copy()
+            headers['Accept'] = dump_options_header(self._media_type, params)
 
-        # (2) validate version supported in the incoming response
+        response = super().request(*args, headers=headers, **kwargs)
+
+        # (2) validate format/version supported in the incoming response
         #     (validate `Content-Type` if `media_type` and/or `accept_version` set)
-        self._validate_response_content_type(response)
+        if self._media_type is not None:
+            self._validate_response_content_type(response)
 
         return response
 
