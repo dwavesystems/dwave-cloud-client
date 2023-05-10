@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  codecov: codecov/codecov@3
+
 jobs:
   test-linux:
     parameters:
@@ -55,13 +58,13 @@ jobs:
 
       - run: &run-python-tests
           name: Run Python tests
-          command: env/bin/coverage run -m unittest discover
-
-      - run: &upload-python-code-coverage
-          name: Upload code coverage
           command: |
             . env/bin/activate
-            codecov     # calls `coverage xml`, so we must activate venv
+            coverage run -m unittest discover
+            coverage xml
+
+      - codecov/upload: &upload-python-code-coverage
+          file: coverage.xml
 
   test-macos:
     parameters:
@@ -201,6 +204,7 @@ workflows:
     jobs:
       - test-linux:
           name: test-linux-py<< matrix.python-version >><<# matrix.dimod-numpy-version >> | << matrix.dimod-numpy-version >><</ matrix.dimod-numpy-version >>
+          context: &ctx-build "ocean-build"
           matrix:
             parameters:
               python-version: &python-versions ["3.7.9", "3.8.6", "3.9.0", "3.10.0", "3.11.0"]
@@ -222,6 +226,7 @@ workflows:
 
       - test-macos:
           name: test-macos-py<< matrix.python-version >>
+          context: *ctx-build
           matrix:
             parameters:
               python-version: *python-versions
@@ -232,6 +237,7 @@ workflows:
   deploy:
     jobs:
       - pypi-deploy:
+          context: ocean-publish
           filters:
             tags:
               only: /^[0-9]+(\.[0-9]+)*((\.dev|rc)([0-9]+)?)?$/
