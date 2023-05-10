@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  codecov: codecov/codecov@3
+
 jobs:
   test-linux:
     parameters:
@@ -55,13 +58,13 @@ jobs:
 
       - run: &run-python-tests
           name: Run Python tests
-          command: env/bin/coverage run -m unittest discover
-
-      - run: &upload-python-code-coverage
-          name: Upload code coverage
           command: |
             . env/bin/activate
-            codecov     # calls `coverage xml`, so we must activate venv
+            coverage run -m unittest discover
+            coverage xml
+
+      - codecov/upload: &upload-python-code-coverage
+          file: coverage.xml
 
   test-macos:
     parameters:
