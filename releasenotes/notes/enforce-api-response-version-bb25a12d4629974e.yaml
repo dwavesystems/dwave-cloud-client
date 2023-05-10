@@ -1,0 +1,12 @@
+---
+features:
+  - |
+    Add ``VersionedAPISession``, a ``requests.Session`` subclass (more precisely,
+    further specialized ``LoggingSession``) that enforces conformance of API
+    response version with supported version range(s).
+  - |
+    Add ``accepts`` decorator for declaring accepted media type and response
+    format version (range) on ``dwave.cloud.api.Resource`` methods.
+upgrade:
+  - |
+    Enforce D-Wave API response format version on all ``cloud.api`` resources.

@@ -23,6 +23,11 @@ DEFAULT_METADATA_API_ENDPOINT = 'https://cloud.dwavesys.com/metadata/v1/'
 DEFAULT_REGION = 'na-west-1'
 
 
+# Default API version
+DEFAULT_API_MEDIA_TYPE = 'application/vnd.dwave+json'
+DEFAULT_API_RESPONSE_VERSION = '1.0.0'
+
+
 class ProblemStatus(str, enum.Enum):
     """Solver API problem status values.
 

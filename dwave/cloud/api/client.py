@@ -14,9 +14,12 @@
 
 import logging
 from collections import deque, namedtuple
+from typing import Optional
 
 import requests
 import urllib3
+from packaging.specifiers import SpecifierSet
+from werkzeug.http import parse_options_header, dump_options_header
 
 from dwave.cloud.api import constants, exceptions
 from dwave.cloud.package_info import __packagename__, __version__
@@ -110,8 +113,84 @@ class LoggingSession(BaseUrlSession):
 
             raise
 
-        logger.trace("[%s] request(...) = (code=%r, body=%r)",
-                     callee, response.status_code, response.text)
+        logger.trace("[%s] request(...) = (code=%r, body=%r, headers=%r)",
+                     callee, response.status_code, response.text, response.headers)
+
+        return response
+
+
+class VersionedAPISession(LoggingSession):
+    """A `requests.Session` subclass (technically, further specialized
+    :class:`.LoggingSession`) that enforces conformance of API response
+    version with supported version range(s).
+
+    Response format version is requested via `Accept` header field, and
+    format/version of the response is checked via `Content-Type`.
+    """
+
+    _media_type: Optional[str] = None
+    _ask_version: Optional[str] = None
+    _accept_version: Optional[str] = None
+    _media_type_params: Optional[dict] = None
+
+    def set_accept(self,
+                   media_type: Optional[str] = None,
+                   ask_version: Optional[str] = None,
+                   accept_version: Optional[str] = None,
+                   media_type_params: Optional[dict] = None) -> None:
+        self._media_type = media_type
+        self._ask_version = ask_version
+        self._accept_version = accept_version
+        self._media_type_params = media_type_params
+
+    def _validate_response_content_type(self, response: requests.Response) -> None:
+        """Validate response's `Content-Type` matches the expected media type
+        and version range.
+        """
+        if self._media_type is None or not response.ok:
+            return
+
+        content_type = response.headers.get('Content-Type')
+        if not content_type:
+            # TODO: implement strict mode (fail when media type / version unknown)
+            return
+
+        media_type, params = parse_options_header(content_type)
+
+        if media_type != self._media_type:
+            raise exceptions.ResourceBadResponseError(
+                f'Received media type {media_type!r} while '
+                f'expecting {self._media_type!r}')
+
+        if self._accept_version is not None:
+            # todo: move parsing level up?
+            ss = SpecifierSet(self._accept_version, prereleases=True)
+
+            version = params.pop('version', None)
+            if version is not None:
+                if not ss.contains(version):
+                    raise exceptions.ResourceBadResponseError(
+                        f'API response format version {version!r} not compliant '
+                        f'with supported version {self._accept_version!r}. '
+                        'Try upgrading "dwave-cloud-client".')
+
+    def request(self, *args, headers: Optional[dict] = None, **kwargs) -> requests.Response:
+        # (1) communicate lower bound on version handled in the outgoing request
+        #     (via media type in `Accept` header field)
+        if self._media_type is not None:
+            params = {} if self._media_type_params is None else self._media_type_params.copy()
+            if self._ask_version:
+                params['version'] = self._ask_version
+
+            headers = {} if headers is None else headers.copy()
+            headers['Accept'] = dump_options_header(self._media_type, params)
+
+        response = super().request(*args, headers=headers, **kwargs)
+
+        # (2) validate format/version supported in the incoming response
+        #     (validate `Content-Type` if `media_type` and/or `accept_version` set)
+        if self._media_type is not None:
+            self._validate_response_content_type(response)
 
         return response
 
@@ -124,6 +203,11 @@ class DWaveAPIClient:
     Note:
         To make sure the session is closed, call :meth:`.close`, or use the
         context manager form (as show in the example below).
+
+    Note:
+        Since `requests.Session` is **not thread-safe**, neither is
+        :class:`DWaveAPIClient`. It's best to create (and dispose) a new client
+        on demand, in each thread.
 
     Example:
         with DWaveAPIClient(endpoint='...', timeout=(5, 600)) as client:
@@ -206,7 +290,7 @@ class DWaveAPIClient:
 
         # configure request timeout and retries
         history_size = config['history_size']
-        session = LoggingSession(base_url=endpoint, history_size=history_size)
+        session = VersionedAPISession(base_url=endpoint, history_size=history_size)
         timeout = config['timeout']
         retry = config['retry']
         session.mount('http://',
@@ -242,14 +326,14 @@ class DWaveAPIClient:
 
     @staticmethod
     def _raise_for_status(response, **kwargs):
-        """Raises :class:`~dwave.cloud.exceptions.SAPIRequestError`, if one
+        """Raises :class:`~dwave.cloud.api.exceptions.RequestError`, if one
         occurred, with message populated from SAPI error response.
 
         See:
             :meth:`requests.Response.raise_for_status`.
 
         Raises:
-            :class:`dwave.cloud.exceptions.SAPIRequestError` subclass
+            :class:`dwave.cloud.api.exceptions.RequestError` subclass
         """
         # NOTE: the expected behavior is for SAPI to return JSON error on
         # failure. However, that is currently not the case. We need to work
