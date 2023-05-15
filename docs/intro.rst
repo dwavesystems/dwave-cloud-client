@@ -86,10 +86,13 @@ Default values for undefined profile keys are taken from the `[defaults]` sectio
 
 For example, if the configuration file, `~/.config/dwave/dwave.conf`, selected
 through auto-detection as the default configuration, contains the following
-profiles::
+profiles,::
 
     [defaults]
     token = ABC-123456789123456789123456789
+
+    [default-solver]
+    solver = {"qpu": true, "num_qubits__gt": 5000}
 
     [hybrid]
     client = hybrid
@@ -103,11 +106,11 @@ profiles::
     [test-advantage2]
     solver = {"topology__type": "zephyr"}
 
-You can instantiate clients for a D-Wave quantum computer and a quantum-classical
+you can instantiate clients for a D-Wave quantum computer and a quantum-classical
 hybrid solver with::
 
     >>> from dwave.cloud import Client
-    >>> client_qpu = Client.from_config(solver={'qpu': True})   # doctest: +SKIP
+    >>> client_qpu = Client.from_config()   # doctest: +SKIP
     >>> client_hybrid = Client.from_config(profile='hybrid')   # doctest: +SKIP
 
 .. _environmentVariables:

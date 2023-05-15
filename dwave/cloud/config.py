@@ -48,32 +48,57 @@ CLI commands from your system's console, such as :code:`dwave config create` and
 
 Environment variables:
 
-    ``DWAVE_CONFIG_FILE``: Configuration file path.
-
-    ``DWAVE_PROFILE``: Name of profile (section).
-
-    ``DWAVE_API_CLIENT``: API client class. Supported values are ``qpu``, ``sw`` and ``hybrid``.
-
-    ``DWAVE_API_REGION``: API region code.
-
-    ``DWAVE_API_ENDPOINT``: API endpoint URL.
-
-    ``DWAVE_METADATA_API_ENDPOINT``: Metadata API endpoint URL.
-
-    ``DWAVE_API_TOKEN``: API authorization token.
-
-    ``DWAVE_API_SOLVER``: Default solver.
-
-    ``DWAVE_API_PROXY``: URL for proxy connections to D-Wave API.
-
-    ``DWAVE_API_HEADERS``: Optional additional HTTP headers.
+*   ``DWAVE_API_CLIENT``: API client class. Supported values are ``qpu``, ``sw`` and ``hybrid``.
+*   ``DWAVE_API_ENDPOINT``: API endpoint URL.
+*   ``DWAVE_API_HEADERS``: Optional additional HTTP headers.
+*   ``DWAVE_API_PROXY``: URL for proxy connections to D-Wave API.
+*   ``DWAVE_API_REGION``: API region code.
+*   ``DWAVE_API_SOLVER``: Default solver.
+*   ``DWAVE_API_TOKEN``: API authorization token.
+*   ``DWAVE_CONFIG_FILE``: Configuration file path. 
+*   ``DWAVE_METADATA_API_ENDPOINT``: Metadata API endpoint URL.
+*   ``DWAVE_PROFILE``: Name of profile (section).
 
 Examples:
-    The following are typical examples of using :func:`~dwave.cloud.client.Client.from_config`
-    to create a configured client.
+    The following are typical and advanced examples of using 
+    :func:`~dwave.cloud.client.Client.from_config` to create a configured client.
 
-    This first example initializes :class:`~dwave.cloud.client.Client` from an
-    explicitly specified configuration file, "~/jane/my_path_to_config/my_cloud_conf.conf"::
+    *   **Example** Typical use for QPU and hybrid solvers
+
+    This example uses the following standard configuration file, 
+    :code:`~/.config/dwave/dwave.conf`, selected through auto-detection as the 
+    default configuration::
+
+        [defaults]
+        token = ABC-123456789123456789123456789
+
+        [default-solver]
+        solver = {"qpu": true, "num_qubits__gt": 5000}
+
+        [hybrid]
+        client = hybrid
+
+        [europe]
+        region = eu-central-1
+    
+    That configuration files sets a default API token used by all following 
+    profiles unless overridden, ensures that by default selecting a solver with 
+    the :func:`~dwave.cloud.client.Client.get_solver` method returns a 
+    QPU solver with at least 5000 qubits, and configures profiles for selecting 
+    a quantum-classical hybrid solver and solvers from the European region.
+
+    The code below instantiates clients for a D-Wave quantum computer and a 
+    quantum-classical hybrid CQM solver.
+
+    >>> with Client.from_config() as client:   # doctest: +SKIP
+    ...     solver_qpu = client.get_solver()
+    >>> with Client.from_config(profile='hybrid') as client:   # doctest: +SKIP
+    ...     solver_cqm = client.get_solver(supported_problem_types__issubset={"cqm"})
+
+    *   **Example:** Explicitly specified configuration file
+    
+    This example explicitly specifies a configuration file, 
+    :code:`~/jane/my_path_to_config/my_cloud_conf.conf`::
 
         [defaults]
         token = ABC-123456789123456789123456789
@@ -81,113 +106,72 @@ Examples:
         [first-qpu]
         solver = {"qpu": true}
 
-        [feature]
-        endpoint = https://url.of.some.dwavesystem.com/sapi
-        token = DEF-987654321987654321987654321
-        solver = {"num_qubits__gte": 2000, "max_anneal_schedule_points__gte": 4}
-
-    The example code below creates a client object that connects to a D-Wave QPU,
-    using :class:`dwave.cloud.qpu.Client` and the first available online D-Wave system
-    at the default API endpoint URL (https://cloud.dwavesys.com/sapi).
-    The ``feature`` profile specifies a solver selected based on available features,
-    namely we're requesting the first solver that has at least 2000 qubits and the
-    anneal schedule can be described with at least 4 points.
+    The code below creates creates a client that it later explicitly closes.
 
     >>> from dwave.cloud import Client
     >>> client = Client.from_config(config_file='~/jane/my_path_to_config/my_cloud_conf.conf')  # doctest: +SKIP
     >>> # code that uses client
     >>> client.close()   # doctest: +SKIP
 
-    This second example auto-detects a configuration file on the local system following the
+    *   **Example:** Auto-detected configuration file, unrecognized key-value pair
+    
+    This example auto-detects a configuration file on the local system following the
     user/system configuration paths of :func:`get_configfile_paths`. It passes through
-    to the instantiated client an unrecognized key-value pair my_param=`my_value`.
+    to the instantiated client an unrecognized key-value pair ``my_param="my_value"``.
 
     >>> from dwave.cloud import Client
     >>> client = Client.from_config(my_param="my_value")    # doctest: +SKIP
     >>> # code that uses client
     >>> client.close()      # doctest: +SKIP
 
-    This third example instantiates two clients, for managing both QPU and software
-    solvers. Common key-value pairs are taken from the defaults section of a shared
-    configuration file::
+    *   **Advanced Example:** Multiple auto-detected configuration files
+    
+    This example uses two configuration files: (1) a user-local file, 
+    ``/usr/local/share/dwave/dwave.conf``::
 
         [defaults]
         token = ABC-123456789123456789123456789
-
-        [primary-qpu]
         solver = {"qpu": true}
 
-        [sw-solver]
-        client = sw
-        solver = c4-sw_sample
-        endpoint = https://url.of.some.software.resource.com/my_if
+        [advantage]
+        region = eu-central-1
+
+    and (2), a ``./dwave.conf`` file in the current working directory::
+
+        [advantage]
         token = DEF-987654321987654321987654321
 
-        [backup-qpu]
-        solver = {"qpu": true, "num_qubits__gte": 2000}
-        endpoint = https://url.of.some.dwavesystem.com/sapi
-        proxy = http://user:pass@myproxy.com:8080/
-        token = XYZ-0101010100112341234123412341234
-
-    The example code below creates client objects for two QPU solvers (at the
-    same URL but each with its own solver ID and token) and one software solver.
-
-    >>> from dwave.cloud import Client
-    >>> client_qpu1 = Client.from_config(profile='primary-qpu')    # doctest: +SKIP
-    >>> client_qpu1 = Client.from_config(profile='backup-qpu')    # doctest: +SKIP
-    >>> client_sw1 = Client.from_config(profile='sw-solver')   # doctest: +SKIP
-    >>> client_qpu1.default_solver   # doctest: +SKIP
-    'EXAMPLE_2000Q_SYSTEM_A'
-    >>> client_qpu2.endpoint   # doctest: +SKIP
-    'https://url.of.some.dwavesystem.com/sapi'
-    >>> # code that uses client
-    >>> client_qpu1.close() # doctest: +SKIP
-    >>> client_qpu2.close() # doctest: +SKIP
-    >>> client_sw1.close() # doctest: +SKIP
-
-    This fourth example loads configurations auto-detected in more than one configuration
-    file, with the higher priority file (in the current working directory) supplementing
-    and overriding values from the lower priority user-local file. After instantiation,
-    an endpoint from the default section and client from the profile section is provided
-    from the user-local ``/usr/local/share/dwave/dwave.conf`` file::
-
-        [defaults]
-        solver = {"qpu": true}
-
-        [dw2000]
-        endpoint = https://int.se.dwavesystems.com/sapi
-        token = ABC-123456789123456789123456789
-
-    A solver is supplemented from the file in the current working directory, which also
-    overrides the token value. ``./dwave.conf`` is the file in the current directory::
-
-        [dw2000]
-        token = DEF-987654321987654321987654321
+    The code below supplements the API token from higher priority file (the 
+    ``./dwave.conf`` file in the current working directory), overriding the value
+    from the ``[defaults]`` section of the lower-priority user-local file, 
+    ``/usr/local/share/dwave/dwave.conf`` for the Advantage solver selection.
 
     >>> from dwave.cloud import Client
     >>> client = Client.from_config()  # doctest: +SKIP
-    >>> client.default_solver   # doctest: +SKIP
-    'EXAMPLE_2000Q_SYSTEM_A'
-    >>> client.endpoint  # doctest: +SKIP
-    'https://int.se.dwavesystems.com/sapi'
-    >>> client.token  # doctest: +SKIP
-    'DEF-987654321987654321987654321'
+    >>> print(client.endpoint)      # doctest: +SKIP
+    https://eu-central-1.cloud.dwavesys.com/sapi/v2/
+    >>> print(client.token)  # doctest: +SKIP
+    DEF-987654321987654321987654321
     >>> # code that uses client
     >>> client.close() # doctest: +SKIP
 
-    The next example uses :func:`~dwave.cloud.config.load_config` to load profile values.
-    **Most users do not need to use this method.** It loads from the following configuration
-    file, dwave_c.conf, located in the current working directory, and specified explicitly::
+    *   **Advanced Example:** Loading profile values
+    
+    **Most users do not need to use this method.** 
+    
+    This example uses :func:`~dwave.cloud.config.load_config` to load profile 
+    values. It loads from the following configuration
+    file, ``dwave_c.conf``, located in the current working directory, and 
+    specified explicitly::
 
         [defaults]
-        endpoint = https://url.of.some.dwavesystem.com/sapi
+        token = ABC-123456789123456789123456789
         solver = {"qpu": true}
 
-        [dw2000a]
-        solver = {"software": true, "name": "EXAMPLE_2000Q"}
-        token = ABC-123456789123456789123456789
+        [advantage-a]
+        solver = {"software": true, "name": "Fake_Advantage"}
 
-        [dw2000b]
+        [advantage-b]
         solver = {"qpu": true}
         token = DEF-987654321987654321987654321
 
@@ -199,20 +183,12 @@ Examples:
 
     >>> import dwave.cloud
     >>> import os
-    >>> os.environ['DWAVE_API_SOLVER'] = 'EXAMPLE_2000Q_SYSTEM'   # doctest: +SKIP
+    >>> os.environ['DWAVE_API_SOLVER'] = 'Advantage_Emulator'   # doctest: +SKIP
     >>> dwave.cloud.config.load_config("./dwave_c.conf")   # doctest: +SKIP
-    {'client': 'sw',
-     'endpoint': 'https://url.of.some.dwavesystem.com/sapi',
-     'proxy': None,
-     'headers': None,
-     'solver': 'EXAMPLE_2000Q_SYSTEM',
+    {'solver': {"software": true, "name": "Advantage_Emulator"},
      'token': 'ABC-123456789123456789123456789'}
-    >>> dc.config.load_config("./dwave_c.conf", profile='dw2000b', solver='Solver3')   # doctest: +SKIP
-    {'client': 'qpu',
-     'endpoint': 'https://url.of.some.dwavesystem.com/sapi',
-     'proxy': None,
-     'headers': None,
-     'solver': 'Solver3',
+    >>> dwave.cloud.config.load_config("./dwave_c.conf", profile='advantage-b', solver='Advantage_system4.1')   # doctest: +SKIP
+    {'solver': {"software": true, "name": "Advantage_system4.1"},
      'token': 'DEF-987654321987654321987654321'}
 
 """
