@@ -17,25 +17,20 @@ D-Wave API clients handle communications with :term:`solver` resources: problem 
 monitoring, samples retrieval, etc.
 
 Examples:
-    This example creates a client using the local system's default D-Wave Cloud Client
-    configuration file, which is configured to access a D-Wave 2000Q QPU, submits
-    a :term:`QUBO` problem (a Boolean NOT gate represented by a penalty model), and
-    samples 5 times.
+    This example creates a client using the local system's default D-Wave Cloud 
+    Client configuration file, which provide the API token, submits to a Leap
+    quantum-classical hybrid binary quadratic model (BQM) sampler a :term:`QUBO` 
+    problem representing a Boolean NOT gate as a penalty model, and prints the 
+    returned samples.
 
     >>> from dwave.cloud import Client
     >>> Q = {(0, 0): -1, (0, 4): 0, (4, 0): 2, (4, 4): -1}
-    >>> with Client.from_config() as client:  # doctest: +SKIP
-    ...     solver = client.get_solver()
-    ...     computation = solver.sample_qubo(Q, num_reads=5)
+    >>> with Client.from_config(client="hybrid") as client:  # doctest: +SKIP
+    ...     solver = client.get_solver(supported_problem_types__issubset={"bqm"})
+    ...     computation = solver.sample_qubo(Q, time_limit=5)
     ...
-    >>> for i in range(5):     # doctest: +SKIP
-    ...     print(computation.samples[i][0], computation.samples[i][4])
-    ...
-    (1, 0)
-    (1, 0)
-    (0, 1)
-    (0, 1)
-    (0, 1)
+    >>> print(computation.samples)     # doctest: +SKIP
+    [[1 0]]
 
 """
 
@@ -1013,28 +1008,25 @@ class Client(object):
         Examples::
 
             client.get_solvers(
-                num_qubits__gt=2000,                # we need more than 2000 qubits
-                num_qubits__lt=4000,                # ... but fewer than 4000 qubits
-                num_qubits__within=(2000, 4000),    # an alternative to the previous two lines
-                num_active_qubits=1089,             # we want a particular number of active qubits
-                vfyc=True,                          # we require a fully yielded Chimera
-                vfyc__in=[False, None],             # inverse of the previous filter
-                vfyc__available=False,              # we want solvers that do not advertize the vfyc property
+                num_qubits__gt=5000,                # we need more than 5000 qubits
+                num_qubits__lt=6000,                # ... but fewer than 6000 qubits
+                num_qubits__within=(5000, 6000),    # an alternative to the previous two lines
+                num_active_qubits=5627,             # we want a particular number of active qubits
                 anneal_schedule=True,               # we need support for custom anneal schedule
                 max_anneal_schedule_points__gte=4,  # we need at least 4 points for our anneal schedule
                 num_reads_range__covers=1000,       # our solver must support returning 1000 reads
-                extended_j_range__covers=[-2, 2],   # we need extended J range to contain subrange [-2,2]
-                couplers__contains=[0, 128],        # coupler (edge between) qubits (0,128) must exist
-                couplers__issuperset=[[0,128], [0,4]],
-                                                    # two couplers required: (0,128) and (0,4)
-                qubits__issuperset={0, 4, 215},     # qubits 0, 4 and 215 must exist
+                extended_j_range__covers=[-2, 1],   # we need extended J range to contain subrange [-2,1]
+                couplers__contains=[30, 31],        # coupler (edge between) qubits (30,31) must exist
+                couplers__issuperset=[[30,31], [30,45]],
+                                                    # two couplers required: (30,31) and (30,45)
+                qubits__issuperset={30, 31, 32},    # qubits 30, 31 and 32 must exist
                 supported_problem_types__issubset={'ising', 'qubo'},
                                                     # require Ising, QUBO or both to be supported
-                name='DW_2000Q_5',                  # full solver name/ID match
-                name__regex='.*2000.*',             # partial/regex-based solver name match
-                chip_id__regex='DW_.*',             # chip ID prefix must be DW_
-                topology__type__eq="chimera"        # topology.type must be chimera
-                topology__type="chimera"            # same as above, `eq` implied even for nested properties
+                name='Advantage_system4.1',         # full solver name/ID match
+                name__regex='Advantage.*',          # partial/regex-based solver name match
+                chip_id__regex='Advantage_.*',      # chip ID prefix must be Advantage_
+                topology__type__eq="pegasus"        # topology.type must be Pegasus
+                topology__type="pegasus"            # same as above, `eq` implied even for nested properties
             )
         """
 
@@ -1222,18 +1214,21 @@ class Client(object):
             This example creates two solvers for a client instantiated from
             a local system's auto-detected default configuration file, which configures
             a connection to a D-Wave resource that provides two solvers. The first
-            uses the default solver, the second explicitly selects another solver.
+            uses the default solver, the second selects a hybrid CQM solver.
 
             >>> from dwave.cloud import Client
             >>> client = Client.from_config()    # doctest: +SKIP
             >>> client.get_solvers()   # doctest: +SKIP
-            [Solver(id='2000Q_ONLINE_SOLVER1'), Solver(id='2000Q_ONLINE_SOLVER2')]
+            BQMSolver(id='hybrid_binary_quadratic_model_version2p'),
+            DQMSolver(id='hybrid_discrete_quadratic_model_version1p'),
+            CQMSolver(id='hybrid_constrained_quadratic_model_version1p'),
+            StructuredSolver(id='Advantage_system6.1')]
             >>> solver1 = client.get_solver()    # doctest: +SKIP
-            >>> solver2 = client.get_solver(name='2000Q_ONLINE_SOLVER2')    # doctest: +SKIP
-            >>> solver1.id  # doctest: +SKIP
-            '2000Q_ONLINE_SOLVER1'
-            >>> solver2.id   # doctest: +SKIP
-            '2000Q_ONLINE_SOLVER2'
+            >>> solver2 = client.get_solver(supported_problem_types__issubset={'cqm'})    # doctest: +SKIP
+            >>> solver1.name  # doctest: +SKIP
+            'Advantage_system6.1'
+            >>> solver2.name   # doctest: +SKIP
+            'hybrid_constrained_quadratic_model_version1p'
             >>> # code that uses client
             >>> client.close() # doctest: +SKIP
 

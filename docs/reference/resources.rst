@@ -4,10 +4,12 @@
 Clients
 =======
 
-The :term:`solver`\ s that provide sampling for solving :term:`Ising` and :term:`QUBO` problems, such
-as a D-Wave 2000Q QPU or a software :term:`sampler` such as the `dimod <https://github.com/dwavesystems/dimod>`_
-simulated annealing sampler, are typically remote resources. The D-Wave Cloud Client
-:class:`~dwave.cloud.client.Client` class manages such remote solver resources.
+The :term:`solver`\ s that provide sampling for a :term:`binary quadratic model` 
+problem, such as an Advantage quantum computer, or a quantum-classical hybrid 
+:term:`sampler`, such as Leap's :class:`~dwave.system.samplers.LeapHybridCQMSampler`
+hybrid constrained quadratic model (CQM) sampler, are typically remote resources. 
+The D-Wave Cloud Client :class:`~dwave.cloud.client.Client` class manages such 
+remote solver resources.
 
 Preferred use is with a context manager---a :code:`with Client.from_config(...) as`
 construct---to ensure proper closure of all resources. The following example snippet
@@ -15,17 +17,17 @@ creates a client based on an auto-detected configuration file and instantiates
 a solver.
 
 >>> with Client.from_config() as client:   # doctest: +SKIP
-...     solver = client.get_solver(num_qubits__gt=2000)
+...     solver = client.get_solver(num_qubits__gt=5000)
 
-Alternatively, the following example snippet creates a client for software resources
+Alternatively, the following example snippet creates a client for hybrid resources
 that it later explicitly closes.
 
->>> client = Client.from_config(software=True)   # doctest: +SKIP
+>>> client = Client.from_config(client="hybrid")   # doctest: +SKIP
 >>> # code that uses client
 >>> client.close()    # doctest: +SKIP
 
 Typically you use the :class:`~dwave.cloud.client.Client` class. By default, it instantiates
-a QPU client. You can also use the specialized QPU and CPU/GPU clients directly.
+a QPU client. You can also use the specialized QPU, hybrid, and CPU/GPU clients directly.
 
 
 Client (Base Client)
@@ -67,7 +69,7 @@ Specialized Clients
 ===================
 
 Typically you use the :class:`~dwave.cloud.client.Client` class. By default, it instantiates
-a QPU client. You can also instantiate a QPU or CPU/GPU client directly.
+a QPU client. You can also instantiate a QPU, hybrid, or CPU/GPU client directly.
 
 QPU Client
 ----------
@@ -81,8 +83,8 @@ Class
 .. autoclass:: dwave.cloud.qpu.Client
 
 
-Hybrid-Samplers Client
-------------------------
+Hybrid Client
+-------------
 
 .. automodule:: dwave.cloud.hybrid
 .. currentmodule:: dwave.cloud.hybrid
@@ -93,8 +95,8 @@ Class
 .. autoclass:: dwave.cloud.hybrid.Client
 
 
-Software-Samplers Client
-------------------------
+Software Client
+---------------
 
 .. automodule:: dwave.cloud.sw
 .. currentmodule:: dwave.cloud.sw
