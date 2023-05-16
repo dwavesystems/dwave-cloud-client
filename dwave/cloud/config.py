@@ -65,9 +65,11 @@ Examples:
 
     *   **Example** Typical use for QPU and hybrid solvers
 
-    This example uses the following standard configuration file, 
-    :code:`~/.config/dwave/dwave.conf`, selected through auto-detection as the 
-    default configuration::
+    This example uses a configuration file in one of the standard paths, 
+    :code:`~/.config/dwave/dwave.conf`, selected through auto-detection
+    on the local system following the user/system configuration paths of 
+    :func:`get_configfile_paths`, to provide the following default 
+    configuration::
 
         [defaults]
         token = ABC-123456789123456789123456789
@@ -81,23 +83,22 @@ Examples:
         [europe]
         region = eu-central-1
     
-    That configuration files sets a default API token used by all following 
-    profiles unless overridden, ensures that by default selecting a solver with 
-    the :func:`~dwave.cloud.client.Client.get_solver` method returns a 
+    This configuration file sets a default API token used by all following 
+    profiles unless overridden, ensures that selecting a solver with the 
+    :func:`~dwave.cloud.client.Client.get_solver` method by default returns a 
     QPU solver with at least 5000 qubits, and configures profiles for selecting 
-    a quantum-classical hybrid solver and solvers from the European region.
+    a quantum-classical hybrid solver and solvers from Leap's European region.
 
-    The code below instantiates clients for a D-Wave quantum computer and a 
-    quantum-classical hybrid CQM solver.
+    The code below instantiates clients for a QPU solver and a hybrid CQM solver.
 
     >>> with Client.from_config() as client:   # doctest: +SKIP
     ...     solver_qpu = client.get_solver()
     >>> with Client.from_config(profile='hybrid') as client:   # doctest: +SKIP
     ...     solver_cqm = client.get_solver(supported_problem_types__issubset={"cqm"})
 
-    *   **Example:** Explicitly specified configuration file
+    *   **Example:** Explicitly specified configuration file, unrecognized parameter
     
-    This example explicitly specifies a configuration file, 
+    This example explicitly specifies the following configuration file, 
     :code:`~/jane/my_path_to_config/my_cloud_conf.conf`::
 
         [defaults]
@@ -106,23 +107,15 @@ Examples:
         [first-qpu]
         solver = {"qpu": true}
 
-    The code below creates creates a client that it later explicitly closes.
+    The code below creates a client that it later explicitly closes. It also 
+    passes through to the instantiated client an unrecognized key-value pair 
+    ``my_param="my_value"``.
 
     >>> from dwave.cloud import Client
-    >>> client = Client.from_config(config_file='~/jane/my_path_to_config/my_cloud_conf.conf')  # doctest: +SKIP
+    >>> client = Client.from_config(config_file='~/jane/my_path_to_config/my_cloud_conf.conf',
+    ...                             my_param="my_value")  # doctest: +SKIP
     >>> # code that uses client
     >>> client.close()   # doctest: +SKIP
-
-    *   **Example:** Auto-detected configuration file, unrecognized key-value pair
-    
-    This example auto-detects a configuration file on the local system following the
-    user/system configuration paths of :func:`get_configfile_paths`. It passes through
-    to the instantiated client an unrecognized key-value pair ``my_param="my_value"``.
-
-    >>> from dwave.cloud import Client
-    >>> client = Client.from_config(my_param="my_value")    # doctest: +SKIP
-    >>> # code that uses client
-    >>> client.close()      # doctest: +SKIP
 
     *   **Advanced Example:** Multiple auto-detected configuration files
     
@@ -143,8 +136,10 @@ Examples:
 
     The code below supplements the API token from higher priority file (the 
     ``./dwave.conf`` file in the current working directory), overriding the value
-    from the ``[defaults]`` section of the lower-priority user-local file, 
-    ``/usr/local/share/dwave/dwave.conf`` for the Advantage solver selection.
+    from the ``[defaults]`` and first (``[advantage]``) sections of the 
+    lower-priority user-local file, ``/usr/local/share/dwave/dwave.conf``. Use
+    of the :func:`~dwave.cloud.client.Client.get_solver` method would select 
+    an Advantage from Leap's European region using the ``DEF-987 ...`` token.
 
     >>> from dwave.cloud import Client
     >>> client = Client.from_config()  # doctest: +SKIP
@@ -156,13 +151,12 @@ Examples:
     >>> client.close() # doctest: +SKIP
 
     *   **Advanced Example:** Loading profile values
-    
-    **Most users do not need to use this method.** 
-    
+       
     This example uses :func:`~dwave.cloud.config.load_config` to load profile 
-    values. It loads from the following configuration
-    file, ``dwave_c.conf``, located in the current working directory, and 
-    specified explicitly::
+    values. **Most users do not need to use this method.** It loads from the 
+    following configuration file, ``dwave_c.conf``, located in the current 
+    working directory, and which contains two profiles in addition to the 
+    defaults section::
 
         [defaults]
         token = ABC-123456789123456789123456789
@@ -174,21 +168,21 @@ Examples:
         [advantage-b]
         solver = {"qpu": true}
         token = DEF-987654321987654321987654321
-
-    This configuration file contains two profiles in addition to the defaults section.
-    In the following example code, first no profile is specified, and the first profile
-    after the defaults section is loaded with the solver overridden by the environment
-    variable. Next, the second profile is selected
-    with the explicitly named solver overriding the environment variable setting.
+   
+    The following example code first loads, by default, the first profile 
+    (``[advantage-a]``) after the ``[defaults]`` section with its solver 
+    preference overridden by the environment variable. Next, the second profile
+    (``[advantage-b]``) is explicitly selected with the explicitly named solver
+    overriding the environment variable setting.
 
     >>> import dwave.cloud
     >>> import os
-    >>> os.environ['DWAVE_API_SOLVER'] = 'Advantage_Emulator'   # doctest: +SKIP
+    >>> os.environ["DWAVE_API_SOLVER"] = "Advantage_Emulator"   # doctest: +SKIP
     >>> dwave.cloud.config.load_config("./dwave_c.conf")   # doctest: +SKIP
-    {'solver': {"software": true, "name": "Advantage_Emulator"},
+    {'solver': '{"software": true, "name": "Advantage_Emulator"}',
      'token': 'ABC-123456789123456789123456789'}
-    >>> dwave.cloud.config.load_config("./dwave_c.conf", profile='advantage-b', solver='Advantage_system4.1')   # doctest: +SKIP
-    {'solver': {"software": true, "name": "Advantage_system4.1"},
+    >>> dwave.cloud.config.load_config("./dwave_c.conf", profile="advantage-b", solver="Advantage_system4.1")   # doctest: +SKIP
+    {'solver': '{"software": true, "name": "Advantage_system4.1"}',
      'token': 'DEF-987654321987654321987654321'}
 
 """
@@ -778,13 +772,9 @@ def load_config(config_file=None, profile=None, **kwargs):
 
         >>> from dwave.cloud import config
         >>> config.load_config()         # doctest: +SKIP
-        {'client': 'qpu',
-         'endpoint': 'https://url.of.some.dwavesystem.com/sapi',
-         'proxy': None,
-         'solver': 'EXAMPLE_2000Q_SYSTEM_A',
-         'token': 'DEF-987654321987654321987654321',
-         'headers': None}
-        ... # See which configuration file was loaded
+        {'solver': '{"qpu": true, "num_qubits__gt": 5000}',
+         'token': 'ABC-123456789123456789123456789'}
+        >>> # See which configuration file was loaded
         >>> config.get_configfile_paths()             # doctest: +SKIP
         ['C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf']
 
