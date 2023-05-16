@@ -460,29 +460,27 @@ def load_config_from_files(filenames=None):
     Examples:
         This example loads configurations from two files. One contains a default
         section with key/values that are overwritten by any profile section that
-        contains that key/value; for example, profile dw2000b in file dwave_b.conf
-        overwrites the default URL and client type, which profile dw2000a inherits
-        from the defaults section, while profile dw2000a overwrites the API token that
-        profile dw2000b inherits.
+        contains that key/value; for example, profile advantage_b in file dwave_b.conf
+        overwrites the default URL and client type, which profile advantage_a inherits
+        from the defaults section, while profile advantage_a overwrites the API token that
+        profile advantage_b inherits.
 
         The files, which are located in the current working directory, are
         (1) dwave_a.conf::
 
             [defaults]
-            endpoint = https://url.of.some.dwavesystem.com/sapi
             client = qpu
             token = ABC-123456789123456789123456789
 
-            [dw2000a]
-            solver = EXAMPLE_2000Q_SYSTEM
+            [advantage_a]
+            solver = Advantage_system4.1
             token = DEF-987654321987654321987654321
 
         and (2) dwave_b.conf::
 
-            [dw2000b]
-            endpoint = https://url.of.some.other.dwavesystem.com/sapi
+            [advantage_b]
             client = sw
-            solver = EXAMPLE_2000Q_SYSTEM
+            solver = Emulator
 
         The following example code loads configuration from both these files, with
         the defined overrides and inheritance.
@@ -494,18 +492,16 @@ def load_config_from_files(filenames=None):
             >>> configuration = dc.config.load_config_from_files(["./dwave_a.conf", "./dwave_b.conf"])   # doctest: +SKIP
             >>> configuration.write(sys.stdout)    # doctest: +SKIP
             [defaults]
-            endpoint = https://url.of.some.dwavesystem.com/sapi
             client = qpu
             token = ABC-123456789123456789123456789
 
-            [dw2000a]
-            solver = EXAMPLE_2000Q_SYSTEM
+            [advantage_a]
+            solver = Advantage_system4.1
             token = DEF-987654321987654321987654321
 
-            [dw2000b]
-            endpoint = https://url.of.some.other.dwavesystem.com/sapi
+            [advantage_b]
             client = sw
-            solver = EXAMPLE_2000Q_SYSTEM
+            solver = Emulator
 
     """
     if filenames is None:
