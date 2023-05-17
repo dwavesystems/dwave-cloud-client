@@ -150,26 +150,65 @@ class TestRequests(unittest.TestCase):
         media_type = 'application/vnd.dwave.api.mock+json'
         version = '1.2.3'
 
-        path, data = 'version', dict(v=version)
+        data = dict(v=version)
 
         m.get(requests_mock.ANY, status_code=404)
-        m.get(f"{baseurl}/{path}", json=data,
+        m.get(f"{baseurl}/no-type", json=data)
+        m.get(f"{baseurl}/no-version", json=data,
+              headers={'Content-Type': f'{media_type}'})
+        m.get(f"{baseurl}/version", json=data,
               headers={'Content-Type': f'{media_type}; version={version}'})
 
+        # validate strict mode (the default mode)
         with DWaveAPIClient(**config) as client:
             # nominal
             client.session.set_accept(media_type=media_type, accept_version='~=1.2.0')
-            self.assertEqual(client.session.get(path).json(), data)
+            self.assertEqual(client.session.get('version').json(), data)
+
+            # no type
+            with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'^Media type not present'):
+                client.session.set_accept(media_type=media_type, accept_version='~=1.2.0')
+                self.assertEqual(client.session.get('no-type').json(), data)
+
+            # but fine if type not expected
+            client.session.set_accept()
+            self.assertEqual(client.session.get('no-type').json(), data)
+
+            # wrong type
+            client.session.set_accept(media_type='wrong')
+            with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'^Received media type'):
+                self.assertEqual(client.session.get('version').json(), data)
+
+            # no version
+            client.session.set_accept(media_type=media_type, accept_version='~=1.2.0')
+            with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'version undefined in the response'):
+                self.assertEqual(client.session.get('no-version').json(), data)
+
+            # wrong version
+            client.session.set_accept(media_type=media_type, accept_version='>2')
+            with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'version .* not compliant'):
+                self.assertEqual(client.session.get('version').json(), data)
+
+        # validate non-strict mode
+        with DWaveAPIClient(version_strict_mode=False, **config) as client:
+            # no type
+            client.session.set_accept(media_type=media_type, accept_version='~=1.2.0')
+            self.assertEqual(client.session.get('no-type').json(), data)
 
             # wrong type
             client.session.set_accept(media_type='wrong', accept_version='~=1.2.0')
             with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'^Received media type'):
-                self.assertEqual(client.session.get(path).json(), data)
+                self.assertEqual(client.session.get('version').json(), data)
+
+            # no version
+            client.session.set_accept(media_type=media_type, accept_version='~=1.2.0')
+            with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'version undefined in the response'):
+                self.assertEqual(client.session.get('no-version').json(), data)
 
             # wrong version
-            client.session.set_accept(media_type=media_type, accept_version='>2')
-            with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'^API response format version'):
-                self.assertEqual(client.session.get(path).json(), data)
+            client.session.set_accept(media_type=media_type, accept_version='~=2.0')
+            with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'version .* not compliant'):
+                self.assertEqual(client.session.get('version').json(), data)
 
 
 class TestResponseParsing(unittest.TestCase):
