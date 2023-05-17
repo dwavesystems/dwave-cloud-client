@@ -126,22 +126,39 @@ class VersionedAPISession(LoggingSession):
 
     Response format version is requested via `Accept` header field, and
     format/version of the response is checked via `Content-Type`.
+
+    Args:
+        strict_mode:
+            In strict mode (the default), response validation fails unless an
+            appropriate `Content-Type` is returned. Set to ``False`` to disable it.
+
     """
 
+    _strict_mode: bool = True
     _media_type: Optional[str] = None
     _ask_version: Optional[str] = None
     _accept_version: Optional[str] = None
     _media_type_params: Optional[dict] = None
 
+    def __init__(self, strict_mode: bool = True, **kwargs):
+        self._strict_mode = strict_mode
+        super().__init__(**kwargs)
+
     def set_accept(self,
                    media_type: Optional[str] = None,
                    ask_version: Optional[str] = None,
                    accept_version: Optional[str] = None,
-                   media_type_params: Optional[dict] = None) -> None:
+                   media_type_params: Optional[dict] = None,
+                   strict_mode: Optional[bool] = None) -> None:
+        """Set the request and expected response media type, going forward."""
+
         self._media_type = media_type
         self._ask_version = ask_version
         self._accept_version = accept_version
         self._media_type_params = media_type_params
+
+        if strict_mode is not None:
+            self._strict_mode = strict_mode
 
     def _validate_response_content_type(self, response: requests.Response) -> None:
         """Validate response's `Content-Type` matches the expected media type
@@ -152,8 +169,12 @@ class VersionedAPISession(LoggingSession):
 
         content_type = response.headers.get('Content-Type')
         if not content_type:
-            # TODO: implement strict mode (fail when media type / version unknown)
-            return
+            if self._strict_mode:
+                raise exceptions.ResourceBadResponseError(
+                    f'Media type not present in the response while '
+                    f'expecting {self._media_type!r}')
+            else:
+                return
 
         media_type, params = parse_options_header(content_type)
 
@@ -167,7 +188,10 @@ class VersionedAPISession(LoggingSession):
             ss = SpecifierSet(self._accept_version, prereleases=True)
 
             version = params.pop('version', None)
-            if version is not None:
+            if version is None:
+                raise exceptions.ResourceBadResponseError(
+                    'API response format version undefined in the response.')
+            else:
                 if not ss.contains(version):
                     raise exceptions.ResourceBadResponseError(
                         f'API response format version {version!r} not compliant '
@@ -205,7 +229,7 @@ class DWaveAPIClient:
         context manager form (as show in the example below).
 
     Note:
-        Since `requests.Session` is **not thread-safe**, neither is
+        Since :class:`requests.Session` is **not thread-safe**, neither is
         :class:`DWaveAPIClient`. It's best to create (and dispose) a new client
         on demand, in each thread.
 
@@ -236,6 +260,9 @@ class DWaveAPIClient:
 
         # number of most recent request records to keep in :attr:`.session.history`
         'history_size': 0,
+
+        # response version strict mode validation, see :class:`VersionedAPISession`
+        'version_strict_mode': True
     }
 
     # client instance config, populated on init from kwargs overridding DEFAULTS
@@ -289,8 +316,10 @@ class DWaveAPIClient:
             endpoint += '/'
 
         # configure request timeout and retries
-        history_size = config['history_size']
-        session = VersionedAPISession(base_url=endpoint, history_size=history_size)
+        session = VersionedAPISession(
+            base_url=endpoint,
+            history_size=config['history_size'],
+            strict_mode=config['version_strict_mode'])
         timeout = config['timeout']
         retry = config['retry']
         session.mount('http://',

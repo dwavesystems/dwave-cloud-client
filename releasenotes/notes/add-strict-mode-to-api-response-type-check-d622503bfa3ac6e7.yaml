@@ -1,0 +1,13 @@
+---
+features:
+  - |
+    Add ``strict_mode`` support to ``VersionedAPISession``. Strict mode is now
+    the default, implying API requests will fail if type/version is expected and
+    the response doesn't include it.
+  - |
+    Add ``version_strict_mode`` config option to ``DWaveAPIClient``. It
+    corresponds to underlying session's (``VersionedAPISession``) ``strict_mode``.
+upgrade:
+  - |
+    Response type version is now always required (regardless of ``strict_mode``)
+    if type is expected and received, and version is expected.
