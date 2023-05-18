@@ -86,7 +86,7 @@ class TestMockResource(unittest.TestCase):
     def test_media_type(self, m):
         # note: media_type is matched only if `accept_version` is specified!
         m.get(urljoin(self.base_uri, 'format/ok'), json=dict(works=True),
-              headers={'Content-Type': 'application/vnd.dwave.api.mock+json'})
+              headers={'Content-Type': 'application/vnd.dwave.api.mock+json; version=1'})
         m.get(urljoin(self.base_uri, 'format/wrong'), json={},
               headers={'Content-Type': 'unknown'})
 
@@ -144,7 +144,8 @@ class TestMockResource(unittest.TestCase):
         # return exactly version asked for
         def json_callback(request: requests.Request, context):
             return dict(accept=request.headers['Accept'])
-        m.get(urljoin(self.base_uri, 'params/'), json=json_callback)
+        m.get(urljoin(self.base_uri, 'params/'), json=json_callback,
+              headers={'Content-Type': constants.DEFAULT_API_MEDIA_TYPE})
 
         resource = MathResource(endpoint=self.endpoint)
 
