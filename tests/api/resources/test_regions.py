@@ -53,12 +53,14 @@ class TestMockRegions(unittest.TestCase):
 
         self.mocker.start()
 
+        self.api = Regions(endpoint=self.endpoint, version_strict_mode=False)
+
     def tearDown(self):
+        self.api.close()
         self.mocker.stop()
 
     def test_list_regions(self):
-        resource = Regions(endpoint=self.endpoint)
-        regions = resource.list_regions()
+        regions = self.api.list_regions()
 
         self.assertEqual(len(regions), len(self.region_codes))
         self.assertEqual(regions[0].code, self.region_codes[0])
@@ -67,16 +69,14 @@ class TestMockRegions(unittest.TestCase):
     def test_get_region(self):
         code = self.region_codes[0]
 
-        regions = Regions(endpoint=self.endpoint)
-        region = regions.get_region(code)
+        region = self.api.get_region(code)
 
         self.assertEqual(region.code, code)
         self.assertEqual(region.endpoint, urljoin(self.endpoint, f"regions/{code}"))
 
     def test_nonexisting_region(self):
-        resource = Regions(endpoint=self.endpoint)
         with self.assertRaises(exceptions.ResourceNotFoundError):
-            resource.get_region('non-existing-region')
+            self.api.get_region('non-existing-region')
 
 
 @unittest.skipUnless(config, "API access not configured.")

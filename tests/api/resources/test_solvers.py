@@ -61,14 +61,16 @@ class TestMockSolvers(unittest.TestCase):
 
         self.mocker.start()
 
+        self.api = Solvers(token=self.token, endpoint=self.endpoint, version_strict_mode=False)
+
     def tearDown(self):
+        self.api.close()
         self.mocker.stop()
 
     def test_list_solvers(self):
         """List of solver configurations fetched."""
 
-        resource = Solvers(token=self.token, endpoint=self.endpoint)
-        solvers = resource.list_solvers()
+        solvers = self.api.list_solvers()
 
         self.assertEqual(len(solvers), 2)
         self.assertEqual(solvers[0].properties['num_qubits'], self.solver_sizes[0])
@@ -80,8 +82,7 @@ class TestMockSolvers(unittest.TestCase):
         solver_id = self.solver_ids[0]
         num_qubits = self.solver_sizes[0]
 
-        resource = Solvers(token=self.token, endpoint=self.endpoint)
-        solver = resource.get_solver(solver_id)
+        solver = self.api.get_solver(solver_id)
 
         self.assertEqual(solver.id, solver_id)
         self.assertEqual(solver.properties['num_qubits'], num_qubits)
@@ -89,16 +90,15 @@ class TestMockSolvers(unittest.TestCase):
     def test_nonexisting_solver(self):
         """Not found error is raised when trying to fetch a non-existing solver."""
 
-        resource = Solvers(token=self.token, endpoint=self.endpoint)
         with self.assertRaises(exceptions.ResourceNotFoundError):
-            resource.get_solver('non-existing-solver')
+            self.api.get_solver('non-existing-solver')
 
     def test_invalid_token(self):
         """Auth error is raised when request not authorized with token."""
 
-        resource = Solvers(token='invalid-token', endpoint=self.endpoint)
+        api = Solvers(token='invalid-token', endpoint=self.endpoint, version_strict_mode=False)
         with self.assertRaises(exceptions.ResourceAuthenticationError):
-            resource.list_solvers()
+            api.list_solvers()
 
 
 @unittest.skipUnless(config, "SAPI access not configured.")

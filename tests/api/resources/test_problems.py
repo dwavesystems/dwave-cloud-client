@@ -496,7 +496,7 @@ class ProblemResourcesMockerMixin:
 
         self.mocker.start()
 
-        self.api = Problems(token=self.token, endpoint=self.endpoint)
+        self.api = Problems(token=self.token, endpoint=self.endpoint, version_strict_mode=False)
 
     def tearDown(self):
         self.mocker.stop()

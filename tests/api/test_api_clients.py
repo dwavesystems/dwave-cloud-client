@@ -141,35 +141,72 @@ class TestRequests(unittest.TestCase):
             client.session.get('/path')
             self.assertEqual(client.session.history[-1].request.path_url, '/path')
 
-    @requests_mock.Mocker()
-    def test_api_version_validation(self, m):
-        """API response version validation works."""
 
-        baseurl = 'https://test.com'
-        config = dict(endpoint=baseurl)
-        media_type = 'application/vnd.dwave.api.mock+json'
+class TestVersionValidation(unittest.TestCase):
+
+    version_strict_mode = True
+
+    def setUp(self):
+        self.mocker = requests_mock.Mocker()
+
+        endpoint = 'http://test.com/path'
+        self.media_type = 'application/vnd.dwave.api.mock+json'
+
         version = '1.2.3'
+        self.data = dict(v=version)
 
-        path, data = 'version', dict(v=version)
+        self.mocker.get(requests_mock.ANY, status_code=404)
+        self.mocker.get(f"{endpoint}/no-type", json=self.data)
+        self.mocker.get(f"{endpoint}/no-version", json=self.data,
+                        headers={'Content-Type': f'{self.media_type}'})
+        self.mocker.get(f"{endpoint}/version", json=self.data,
+                        headers={'Content-Type': f'{self.media_type}; version={version}'})
 
-        m.get(requests_mock.ANY, status_code=404)
-        m.get(f"{baseurl}/{path}", json=data,
-              headers={'Content-Type': f'{media_type}; version={version}'})
+        self.mocker.start()
 
-        with DWaveAPIClient(**config) as client:
-            # nominal
-            client.session.set_accept(media_type=media_type, accept_version='~=1.2.0')
-            self.assertEqual(client.session.get(path).json(), data)
+        self.client = DWaveAPIClient(
+            endpoint=endpoint, version_strict_mode=self.version_strict_mode)
 
-            # wrong type
-            client.session.set_accept(media_type='wrong', accept_version='~=1.2.0')
-            with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'^Received media type'):
-                self.assertEqual(client.session.get(path).json(), data)
+    def tearDown(self):
+        self.client.close()
+        self.mocker.stop()
 
-            # wrong version
-            client.session.set_accept(media_type=media_type, accept_version='>2')
-            with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'^API response format version'):
-                self.assertEqual(client.session.get(path).json(), data)
+    def test_nominal(self):
+        self.client.session.set_accept(media_type=self.media_type, accept_version='~=1.2.0')
+        self.assertEqual(self.client.session.get('version').json(), self.data)
+
+    def test_no_type(self):
+        with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'^Media type not present'):
+            self.client.session.set_accept(media_type=self.media_type, accept_version='~=1.2.0')
+            self.assertEqual(self.client.session.get('no-type').json(), self.data)
+
+    def test_no_type_when_not_expected(self):
+        self.client.session.set_accept()
+        self.assertEqual(self.client.session.get('no-type').json(), self.data)
+
+    def test_wrong_type(self):
+        self.client.session.set_accept(media_type='wrong')
+        with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'^Received media type'):
+            self.assertEqual(self.client.session.get('version').json(), self.data)
+
+    def test_no_version(self):
+        self.client.session.set_accept(media_type=self.media_type, accept_version='~=1.2.0')
+        with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'version undefined in the response'):
+            self.assertEqual(self.client.session.get('no-version').json(), self.data)
+
+    def test_wrong_version(self):
+        self.client.session.set_accept(media_type=self.media_type, accept_version='>2')
+        with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'version .* not compliant'):
+            self.assertEqual(self.client.session.get('version').json(), self.data)
+
+
+class TestNonStrictVersionValidation(TestVersionValidation):
+
+    version_strict_mode = False
+
+    def test_no_type(self):
+        self.client.session.set_accept(media_type=self.media_type, accept_version='~=1.2.0')
+        self.assertEqual(self.client.session.get('no-type').json(), self.data)
 
 
 class TestResponseParsing(unittest.TestCase):
