@@ -102,14 +102,14 @@ class Regions(ResourceBase):
     resource_path = 'regions/'
     client_class = MetadataAPIClient
 
-    @accepts(media_type='application/vnd.dwave.metadata.regions+json', accept_version='~=1.0')
+    @accepts(media_type='application/vnd.dwave.metadata.regions+json', version='~=1.0')
     def list_regions(self) -> List[models.Region]:
         path = ''
         response = self.session.get(path)
         regions = response.json()
         return parse_obj_as(List[models.Region], regions)
 
-    @accepts(media_type='application/vnd.dwave.metadata.region+json', accept_version='~=1.0')
+    @accepts(media_type='application/vnd.dwave.metadata.region+json', version='~=1.0')
     def get_region(self, code: str) -> models.Region:
         path = '{}'.format(code)
         response = self.session.get(path)
@@ -122,14 +122,14 @@ class Solvers(ResourceBase):
     resource_path = 'solvers/'
     client_class = SolverAPIClient
 
-    @accepts(media_type='application/vnd.dwave.sapi.solver-definition-list+json', accept_version='~=2.0')
+    @accepts(media_type='application/vnd.dwave.sapi.solver-definition-list+json', version='~=2.0')
     def list_solvers(self) -> List[models.SolverConfiguration]:
         path = 'remote/'
         response = self.session.get(path)
         solvers = response.json()
         return parse_obj_as(List[models.SolverConfiguration], solvers)
 
-    @accepts(media_type='application/vnd.dwave.sapi.solver-definition+json', accept_version='~=2.0')
+    @accepts(media_type='application/vnd.dwave.sapi.solver-definition+json', version='~=2.0')
     def get_solver(self, solver_id: str) -> models.SolverConfiguration:
         path = 'remote/{}'.format(solver_id)
         response = self.session.get(path)
@@ -142,7 +142,7 @@ class Problems(ResourceBase):
     resource_path = 'problems/'
     client_class = SolverAPIClient
 
-    @accepts(media_type='application/vnd.dwave.sapi.problems+json', accept_version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
     def list_problems(self, *,
                       id: str = None,
                       label: str = None,
@@ -171,7 +171,7 @@ class Problems(ResourceBase):
         statuses = response.json()
         return parse_obj_as(List[models.ProblemStatus], statuses)
 
-    @accepts(media_type='application/vnd.dwave.sapi.problem+json', accept_version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problem+json', version='>=2.1,<3')
     def get_problem(self, problem_id: str) -> models.ProblemStatusMaybeWithAnswer:
         """Retrieve problem short status and answer if answer is available."""
         path = '{}'.format(problem_id)
@@ -179,7 +179,7 @@ class Problems(ResourceBase):
         status = response.json()
         return models.ProblemStatusMaybeWithAnswer.parse_obj(status)
 
-    @accepts(media_type='application/vnd.dwave.sapi.problems+json', accept_version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
     def get_problem_status(self, problem_id: str) -> models.ProblemStatus:
         """Retrieve short status of a single problem."""
         path = ''
@@ -189,7 +189,7 @@ class Problems(ResourceBase):
         return models.ProblemStatus.parse_obj(status)
 
     # XXX: @pydantic.validate_arguments
-    @accepts(media_type='application/vnd.dwave.sapi.problems+json', accept_version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
     def get_problem_statuses(self, problem_ids: List[str]) -> List[models.ProblemStatus]:
         """Retrieve short problem statuses for a list of problems."""
         if not isinstance(problem_ids, list):
@@ -203,7 +203,7 @@ class Problems(ResourceBase):
         statuses = response.json()
         return parse_obj_as(List[models.ProblemStatus], statuses)
 
-    @accepts(media_type='application/vnd.dwave.sapi.problem-data+json', accept_version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problem-data+json', version='>=2.1,<3')
     def get_problem_info(self, problem_id: str) -> models.ProblemInfo:
         """Retrieve complete problem info."""
         path = '{}/info'.format(problem_id)
@@ -211,7 +211,7 @@ class Problems(ResourceBase):
         info = response.json()
         return models.ProblemInfo.parse_obj(info)
 
-    @accepts(media_type='application/vnd.dwave.sapi.problem-answer+json', accept_version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problem-answer+json', version='>=2.1,<3')
     def get_problem_answer(self, problem_id: str) -> models.ProblemAnswer:
         """Retrieve problem answer."""
         path = '{}/answer'.format(problem_id)
@@ -219,14 +219,14 @@ class Problems(ResourceBase):
         answer = response.json()['answer']
         return models.ProblemAnswer.parse_obj(answer)
 
-    @accepts(media_type='application/vnd.dwave.sapi.problem-message+json', accept_version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problem-message+json', version='>=2.1,<3')
     def get_problem_messages(self, problem_id: str) -> List[dict]:
         """Retrieve list of problem messages."""
         path = '{}/messages'.format(problem_id)
         response = self.session.get(path)
         return response.json()
 
-    @accepts(media_type='application/vnd.dwave.sapi.problems+json', accept_version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
     def submit_problem(self, *,
                        data: models.ProblemData,
                        params: dict,
@@ -246,7 +246,7 @@ class Problems(ResourceBase):
         rtype = get_type_hints(self.submit_problem)['return']
         return parse_obj_as(rtype, response.json())
 
-    @accepts(media_type='application/vnd.dwave.sapi.problems+json', accept_version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
     def submit_problems(self, problems: List[models.ProblemJob]) -> \
             List[Union[models.ProblemInitialStatus, models.ProblemSubmitError]]:
         """Asynchronous multi-problem submit, returning initial statuses."""
@@ -258,7 +258,7 @@ class Problems(ResourceBase):
         rtype = get_type_hints(self.submit_problems)['return']
         return parse_obj_as(rtype, response.json())
 
-    @accepts(media_type='application/vnd.dwave.sapi.problem+json', accept_version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problem+json', version='>=2.1,<3')
     def cancel_problem(self, problem_id: str) -> \
             Union[models.ProblemStatus, models.ProblemCancelError]:
         """Initiate problem cancel by problem id."""
@@ -267,7 +267,7 @@ class Problems(ResourceBase):
         rtype = get_type_hints(self.cancel_problem)['return']
         return parse_obj_as(rtype, response.json())
 
-    @accepts(media_type='application/vnd.dwave.sapi.problems+json', accept_version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
     def cancel_problems(self, problem_ids: List[str]) -> \
             List[Union[models.ProblemStatus, models.ProblemCancelError]]:
         """Initiate problem cancel for a list of problems."""
