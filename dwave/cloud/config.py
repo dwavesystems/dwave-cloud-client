@@ -77,8 +77,13 @@ Examples:
         [default-solver]
         solver = {"qpu": true, "num_qubits__gt": 5000}
 
-        [hybrid]
+        [bqm]
         client = hybrid
+        solver = {"supported_problem_types__contains": "bqm"}
+
+        [cqm]
+        client = hybrid
+        solver = {"supported_problem_types__contains": "cqm"}
 
         [europe]
         region = eu-central-1
