@@ -26,21 +26,21 @@ __all__ = ['Solvers', 'Problems', 'Regions']
 
 
 class accepts:
+    """Decorate :class:`ResourceBase` methods to enforce API response type
+    validation.
+    """
+
     def __init__(self,
                  media_type: Optional[str] = constants.DEFAULT_API_MEDIA_TYPE,
-                 ask_version: Optional[str] = None,
-                 accept_version: Optional[str] = None,
-                 media_type_params: Optional[dict] = None):
+                 version: Optional[str] = None,
+                 **kwargs):
 
-        self.ctx = dict(
-            media_type=media_type,
-            ask_version=ask_version,
-            accept_version=accept_version,
-            media_type_params=media_type_params)
+        self.ctx = dict(media_type=media_type, accept_version=version)
+        self.ctx.update(kwargs)
 
     def __call__(self, fn: Callable):
         @wraps(fn)
-        def wrapper(obj, *args, **kwargs):
+        def wrapper(obj: 'ResourceBase', *args, **kwargs):
             try:
                 obj.session.set_accept(**self.ctx)
                 return fn(obj, *args, **kwargs)
