@@ -84,7 +84,6 @@ class TestMockResource(unittest.TestCase):
 
     @requests_mock.Mocker()
     def test_media_type(self, m):
-        # note: media_type is matched only if `accept_version` is specified!
         m.get(urljoin(self.base_uri, 'format/ok'), json=dict(works=True),
               headers={'Content-Type': 'application/vnd.dwave.api.mock+json; version=1'})
         m.get(urljoin(self.base_uri, 'format/wrong'), json={},
@@ -152,3 +151,19 @@ class TestMockResource(unittest.TestCase):
         # ask_version is set to 1.1; ensure that's actually sent
         expected_accept = f"{constants.DEFAULT_API_MEDIA_TYPE}; a=1; b=2"
         self.assertEqual(resource.params()['accept'], expected_accept)
+
+    @requests_mock.Mocker()
+    def test_resource_partial_decoration_with_accepts(self, m):
+        m.get(urljoin(self.base_uri, 'add/?in1=1&in2=2'), json=dict(out=3))
+        m.get(urljoin(self.base_uri, 'format/ok'), json=dict(works=True),
+              headers={'Content-Type': 'application/vnd.dwave.api.mock+json; version=1'})
+
+        resource = MathResource(endpoint=self.endpoint)
+
+        # test validation works on the decorated endpoint (`format/ok`)
+        res = resource.format(subpath='ok')
+        self.assertEqual(res['works'], True)
+
+        # test undecorated endpoint is not validated
+        res = resource.add(1, 2)
+        self.assertEqual(res, 3)
