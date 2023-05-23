@@ -41,7 +41,7 @@ class Client(BaseClient):
             from dwave.cloud.hybrid import Client
 
             with Client(token='...') as client:
-                solver = client.get_solver()
+                solver = client.get_solver(supported_problem_types__issubset={"bqm"})
                 response = solver.sample_bqm(...)
 
         The following example instantiates a hybrid client indirectly. Again,
@@ -54,8 +54,8 @@ class Client(BaseClient):
             from dwave.cloud import Client
 
             with Client.from_config(client='hybrid') as client:
-                solver = client.get_solver()
-                response = solver.sample_bqm(...)
+                solver = client.get_solver(supported_problem_types__issubset={"cqm"})
+                response = solver.sample_cqm(...)
 
     """
 

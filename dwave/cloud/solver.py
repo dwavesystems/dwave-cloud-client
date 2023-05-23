@@ -17,10 +17,10 @@ A :term:`solver` is a resource for solving problems.
 
 Solvers are responsible for:
 
-    - Encoding submitted problems
-    - Checking submitted parameters
-    - Decoding answers
-    - Adding problems to a client's submission queue
+- Encoding submitted problems
+- Checking submitted parameters
+- Decoding answers
+- Adding problems to a client's submission queue
 
 You can list all solvers available to a :class:`~dwave.cloud.client.Client` with its
 :func:`~dwave.cloud.client.Client.get_solvers` method and select and return one with its
@@ -101,7 +101,7 @@ class BaseSolver(object):
         >>> with Client.from_config() as client:
         ...     solver = client.get_solver()
         ...     solver.id       # doctest: +SKIP
-        'EXAMPLE_2000Q_SYSTEM'
+        'Advantage_system4.1'
     """
 
     # Classes of problems the remote solver has to support (at least one of these)
@@ -882,10 +882,10 @@ class StructuredSolver(BaseSolver):
             :class:`~dwave.cloud.computation.Future`
 
         Examples:
-            This example creates a client using the local system's default D-Wave Cloud Client
-            configuration file, which is configured to access a D-Wave 2000Q QPU, submits a
-            simple :term:`Ising` problem (opposite linear biases on two coupled qubits), and samples
-            5 times.
+            This example creates a client using the local system's default D-Wave
+            Cloud Client configuration file, which is configured to access an 
+            Advantage QPU, submits a simple :term:`Ising` problem (opposite 
+            linear biases on two coupled qubits), and samples 5 times.
 
             >>> from dwave.cloud import Client
             >>> with Client.from_config() as client:
@@ -931,10 +931,10 @@ class StructuredSolver(BaseSolver):
             :class:`~dwave.cloud.computation.Future`
 
         Examples:
-            This example creates a client using the local system's default D-Wave Cloud Client
-            configuration file, which is configured to access a D-Wave 2000Q QPU, submits
-            a :term:`QUBO` problem (a Boolean NOT gate represented by a penalty model), and
-            samples 5 times.
+            This example creates a client using the local system's default D-Wave 
+            Cloud Client configuration file, which is configured to access an 
+            Advantage QPU, submits a :term:`QUBO` problem (a Boolean NOT gate 
+            represented by a penalty model), and samples 5 times.
 
             >>> from dwave.cloud import Client
             >>> with Client.from_config() as client:  # doctest: +SKIP
@@ -1149,21 +1149,18 @@ class StructuredSolver(BaseSolver):
             bool
 
         Examples:
-            This example creates a client using the local system's default D-Wave Cloud Client
-            configuration file, which is configured to access a D-Wave 2000Q QPU, and
-            tests a simple :term:`Ising` model for two target embeddings (that is, representations
-            of the model's graph by coupled qubits on the QPU's sparsely connected graph),
-            where only the second is valid.
+            This example creates a client using the local system's default D-Wave 
+            Cloud Client configuration file, which is configured to access an 
+            Advantage QPU, and tests a simple :term:`Ising` model for two target 
+            minor embeddings (that is, representations of the model's graph by 
+            coupled qubits on the QPU's sparsely connected graph), where only 
+            the second is valid.
 
             >>> from dwave.cloud import Client
-            >>> print((0, 1) in solver.edges)   # doctest: +SKIP
-            False
-            >>> print((0, 4) in solver.edges)   # doctest: +SKIP
-            True
             >>> with Client.from_config() as client:  # doctest: +SKIP
             ...     solver = client.get_solver()
             ...     print(solver.check_problem({0: -1, 1: 1},{(0, 1):0.5}))
-            ...     print(solver.check_problem({0: -1, 4: 1},{(0, 4):0.5}))
+            ...     print(solver.check_problem({30: -1, 31: 1},{(30, 31):0.5}))
             ...
             False
             True
@@ -1204,7 +1201,7 @@ class StructuredSolver(BaseSolver):
                 Number of qubits required to represent your binary quadratic model
                 on the selected solver.
             num_reads:
-                Number of reads. Provide this value if you explictly set ``num_reads``
+                Number of reads. Provide this value if you explicitly set ``num_reads``
                 in your submission.
             annealing_time:
                 Annealing duration. Provide this value of if you set
@@ -1218,7 +1215,7 @@ class StructuredSolver(BaseSolver):
             reinitialize_state:
                 Set to ``True`` if your submission sets ``reinitialize_state``.
             programming_thermalization:
-                programming thermalization time. Provide this value if you explictly
+                programming thermalization time. Provide this value if you explicitly
                 set a value for ``programming_thermalization`` in your submission.
             readout_thermalization:
                 Set to ``True`` if your submission sets ``readout_thermalization``.

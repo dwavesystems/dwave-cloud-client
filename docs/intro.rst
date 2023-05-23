@@ -4,19 +4,19 @@
 Introduction
 ============
 
-D-Wave Cloud Client is a minimal implementation of the REST interface used to communicate
-with D-Wave Sampler API (SAPI) servers.
+D-Wave Cloud Client is a minimal implementation of the REST interface used to
+communicate with D-Wave's Solver API (SAPI) servers.
 
 SAPI is an application layer built to provide resource discovery, permissions,
-and scheduling for quantum annealing resources at D-Wave Systems.
-This package provides a minimal Python interface to that layer without
+and scheduling for quantum computers and quantum-classical hybrid solvers at 
+D-Wave. This package provides a minimal Python interface to that layer without
 compromising the quality of interactions and workflow.
 
-The D-Wave Cloud Client :class:`~dwave.cloud.solver.Solver` class enables low-level control of problem
-submission. It is used, for example, by the :std:doc:`dwave-system <oceandocs:docs_system/sdk_index>`
+The D-Wave Cloud Client :class:`~dwave.cloud.solver.Solver` class enables low-level 
+control of problem submission. It is used, for example, by the 
+:std:doc:`dwave-system <oceandocs:docs_system/sdk_index>`
 :class:`~dwave.system.samplers.DWaveSampler`, which enables quick incorporation
-of the D-Wave system as a sampler in your code.
-
+of a D-Wave quantum computer as a sampler in your code.
 
 Configuration
 =============
@@ -48,18 +48,18 @@ locations with the :func:`~dwave.cloud.config.get_configfile_paths` method.
 
 For example, on a Unix system, depending on its flavor, these might include (in order)::
 
-          /usr/share/dwave/dwave.conf
-          /usr/local/share/dwave/dwave.conf
-          ~/.config/dwave/dwave.conf
-          ./dwave.conf
+    /usr/share/dwave/dwave.conf
+    /usr/local/share/dwave/dwave.conf
+    ~/.config/dwave/dwave.conf
+    ./dwave.conf
 
 On Windows 7+, configuration files are expected to be located under::
 
-      C:\\Users\\<username>\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf
+    C:\\Users\\<username>\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf
 
 On Mac OS X, configuration files are expected to be located under::
 
-     ~/Library/Application Support/dwave/dwave.conf
+    ~/Library/Application Support/dwave/dwave.conf
 
 (For details on the D-Wave API for determining platform-independent paths to user
 data and configuration folders see the homebase_ tool.)
@@ -70,12 +70,12 @@ You can check the directories searched by :func:`~dwave.cloud.config.get_configf
 from a console using the :std:doc:`interactive CLI utility <oceandocs:docs_cli>`;
 for example::
 
-  $ dwave config ls -m
-  /etc/xdg/xdg-ubuntu/dwave/dwave.conf
-  /usr/share/upstart/xdg/dwave/dwave.conf
-  /etc/xdg/dwave/dwave.conf
-  /home/jane/.config/dwave/dwave.conf
-  ./dwave.conf
+    $ dwave config ls -m
+    /etc/xdg/xdg-ubuntu/dwave/dwave.conf
+    /usr/share/upstart/xdg/dwave/dwave.conf
+    /etc/xdg/dwave/dwave.conf
+    /home/jane/.config/dwave/dwave.conf
+    ./dwave.conf
 
 A single D-Wave Cloud Client configuration file can contain multiple profiles, each
 defining a separate combination of communication parameters such as the URL to the
@@ -86,29 +86,33 @@ Default values for undefined profile keys are taken from the `[defaults]` sectio
 
 For example, if the configuration file, `~/.config/dwave/dwave.conf`, selected
 through auto-detection as the default configuration, contains the following
-profiles::
+profiles,\ ::
 
-          [defaults]
-          token = ABC-123456789123456789123456789
+    [defaults]
+    token = ABC-123456789123456789123456789
 
-          [first-available-qpu]
-          solver = {"qpu": true}
+    [default-solver]
+    client = qpu
+    solver = {"num_qubits__gt": 5000}
 
-          [software]
-          client = sw
-          solver = c4-sw_sample
-          token = DEF-987654321987654321987654321
-          proxy = http://user:pass@myproxy.com:8080/
+    [hybrid]
+    client = hybrid
 
-          [backup-dwave2000q]
-          endpoint = https://url.of.my.backup.dwavesystem.com/sapi
-          solver = {"num_qubits__gt": 2000}
+    [europe]
+    region = eu-central-1
+    
+    [secondary-project]
+    token = DEF-987654321987654321987654321
 
-You can instantiate clients for a D-Wave system and a CPU with::
+    [test-advantage2]
+    solver = {"topology__type": "zephyr"}
 
-      >>> from dwave.cloud import Client
-      >>> client_qpu = Client.from_config()   # doctest: +SKIP
-      >>> client_cpu = Client.from_config(profile='software')   # doctest: +SKIP
+you can instantiate clients for a D-Wave quantum computer and a quantum-classical
+hybrid solver with::
+
+    >>> from dwave.cloud import Client
+    >>> client_qpu = Client.from_config()   # doctest: +SKIP
+    >>> client_hybrid = Client.from_config(profile='hybrid')   # doctest: +SKIP
 
 .. _environmentVariables:
 
@@ -147,20 +151,22 @@ A typical workflow may include the following steps:
    Alternatively, the following example snippet creates a client for software resources
    that it later explicitly closes.
 
-   >>> client = Client.from_config(client='sw')   # doctest: +SKIP
+   >>> client = Client.from_config(client='hybrid')   # doctest: +SKIP
    >>> # code that uses client
    >>> client.close()    # doctest: +SKIP
 
 2. Instantiate a selected :class:`~dwave.cloud.solver.Solver`, a resource for solving problems.
    Solvers are responsible for:
 
-      - Encoding submitted problems
-      - Checking submitted parameters
-      - Adding problems to a client's submission queue
+    - Encoding submitted problems
+    - Checking submitted parameters
+    - Adding problems to a client's submission queue
 
-   Solvers that provide sampling for solving :term:`Ising` and :term:`QUBO` problems,
-   such as a D-Wave 2000Q :term:`sampler` :class:`~dwave.system.samplers.DWaveSampler`
-   or software sampler :class:`~neal.sampler.SimulatedAnnealingSampler`, might be remote
+   Solvers that provide sampling for solving :term:`Ising` and :term:`QUBO` 
+   problems, such as an Advantage :term:`sampler` 
+   :class:`~dwave.system.samplers.DWaveSampler`, or constrained quadratic models, 
+   such as a quantum-classical hybrid 
+   solver :class:`~dwave.system.samplers.LeapHybridCQMSampler`, might be remote
    resources.
 
 3. Submit your problem, using your solver, and then process the returned

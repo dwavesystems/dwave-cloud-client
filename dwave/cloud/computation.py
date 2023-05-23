@@ -248,7 +248,7 @@ class Future(object):
         Examples:
             This example creates a solver using the local system's default
             D-Wave Cloud Client configuration file, submits a simple QUBO
-            problem to a remote D-Wave resource 3 times for differing numers of
+            problem to a remote D-Wave resource 3 times for differing numbers of
             samples, and waits for sampling to complete on any two of the
             submissions. The wait ends with the completion of two submissions
             while the third is still in progress. (A more typical approach would
@@ -349,7 +349,7 @@ class Future(object):
         Examples:
             This example creates a solver using the local system's default D-Wave
             Cloud Client configuration file, submits a simple QUBO problem to a
-            remote D-Wave resource 3 times for differing numers of samples, and
+            remote D-Wave resource 3 times for differing numbers of samples, and
             yields timing information for each job as it completes.
 
             >>> import dwave.cloud as dc
@@ -848,7 +848,7 @@ class Future(object):
         Examples:
             This example creates a client using the local system's default
             D-Wave Cloud Client configuration file, which is configured to
-            access a D-Wave 2000Q QPU, submits a simple :term:`Ising` problem
+            access an Advantage QPU, submits a simple :term:`Ising` problem
             (opposite linear biases on two coupled qubits) for 5 samples, and
             prints timing information for the job.
 
@@ -859,7 +859,7 @@ class Future(object):
             ...     computation = solver.sample_ising({u: -1, v: 1},{}, num_reads=5)
             ...     print(computation.timing)
             ...
-            {'total_real_time': 10961, 'anneal_time_per_run': 20, ...}
+            {'qpu_sampling_time': 378.2, 'qpu_anneal_time_per_sample': 20.0, ...}
 
         """
         return self.result().get('timing', {})
