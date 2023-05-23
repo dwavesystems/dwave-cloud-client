@@ -40,17 +40,17 @@ class accepts:
     def __call__(self, fn: Callable):
         @wraps(fn)
         def wrapper(obj, *args, **kwargs):
-            # set media_type and params on Resource object's session context
             key = '_session_context'
-            ctx = obj.__dict__.get(key, {})
-            ctx.update(
-                media_type=self.media_type,
-                ask_version=self.ask_version,
-                accept_version=self.accept_version,
-                media_type_params=self.media_type_params)
-            obj.__dict__[key] = ctx
+            try:
+                setattr(obj, key, dict(
+                    media_type=self.media_type,
+                    ask_version=self.ask_version,
+                    accept_version=self.accept_version,
+                    media_type_params=self.media_type_params))
+                return fn(obj, *args, **kwargs)
 
-            return fn(obj, *args, **kwargs)
+            finally:
+                delattr(obj, key)
 
         return wrapper
 
@@ -79,7 +79,9 @@ class ResourceBase:
 
         # set accepted media range on every access
         ctx = getattr(self, '_session_context', None)
-        if ctx is not None:
+        if ctx is None:
+            session.unset_accept()
+        else:
             session.set_accept(
                 media_type=ctx.get('media_type'),
                 ask_version=ctx.get('ask_version'),
