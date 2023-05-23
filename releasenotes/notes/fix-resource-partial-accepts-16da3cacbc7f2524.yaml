@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Fix ``dwave.cloud.api.resources.accepts`` to allow for partial decoration of
+    ``Resource`` methods.
+    See `#544 <https://github.com/dwavesystems/dwave-cloud-client/issues/544>`_.

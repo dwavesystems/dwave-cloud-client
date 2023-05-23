@@ -160,6 +160,10 @@ class VersionedAPISession(LoggingSession):
         if strict_mode is not None:
             self._strict_mode = strict_mode
 
+    def unset_accept(self) -> None:
+        """Stop response validation by removing expectations of media type."""
+        self._media_type = None
+
     def _validate_response_content_type(self, response: requests.Response) -> None:
         """Validate response's `Content-Type` matches the expected media type
         and version range.
