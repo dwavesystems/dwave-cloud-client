@@ -54,6 +54,10 @@ class MathResource(ResourceBase):
     def params(self) -> dict:
         return self.session.get(f'params/').json()
 
+    @accepts(media_type='application/vnd.dwave.api.mock+json', version='>0', strict_mode=False)
+    def nonstrict(self) -> dict:
+        return self.session.get(f'nonstrict/').json()
+
 
 class TestMockResource(unittest.TestCase):
     """Test request formation and response parsing (including error
@@ -167,3 +171,13 @@ class TestMockResource(unittest.TestCase):
         # test undecorated endpoint is not validated
         res = resource.add(1, 2)
         self.assertEqual(res, 3)
+
+    @requests_mock.Mocker()
+    def test_nonstrict_mode(self, m):
+        m.get(urljoin(self.base_uri, 'nonstrict/'), json=dict(works=True))
+
+        resource = MathResource(endpoint=self.endpoint)
+
+        # media_type is not enforced (because response lacks Content-Type)
+        res = resource.nonstrict()
+        self.assertEqual(res['works'], True)
