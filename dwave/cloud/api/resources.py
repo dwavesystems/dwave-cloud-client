@@ -16,7 +16,6 @@ import json
 from typing import List, Union, Optional, Callable, get_type_hints
 from functools import wraps
 
-import requests
 from pydantic import parse_obj_as
 
 from dwave.cloud.api.client import DWaveAPIClient, SolverAPIClient, MetadataAPIClient
@@ -31,26 +30,23 @@ class accepts:
                  media_type: Optional[str] = constants.DEFAULT_API_MEDIA_TYPE,
                  ask_version: Optional[str] = None,
                  accept_version: Optional[str] = None,
-                 **media_type_params):
-        self.media_type = media_type
-        self.ask_version = ask_version
-        self.accept_version = accept_version
-        self.media_type_params = media_type_params
+                 media_type_params: Optional[dict] = None):
+
+        self.ctx = dict(
+            media_type=media_type,
+            ask_version=ask_version,
+            accept_version=accept_version,
+            media_type_params=media_type_params)
 
     def __call__(self, fn: Callable):
         @wraps(fn)
         def wrapper(obj, *args, **kwargs):
-            key = '_session_context'
             try:
-                setattr(obj, key, dict(
-                    media_type=self.media_type,
-                    ask_version=self.ask_version,
-                    accept_version=self.accept_version,
-                    media_type_params=self.media_type_params))
+                obj.session.set_accept(**self.ctx)
                 return fn(obj, *args, **kwargs)
 
             finally:
-                delattr(obj, key)
+                obj.session.unset_accept()
 
         return wrapper
 
@@ -76,17 +72,6 @@ class ResourceBase:
             session = self._session = self.client.session
             if self.resource_path:
                 session.base_url = session.create_url(self.resource_path)
-
-        # set accepted media range on every access
-        ctx = getattr(self, '_session_context', None)
-        if ctx is None:
-            session.unset_accept()
-        else:
-            session.set_accept(
-                media_type=ctx.get('media_type'),
-                ask_version=ctx.get('ask_version'),
-                accept_version=ctx.get('accept_version'),
-                media_type_params=ctx.get('media_type_params'))
 
         return session
 

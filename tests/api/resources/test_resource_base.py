@@ -50,7 +50,7 @@ class MathResource(ResourceBase):
     def version(self, v: str = '') -> dict:
         return self.session.get(f'version/{v}').json()
 
-    @accepts(a='1', b='2')
+    @accepts(media_type_params=dict(a='1', b='2'))
     def params(self) -> dict:
         return self.session.get(f'params/').json()
 
