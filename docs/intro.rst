@@ -86,13 +86,14 @@ Default values for undefined profile keys are taken from the `[defaults]` sectio
 
 For example, if the configuration file, `~/.config/dwave/dwave.conf`, selected
 through auto-detection as the default configuration, contains the following
-profiles,::
+profiles,\ ::
 
     [defaults]
     token = ABC-123456789123456789123456789
 
     [default-solver]
-    solver = {"qpu": true, "num_qubits__gt": 5000}
+    client = qpu
+    solver = {"num_qubits__gt": 5000}
 
     [hybrid]
     client = hybrid

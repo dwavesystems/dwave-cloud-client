@@ -93,8 +93,8 @@ Examples:
 
     >>> with Client.from_config() as client:   # doctest: +SKIP
     ...     solver_qpu = client.get_solver()
-    >>> with Client.from_config(profile='hybrid') as client:   # doctest: +SKIP
-    ...     solver_cqm = client.get_solver(supported_problem_types__issubset={"cqm"})
+    >>> with Client.from_config(profile="cqm") as client:   # doctest: +SKIP
+    ...     solver_cqm = client.get_solver()
 
     *   **Example:** Explicitly specified configuration file, unrecognized parameter
     
@@ -149,41 +149,6 @@ Examples:
     DEF-987654321987654321987654321
     >>> # code that uses client
     >>> client.close() # doctest: +SKIP
-
-    *   **Advanced Example:** Loading profile values
-       
-    This example uses :func:`~dwave.cloud.config.load_config` to load profile 
-    values. **Most users do not need to use this method.** It loads from the 
-    following configuration file, ``dwave_c.conf``, located in the current 
-    working directory, and which contains two profiles in addition to the 
-    defaults section::
-
-        [defaults]
-        token = ABC-123456789123456789123456789
-        solver = {"qpu": true}
-
-        [advantage-a]
-        solver = {"software": true, "name": "Fake_Advantage"}
-
-        [advantage-b]
-        solver = {"qpu": true}
-        token = DEF-987654321987654321987654321
-   
-    The following example code first loads, by default, the first profile 
-    (``[advantage-a]``) after the ``[defaults]`` section with its solver 
-    preference overridden by the environment variable. Next, the second profile
-    (``[advantage-b]``) is explicitly selected with the explicitly named solver
-    overriding the environment variable setting.
-
-    >>> import dwave.cloud
-    >>> import os
-    >>> os.environ["DWAVE_API_SOLVER"] = "Advantage_Emulator"   # doctest: +SKIP
-    >>> dwave.cloud.config.load_config("./dwave_c.conf")   # doctest: +SKIP
-    {'solver': '{"software": true, "name": "Advantage_Emulator"}',
-     'token': 'ABC-123456789123456789123456789'}
-    >>> dwave.cloud.config.load_config("./dwave_c.conf", profile="advantage-b", solver="Advantage_system4.1")   # doctest: +SKIP
-    {'solver': '{"software": true, "name": "Advantage_system4.1"}',
-     'token': 'DEF-987654321987654321987654321'}
 
 """
 
@@ -456,52 +421,6 @@ def load_config_from_files(filenames=None):
 
         :exc:`~dwave.cloud.exceptions.ConfigFileParseError`:
             Config file parse failed.
-
-    Examples:
-        This example loads configurations from two files. One contains a default
-        section with key/values that are overwritten by any profile section that
-        contains that key/value; for example, profile advantage_b in file dwave_b.conf
-        overwrites the default URL and client type, which profile advantage_a inherits
-        from the defaults section, while profile advantage_a overwrites the API token that
-        profile advantage_b inherits.
-
-        The files, which are located in the current working directory, are
-        (1) dwave_a.conf::
-
-            [defaults]
-            client = qpu
-            token = ABC-123456789123456789123456789
-
-            [advantage_a]
-            solver = Advantage_system4.1
-            token = DEF-987654321987654321987654321
-
-        and (2) dwave_b.conf::
-
-            [advantage_b]
-            client = sw
-            solver = Emulator
-
-        The following example code loads configuration from both these files, with
-        the defined overrides and inheritance.
-
-        .. code:: python
-
-            >>> import dwave.cloud as dc
-            >>> import sys
-            >>> configuration = dc.config.load_config_from_files(["./dwave_a.conf", "./dwave_b.conf"])   # doctest: +SKIP
-            >>> configuration.write(sys.stdout)    # doctest: +SKIP
-            [defaults]
-            client = qpu
-            token = ABC-123456789123456789123456789
-
-            [advantage_a]
-            solver = Advantage_system4.1
-            token = DEF-987654321987654321987654321
-
-            [advantage_b]
-            client = sw
-            solver = Emulator
 
     """
     if filenames is None:

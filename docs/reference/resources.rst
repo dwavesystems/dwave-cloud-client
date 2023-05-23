@@ -26,9 +26,8 @@ that it later explicitly closes.
 >>> # code that uses client
 >>> client.close()    # doctest: +SKIP
 
-Typically you use the :class:`~dwave.cloud.client.Client` class. By default, it instantiates
-a QPU client. You can also use the specialized QPU, hybrid, and CPU/GPU clients directly.
-
+Typically you use the :class:`~dwave.cloud.client.Client` class. You can also 
+instantiate specialized QPU, hybrid, and CPU clients directly.
 
 Client (Base Client)
 ====================
@@ -68,8 +67,8 @@ Methods
 Specialized Clients
 ===================
 
-Typically you use the :class:`~dwave.cloud.client.Client` class. By default, it instantiates
-a QPU client. You can also instantiate a QPU, hybrid, or CPU/GPU client directly.
+Typically you use the :class:`~dwave.cloud.client.Client` class. You can also 
+instantiate a QPU, hybrid, or CPU client directly.
 
 QPU Client
 ----------
