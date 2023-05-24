@@ -1,0 +1,9 @@
+---
+features:
+  - |
+    Simplify ``dwave.cloud.api.resource.accepts`` interface (require only
+    ``media_type`` and ``version``), but retain flexibility (pass all keyword
+    arguments to ``VersionedAPISession.set_accept``).
+  - |
+    Support ``strict_mode`` control of API response type validation via
+    ``@accepts`` interface.
