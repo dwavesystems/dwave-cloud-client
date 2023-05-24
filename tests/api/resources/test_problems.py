@@ -280,6 +280,14 @@ class ProblemResourcesBaseTests(abc.ABC):
             self.assertEqual(status.error_code, 400)
 
     def test_problem_cancel(self):
+        """Cancel problem."""
+
+        status = self.api.cancel_problem(problem_id=self.p2.problem_id)
+
+        self.assertIsInstance(status, models.ProblemStatus)
+        self.assertIs(status.status, constants.ProblemStatus.CANCELLED)
+
+    def test_finished_problem_cancel(self):
         """(Finished) problem cancel attempted."""
 
         with self.assertRaises(exceptions.ResourceConflictError):
@@ -369,6 +377,16 @@ class ProblemResourcesMockerMixin:
             json=[p1_status],
             request_headers=headers)
         self.mocker.get(
+            url(f'problems/?id={p2_id}'),
+            complete_qs=True,
+            json=[p2_status],
+            request_headers=headers)
+        self.mocker.get(
+            url(f'problems/?id={p3_id}'),
+            complete_qs=True,
+            json=[p3_status],
+            request_headers=headers)
+        self.mocker.get(
             url(f'problems/{p1_id}/info'),
             json=p1_info,
             request_headers=headers)
@@ -391,11 +409,6 @@ class ProblemResourcesMockerMixin:
             url('problems/'),
             complete_qs=True,
             json=[p1_status, p2_status, p3_status],
-            request_headers=headers)
-        self.mocker.get(
-            url(f'problems/?id={p1_id}'),
-            complete_qs=True,
-            json=[p1_status],
             request_headers=headers)
         self.mocker.get(
             url(f'problems/?id={p1_id},{p2_id}'),
@@ -487,11 +500,17 @@ class ProblemResourcesMockerMixin:
             json=[self.p1.immediate_error_reply(code=400, msg='Unknown parameter')],
             request_headers=headers)
 
-        # problem cancel
+        # problem cancel (finished problem)
         self.mocker.delete(url(f'problems/{p1_id}'), status_code=409, request_headers=headers)
         self.mocker.delete(
             url('problems/'),
             json=[self.p1.immediate_error_reply(code=409, msg='Problem has been finished.')] * 2,
+            request_headers=headers)
+
+        # problem cancel (pending problem)
+        self.mocker.delete(
+            url(f'problems/{p2_id}'),
+            json=self.p2.cancel_reply(),
             request_headers=headers)
 
         self.mocker.start()
