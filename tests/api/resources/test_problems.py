@@ -282,10 +282,28 @@ class ProblemResourcesBaseTests(abc.ABC):
     def test_problem_cancel(self):
         """Cancel problem."""
 
-        status = self.api.cancel_problem(problem_id=self.p2.problem_id)
+        # first, submit a problem we can immediately cancel
+        job = models.ProblemJob(
+            data=self.problem_data,
+            params=self.params,
+            solver=self.solver_id,
+            type=self.problem_type,
+        )
+        submitted = self.api.submit_problems(problems=[job]*2)
+        problem_id = submitted[0].id
 
-        self.assertIsInstance(status, models.ProblemStatus)
-        self.assertIs(status.status, constants.ProblemStatus.CANCELLED)
+        # now cancel the submitted problem (hopefully hasn't finished already;
+        # but catch `ResourceConflictError` in case it has, and `ProblemCancelError`
+        # in case problem is in progress already)
+        try:
+            status = self.api.cancel_problem(problem_id=problem_id)
+        except exceptions.ResourceConflictError:
+            pass
+        else:
+            if isinstance(status, models.ProblemStatus):
+                self.assertIs(status.status, constants.ProblemStatus.CANCELLED)
+            elif isinstance(status, models.ProblemCancelError):
+                self.assertIn('cancel problem in progress', status.error_msg)
 
     def test_finished_problem_cancel(self):
         """(Finished) problem cancel attempted."""
@@ -488,6 +506,17 @@ class ProblemResourcesMockerMixin:
             url('problems/'),
             additional_matcher=match_batch_submit,
             json=[p2_status] * 3,
+            request_headers=headers)
+
+        # problem submitted just to be cancelled (list of len 2)
+        def match_batch_submit(request):
+            data = request.json()
+            return isinstance(data, list) and len(data) == 2
+
+        self.mocker.post(
+            url('problems/'),
+            additional_matcher=match_batch_submit,
+            json=[p2_status] * 2,
             request_headers=headers)
 
         def match_invalid_batch_submit(request):
