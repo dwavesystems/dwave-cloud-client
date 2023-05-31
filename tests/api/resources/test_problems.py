@@ -16,6 +16,7 @@ import abc
 import json
 import uuid
 import unittest
+import datetime
 from urllib.parse import urljoin, urlparse, parse_qs
 from itertools import chain
 
@@ -120,7 +121,20 @@ class ProblemResourcesBaseTests(abc.ABC):
 
         # verify all fields of the returned problem are identical to the original
         p = ps.pop()
-        self.assertEqual(p, problem)
+
+        # dev note: due to a SAPI bug/regression (SSW-11390), we can't simply
+        # assert equality with: `self.assertEqual(p, problem)`; instead we have
+        # to round all datetimes to a full second.
+        def round_to_second(val):
+            if isinstance(val, datetime.datetime):
+                val = round(val.timestamp())
+            return val
+        def with_second_resolution_values(obj: dict):
+            return {k: round_to_second(v) for k, v in obj.copy().items()}
+
+        self.assertEqual(
+            with_second_resolution_values(p.dict()),
+            with_second_resolution_values(problem.dict()))
 
     def test_get_problem(self):
         """Problem status with answer retrieved by problem id."""
