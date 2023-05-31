@@ -80,10 +80,23 @@ class LoggingSession(BaseUrlSession):
     RequestRecord = namedtuple('RequestRecord',
                                ('request', 'response', 'exception'))
 
+    def send(self, request: requests.PreparedRequest, **kwargs):
+        callee = type(self).__name__
+        if logger.getEffectiveLevel() >= logging.DEBUG:
+            logger.debug(f"[{callee!s}] send(method={request.method!r}, url={request.url!r}, ...)")
+        else:   # pragma: no cover
+            logger.trace(f"[{callee!s}] send(method={request.method!r}, url={request.url!r},"
+                         f" headers={request.headers!r}, body={request.body!r})")
+        return super().send(request, **kwargs)
+
     def request(self, method: str, *args, **kwargs):
         callee = type(self).__name__
-        logger.trace("[%s] request(%r, *%r, **%r)",
-                     callee, method, args, kwargs)
+        if logger.getEffectiveLevel() >= logging.DEBUG:
+            logger.debug("[%s] request(%r, %r, *%r, ...)",
+                         callee, method, self.base_url, args)
+        else:   # pragma: no cover
+            logger.trace("[%s] request(%r, %r, *%r, **%r)",
+                         callee, method, self.base_url, args, kwargs)
 
         try:
             response = self._request_unified(method, *args, **kwargs)
@@ -113,8 +126,12 @@ class LoggingSession(BaseUrlSession):
 
             raise
 
-        logger.trace("[%s] request(...) = (code=%r, body=%r, headers=%r)",
-                     callee, response.status_code, response.text, response.headers)
+        if logger.getEffectiveLevel() >= logging.DEBUG:
+            logger.debug("[%s] request succeeded with status_code=%r",
+                         callee, response.status_code)
+        else:   # pragma: no cover
+            logger.trace("[%s] request(...) = (code=%r, body=%r, headers=%r)",
+                         callee, response.status_code, response.text, response.headers)
 
         return response
 
