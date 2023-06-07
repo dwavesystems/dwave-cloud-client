@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import uuid
 import unittest
 from urllib.parse import urljoin
@@ -20,9 +21,7 @@ from dwave.cloud.api.client import LeapAPIClient
 import requests_mock
 
 from dwave.cloud.api.resources import LeapAccount
-from dwave.cloud.api import exceptions
-
-from tests import config
+from dwave.cloud.api import exceptions, models
 
 
 class TestMockAccount(unittest.TestCase):
@@ -112,22 +111,64 @@ class TestMockAccount(unittest.TestCase):
     def test_invalid_token(self):
         """Auth error is raised when request not authorized with token."""
 
-        resource = LeapAccount(token='invalid-token', endpoint=self.endpoint)
+        api = LeapAccount(token='invalid-token', endpoint=self.endpoint)
         with self.assertRaises(exceptions.ResourceAuthenticationError):
-            resource.get_active_project()
+            api.get_active_project()
 
 
-@unittest.skipUnless(config, "LeapAPI access not configured.")
+# TODO: we need to implement generalized config before we can implement
+# live tests (access_token has to be stored)
+
+# XXX: provisional tests until we have the generalized config
+@unittest.skipUnless(os.getenv('LEAP_API_ACCESS_TOKEN'), "LeapAPI access not configured.")
 class TestCloudAccount(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        with LeapAPIClient(**config) as client:
+        with LeapAPIClient(token=os.getenv('LEAP_API_ACCESS_TOKEN')) as client:
             cls.api = LeapAccount.from_client_config(client)
 
     @classmethod
     def tearDownClass(cls):
         cls.api.close()
 
-    # TODO: we need to implement generalized config before we can implement
-    # live tests (access_token has to be stored)
+    def test_get_active_project(self):
+        """Active Leap project fetched."""
+
+        project = self.api.get_active_project()
+
+        self.assertIsInstance(project, models.LeapProject)
+        self.assertTrue(len(project.name) > 0)
+
+    def test_list_projects(self):
+        """All Leap projects fetched."""
+
+        projects = self.api.list_projects()
+
+        self.assertIsInstance(projects, list)
+        self.assertGreater(len(projects), 0)
+
+        for project in projects:
+            self.assertIsInstance(project, models.LeapProject)
+
+    def test_get_project_token(self):
+        """Token for Leap project fetched."""
+
+        project = self.api.get_active_project()
+
+        token = self.api.get_project_token(project_id=project.id)
+        self.assertTrue(token.startswith(f"{project.code}-"))
+
+    def test_get_project_token__for_nonexisting_project(self):
+        """Not found error is raised when trying to fetch a non-existing
+        project's token."""
+
+        with self.assertRaises(exceptions.ResourceNotFoundError):
+            self.api.get_project_token(project_id=42424242)
+
+    def test_invalid_token(self):
+        """Auth error is raised when request not authorized with token."""
+
+        with LeapAccount(token='invalid-token') as api:
+            with self.assertRaises(exceptions.ResourceAuthenticationError):
+                api.get_active_project()
