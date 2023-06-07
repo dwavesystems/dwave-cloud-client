@@ -130,13 +130,10 @@ jobs:
 
   test-docs:
     docker:
-      - image: cimg/python:3.7
+      - image: cimg/python:3.9
 
     steps:
       - checkout
-
-      - restore_cache:
-          key: v2-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ checksum "docs/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
 
       - run: *create-virtualenv
 
@@ -145,11 +142,6 @@ jobs:
       - run:
           name: Install docs requirements
           command: env/bin/pip install -r docs/requirements.txt
-
-      - save_cache:
-          key: v2-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ checksum "docs/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
-          paths:
-            - env
 
       - run: *install-package
 
