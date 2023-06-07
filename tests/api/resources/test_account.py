@@ -31,7 +31,7 @@ class TestMockAccount(unittest.TestCase):
     """
 
     token = str(uuid.uuid4())
-    endpoint = 'http://test.com/path/'
+    endpoint = 'http://test.com/path/api/'
 
     def setUp(self):
         self.mocker = requests_mock.Mocker()
@@ -43,15 +43,15 @@ class TestMockAccount(unittest.TestCase):
         self.mocker.get(requests_mock.ANY, status_code=401)
         self.mocker.get(requests_mock.ANY, status_code=404, request_headers=headers)
 
-        active_project_uri = urljoin(self.endpoint, 'api/account/active_project/oauth/')
+        active_project_uri = urljoin(self.endpoint, 'account/active_project/oauth/')
         active_project_data = {"data": {"project": self.p1}}
         self.mocker.get(active_project_uri, json=active_project_data, request_headers=headers)
 
-        projects_uri = urljoin(self.endpoint, 'api/account/projects/oauth/')
+        projects_uri = urljoin(self.endpoint, 'account/projects/oauth/')
         projects_data = {"data": {"projects": [{"project": self.p1}, {"project": self.p2}]}}
         self.mocker.get(projects_uri, json=projects_data, request_headers=headers)
 
-        token_uri = urljoin(self.endpoint, 'api/account/token/oauth/')
+        token_uri = urljoin(self.endpoint, 'account/token/oauth/')
         self.project_token = {1: "ONE-123", 2: "TWO-234"}
         self.mocker.get(f"{token_uri}?project_id={self.p1['id']}",
                         json={"data": {"token": self.project_token[self.p1['id']]}},

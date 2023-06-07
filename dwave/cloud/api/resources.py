@@ -280,7 +280,7 @@ class Problems(ResourceBase):
 
 class LeapAccount(ResourceBase):
 
-    resource_path = 'api/account/'
+    resource_path = 'account/'
     client_class = LeapAPIClient
 
     # TODO: constrain accepted resource/response version, when

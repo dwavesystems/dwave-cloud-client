@@ -20,7 +20,7 @@ DEFAULT_SOLVER_API_ENDPOINT = 'https://cloud.dwavesys.com/sapi/'
 
 DEFAULT_METADATA_API_ENDPOINT = 'https://cloud.dwavesys.com/metadata/v1/'
 
-DEFAULT_LEAP_API_ENDPOINT = 'https://cloud.dwavesys.com/leap/'
+DEFAULT_LEAP_API_ENDPOINT = 'https://cloud.dwavesys.com/leap/api/'
 
 DEFAULT_REGION = 'na-west-1'
 
