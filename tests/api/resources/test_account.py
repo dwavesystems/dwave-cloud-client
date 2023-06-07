@@ -63,24 +63,25 @@ class TestMockAccount(unittest.TestCase):
 
         self.mocker.start()
 
+        self.api = LeapAccount(token=self.token, endpoint=self.endpoint, version_strict_mode=False)
+
     def tearDown(self):
+        self.api.close()
         self.mocker.stop()
 
     def test_get_active_project(self):
         """Active Leap project fetched."""
 
-        resource = LeapAccount(token=self.token, endpoint=self.endpoint)
-        project = resource.get_active_project()
+        project = self.api.get_active_project()
 
         self.assertEqual(project.id, self.p1['id'])
         self.assertEqual(project.name, self.p1['name'])
         self.assertEqual(project.code, self.p1['code'])
 
-    def test_get_project(self):
+    def test_list_projects(self):
         """All Leap projects fetched."""
 
-        resource = LeapAccount(token=self.token, endpoint=self.endpoint)
-        projects = resource.get_projects()
+        projects = self.api.list_projects()
 
         ref = [self.p1, self.p2]
         self.assertEqual(len(projects), len(ref))
@@ -92,22 +93,21 @@ class TestMockAccount(unittest.TestCase):
     def test_get_project_token(self):
         """Correct token for Leap project fetched."""
 
-        resource = LeapAccount(token=self.token, endpoint=self.endpoint)
-        project = resource.get_active_project()
+        project = self.api.get_active_project()
+        self.assertEqual(project.id, self.p1['id'])
 
-        token = resource.get_project_token(project_id=project.id)
+        token = self.api.get_project_token(project_id=project.id)
         self.assertEqual(token, self.project_token[project.id])
 
-        token = resource.get_project_token(project=project)
+        token = self.api.get_project_token(project=project)
         self.assertEqual(token, self.project_token[project.id])
 
     def test_get_project_token__for_nonexisting_project(self):
         """Not found error is raised when trying to fetch a non-existing
         project's token."""
 
-        resource = LeapAccount(token=self.token, endpoint=self.endpoint)
         with self.assertRaises(exceptions.ResourceNotFoundError):
-            resource.get_project_token(project_id=42)
+            self.api.get_project_token(project_id=42)
 
     def test_invalid_token(self):
         """Auth error is raised when request not authorized with token."""

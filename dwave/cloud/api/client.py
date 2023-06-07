@@ -327,7 +327,7 @@ class DWaveAPIClient:
         return retry
 
     @classmethod
-    def _add_auth(cls, session, config):
+    def _set_session_auth(cls, session, config):
         if config['token']:
             session.headers.update({'X-Auth-Token': config['token']})
         if config['cert']:
@@ -363,7 +363,7 @@ class DWaveAPIClient:
             session.headers.update(config['headers'])
 
         # auth
-        cls._add_auth(session, config)
+        cls._set_session_auth(session, config)
 
         if config['proxies']:
             session.proxies = config['proxies']
@@ -489,7 +489,7 @@ class LeapAPIClient(DWaveAPIClient):
     """Client for D-Wave's Leap API."""
 
     @classmethod
-    def _add_auth(cls, session, config):
+    def _set_session_auth(cls, session, config):
         if config['token']:
             session.headers.update({'Authorization': f"Bearer {config['token']}"})
 

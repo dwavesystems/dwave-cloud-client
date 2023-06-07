@@ -281,12 +281,10 @@ class Problems(ResourceBase):
 class LeapAccount(ResourceBase):
 
     resource_path = 'api/account/'
+    client_class = LeapAPIClient
 
-    def __init__(self, **config):
-        self.client = LeapAPIClient(**config)
-        self.session = self.client.session
-        self._patch_session()
-
+    # TODO: constrain accepted resource/response version, when
+    # media type defined for Leap API responses
     def get_active_project(self) -> models.LeapProject:
         """Retrieve user's active Leap project, as selected in Leap dashboard."""
         path = 'active_project/oauth/'
@@ -294,7 +292,7 @@ class LeapAccount(ResourceBase):
         parsed = models._LeapActiveProjectResponse.parse_obj(response.json())
         return parsed.data.project
 
-    def get_projects(self) -> List[models.LeapProject]:
+    def list_projects(self) -> List[models.LeapProject]:
         """Retrieve list of Leap projects accessible to the authenticated user."""
         path = 'projects/oauth/'
         response = self.session.get(path)
