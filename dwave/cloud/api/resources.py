@@ -18,7 +18,8 @@ from functools import wraps
 
 from pydantic import parse_obj_as
 
-from dwave.cloud.api.client import DWaveAPIClient, SolverAPIClient, MetadataAPIClient
+from dwave.cloud.api.client import (
+    DWaveAPIClient, SolverAPIClient, MetadataAPIClient, LeapAPIClient)
 from dwave.cloud.api import constants, models
 from dwave.cloud.utils import NumpyEncoder
 
@@ -275,3 +276,39 @@ class Problems(ResourceBase):
         response = self.session.delete(path, json=problem_ids)
         rtype = get_type_hints(self.cancel_problems)['return']
         return parse_obj_as(rtype, response.json())
+
+
+class LeapAccount(ResourceBase):
+
+    resource_path = 'account/'
+    client_class = LeapAPIClient
+
+    # TODO: constrain accepted resource/response version, when
+    # media type defined for Leap API responses
+    def get_active_project(self) -> models.LeapProject:
+        """Retrieve user's active Leap project, as selected in Leap dashboard."""
+        path = 'active_project/oauth/'
+        response = self.session.get(path)
+        parsed = models._LeapActiveProjectResponse.parse_obj(response.json())
+        return parsed.data.project
+
+    def list_projects(self) -> List[models.LeapProject]:
+        """Retrieve list of Leap projects accessible to the authenticated user."""
+        path = 'projects/oauth/'
+        response = self.session.get(path)
+        parsed = models._LeapProjectsResponse.parse_obj(response.json())
+        return [p.project for p in parsed.data.projects]
+
+    def get_project_token(self, *,
+                          project: Optional[models.LeapProject] = None,
+                          project_id: Optional[str] = None) -> str:
+        """Retrieve SAPI token for a given Leap project."""
+        if project is not None:
+            project_id = project.id
+        if project_id is None:
+            raise ValueError("'project' or 'project_id' must be given.")
+        path = 'token/oauth/'
+        query = {'project_id': project_id}
+        response = self.session.get(path, params=query)
+        parsed = models._LeapProjectTokenResponse.parse_obj(response.json())
+        return parsed.data.token
