@@ -33,13 +33,18 @@ class FilteredSecretsFormatter(logging.Formatter):
     a short alphanumeric string, and comprises 40 or more hex digits.
     """
 
-    _SECRETS_PATTERN = re.compile(
-        r'\b([0-9A-Za-z]{2,4})-([0-9A-Fa-f]{3})([0-9A-Fa-f]{34,})([0-9A-Fa-f]{3})\b')
+    # prefixed 160-bit+ hex tokens (sapi token format: `A{2,4}-X{40,}`)
+    _SAPI_TOKEN_PATTERN = re.compile(
+        r'\b([0-9A-Za-z]{2,4}-[0-9A-Fa-f]{3})([0-9A-Fa-f]{34,})([0-9A-Fa-f]{3})\b')
+    # 128-bit+ hex tokens (`X{32,}`)
+    _HEX_TOKEN_PATTERN = re.compile(
+        r'\b([0-9A-Fa-f]{3})([0-9A-Fa-f]{26,})([0-9A-Fa-f]{3})\b')
 
     def format(self, record):
         output = super().format(record)
-        filtered = re.sub(self._SECRETS_PATTERN, r'\1-\2...\4', output)
-        return filtered
+        output = re.sub(self._SAPI_TOKEN_PATTERN, r'\1...\3', output)
+        output = re.sub(self._HEX_TOKEN_PATTERN, r'\1...\3', output)
+        return output
 
 # configure logger `dwave.cloud` root logger, inherited in submodules
 # (write level warning+ to stderr, include timestamp/module/level)
