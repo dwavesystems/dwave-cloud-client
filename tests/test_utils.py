@@ -24,6 +24,7 @@ from collections import OrderedDict
 from itertools import count
 from datetime import datetime
 from functools import partial
+from typing import Tuple, Union
 
 import numpy
 from parameterized import parameterized
@@ -735,10 +736,18 @@ class TestExceptionUtils(unittest.TestCase):
 
 class TestFilteredSecretsFormatter(unittest.TestCase):
 
-    def _filter(self, msg):
+    @staticmethod
+    def _filtered(msg: str) -> str:
+        """Filter `msg` using `FilteredSecretsFormatter`."""
         fmt = FilteredSecretsFormatter('%(msg)s')
         rec = logging.makeLogRecord(dict(msg=msg))
         return fmt.format(rec)
+
+    # dev note: define as unbound local function, to be used in class def context only
+    # in py310+ we can declare it as @staticmethod and call it as regular function
+    def _snipped(inp: Union[str, uuid.UUID]) -> Tuple[str, str]:
+        """Naively assuming `inp` is a secret/token, scrub the middle part."""
+        return (lambda x: (x, f"{x[:3]}...{x[-3:]}"))(str(inp))
 
     @parameterized.expand([
         # prefixed 160-bit+ hex tokens (SAPI token format)
@@ -755,21 +764,29 @@ class TestFilteredSecretsFormatter(unittest.TestCase):
         # sapi-like tokens filtered as partial hex
         ('A-0123456789012345678901234567890123456789', 'A-012...789'),
         ('ABCDE-0123456789012345678901234567890123456789', 'ABCDE-012...789'),
+        _snipped(uuid.uuid4().hex),
+        # 128-bit uuid tokens
+        _snipped(uuid.uuid1()),
+        _snipped(uuid.uuid3(uuid.NAMESPACE_DNS, 'example.com')),
+        _snipped(uuid.uuid4()),
+        _snipped(uuid.uuid5(uuid.NAMESPACE_DNS, 'example.com')),
+        (f"{uuid.uuid1()}1", None),
+        (f"{str(uuid.uuid1())[-3:]}xyz", None),
     ])
-    def test_sapi_tokens(self, inp, out=None):
+    def test_token_filtration(self, inp, out=None):
         if out is None:
             out = inp
 
-        self.assertEqual(self._filter(inp), out)
+        self.assertEqual(self._filtered(inp), out)
 
         ctx = '{} suffix'
-        self.assertEqual(self._filter(ctx.format(inp)), ctx.format(out))
+        self.assertEqual(self._filtered(ctx.format(inp)), ctx.format(out))
 
         ctx = 'prefix {}'
-        self.assertEqual(self._filter(ctx.format(inp)), ctx.format(out))
+        self.assertEqual(self._filtered(ctx.format(inp)), ctx.format(out))
 
         ctx = 'a{}word'
-        self.assertEqual(self._filter(ctx.format(inp)), ctx.format(inp))
+        self.assertEqual(self._filtered(ctx.format(inp)), ctx.format(inp))
 
 
 if __name__ == '__main__':

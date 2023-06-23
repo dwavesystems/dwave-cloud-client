@@ -39,11 +39,15 @@ class FilteredSecretsFormatter(logging.Formatter):
     # 128-bit+ hex tokens (`X{32,}`)
     _HEX_TOKEN_PATTERN = re.compile(
         r'\b([0-9A-Fa-f]{3})([0-9A-Fa-f]{26,})([0-9A-Fa-f]{3})\b')
+    # 128-bit uuid tokens (`X{8}-X{4}-X{4}-X{4}-X{12}`)
+    _UUID_TOKEN_PATTERN = re.compile(
+        r'\b([0-9A-Fa-f]{3})([0-9A-Fa-f]{5}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{9})([0-9A-Fa-f]{3})\b')
 
     def format(self, record):
         output = super().format(record)
         output = re.sub(self._SAPI_TOKEN_PATTERN, r'\1...\3', output)
         output = re.sub(self._HEX_TOKEN_PATTERN, r'\1...\3', output)
+        output = re.sub(self._UUID_TOKEN_PATTERN, r'\1...\3', output)
         return output
 
 # configure logger `dwave.cloud` root logger, inherited in submodules
