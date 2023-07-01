@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Constrain ``pydantic`` version, as V2 introduces major backwards
+    incompatible changes.
