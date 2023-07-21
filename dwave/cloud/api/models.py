@@ -16,7 +16,7 @@ from typing import List, Union, Optional
 from datetime import datetime
 
 import numpy
-from pydantic import BaseModel
+from pydantic import BaseModel, RootModel
 
 from dwave.cloud.api import constants
 
@@ -67,14 +67,11 @@ class UnstructuredProblemAnswer(BaseModel):
     data: dict
 
 
-class ProblemAnswer(BaseModel):
-    __root__: Union[StructuredProblemAnswer, UnstructuredProblemAnswer]
+class ProblemAnswer(RootModel):
+    root: Union[StructuredProblemAnswer, UnstructuredProblemAnswer]
 
     def __getattr__(self, item):
-        return getattr(self.__root__, item)
-
-    def dict(self, **kwargs):
-        return super().dict(**kwargs)['__root__']
+        return getattr(self.root, item)
 
 
 class ProblemStatusWithAnswer(ProblemStatus):
@@ -97,14 +94,11 @@ class UnstructuredProblemData(BaseModel):
     data: str
 
 
-class ProblemData(BaseModel):
-    __root__: Union[StructuredProblemData, UnstructuredProblemData]
+class ProblemData(RootModel):
+    root: Union[StructuredProblemData, UnstructuredProblemData]
 
     def __getattr__(self, item):
-        return getattr(self.__root__, item)
-
-    def dict(self, **kwargs):
-        return super().dict(**kwargs)['__root__']
+        return getattr(self.root, item)
 
 
 class ProblemMetadata(BaseModel):
