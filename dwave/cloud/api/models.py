@@ -12,23 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Union, Optional
+import json
+from typing import List, Union, Optional, Dict, Any, Annotated, Mapping, Sequence
 from datetime import datetime
 
 import numpy
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel, RootModel, field_serializer, SerializerFunctionWrapHandler
+from pydantic.functional_serializers import WrapSerializer
 
 from dwave.cloud.api import constants
-
-
-class BaseModelWithEncoders(BaseModel):
-    class Config:
-        json_encoders = {
-            numpy.integer: int,
-            numpy.floating: float,
-            numpy.bool_: bool,
-            numpy.ndarray: lambda obj: obj.tolist(),
-        }
+from dwave.cloud.utils import NumpyEncoder
 
 
 class SolverConfiguration(BaseModel):
@@ -120,12 +113,32 @@ class ProblemInfo(BaseModel):
     answer: ProblemAnswer
 
 
-class ProblemJob(BaseModelWithEncoders):
+def coerce_numpy_to_python(obj, handler):
+    if isinstance(obj, numpy.integer):
+        return int(obj)
+    elif isinstance(obj, numpy.floating):
+        return float(obj)
+    elif isinstance(obj, numpy.bool_):
+        return bool(obj)
+    elif isinstance(obj, numpy.ndarray):
+        return [coerce_numpy_to_python(v, handler) for v in obj.to_list()]
+    elif isinstance(obj, Sequence):
+        return [coerce_numpy_to_python(v, handler) for v in obj]
+    elif isinstance(obj, Mapping):
+        return {k: coerce_numpy_to_python(v, handler) for k,v in obj.items()}
+    return handler(obj)
+
+def np_serialize(v: Any, nxt: SerializerFunctionWrapHandler):
+    return coerce_numpy_to_python(v, nxt)
+
+AnyIncludingNumpy = Annotated[Any, WrapSerializer(np_serialize, when_used='json')]
+
+class ProblemJob(BaseModel):
     data: ProblemData
-    params: dict
+    params: Dict[str, AnyIncludingNumpy]
     solver: str
     type: constants.ProblemType
-    label: Optional[str]
+    label: Optional[str] = None
 
 
 class BatchItemError(BaseModel):
