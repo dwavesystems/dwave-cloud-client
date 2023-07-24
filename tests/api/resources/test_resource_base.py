@@ -18,7 +18,7 @@ from urllib.parse import urljoin
 
 import requests
 import requests_mock
-from pydantic import parse_obj_as, BaseModel
+from pydantic import TypeAdapter, BaseModel
 
 from dwave.cloud.api import exceptions, constants
 from dwave.cloud.api.resources import ResourceBase, accepts
@@ -36,7 +36,7 @@ class MathResource(ResourceBase):
         path = 'add/'
         response = self.session.get(path, params=dict(in1=in1, in2=in2))
         result = response.json()
-        return parse_obj_as(MathResource.AddResult, result).out
+        return TypeAdapter(MathResource.AddResult).validate_python(result).out
 
     def nonexisting(self):
         return self.session.get('nonexisting')

@@ -583,7 +583,7 @@ class TestMockProblemsStructured(StructuredProblemTestsMixin,
         cls.p3 = StructuredSapiMockResponses()
 
         cls.linear, cls.quadratic = cls.p1.problem
-        cls.problem_data = models.ProblemData.parse_obj(cls.p1.problem_data())
+        cls.problem_data = models.ProblemData.model_validate(cls.p1.problem_data())
         cls.problem_type = constants.ProblemType(cls.p1.problem_type)
         cls.problem_id = cls.p1.problem_id
         cls.problem_label = cls.p1.problem_label
@@ -610,7 +610,7 @@ class TestMockProblemsUnstructured(UnstructuredProblemTestsMixin,
         cls.p3 = UnstructuredSapiMockResponses()
 
         cls.bqm = cls.p1.problem
-        cls.problem_data = models.ProblemData.parse_obj(cls.p1.problem_data())
+        cls.problem_data = models.ProblemData.model_validate(cls.p1.problem_data())
         cls.problem_type = constants.ProblemType(cls.p1.problem_type)
         cls.problem_id = cls.p1.problem_id
         cls.problem_label = cls.p1.problem_label
@@ -642,7 +642,7 @@ class TestCloudProblemsStructured(StructuredProblemTestsMixin,
             cls.linear = {}
             cls.quadratic = {edge: 1.0}
             qp = encode_problem_as_qp(solver, cls.linear, cls.quadratic)
-            cls.problem_data = models.ProblemData.parse_obj(qp)
+            cls.problem_data = models.ProblemData.model_validate(qp)
             cls.problem_type = constants.ProblemType.ISING
             cls.params = dict(num_reads=100)
             future = solver.sample_ising(cls.linear, cls.quadratic, **cls.params)
@@ -681,7 +681,7 @@ class TestCloudProblemsUnstructured(UnstructuredProblemTestsMixin,
             cls.bqm = dimod.BQM.from_ising({}, {'ab': 1.0})
             problem_data_id = solver.upload_problem(cls.bqm).result()
             problem_data_ref = encode_problem_as_ref(problem_data_id)
-            cls.problem_data = models.ProblemData.parse_obj(problem_data_ref)
+            cls.problem_data = models.ProblemData.model_validate(problem_data_ref)
             cls.problem_type = constants.ProblemType.BQM
             cls.params = dict(time_limit=3)
             future = solver.sample_bqm(problem_data_id, **cls.params)
@@ -725,7 +725,7 @@ class NumpyParamsSerialization(unittest.TestCase):
     def setUpClass(cls):
         _p = StructuredSapiMockResponses()
         cls.linear, cls.quadratic = _p.problem
-        cls.problem_data = models.ProblemData.parse_obj(_p.problem_data())
+        cls.problem_data = models.ProblemData.model_validate(_p.problem_data())
         cls.problem_type = constants.ProblemType(_p.problem_type)
         cls.problem_id = _p.problem_id
         cls.problem_label = _p.problem_label
