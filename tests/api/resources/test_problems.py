@@ -133,8 +133,8 @@ class ProblemResourcesBaseTests(abc.ABC):
             return {k: round_to_second(v) for k, v in obj.copy().items()}
 
         self.assertEqual(
-            with_second_resolution_values(p.dict()),
-            with_second_resolution_values(problem.dict()))
+            with_second_resolution_values(p.model_dump()),
+            with_second_resolution_values(problem.model_dump()))
 
     def test_get_problem(self):
         """Problem status with answer retrieved by problem id."""
@@ -342,7 +342,7 @@ class ProblemResourcesBaseTests(abc.ABC):
 class StructuredProblemTestsMixin:
 
     def verify_problem_answer(self, answer: models.ProblemAnswer):
-        ans = decode_qp(msg=dict(answer=answer.dict(), type=self.problem_type.value))
+        ans = decode_qp(msg=dict(answer=answer.model_dump(), type=self.problem_type.value))
         var = set(chain(*self.quadratic)) | self.linear.keys()
         self.assertEqual(set(ans['active_variables']), var)
         self.assertEqual(len(ans['energies']), len(ans['solutions']))
@@ -352,7 +352,7 @@ class StructuredProblemTestsMixin:
 class UnstructuredProblemTestsMixin:
 
     def verify_problem_answer(self, answer: models.ProblemAnswer):
-        ans = decode_bq(msg=dict(answer=answer.dict(), type=self.problem_type.value))
+        ans = decode_bq(msg=dict(answer=answer.model_dump(), type=self.problem_type.value))
         ss = ans['sampleset']
         self.assertEqual(ss.variables, self.bqm.variables)
         dimod.testing.assert_sampleset_energies(ss, self.bqm)

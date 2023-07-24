@@ -239,7 +239,7 @@ class Problems(ResourceBase):
         answer, if problem is solved within the (undisclosed) time limit.
         """
         path = ''
-        body = dict(data=data.dict(), params=params, solver=solver,
+        body = dict(data=data.model_dump(), params=params, solver=solver,
                     type=type, label=label)
         data = json.dumps(body, cls=NumpyEncoder)
         response = self.session.post(
@@ -253,7 +253,7 @@ class Problems(ResourceBase):
         """Asynchronous multi-problem submit, returning initial statuses."""
         path = ''
         # encode iteratively so that timestamps are serialized (via pydantic json encoder)
-        body = '[%s]' % ','.join(p.json() for p in problems)
+        body = '[%s]' % ','.join(p.model_dump_json() for p in problems)
         response = self.session.post(
             path, data=body, headers={'Content-Type': 'application/json'})
         rtype = get_type_hints(self.submit_problems)['return']
