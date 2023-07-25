@@ -36,13 +36,13 @@ class ProblemInitialStatus(BaseModel):
     id: str
     type: constants.ProblemType
     solver: str
-    label: Optional[str]
+    label: Optional[str] = None
     status: constants.ProblemStatus
     submitted_on: datetime
 
 
 class ProblemStatus(ProblemInitialStatus):
-    solved_on: Optional[datetime]
+    solved_on: Optional[datetime] = None
 
 
 class StructuredProblemAnswer(BaseModel):
@@ -72,7 +72,7 @@ class ProblemStatusWithAnswer(ProblemStatus):
 
 
 class ProblemStatusMaybeWithAnswer(ProblemStatus):
-    answer: Optional[ProblemAnswer]
+    answer: Optional[ProblemAnswer] = None
 
 
 class StructuredProblemData(BaseModel):
@@ -97,12 +97,12 @@ class ProblemData(RootModel):
 class ProblemMetadata(BaseModel):
     solver: str
     type: constants.ProblemType
-    label: Optional[str]
+    label: Optional[str] = None
     status: constants.ProblemStatus
     submitted_by: str
     submitted_on: datetime
-    solved_on: Optional[datetime]
-    messages: Optional[List[dict]]
+    solved_on: Optional[datetime] = None
+    messages: Optional[List[dict]] = None
 
 
 class ProblemInfo(BaseModel):
