@@ -12,16 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-from typing import List, Union, Optional, Dict, Any, Annotated, Mapping, Sequence
+from typing import List, Union, Optional, Dict, Any, Annotated
 from datetime import datetime
 
-import numpy
-from pydantic import BaseModel, RootModel, field_serializer, SerializerFunctionWrapHandler
-from pydantic.functional_serializers import WrapSerializer
+from pydantic import BaseModel, RootModel, field_validator
+from pydantic.functional_validators import AfterValidator
 
 from dwave.cloud.api import constants
-from dwave.cloud.utils import NumpyEncoder
+from dwave.cloud.utils import coerce_numpy_to_python
+
+
+# coerce common numpy types to python types on validation (parsing)
+AnyIncludingNumpy = Annotated[Any, AfterValidator(coerce_numpy_to_python)]
 
 
 class SolverConfiguration(BaseModel):
@@ -108,30 +110,10 @@ class ProblemMetadata(BaseModel):
 class ProblemInfo(BaseModel):
     id: str
     data: ProblemData
-    params: dict
+    params: Dict[str, AnyIncludingNumpy]
     metadata: ProblemMetadata
     answer: ProblemAnswer
 
-
-def coerce_numpy_to_python(obj, handler):
-    if isinstance(obj, numpy.integer):
-        return int(obj)
-    elif isinstance(obj, numpy.floating):
-        return float(obj)
-    elif isinstance(obj, numpy.bool_):
-        return bool(obj)
-    elif isinstance(obj, numpy.ndarray):
-        return [coerce_numpy_to_python(v, handler) for v in obj.to_list()]
-    elif isinstance(obj, Sequence):
-        return [coerce_numpy_to_python(v, handler) for v in obj]
-    elif isinstance(obj, Mapping):
-        return {k: coerce_numpy_to_python(v, handler) for k,v in obj.items()}
-    return handler(obj)
-
-def np_serialize(v: Any, nxt: SerializerFunctionWrapHandler):
-    return coerce_numpy_to_python(v, nxt)
-
-AnyIncludingNumpy = Annotated[Any, WrapSerializer(np_serialize, when_used='json')]
 
 class ProblemJob(BaseModel):
     data: ProblemData

@@ -44,7 +44,8 @@ except ImportError:  # pragma: no cover
 __all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
            'default_text_input', 'datetime_to_timestamp',
            'datetime_to_timestamp', 'utcnow', 'epochnow', 'tictoc',
-           'hasinstance', 'exception_chain', 'is_caused_by', 'NumpyEncoder',
+           'hasinstance', 'exception_chain', 'is_caused_by',
+           'NumpyEncoder', 'coerce_numpy_to_python',
            ]
 
 logger = logging.getLogger(__name__)
@@ -239,6 +240,24 @@ def utcrel(offset):
 def strtrunc(s, maxlen=60):
     s = str(s)
     return s[:(maxlen-3)]+'...' if len(s) > maxlen else s
+
+
+def coerce_numpy_to_python(obj):
+    """Numpy object serializer with support for basic scalar types and ndarrays."""
+
+    if isinstance(obj, numpy.integer):
+        return int(obj)
+    elif isinstance(obj, numpy.floating):
+        return float(obj)
+    elif isinstance(obj, numpy.bool_):
+        return bool(obj)
+    elif isinstance(obj, numpy.ndarray):
+        return [coerce_numpy_to_python(v) for v in obj.to_list()]
+    elif isinstance(obj, (list, tuple)):    # be explicit to avoid recursing over string et al
+        return [coerce_numpy_to_python(v) for v in obj]
+    elif isinstance(obj, dict):
+        return {k: coerce_numpy_to_python(v) for k, v in obj.items()}
+    return obj
 
 
 # copied from dwave-hybrid utils
