@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Union, Optional, Dict, Any, Annotated
+from typing import List, Union, Optional, Dict, Any
+from typing_extensions import Annotated     # backport for py37, py38
 from datetime import datetime
 
-from pydantic import BaseModel, RootModel, field_validator
+from pydantic import BaseModel, RootModel
 from pydantic.functional_validators import AfterValidator
 
 from dwave.cloud.api import constants
