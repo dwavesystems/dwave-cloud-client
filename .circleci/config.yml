@@ -208,7 +208,7 @@ workflows:
           matrix:
             parameters:
               python-version: *python-versions
-              xcode: ["13.2.0"]
+              xcode: ["14.2.0"]
 
       - test-docs
 
