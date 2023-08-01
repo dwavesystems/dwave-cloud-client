@@ -51,7 +51,7 @@ import codecs
 import concurrent.futures
 
 from itertools import chain, zip_longest
-from functools import partial, wraps, lru_cache
+from functools import partial, wraps, cached_property
 from collections import abc, namedtuple
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Tuple, Dict
@@ -591,9 +591,7 @@ class Client(object):
         self._encode_problem_executor = \
             ThreadPoolExecutor(self._ENCODE_PROBLEM_THREAD_COUNT)
 
-    # note: @cached_property available only in py38+
-    @property
-    @lru_cache(maxsize=None)
+    @cached_property
     def _user_agent(self):
         """User-Agent string for this client instance, as returned by
         :meth:`~dwave.cloud.utils.user_agent`, computed on first access and
