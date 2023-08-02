@@ -19,6 +19,7 @@ import logging
 import unittest
 import warnings
 import tempfile
+import contextlib
 from unittest import mock
 from collections import OrderedDict
 from itertools import count
@@ -324,7 +325,10 @@ class TestCachedOnDiskDecorator(TestCachedInMemoryDecorator):
         self.cached = partial(cached.ondisk, directory=self.tmpdir.name)
 
     def tearDown(self):
-        self.tmpdir.cleanup()
+        # suppress tmp dir cleanup failures on windows when files are still in use
+        # note: the temp dir is cleaned up automatically when `self.tmpdir` object is gc'ed
+        with contextlib.suppress(OSError):
+            self.tmpdir.cleanup()
 
     @mock.patch('dwave.cloud.utils.epochnow', lambda: 0)
     def test_persistency(self):
