@@ -1,5 +1,10 @@
 version: 2.1
 
+parameters:
+  cache-generation:
+    type: integer
+    default: 3
+
 orbs:
   win: circleci/windows@2.2.0
   codecov: codecov/codecov@3
@@ -22,7 +27,7 @@ jobs:
       - checkout
 
       - restore_cache: &restore-cache-env
-          key: v2-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
+          key: v<< pipeline.parameters.cache-generation >>-pip-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
 
       - run: &create-virtualenv
           name: Create virtual environment
@@ -48,7 +53,7 @@ jobs:
             fi
 
       - save_cache: &save-cache-env
-          key: v2-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
+          key: v<< pipeline.parameters.cache-generation >>-pip-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
           paths:
             - env
 
@@ -89,7 +94,7 @@ jobs:
 
       - restore_cache: &restore-cache-pyenv
           keys:
-            - v1-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-<< parameters.xcode >>
+            - v<< pipeline.parameters.cache-generation >>-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-<< parameters.xcode >>
 
       - run: &pyenv-install-python
           name: Install python
@@ -104,7 +109,7 @@ jobs:
             pyenv global << parameters.python-version >>
 
       - save_cache: &save-cache-pyenv
-          key: v1-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-<< parameters.xcode >>
+          key: v<< pipeline.parameters.cache-generation >>-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-<< parameters.xcode >>
           paths:
             - ~/.pyenv
 
@@ -134,7 +139,7 @@ jobs:
 
       - restore_cache:
           keys:
-            - v1-nuget-python-<< parameters.python-version >>-{{ .Environment.CIRCLE_JOB }}
+            - v<< pipeline.parameters.cache-generation >>-nuget-python-<< parameters.python-version >>-{{ .Environment.CIRCLE_JOB }}
 
       - run:
           name: Install python and create virtualenv
@@ -143,7 +148,7 @@ jobs:
             python\tools\python -m venv env
 
       - save_cache:
-          key: v1-nuget-python-<< parameters.python-version >>-{{ .Environment.CIRCLE_JOB }}
+          key: v<< pipeline.parameters.cache-generation >>-nuget-python-<< parameters.python-version >>-{{ .Environment.CIRCLE_JOB }}
           paths:
             - python
 
