@@ -32,6 +32,7 @@ jobs:
       - run: &create-virtualenv
           name: Create virtual environment
           command: |
+            python -V
             python -m venv env
 
       - run: &install-requirements
@@ -145,6 +146,7 @@ jobs:
           name: Install python and create virtualenv
           command: |
             nuget install python -Version << parameters.python-version >> -ExcludeVersion
+            python\tools\python -V
             python\tools\python -m venv env
 
       - save_cache:
