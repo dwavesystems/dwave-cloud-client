@@ -85,7 +85,8 @@ class TestUnstructuredSolver(unittest.TestCase):
 
         # upload is now part of submit, so we need to mock it
         mock_problem_id = 'mock-problem-id'
-        def mock_upload(self, bqm):
+        def mock_upload(self, bqm_file):
+            bqm_file.close()
             return Present(result=mock_problem_id)
 
         # construct a functional solver by mocking client and api response data
@@ -167,7 +168,8 @@ class TestUnstructuredSolver(unittest.TestCase):
 
         # upload is now part of submit, so we need to mock it
         mock_problem_id = 'mock-problem-id'
-        def mock_upload(self, bqm):
+        def mock_upload(self, bqm_file):
+            bqm_file.close()
             return Present(result=mock_problem_id)
 
         # construct a functional solver by mocking client and api response data
@@ -209,7 +211,8 @@ class TestUnstructuredSolver(unittest.TestCase):
 
         # upload is now part of submit, so we need to mock it
         mock_problem_id = 'mock-problem-id'
-        def mock_upload(self, bqm):
+        def mock_upload(self, bqm_file):
+            bqm_file.close()
             return Present(result=mock_problem_id)
 
         # construct a functional solver by mocking client and api response data
@@ -240,7 +243,7 @@ class TestUnstructuredSolver(unittest.TestCase):
 
         # upload is now part of submit, so we need to mock it
         mock_upload_exc = ValueError('error')
-        def mock_upload(self, bqm):
+        def mock_upload(self, bqm_file):
             return Present(exception=mock_upload_exc)
 
         # construct a functional solver by mocking client and api response data
@@ -270,7 +273,7 @@ class TestUnstructuredSolver(unittest.TestCase):
 
         # upload is now part of submit, so we need to mock it
         mock_upload_exc = ValueError('error')
-        def mock_upload(self, bqm):
+        def mock_upload(self, bqm_file):
             return Present(exception=mock_upload_exc)
 
         # construct a functional solver by mocking client and api response data
@@ -331,7 +334,8 @@ class TestProblemLabel(unittest.TestCase):
 
         # upload is now part of submit, so we need to mock it
         mock_problem_id = 'mock-problem-id'
-        def mock_upload(self, bqm):
+        def mock_upload(self, bqm_file):
+            bqm_file.close()
             return Present(result=mock_problem_id)
 
         # construct a functional solver by mocking client and api response data
@@ -369,7 +373,8 @@ class TestProblemLabel(unittest.TestCase):
 
         # upload is now part of submit, so we need to mock it
         mock_problem_id = 'mock-problem-id'
-        def mock_upload(self, bqm):
+        def mock_upload(self, bqm_file):
+            bqm_file.close()
             return Present(result=mock_problem_id)
 
         # construct a functional solver by mocking client and api response data
@@ -446,7 +451,8 @@ class TestSerialization(unittest.TestCase):
 
         # upload is now part of submit, so we need to mock it
         mock_problem_id = 'mock-problem-id'
-        def mock_upload(self, bqm):
+        def mock_upload(self, bqm_file):
+            bqm_file.close()
             return Present(result=mock_problem_id)
 
         # construct a functional solver by mocking client and api response data

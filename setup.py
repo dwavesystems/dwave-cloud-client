@@ -10,7 +10,7 @@ package_info = {}
 with open(package_info_path, encoding='utf-8') as f:
     exec(f.read(), package_info)
 
-python_requires = '>=3.7'
+python_requires = '>=3.8'
 
 # Package requirements, minimal pinning
 install_requires = ['requests[socks]>=2.18', 'pydantic>=1.7.3,<2', 'homebase>=1.0',
@@ -44,7 +44,6 @@ classifiers = [
     'License :: OSI Approved :: Apache Software License',
     'Operating System :: OS Independent',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.7',
     'Programming Language :: Python :: 3.8',
     'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
