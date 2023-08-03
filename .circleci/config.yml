@@ -6,7 +6,7 @@ parameters:
     default: 3
 
 orbs:
-  win: circleci/windows@2.2.0
+  win: circleci/windows@5.0
   codecov: codecov/codecov@3
 
 environment:
@@ -138,21 +138,20 @@ jobs:
     steps:
       - checkout
 
-      - restore_cache:
-          keys:
-            - v<< pipeline.parameters.cache-generation >>-nuget-python-<< parameters.python-version >>-{{ .Environment.CIRCLE_JOB }}
-
       - run:
           name: Install python and create virtualenv
+          shell: bash -eo pipefail
           command: |
-            nuget install python -Version << parameters.python-version >> -ExcludeVersion
-            python\tools\python -V
-            python\tools\python -m venv env
-
-      - save_cache:
-          key: v<< pipeline.parameters.cache-generation >>-nuget-python-<< parameters.python-version >>-{{ .Environment.CIRCLE_JOB }}
-          paths:
-            - python
+            # resolve python MAJOR.MINOR version to latest MAJOR.MINOR.PATCH version available on NuGet
+            full_version=$(
+              curl -s 'https://azuresearch-usnc.nuget.org/query?q=python' \
+              | jq -r '.data[] | select(.id == "python") .versions[] | .version' \
+              | awk -F. -v ver='<< parameters.python-version >>' \
+                  'index($0, ver".") == 1 && $3 > m { m = $3; v = $0 } END { print v }'
+            )
+            nuget install python -Version "$full_version" -ExcludeVersion
+            python/tools/python -V
+            python/tools/python -m venv env
 
       - run:
           name: Install requirements
