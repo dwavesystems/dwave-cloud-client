@@ -252,11 +252,11 @@ def coerce_numpy_to_python(obj):
     elif isinstance(obj, numpy.bool_):
         return bool(obj)
     elif isinstance(obj, numpy.ndarray):
-        return [coerce_numpy_to_python(v) for v in obj.to_list()]
+        return [coerce_numpy_to_python(v) for v in obj.tolist()]
     elif isinstance(obj, (list, tuple)):    # be explicit to avoid recursing over string et al
-        return [coerce_numpy_to_python(v) for v in obj]
+        return type(obj)(coerce_numpy_to_python(v) for v in obj)
     elif isinstance(obj, dict):
-        return {k: coerce_numpy_to_python(v) for k, v in obj.items()}
+        return {coerce_numpy_to_python(k): coerce_numpy_to_python(v) for k, v in obj.items()}
     return obj
 
 
