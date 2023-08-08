@@ -13,9 +13,11 @@ with open(package_info_path, encoding='utf-8') as f:
 python_requires = '>=3.8'
 
 # Package requirements, minimal pinning
-install_requires = ['requests[socks]>=2.18', 'pydantic>=1.7.3,<2', 'homebase>=1.0',
+install_requires = ['requests[socks]>=2.18', 'pydantic>=2,<3', 'homebase>=1.0',
                     'click>=7.0', 'python-dateutil>=2.7', 'plucky>=0.4.3',
-                    'diskcache>=5.2.1', 'packaging>=19', 'werkzeug>=2.2']
+                    'diskcache>=5.2.1', 'packaging>=19', 'werkzeug>=2.2',
+                    'typing-extensions>=4.5.0',
+                    ]
 
 # Package extras requirements
 extras_require = {

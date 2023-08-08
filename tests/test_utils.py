@@ -33,7 +33,8 @@ from parameterized import parameterized
 from dwave.cloud import FilteredSecretsFormatter
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_head, strip_tail,
-    active_qubits, generate_random_ising_problem, NumpyEncoder,
+    active_qubits, generate_random_ising_problem,
+    NumpyEncoder, coerce_numpy_to_python,
     default_text_input, utcnow, cached, retried, deprecated, aliasdict,
     parse_loglevel, user_agent, hasinstance, exception_chain, is_caused_by)
 
@@ -175,11 +176,11 @@ class TestSimpleUtils(unittest.TestCase):
             self.assertIn(key, ua)
 
 
-# copied from dwave-hybrid utils
-# TODO: remove these tests when we/if switch to `dwave.common`
-class TestNumpyJSONEncoder(unittest.TestCase):
+# initially copied from dwave-hybrid/NumpyEncoder tests, but expanded to cover
+# `coerce_numpy_to_python`
+class TestNumpyTypesEncoding(unittest.TestCase):
 
-    @parameterized.expand([
+    NUMPY_SCALARS = [
         (numpy.bool_(1), True), (numpy.bool8(1), True),
         (numpy.byte(1), 1), (numpy.int8(1), 1),
         (numpy.ubyte(1), 1), (numpy.uint8(1), 1),
@@ -198,29 +199,36 @@ class TestNumpyJSONEncoder(unittest.TestCase):
     ] + ([
         (numpy.float128(1.0), 1.0)      # unavailable on windows
     ] if hasattr(numpy, 'float128') else [
-    ]))
-    def test_numpy_primary_type_encode(self, np_val, py_val):
-        self.assertEqual(
-            json.dumps(py_val),
-            json.dumps(np_val, cls=NumpyEncoder)
-        )
+    ])
 
-    @parameterized.expand([
+    NUMPY_ARRAYS = [
         (numpy.array([1, 2, 3], dtype=int), [1, 2, 3]),
         (numpy.array([[1], [2], [3]], dtype=float), [[1.0], [2.0], [3.0]]),
         (numpy.zeros((2, 2), dtype=bool), [[False, False], [False, False]]),
         (numpy.array([('Rex', 9, 81.0), ('Fido', 3, 27.0)],
                      dtype=[('name', 'U10'), ('age', 'i4'), ('weight', 'f4')]),
-         [['Rex', 9, 81.0], ['Fido', 3, 27.0]]),
+         [('Rex', 9, 81.0), ('Fido', 3, 27.0)]),
         (numpy.rec.array([(1, 2., 'Hello'), (2, 3., "World")],
                          dtype=[('foo', 'i4'), ('bar', 'f4'), ('baz', 'U10')]),
-         [[1, 2.0, "Hello"], [2, 3.0, "World"]])
-    ])
-    def test_numpy_array_encode(self, np_val, py_val):
+         [(1, 2.0, "Hello"), (2, 3.0, "World")]),
+    ]
+
+    NUMPY_STRUCTURES = [
+        ([numpy.int8(1), numpy.array([2], dtype=numpy.int64), 'three'], [1, [2], 'three']),
+        ({'one': numpy.float64(1), 'two': numpy.array([2.0])}, {'one': 1.0, 'two': [2.0]}),
+        ({(numpy.int32(1), numpy.int32(2)): {'v': [1, 2]}}, {(1, 2): {'v': [1, 2]}}),
+    ]
+
+    @parameterized.expand(NUMPY_SCALARS + NUMPY_ARRAYS)
+    def test_numpy_dump(self, np_val, py_val):
         self.assertEqual(
             json.dumps(py_val),
             json.dumps(np_val, cls=NumpyEncoder)
         )
+
+    @parameterized.expand(NUMPY_SCALARS + NUMPY_ARRAYS + NUMPY_STRUCTURES)
+    def test_numpy_to_python_coercion(self, np_val, py_val):
+        self.assertEqual(py_val, coerce_numpy_to_python(np_val))
 
 
 class TestCachedInMemoryDecorator(unittest.TestCase):

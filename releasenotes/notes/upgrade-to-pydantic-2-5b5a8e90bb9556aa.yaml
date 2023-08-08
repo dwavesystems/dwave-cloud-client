@@ -1,0 +1,9 @@
+---
+features:
+  - |
+    Upgrade ``dwave.cloud.api.models.*`` to use Pydantic v2.
+    See `#555 <https://github.com/dwavesystems/dwave-cloud-client/issues/555>`_.
+upgrade:
+  - |
+    API models now coerce Numpy types to Python types on validation (model
+    instantiation), instead of holding ``typing.Any`` until serialization.

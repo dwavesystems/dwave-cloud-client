@@ -16,7 +16,7 @@ import json
 from typing import List, Union, Optional, Callable, get_type_hints
 from functools import wraps
 
-from pydantic import parse_obj_as
+from pydantic import TypeAdapter
 
 from dwave.cloud.api.client import (
     DWaveAPIClient, SolverAPIClient, MetadataAPIClient, LeapAPIClient)
@@ -108,14 +108,14 @@ class Regions(ResourceBase):
         path = ''
         response = self.session.get(path)
         regions = response.json()
-        return parse_obj_as(List[models.Region], regions)
+        return TypeAdapter(List[models.Region]).validate_python(regions)
 
     @accepts(media_type='application/vnd.dwave.metadata.region+json', version='~=1.0')
     def get_region(self, code: str) -> models.Region:
         path = '{}'.format(code)
         response = self.session.get(path)
         region = response.json()
-        return parse_obj_as(models.Region, region)
+        return TypeAdapter(models.Region).validate_python(region)
 
 
 class Solvers(ResourceBase):
@@ -128,14 +128,14 @@ class Solvers(ResourceBase):
         path = 'remote/'
         response = self.session.get(path)
         solvers = response.json()
-        return parse_obj_as(List[models.SolverConfiguration], solvers)
+        return TypeAdapter(List[models.SolverConfiguration]).validate_python(solvers)
 
     @accepts(media_type='application/vnd.dwave.sapi.solver-definition+json', version='~=2.0')
     def get_solver(self, solver_id: str) -> models.SolverConfiguration:
         path = 'remote/{}'.format(solver_id)
         response = self.session.get(path)
         solver = response.json()
-        return models.SolverConfiguration.parse_obj(solver)
+        return models.SolverConfiguration.model_validate(solver)
 
 
 class Problems(ResourceBase):
@@ -170,7 +170,7 @@ class Problems(ResourceBase):
         path = ''
         response = self.session.get(path, params=params)
         statuses = response.json()
-        return parse_obj_as(List[models.ProblemStatus], statuses)
+        return TypeAdapter(List[models.ProblemStatus]).validate_python(statuses)
 
     @accepts(media_type='application/vnd.dwave.sapi.problem+json', version='>=2.1,<3')
     def get_problem(self, problem_id: str) -> models.ProblemStatusMaybeWithAnswer:
@@ -178,7 +178,7 @@ class Problems(ResourceBase):
         path = '{}'.format(problem_id)
         response = self.session.get(path)
         status = response.json()
-        return models.ProblemStatusMaybeWithAnswer.parse_obj(status)
+        return models.ProblemStatusMaybeWithAnswer.model_validate(status)
 
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
     def get_problem_status(self, problem_id: str) -> models.ProblemStatus:
@@ -187,7 +187,7 @@ class Problems(ResourceBase):
         params = dict(id=problem_id)
         response = self.session.get(path, params=params)
         status = response.json()[0]
-        return models.ProblemStatus.parse_obj(status)
+        return models.ProblemStatus.model_validate(status)
 
     # XXX: @pydantic.validate_arguments
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
@@ -202,7 +202,7 @@ class Problems(ResourceBase):
         params = dict(id=','.join(problem_ids))
         response = self.session.get(path, params=params)
         statuses = response.json()
-        return parse_obj_as(List[models.ProblemStatus], statuses)
+        return TypeAdapter(List[models.ProblemStatus]).validate_python(statuses)
 
     @accepts(media_type='application/vnd.dwave.sapi.problem-data+json', version='>=2.1,<3')
     def get_problem_info(self, problem_id: str) -> models.ProblemInfo:
@@ -210,7 +210,7 @@ class Problems(ResourceBase):
         path = '{}/info'.format(problem_id)
         response = self.session.get(path)
         info = response.json()
-        return models.ProblemInfo.parse_obj(info)
+        return models.ProblemInfo.model_validate(info)
 
     @accepts(media_type='application/vnd.dwave.sapi.problem-answer+json', version='>=2.1,<3')
     def get_problem_answer(self, problem_id: str) -> models.ProblemAnswer:
@@ -218,7 +218,7 @@ class Problems(ResourceBase):
         path = '{}/answer'.format(problem_id)
         response = self.session.get(path)
         answer = response.json()['answer']
-        return models.ProblemAnswer.parse_obj(answer)
+        return models.ProblemAnswer.model_validate(answer)
 
     @accepts(media_type='application/vnd.dwave.sapi.problem-message+json', version='>=2.1,<3')
     def get_problem_messages(self, problem_id: str) -> List[dict]:
@@ -239,13 +239,13 @@ class Problems(ResourceBase):
         answer, if problem is solved within the (undisclosed) time limit.
         """
         path = ''
-        body = dict(data=data.dict(), params=params, solver=solver,
+        body = dict(data=data.model_dump(), params=params, solver=solver,
                     type=type, label=label)
         data = json.dumps(body, cls=NumpyEncoder)
         response = self.session.post(
             path, data=data, headers={'Content-Type': 'application/json'})
         rtype = get_type_hints(self.submit_problem)['return']
-        return parse_obj_as(rtype, response.json())
+        return TypeAdapter(rtype).validate_python(response.json())
 
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
     def submit_problems(self, problems: List[models.ProblemJob]) -> \
@@ -253,11 +253,11 @@ class Problems(ResourceBase):
         """Asynchronous multi-problem submit, returning initial statuses."""
         path = ''
         # encode iteratively so that timestamps are serialized (via pydantic json encoder)
-        body = '[%s]' % ','.join(p.json() for p in problems)
+        body = '[%s]' % ','.join(p.model_dump_json() for p in problems)
         response = self.session.post(
             path, data=body, headers={'Content-Type': 'application/json'})
         rtype = get_type_hints(self.submit_problems)['return']
-        return parse_obj_as(rtype, response.json())
+        return TypeAdapter(rtype).validate_python(response.json())
 
     @accepts(media_type='application/vnd.dwave.sapi.problem+json', version='>=2.1,<3')
     def cancel_problem(self, problem_id: str) -> \
@@ -266,7 +266,7 @@ class Problems(ResourceBase):
         path = '{}'.format(problem_id)
         response = self.session.delete(path)
         rtype = get_type_hints(self.cancel_problem)['return']
-        return parse_obj_as(rtype, response.json())
+        return TypeAdapter(rtype).validate_python(response.json())
 
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
     def cancel_problems(self, problem_ids: List[str]) -> \
@@ -275,7 +275,7 @@ class Problems(ResourceBase):
         path = ''
         response = self.session.delete(path, json=problem_ids)
         rtype = get_type_hints(self.cancel_problems)['return']
-        return parse_obj_as(rtype, response.json())
+        return TypeAdapter(rtype).validate_python(response.json())
 
 
 class LeapAccount(ResourceBase):
@@ -289,14 +289,14 @@ class LeapAccount(ResourceBase):
         """Retrieve user's active Leap project, as selected in Leap dashboard."""
         path = 'active_project/oauth/'
         response = self.session.get(path)
-        parsed = models._LeapActiveProjectResponse.parse_obj(response.json())
+        parsed = models._LeapActiveProjectResponse.model_validate(response.json())
         return parsed.data.project
 
     def list_projects(self) -> List[models.LeapProject]:
         """Retrieve list of Leap projects accessible to the authenticated user."""
         path = 'projects/oauth/'
         response = self.session.get(path)
-        parsed = models._LeapProjectsResponse.parse_obj(response.json())
+        parsed = models._LeapProjectsResponse.model_validate(response.json())
         return [p.project for p in parsed.data.projects]
 
     def get_project_token(self, *,
@@ -310,5 +310,5 @@ class LeapAccount(ResourceBase):
         path = 'token/oauth/'
         query = {'project_id': project_id}
         response = self.session.get(path, params=query)
-        parsed = models._LeapProjectTokenResponse.parse_obj(response.json())
+        parsed = models._LeapProjectTokenResponse.model_validate(response.json())
         return parsed.data.token

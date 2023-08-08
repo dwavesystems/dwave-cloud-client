@@ -12,23 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Dict, Any
+from typing_extensions import Annotated     # backport for py37, py38
 from datetime import datetime
 
-import numpy
-from pydantic import BaseModel
+from pydantic import BaseModel, RootModel
+from pydantic.functional_validators import AfterValidator
 
 from dwave.cloud.api import constants
+from dwave.cloud.utils import coerce_numpy_to_python
 
 
-class BaseModelWithEncoders(BaseModel):
-    class Config:
-        json_encoders = {
-            numpy.integer: int,
-            numpy.floating: float,
-            numpy.bool_: bool,
-            numpy.ndarray: lambda obj: obj.tolist(),
-        }
+# coerce common numpy types to python types on validation (parsing)
+AnyIncludingNumpy = Annotated[Any, AfterValidator(coerce_numpy_to_python)]
 
 
 class SolverConfiguration(BaseModel):
@@ -43,13 +39,13 @@ class ProblemInitialStatus(BaseModel):
     id: str
     type: constants.ProblemType
     solver: str
-    label: Optional[str]
+    label: Optional[str] = None
     status: constants.ProblemStatus
     submitted_on: datetime
 
 
 class ProblemStatus(ProblemInitialStatus):
-    solved_on: Optional[datetime]
+    solved_on: Optional[datetime] = None
 
 
 class StructuredProblemAnswer(BaseModel):
@@ -67,14 +63,11 @@ class UnstructuredProblemAnswer(BaseModel):
     data: dict
 
 
-class ProblemAnswer(BaseModel):
-    __root__: Union[StructuredProblemAnswer, UnstructuredProblemAnswer]
+class ProblemAnswer(RootModel):
+    root: Union[StructuredProblemAnswer, UnstructuredProblemAnswer]
 
     def __getattr__(self, item):
-        return getattr(self.__root__, item)
-
-    def dict(self, **kwargs):
-        return super().dict(**kwargs)['__root__']
+        return getattr(self.root, item)
 
 
 class ProblemStatusWithAnswer(ProblemStatus):
@@ -82,7 +75,7 @@ class ProblemStatusWithAnswer(ProblemStatus):
 
 
 class ProblemStatusMaybeWithAnswer(ProblemStatus):
-    answer: Optional[ProblemAnswer]
+    answer: Optional[ProblemAnswer] = None
 
 
 class StructuredProblemData(BaseModel):
@@ -97,41 +90,38 @@ class UnstructuredProblemData(BaseModel):
     data: str
 
 
-class ProblemData(BaseModel):
-    __root__: Union[StructuredProblemData, UnstructuredProblemData]
+class ProblemData(RootModel):
+    root: Union[StructuredProblemData, UnstructuredProblemData]
 
     def __getattr__(self, item):
-        return getattr(self.__root__, item)
-
-    def dict(self, **kwargs):
-        return super().dict(**kwargs)['__root__']
+        return getattr(self.root, item)
 
 
 class ProblemMetadata(BaseModel):
     solver: str
     type: constants.ProblemType
-    label: Optional[str]
+    label: Optional[str] = None
     status: constants.ProblemStatus
     submitted_by: str
     submitted_on: datetime
-    solved_on: Optional[datetime]
-    messages: Optional[List[dict]]
+    solved_on: Optional[datetime] = None
+    messages: Optional[List[dict]] = None
 
 
 class ProblemInfo(BaseModel):
     id: str
     data: ProblemData
-    params: dict
+    params: Dict[str, AnyIncludingNumpy]
     metadata: ProblemMetadata
     answer: ProblemAnswer
 
 
-class ProblemJob(BaseModelWithEncoders):
+class ProblemJob(BaseModel):
     data: ProblemData
-    params: dict
+    params: Dict[str, AnyIncludingNumpy]
     solver: str
     type: constants.ProblemType
-    label: Optional[str]
+    label: Optional[str] = None
 
 
 class BatchItemError(BaseModel):
