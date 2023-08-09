@@ -528,7 +528,12 @@ def solvers(config_file, profile, endpoint, region, client_type, solver_def,
 @click.option('--couplings', '-j', default=None,
               help='List/dict of couplings for Ising model problem formulation')
 @click.option('--random-problem', '-r', default=False, is_flag=True,
-              help='Submit a valid random problem using all qubits')
+              help='Submit a valid random problem using all qubits on structured '
+                   'solvers, or a random problem on a complete graph of size "-k" '
+                   'on unstructured solvers')
+@click.option('--clique-size', '--size', '-k', 'problem_size', default=3,
+              help='Clique size for random problems generated for unstructured '
+                   'solvers (complete graph of size K with random node/edge biases)')
 @click.option('--num-reads', '-n', default=None, type=int,
               help='Number of reads/samples')
 @click.option('--label', default='dwave sample', type=str, help='Problem label')
@@ -540,8 +545,8 @@ def solvers(config_file, profile, endpoint, region, client_type, solver_def,
               help='JSON output')
 @standardized_output
 def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
-           biases, couplings, random_problem, num_reads, label, sampling_params,
-           verbose, json_output, output):
+           biases, couplings, random_problem, problem_size, num_reads, label,
+           sampling_params, verbose, json_output, output):
     """Submit Ising-formulated problem and return samples."""
 
     # we'll limit max line len in non-verbose mode
@@ -581,7 +586,7 @@ def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
             except ImportError: # pragma: no cover
                 raise RuntimeError("Can't sample from unstructured solver without dimod. "
                                    "Re-install the library with 'bqm' support.")
-            linear, quadratic, _ = uniform(3, 'SPIN').to_ising()
+            linear, quadratic, _ = uniform(problem_size, 'SPIN').to_ising()
 
         else:
             raise CLIError(f"Unhandled solver type: {solver!r}", code=99)
