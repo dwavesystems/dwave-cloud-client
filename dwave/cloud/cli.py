@@ -31,6 +31,7 @@ import requests.exceptions
 
 import dwave.cloud
 from dwave.cloud import Client
+from dwave.cloud.solver import StructuredSolver, BaseUnstructuredSolver
 from dwave.cloud.utils import (
     default_text_input, generate_random_ising_problem,
     datetime_to_timestamp, utcnow, strtrunc, CLIError, set_loglevel,
@@ -571,7 +572,20 @@ def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
     client, solver = _get_client_solver(config, output)
 
     if random_problem:
-        linear, quadratic = generate_random_ising_problem(solver)
+        if isinstance(solver, StructuredSolver):
+            linear, quadratic = generate_random_ising_problem(solver)
+
+        elif isinstance(solver, BaseUnstructuredSolver):
+            try:
+                from dimod.generators import uniform
+            except ImportError: # pragma: no cover
+                raise RuntimeError("Can't sample from unstructured solver without dimod. "
+                                   "Re-install the library with 'bqm' support.")
+            linear, quadratic, _ = uniform(3, 'SPIN').to_ising()
+
+        else:
+            raise CLIError(f"Unhandled solver type: {solver!r}", code=99)
+
     else:
         try:
             linear = ast.literal_eval(biases) if biases else {}
@@ -584,8 +598,8 @@ def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
         except Exception as e:
             raise CLIError(f"Invalid couplings: {e}", code=99)
 
-    output("Using qubit biases: {linear}", linear=list(linear.items()), maxlen=maxlen)
-    output("Using qubit couplings: {quadratic}", quadratic=list(quadratic.items()), maxlen=maxlen)
+    output("Using biases: {linear}", linear=list(linear.items()), maxlen=maxlen)
+    output("Using couplings: {quadratic}", quadratic=list(quadratic.items()), maxlen=maxlen)
     output("Sampling parameters: {sampling_params}", sampling_params=params)
 
     response = _sample(
