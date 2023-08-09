@@ -1,0 +1,8 @@
+---
+upgrade:
+  - |
+    Disk cache serialization changed from Python pickle to JSON. Currently, disk
+    cache is used only for the list of Leap regions fetched from the Metadata
+    API on ``dwave.cloud.Client`` instantiation.
+    Upgrade should be seamless, as a new on-disk cache database file is created
+    for each dwave-cloud-client version.
