@@ -54,7 +54,8 @@ from itertools import chain, zip_longest
 from functools import partial, wraps, cached_property
 from collections import abc, namedtuple
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional, Tuple, Dict
+from typing import Optional, Tuple, Dict, Any
+from pydantic import TypeAdapter
 
 import requests
 import urllib3
@@ -752,12 +753,13 @@ class Client(object):
 
     @staticmethod
     @cached.ondisk(maxage=_REGIONS_CACHE_MAXAGE)
-    def _fetch_available_regions(metadata_api_endpoint, **config):
+    def _fetch_available_regions(metadata_api_endpoint: str, **config) -> Dict[str, str]:
         logger.info("Fetching available regions from the Metadata API at %r",
                     metadata_api_endpoint)
 
         with api.Regions(endpoint=metadata_api_endpoint, **config) as regions:
-            data = regions.list_regions()
+            regions = regions.list_regions()
+            data = TypeAdapter(Any).dump_python(regions)
 
         logger.debug("Received region metadata: %r", data)
 
@@ -785,7 +787,7 @@ class Client(object):
 
         logger.info("Using region metadata: %r", rs)
 
-        return {r.code: {"name": r.name, "endpoint": r.endpoint} for r in rs}
+        return {r['code']: {"name": r['name'], "endpoint": r['endpoint']} for r in rs}
 
     @cached(maxage=_SOLVERS_CACHE_MAXAGE)
     def _fetch_solvers(self, name=None):
