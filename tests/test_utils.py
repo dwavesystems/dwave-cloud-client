@@ -273,6 +273,25 @@ class TestCachedInMemoryDecorator(unittest.TestCase):
             self.assertEqual(f(x='\0B'), 0)
             self.assertEqual(f(x='\0\0C'), 1)
 
+    @parameterized.expand([
+        (1, ),
+        ('abc', ),
+        ([1, 'b', None], ),
+        ({"a": 1, "b": {"c": 2}}, ),
+    ])
+    @mock.patch('dwave.cloud.utils.epochnow', lambda: 0)
+    def test_value_serialization(self, val):
+        counter = count()
+
+        @self.cached(maxage=1)
+        def f(*a, **b):
+            i = next(counter)
+            if i == 0:
+                return val
+
+        self.assertEqual(f(), val)
+        self.assertEqual(f(), val)
+
     def test_expiry(self):
         counter = count()
 
