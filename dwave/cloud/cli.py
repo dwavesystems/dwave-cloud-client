@@ -20,7 +20,7 @@ import subprocess
 import pkg_resources
 
 from collections.abc import Sequence
-from functools import wraps
+from functools import wraps, partial
 from timeit import default_timer as timer
 
 from typing import Dict
@@ -48,6 +48,9 @@ from dwave.cloud.config import (
     get_configfile_paths)
 from dwave.cloud.api.constants import DEFAULT_METADATA_API_ENDPOINT
 
+
+# show defaults for all click options when printing --help
+click.option = partial(click.option, show_default=True)
 
 def enable_logging(ctx, param, value):
     if value and not ctx.resilient_parsing:
@@ -88,10 +91,10 @@ def solver_options(fn):
     fn = click.option(
         '--client', 'client_type', default=None,
         type=click.Choice(['base', 'qpu', 'sw', 'hybrid'], case_sensitive=False),
-        help='Client type used (default: from config)')(fn)
+        help='Client type used [default: from config]')(fn)
     fn = click.option(
         '--solver', '-s', 'solver_def', default=None,
-        help='Feature-based solver filter (default: from config)')(fn)
+        help='Feature-based solver filter [default: from config]')(fn)
 
     return fn
 
@@ -101,11 +104,11 @@ def endpoint_options(fn):
 
     fn = click.option(
         '--endpoint', default=None, metavar='URL',
-        help='Solver API endpoint (default: from config)')(fn)
+        help='Solver API endpoint [default: from config]')(fn)
     # TODO: provide choice for region
     fn = click.option(
         '--region', default=None, metavar='CODE',
-        help='Solver API region (default: from config)')(fn)
+        help='Solver API region [default: from config]')(fn)
 
     return fn
 
