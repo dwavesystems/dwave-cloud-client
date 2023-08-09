@@ -230,7 +230,7 @@ def _config_create(config_file, profile, ask_full=False):
     if ask_full:
         rs = Client._fetch_available_regions(DEFAULT_METADATA_API_ENDPOINT)
         prompts = dict(
-            region=dict(prompt="Solver API region", choices=[r.code for r in rs]),
+            region=dict(prompt="Solver API region", choices=[r['code'] for r in rs]),
             endpoint=dict(prompt="Solver API endpoint URL (overwrites 'region')"),
             token=dict(prompt="Authentication token"),
             client=dict(prompt="Client class", choices='base qpu sw hybrid'.split()),
