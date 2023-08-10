@@ -20,7 +20,7 @@ import subprocess
 import pkg_resources
 
 from collections.abc import Sequence
-from functools import wraps
+from functools import wraps, partial
 from timeit import default_timer as timer
 
 from typing import Dict
@@ -31,6 +31,7 @@ import requests.exceptions
 
 import dwave.cloud
 from dwave.cloud import Client
+from dwave.cloud.solver import StructuredSolver, BaseUnstructuredSolver
 from dwave.cloud.utils import (
     default_text_input, generate_random_ising_problem,
     datetime_to_timestamp, utcnow, strtrunc, CLIError, set_loglevel,
@@ -47,6 +48,9 @@ from dwave.cloud.config import (
     get_configfile_paths)
 from dwave.cloud.api.constants import DEFAULT_METADATA_API_ENDPOINT
 
+
+# show defaults for all click options when printing --help
+click.option = partial(click.option, show_default=True)
 
 def enable_logging(ctx, param, value):
     if value and not ctx.resilient_parsing:
@@ -87,10 +91,10 @@ def solver_options(fn):
     fn = click.option(
         '--client', 'client_type', default=None,
         type=click.Choice(['base', 'qpu', 'sw', 'hybrid'], case_sensitive=False),
-        help='Client type used (default: from config)')(fn)
+        help='Client type used [default: from config]')(fn)
     fn = click.option(
         '--solver', '-s', 'solver_def', default=None,
-        help='Feature-based solver filter (default: from config)')(fn)
+        help='Feature-based solver filter [default: from config]')(fn)
 
     return fn
 
@@ -100,11 +104,11 @@ def endpoint_options(fn):
 
     fn = click.option(
         '--endpoint', default=None, metavar='URL',
-        help='Solver API endpoint (default: from config)')(fn)
+        help='Solver API endpoint [default: from config]')(fn)
     # TODO: provide choice for region
     fn = click.option(
         '--region', default=None, metavar='CODE',
-        help='Solver API region (default: from config)')(fn)
+        help='Solver API region [default: from config]')(fn)
 
     return fn
 
@@ -527,7 +531,12 @@ def solvers(config_file, profile, endpoint, region, client_type, solver_def,
 @click.option('--couplings', '-j', default=None,
               help='List/dict of couplings for Ising model problem formulation')
 @click.option('--random-problem', '-r', default=False, is_flag=True,
-              help='Submit a valid random problem using all qubits')
+              help='Submit a valid random problem using all qubits on structured '
+                   'solvers, or a random problem on a complete graph of size "-k" '
+                   'on unstructured solvers')
+@click.option('--clique-size', '--size', '-k', 'problem_size', default=3,
+              help='Clique size for random problems generated for unstructured '
+                   'solvers (complete graph of size K with random node/edge biases)')
 @click.option('--num-reads', '-n', default=None, type=int,
               help='Number of reads/samples')
 @click.option('--label', default='dwave sample', type=str, help='Problem label')
@@ -539,8 +548,8 @@ def solvers(config_file, profile, endpoint, region, client_type, solver_def,
               help='JSON output')
 @standardized_output
 def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
-           biases, couplings, random_problem, num_reads, label, sampling_params,
-           verbose, json_output, output):
+           biases, couplings, random_problem, problem_size, num_reads, label,
+           sampling_params, verbose, json_output, output):
     """Submit Ising-formulated problem and return samples."""
 
     # we'll limit max line len in non-verbose mode
@@ -571,7 +580,20 @@ def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
     client, solver = _get_client_solver(config, output)
 
     if random_problem:
-        linear, quadratic = generate_random_ising_problem(solver)
+        if isinstance(solver, StructuredSolver):
+            linear, quadratic = generate_random_ising_problem(solver)
+
+        elif isinstance(solver, BaseUnstructuredSolver):
+            try:
+                from dimod.generators import uniform
+            except ImportError: # pragma: no cover
+                raise RuntimeError("Can't sample from unstructured solver without dimod. "
+                                   "Re-install the library with 'bqm' support.")
+            linear, quadratic, _ = uniform(problem_size, 'SPIN').to_ising()
+
+        else:
+            raise CLIError(f"Unhandled solver type: {solver!r}", code=99)
+
     else:
         try:
             linear = ast.literal_eval(biases) if biases else {}
@@ -584,8 +606,8 @@ def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
         except Exception as e:
             raise CLIError(f"Invalid couplings: {e}", code=99)
 
-    output("Using qubit biases: {linear}", linear=list(linear.items()), maxlen=maxlen)
-    output("Using qubit couplings: {quadratic}", quadratic=list(quadratic.items()), maxlen=maxlen)
+    output("Using biases: {linear}", linear=list(linear.items()), maxlen=maxlen)
+    output("Using couplings: {quadratic}", quadratic=list(quadratic.items()), maxlen=maxlen)
     output("Sampling parameters: {sampling_params}", sampling_params=params)
 
     response = _sample(

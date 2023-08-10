@@ -1,0 +1,10 @@
+---
+fixes:
+  - |
+    Fix random problem sampling on hybrid solvers via ``dwave sample`` CLI.
+    See `#557 <https://github.com/dwavesystems/dwave-cloud-client/issues/557>`_.
+features:
+  - |
+    Add ``--clique-size``/``--size``/``-k`` options to ``dwave sample`` CLI
+    command to help specify problem size (clique size) for random problems
+    generated for unstructured solvers.
