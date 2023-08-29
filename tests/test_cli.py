@@ -66,7 +66,7 @@ class TestConfigCreate(unittest.TestCase):
     def test_default_flows(self, name, extra_opts, inputs):
         runner = CliRunner(mix_stderr=False)
         with runner.isolated_filesystem():
-            with mock.patch("dwave.cloud.config.get_configfile_paths", lambda: ['dwave.conf']):
+            with mock.patch("dwave.cloud.config.loaders.get_configfile_paths", lambda: ['dwave.conf']):
                 with mock.patch("dwave.cloud.utils.input", side_effect=inputs):
                     result = runner.invoke(cli, [
                         'config', 'create'
@@ -121,9 +121,9 @@ class TestCli(unittest.TestCase):
         runner = CliRunner(mix_stderr=False)
         with runner.isolated_filesystem():
             touch('dwave.conf')
-            with mock.patch('dwave.cloud.config.homebase.site_config_dir_list',
+            with mock.patch('dwave.cloud.config.loaders.homebase.site_config_dir_list',
                             lambda **kw: ['system1', 'system2']):
-                with mock.patch('dwave.cloud.config.homebase.user_config_dir',
+                with mock.patch('dwave.cloud.config.loaders.homebase.user_config_dir',
                                 lambda **kw: 'user'):
                     with mock.patch('os.path.exists', lambda *x: True):
                         # test listing of all auto-detected config files
@@ -216,7 +216,7 @@ class TestCli(unittest.TestCase):
                     token = 3''')
 
             # test auto-detected case
-            with mock.patch('dwave.cloud.config.get_configfile_paths',
+            with mock.patch('dwave.cloud.config.loaders.get_configfile_paths',
                             lambda **kw: [config_file]):
                 result = runner.invoke(cli, [
                     'config', 'inspect'

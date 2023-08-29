@@ -161,14 +161,19 @@ import os
 import ast
 import logging
 import configparser
+from typing import Optional, Union
 
 import homebase
 
 from dwave.cloud.exceptions import ConfigFileReadError, ConfigFileParseError
 from dwave.cloud.package_info import __version__, __packagename__
 
-__all__ = ['get_configfile_paths', 'get_configfile_path', 'get_default_configfile_path',
-           'load_config_from_files', 'load_profile_from_files', 'load_config']
+__all__ = ['get_configfile_paths', 'get_configfile_path',
+           'get_default_configfile_path', 'get_default_config',
+           'load_config_from_files', 'load_profile_from_files',
+           'load_config', 'update_config',
+           # XXX: for backward compat only / temporary
+           'parse_float', 'parse_int', 'parse_boolean', 'get_cache_dir']
 
 logger = logging.getLogger(__name__)
 
@@ -594,7 +599,9 @@ def get_default_config():
     return config
 
 
-def load_config(config_file=None, profile=None, **kwargs):
+def load_config(config_file: Optional[Union[str, bool]] = None,
+                profile: Optional[str] = None,
+                **kwargs) -> dict:
     """Load D-Wave Cloud Client configuration based on a configuration file.
 
     Configuration values can be specified in multiple ways, ranked in the following
