@@ -622,11 +622,7 @@ class Client(object):
 
         # create http idempotent Retry config
         def get_retry_conf():
-            # need a subclass to override the backoff_max
-            class Retry(urllib3.Retry):
-                BACKOFF_MAX = self.http_retry_backoff_max
-
-            return Retry(
+            retry = urllib3.Retry(
                 total=self.http_retry_total,
                 connect=self.http_retry_connect,
                 read=self.http_retry_read,
@@ -636,6 +632,12 @@ class Client(object):
                 raise_on_redirect=True,
                 raise_on_status=True,
                 respect_retry_after_header=True)
+
+            if self.http_retry_backoff_max is not None:
+                # handle `urllib3>=1.21.1,<1.27` AND `urllib3>=1.21.1,<3`
+                retry.BACKOFF_MAX = retry.backoff_max = self.http_retry_backoff_max
+
+            return retry
 
         session = BaseUrlSession(base_url=endpoint)
         session.mount('http://',

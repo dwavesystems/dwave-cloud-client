@@ -555,7 +555,8 @@ class ClientConstruction(unittest.TestCase):
         self.assertEqual(retry.redirect, opts['http_retry_redirect'])
         self.assertEqual(retry.status, opts['http_retry_status'])
         self.assertEqual(retry.backoff_factor, opts['http_retry_backoff_factor'])
-        self.assertEqual(retry.BACKOFF_MAX, opts['http_retry_backoff_max'])
+        backoff_max = getattr(retry, 'backoff_max', getattr(retry, 'BACKOFF_MAX'))
+        self.assertEqual(backoff_max, opts['http_retry_backoff_max'])
 
     def test_http_retry_params_from_config(self):
         retry_opts = {
