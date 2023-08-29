@@ -2,13 +2,9 @@
     :target: https://badge.fury.io/py/dwave-cloud-client
     :alt: Latest version on PyPI
 
-.. image:: https://circleci.com/gh/dwavesystems/dwave-cloud-client.svg?style=svg
+.. image:: https://circleci.com/gh/dwavesystems/dwave-cloud-client.svg?style=shield
     :target: https://circleci.com/gh/dwavesystems/dwave-cloud-client
-    :alt: Linux/MacOS build status
-
-.. image:: https://ci.appveyor.com/api/projects/status/6a2wjq9xtgtr2t2c/branch/master?svg=true
-    :target: https://ci.appveyor.com/project/dwave-adtt/dwave-cloud-client/branch/master
-    :alt: Windows build status
+    :alt: Linux/MacOS/Windows build status
 
 .. image:: https://codecov.io/gh/dwavesystems/dwave-cloud-client/branch/master/graph/badge.svg
     :target: https://codecov.io/gh/dwavesystems/dwave-cloud-client
