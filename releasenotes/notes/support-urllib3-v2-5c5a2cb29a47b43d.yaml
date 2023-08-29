@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Correctly set `backoff_max` time for retried requests when ``urllib3>=2.0``
+    is used.
+    See `#566 <https://github.com/dwavesystems/dwave-cloud-client/issues/566>`_.

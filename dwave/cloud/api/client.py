@@ -320,9 +320,10 @@ class DWaveAPIClient:
 
         retry = urllib3.Retry(**kwargs)
 
-        # note: `Retry.BACKOFF_MAX` can't be set on construction
+        # note: prior to `urllib3==2`, backoff_max had to be set manually on object
         if backoff_max is not None:
-            retry.BACKOFF_MAX = backoff_max
+            # handle `urllib3>=1.21.1,<1.27` AND `urllib3>=1.21.1,<3`
+            retry.BACKOFF_MAX = retry.backoff_max = backoff_max
 
         return retry
 
