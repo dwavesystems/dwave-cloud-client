@@ -115,7 +115,7 @@ def validate_config_v1(raw_config: dict) -> ClientConfig:
     config = raw_config.copy()
 
     # parse string headers
-    headers = config['headers']
+    headers = config.get('headers')
     if not headers:
         headers_dict = {}
     elif isinstance(headers, abc.Mapping):
@@ -136,8 +136,8 @@ def validate_config_v1(raw_config: dict) -> ClientConfig:
 
     # parse optional client certificate
     # (if string, path to ssl client cert file (.pem). If tuple, (‘cert’, ‘key’) pair.)
-    client_cert = config['client_cert']
-    client_cert_key = config['client_cert_key']
+    client_cert = config.get('client_cert')
+    client_cert_key = config.get('client_cert_key')
     if client_cert_key is not None:
         if client_cert is not None:
             client_cert = (client_cert, client_cert_key)
@@ -148,7 +148,7 @@ def validate_config_v1(raw_config: dict) -> ClientConfig:
     config['cert'] = client_cert
 
     # parse solver
-    solver = config['solver']
+    solver = config.get('solver')
     if not solver:
         solver_def = {}
     elif isinstance(solver, abc.Mapping):
