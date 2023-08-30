@@ -149,6 +149,8 @@ def validate_config_v1(raw_config: dict) -> ClientConfig:
 
     # parse solver
     solver = config.get('solver')
+    if isinstance(solver, str):
+        solver = solver.strip()
     if not solver:
         solver_def = {}
     elif isinstance(solver, abc.Mapping):

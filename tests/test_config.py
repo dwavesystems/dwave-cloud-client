@@ -19,13 +19,15 @@ import configparser
 from unittest import mock
 from functools import partial
 
+from parameterized import parameterized
+
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import ConfigFileParseError, ConfigFileReadError
 from dwave.cloud.testing import iterable_mock_open
 from dwave.cloud.config import (
     get_configfile_paths, load_config_from_files, load_config,
     parse_float, parse_int, parse_boolean, get_cache_dir, update_config)
-
+from dwave.cloud.config.models import validate_config_v1, load_config_v1
 
 class TestConfigParsing(unittest.TestCase):
 
@@ -506,3 +508,98 @@ class TestConfigUtils(unittest.TestCase):
         update = {'endpoint': 2, 'region': 2}
         update_config(config, update)
         self.assertEqual(config, update)
+
+
+class TestConfigModel(unittest.TestCase):
+
+    @parameterized.expand([
+        ("null", {"client_cert": None, "client_cert_key": None}, None),
+        ("pem", {"client_cert": "/path/to/pem", "client_cert_key": None}, "/path/to/pem"),
+        ("pair", {"client_cert": "cert", "client_cert_key": "key"}, ("cert", "key")),
+    ])
+    def test_cert(self, name, values, model):
+        config = validate_config_v1(values)
+        self.assertEqual(config.cert, model)
+
+    @parameterized.expand([
+        ("null", None, {}),
+        ("blank", '', {}),
+        ("empty", '  ', {}),
+        ("dict", {"Accept": "*/*"}, {"Accept": "*/*"}),
+        ("valid string", "Field-1: value-1\nField-2: value-2",
+                         {"Field-1": "value-1", "Field-2": "value-2"}),
+        ("invalid string", "Field", {}),
+        ("empty field", "Field:", {"Field": ""}),
+        ("empty value", "\n", {}),
+    ])
+    def test_headers(self, name, value, model):
+        config = validate_config_v1({"headers": value})
+        self.assertEqual(config.headers, model)
+
+    @parameterized.expand([
+        ("null", None, {}),
+        ("blank", '', {}),
+        ("empty", '  ', {}),
+        ("string", "name", dict(name__eq="name")),
+        ("simple dict", dict(name="name"), dict(name="name")),
+        ("features dict", dict(feature__op="val", x="y"), dict(feature__op="val", x="y")),
+        ("valid json", '{"key": "val"}', dict(key="val")),
+        ("valid json non-dict", '"name"', dict(name__eq='"name"')),
+        ("invalid json", "{name}", dict(name__eq="{name}")),
+    ])
+    def test_solver(self, name, value, model):
+        config = validate_config_v1({"solver": value})
+        self.assertEqual(config.solver, model)
+
+    @parameterized.expand([
+        ("cert missing", {"client_cert": None, "client_cert_key": "key"}, ValueError),
+        ("invalid headers", {"headers": [1,2,3]}, ValueError),
+        ("invalid solver", {"solver": {1,2,3}}, ValueError),
+    ])
+    def test_validation_errors(self, name, values, model):
+        with self.assertRaises(model):
+            validate_config_v1(values)
+
+    @parameterized.expand([
+        ("total", 1, 1),
+        ("total", 1.0, 1),
+        ("total", False, False),
+        ("connect", 1.0, 1),
+        ("read", 1, 1),
+        ("redirect", 1, 1),
+        ("redirect", False, False),
+        ("status", 1, 1),
+        ("other", 1, 1),
+        ("backoff_factor", 1, 1.0),
+        ("backoff_max", 1, 1.0),
+    ])
+    def test_request_retry(self, key, value, model_value):
+        config = validate_config_v1({f"http_retry_{key}": value})
+        self.assertEqual(getattr(config.request_retry, key), model_value)
+
+    @parameterized.expand([
+        ("backoff_min", 1, 1.0),
+        ("backoff_min", 1.5, 1.5),
+        ("backoff_max", 1, 1.0),
+        ("backoff_max", 1.5, 1.5),
+        ("backoff_base", 1, 1.0),
+        ("backoff_base", 1.5, 1.5),
+    ])
+    def test_polling_schedule(self, key, value, model_value):
+        config = validate_config_v1({f"poll_{key}": value})
+        self.assertEqual(getattr(config.polling_schedule, key), model_value)
+
+    @parameterized.expand([
+        ("1", True), ("on", True), ("On", True), ("true", True), ("True", True),
+        ("0", False), ("off", False), ("Off", False), ("false", False), ("False", False),
+    ])
+    def test_scalars(self, value, model_value):
+        for flag in ("permissive_ssl", "connection_close"):
+            with self.subTest(flag):
+                config = validate_config_v1({flag: value})
+                self.assertEqual(getattr(config, flag), model_value)
+
+    def test_full_load_defaults(self):
+        # just a smoke test of `load_config_v1` for now
+        from dwave.cloud.config.models import _V1_CONFIG_DEFAULTS
+        self.assertEqual(load_config_v1({}),  validate_config_v1(_V1_CONFIG_DEFAULTS))
