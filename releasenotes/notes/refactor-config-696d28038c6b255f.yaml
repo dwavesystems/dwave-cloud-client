@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Add Pydantic-based data model for cloud-client configuration,
+    ``dwave.cloud.config.models.ClientConfig``.

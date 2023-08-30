@@ -157,3 +157,4 @@ Examples:
 """
 
 from .loaders import *
+from .models import *
