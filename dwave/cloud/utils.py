@@ -608,8 +608,9 @@ class deprecated(object):
     decorated function.
     """
 
-    def __init__(self, msg=None):
+    def __init__(self, msg=None, stacklevel=2):
         self.msg = msg
+        self.stacklevel = stacklevel
 
     def __call__(self, fn):
         if not callable(fn):
@@ -621,7 +622,7 @@ class deprecated(object):
             if not msg:
                 fn_name = getattr(fn, '__name__', 'unnamed')
                 msg = "{}() has been deprecated".format(fn_name)
-            warnings.warn(msg, DeprecationWarning)
+            warnings.warn(msg, DeprecationWarning, stacklevel=self.stacklevel)
 
             return fn(*args, **kwargs)
 
