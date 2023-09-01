@@ -5,4 +5,9 @@ features:
     ``dwave.cloud.config.models.ClientConfig``.
   - |
     Consolidate client runtime configuration options under ``Client.config``,
-    a data model defined in ``dwave.cloud.config.models.ClientConfig``.
+    a data model defined with ``dwave.cloud.config.models.ClientConfig``.
+deprecations:
+  - |
+    Individual config options exposed as ``dwave.cloud.Client`` attributes are
+    deprecated since ``dwave-cloud-client==0.11.0`` and will be removed in
+    ``dwave-cloud-client==0.12.0``. Use ``Client.config`` data model instead.
