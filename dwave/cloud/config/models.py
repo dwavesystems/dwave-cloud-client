@@ -30,7 +30,14 @@ __all__ = ['RequestRetryConfig', 'PollingSchedule', 'ClientConfig',
 logger = logging.getLogger(__name__)
 
 
-class RequestRetryConfig(BaseModel):
+class GetterMixin:
+    """Expose class attributes via item getter protocol."""
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+
+class RequestRetryConfig(BaseModel, GetterMixin):
     """Request retry config conformant with :class:`urllib3.Retry` interface."""
 
     #: Total number of retries to allow. Takes precedence over other counts.
@@ -58,7 +65,7 @@ class RequestRetryConfig(BaseModel):
     backoff_max: Optional[float] = 60
 
 
-class PollingSchedule(BaseModel):
+class PollingSchedule(BaseModel, GetterMixin):
     """Problem status polling exponential back-off schedule params."""
 
     #: Duration of the first interval (between first and second poll), in seconds.
@@ -72,7 +79,7 @@ class PollingSchedule(BaseModel):
     backoff_base: Optional[float] = 1.3
 
 
-class ClientConfig(BaseModel):
+class ClientConfig(BaseModel, GetterMixin):
     # api region
     metadata_api_endpoint: str = DEFAULT_METADATA_API_ENDPOINT
     region: Optional[str] = DEFAULT_REGION
