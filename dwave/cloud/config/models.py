@@ -25,7 +25,7 @@ from dwave.cloud.api.constants import (
     DEFAULT_REGION, DEFAULT_METADATA_API_ENDPOINT)
 
 __all__ = ['RequestRetryConfig', 'PollingSchedule', 'ClientConfig',
-           'validate_config_v1', 'load_config_v1']
+           'validate_config_v1', 'dump_config_v1', 'load_config_v1']
 
 logger = logging.getLogger(__name__)
 
@@ -179,7 +179,7 @@ def validate_config_v1(raw_config: dict) -> ClientConfig:
                 solver_def = dict(name__eq=solver)
     else:
         raise ValueError("Expecting a features dictionary or a string name for 'solver'")
-    logger.debug("Parsed solver definition: %r", solver_def)
+    logger.debug("parsed solver definition: %r", solver_def)
     config['solver'] = solver_def
 
     # polling
@@ -193,6 +193,50 @@ def validate_config_v1(raw_config: dict) -> ClientConfig:
                                if k.startswith(prefix)}
 
     return ClientConfig.model_validate(config)
+
+
+def dump_config_v1(config: ClientConfig) -> dict:
+    """Dump :class:`ClientConfig` to a flat dict of v1 config options.
+
+    Note: consider this to be an approximate inverse of :func:`validate_config_v1`::
+
+        dump_config_v1(validate_config_v1(raw_config)) ~= raw_config
+
+    The inverse might not be exact due to field type casting during validation.
+    E.g. original boolean value of 'off' or '0' will be dumped as 'false'.
+    """
+
+    raw_config = config.model_dump()
+
+    # invert transformations during validation
+    if h := raw_config['headers']:
+        raw_config['headers'] = '\n'.join("{k}: {v}" for k, v in h.items())
+
+    cert_pair = (None, None)
+    if c := raw_config.get('cert'):
+        if isinstance(c, tuple):
+            cert_pair = c
+        else:   # assume string
+            cert_pair = (c, None)
+    raw_config.update(zip(("client_cert", "client_cert_key"), cert_pair))
+    del raw_config['cert']
+
+    raw_config['solver'] = json.dumps(raw_config['solver'])
+
+    # TODO: undo this downcast once we support tuple input for `request_timeout` in the v1
+    # config format (issue https://github.com/dwavesystems/dwave-cloud-client/issues/440).
+    if isinstance(rt := raw_config['request_timeout'], tuple):
+        raw_config['request_timeout'] = rt[0]
+
+    # expand/translate polling
+    raw_config.update({f"poll_{k}": v for k, v in raw_config['polling_schedule'].items()})
+    del raw_config['polling_schedule']
+
+    # expand/translate retry config
+    raw_config.update({f"http_retry_{k}": v for k, v in raw_config['request_retry'].items()})
+    del raw_config['request_retry']
+
+    return raw_config
 
 
 # XXX: replace with model defaults?

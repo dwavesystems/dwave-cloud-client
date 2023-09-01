@@ -27,7 +27,7 @@ from dwave.cloud.testing import iterable_mock_open
 from dwave.cloud.config import (
     get_configfile_paths, load_config_from_files, load_config,
     parse_float, parse_int, parse_boolean, get_cache_dir, update_config)
-from dwave.cloud.config.models import validate_config_v1, load_config_v1
+from dwave.cloud.config.models import validate_config_v1, load_config_v1, dump_config_v1
 
 class TestConfigParsing(unittest.TestCase):
 
@@ -603,3 +603,10 @@ class TestConfigModel(unittest.TestCase):
         # just a smoke test of `load_config_v1` for now
         from dwave.cloud.config.models import _V1_CONFIG_DEFAULTS
         self.assertEqual(load_config_v1({}),  validate_config_v1(_V1_CONFIG_DEFAULTS))
+
+    def test_config_dump(self):
+        # just a smoke test of `dump_config_v1` for now
+        from dwave.cloud.config.models import _V1_CONFIG_DEFAULTS
+        attractor = dump_config_v1(validate_config_v1(_V1_CONFIG_DEFAULTS))
+        self.assertEqual(
+            dump_config_v1(validate_config_v1(attractor)), attractor)
