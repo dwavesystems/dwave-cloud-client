@@ -3,3 +3,6 @@ features:
   - |
     Add Pydantic-based data model for cloud-client configuration,
     ``dwave.cloud.config.models.ClientConfig``.
+  - |
+    Consolidate client runtime configuration options under ``Client.config``,
+    a data model defined in ``dwave.cloud.config.models.ClientConfig``.

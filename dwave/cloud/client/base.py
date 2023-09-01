@@ -66,8 +66,7 @@ from dwave.cloud import api
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *    # TODO: fix
 from dwave.cloud.computation import Future
-from dwave.cloud.config import (
-    load_config, parse_float, parse_int, parse_boolean, update_config)
+from dwave.cloud.config import load_config, update_config, validate_config_v1
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.upload import ChunkedData
@@ -434,114 +433,21 @@ class Client(object):
         # note: treat empty string values (e.g. from file/env) as undefined/None
         options = copy.deepcopy(self.defaults)
         update_config(options, kwargs)
-
         logger.debug("Client options with defaults: %r", options)
 
-        # configure MetadataAPI access -- needed by Client.get_regions()
-        self.metadata_api_endpoint = options['metadata_api_endpoint']
-
-        # parse headers as they might be needed by Client.get_regions()
-        headers = options['headers']
-        if not headers:
-            headers_dict = {}
-        elif isinstance(headers, abc.Mapping):
-            headers_dict = headers
-        elif isinstance(headers, str):
-            try:
-                # valid  headers = "Field-1: value-1\nField-2: value-2"
-                headers_dict = {key.strip(): val.strip()
-                                for key, val in [line.split(':')
-                                                 for line in headers.strip().split('\n')]}
-            except Exception as e:
-                logger.debug("Invalid headers: %r", headers)
-                headers_dict = {}
-        else:
-            raise ValueError("HTTP headers expected in a dict, or a string")
-        logger.debug("Parsed headers=%r", headers_dict)
-        self.headers = headers_dict
+        self.config = validate_config_v1(options)
+        logger.debug("Client initialized with config=%r", self.config)
 
         # resolve endpoint using region
-        region, endpoint = self._resolve_region_endpoint(
-            region=options.get('region'), endpoint=options.get('endpoint'))
+        self.config.region, self.config.endpoint = self._resolve_region_endpoint(
+            region=self.config.region, endpoint=self.config.endpoint)
 
         # sanity check
-        if not endpoint:
+        if not self.config.endpoint:
             raise ValueError("API endpoint not defined")
 
-        token = options['token']
-        if not token:
+        if not self.config.token:
             raise ValueError("API token not defined")
-
-        # parse optional client certificate
-        client_cert = options['client_cert']
-        client_cert_key = options['client_cert_key']
-        if client_cert_key is not None:
-            if client_cert is not None:
-                client_cert = (client_cert, client_cert_key)
-            else:
-                raise ValueError(
-                    "Client certificate key given, but the cert is missing")
-
-        # parse solver
-        solver = options['solver']
-        if not solver:
-            solver_def = {}
-        elif isinstance(solver, abc.Mapping):
-            solver_def = solver
-        elif isinstance(solver, str):
-            # support features dict encoded as JSON in our config INI file
-            # TODO: push this decoding to the config module, once we switch to a
-            #       richer config format (JSON or YAML)
-            try:
-                solver_def = json.loads(solver)
-            except Exception:
-                # unparseable json, assume string name for solver
-                # we'll deprecate this eventually, but for now just convert it to
-                # features dict (equality constraint on full solver name)
-                logger.debug("Invalid solver JSON, assuming string name: %r", solver)
-                solver_def = dict(name__eq=solver)
-        else:
-            raise ValueError("Expecting a features dictionary or a string name for 'solver'")
-        logger.debug("Parsed solver=%r", solver_def)
-
-        # Store connection/session parameters
-        # TODO: consolidate all options under Client.options or similar
-        self.region = region    # for record only
-        self.endpoint = endpoint
-        self.token = token
-        self.default_solver = solver_def
-
-        self.client_cert = client_cert
-        self.request_timeout = parse_float(options['request_timeout'])
-        self.polling_timeout = parse_float(options['polling_timeout'])
-
-        self.proxy = options['proxy']
-        self.permissive_ssl = parse_boolean(options['permissive_ssl'])
-        self.connection_close = parse_boolean(options['connection_close'])
-
-        self.poll_backoff_min = parse_float(options['poll_backoff_min'])
-        self.poll_backoff_max = parse_float(options['poll_backoff_max'])
-        self.poll_backoff_base = parse_float(options['poll_backoff_base'])
-
-        self.http_retry_total = parse_int(options['http_retry_total'])
-        self.http_retry_connect = parse_int(options['http_retry_connect'])
-        self.http_retry_read = parse_int(options['http_retry_read'])
-        self.http_retry_redirect = parse_int(options['http_retry_redirect'])
-        self.http_retry_status = parse_int(options['http_retry_status'])
-        self.http_retry_backoff_factor = parse_float(options['http_retry_backoff_factor'])
-        self.http_retry_backoff_max = parse_float(options['http_retry_backoff_max'])
-
-        opts = (
-            'region', 'endpoint', 'token', 'default_solver',
-            'client_cert', 'request_timeout', 'polling_timeout',
-            'proxy', 'headers', 'permissive_ssl', 'connection_close',
-            'poll_backoff_min', 'poll_backoff_max', 'poll_backoff_base',
-            'http_retry_total', 'http_retry_connect', 'http_retry_read',
-            'http_retry_redirect', 'http_retry_status',
-            'http_retry_backoff_factor', 'http_retry_backoff_max')
-        logger.debug(
-            "Client initialized with (%s)",
-            ", ".join("{}={!r}".format(o, getattr(self, o)) for o in opts))
 
         # Create session for main thread only
         self.session = self.create_session()

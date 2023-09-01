@@ -16,7 +16,7 @@ import copy
 import json
 import logging
 from collections import abc
-from typing import Optional, Union, Literal, Tuple, Dict
+from typing import Optional, Union, Literal, Tuple, Dict, Any
 
 from pydantic import BaseModel
 
@@ -90,7 +90,7 @@ class ClientConfig(BaseModel, GetterMixin):
 
     # [sapi client specific] feature-based solver selection query
     client: Optional[str] = 'base'
-    solver: Optional[Dict[str, str]] = None
+    solver: Optional[Dict[str, Any]] = None
 
     # [sapi client specific] poll back-off schedule defaults [sec]
     polling_schedule: PollingSchedule = PollingSchedule()
