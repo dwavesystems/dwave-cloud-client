@@ -569,7 +569,7 @@ class Client(object):
         """
 
         # allow endpoint path to not end with /
-        endpoint = self.endpoint
+        endpoint = self.config.endpoint
         if not endpoint.endswith('/'):
             endpoint += '/'
 
@@ -584,17 +584,17 @@ class Client(object):
                 max_retries=self.config.request_retry.to_urllib3_retry()))
 
         session.headers.update({'User-Agent': self._user_agent})
-        if self.headers:
-            session.headers.update(self.headers)
-        if self.token:
-            session.headers.update({'X-Auth-Token': self.token})
-        if self.client_cert:
-            session.cert = self.client_cert
+        if self.config.headers:
+            session.headers.update(self.config.headers)
+        if self.config.token:
+            session.headers.update({'X-Auth-Token': self.config.token})
+        if self.config.cert:
+            session.cert = self.config.cert
 
-        session.proxies = {'http': self.proxy, 'https': self.proxy}
-        if self.permissive_ssl:
+        session.proxies = {'http': self.config.proxy, 'https': self.config.proxy}
+        if self.config.permissive_ssl:
             session.verify = False
-        if self.connection_close:
+        if self.config.connection_close:
             session.headers.update({'Connection': 'close'})
 
         # Debug-log headers
@@ -715,13 +715,13 @@ class Client(object):
         """
         try:
             rs = Client._fetch_available_regions(
-                metadata_api_endpoint=self.metadata_api_endpoint,
-                headers=self.headers,
+                metadata_api_endpoint=self.config.metadata_api_endpoint,
+                headers=self.config.headers,
                 refresh_=refresh)
         except api.exceptions.RequestError as exc:
             logger.debug("Metadata API unavailable", exc_info=True)
             raise ValueError(
-                f"Metadata API unavailable at {self.metadata_api_endpoint!r}")
+                f"Metadata API unavailable at {self.config.metadata_api_endpoint!r}")
 
         logger.info("Using region metadata: %r", rs)
 
@@ -1181,8 +1181,8 @@ class Client(object):
         order_by = filters.pop('order_by', None)
 
         # in absence of other filters, config/env solver filters/name are used
-        if not filters and self.default_solver:
-            filters = copy.deepcopy(self.default_solver)
+        if not filters and self.config.solver:
+            filters = copy.deepcopy(self.config.solver)
 
         # allow `order_by` from default config/init override
         if order_by is None:
@@ -1453,13 +1453,13 @@ class Client(object):
 
         if future._poll_backoff is None:
             # on first poll, start with minimal back-off
-            future._poll_backoff = self.poll_backoff_min
+            future._poll_backoff = self.config.polling_schedule.backoff_min
         else:
             # on subsequent polls, do exponential back-off, clipped to a range
             future._poll_backoff = \
-                max(self.poll_backoff_min,
-                    min(future._poll_backoff * self.poll_backoff_base,
-                        self.poll_backoff_max))
+                max(self.config.polling_schedule.backoff_min,
+                    min(future._poll_backoff * self.config.polling_schedule.backoff_base,
+                        self.config.polling_schedule.backoff_max))
 
         # for poll priority we use timestamp of next scheduled poll
         at = time.time() + future._poll_backoff
@@ -1471,9 +1471,9 @@ class Client(object):
 
         # don't enqueue for next poll if polling_timeout is exceeded by then
         future_age_on_next_poll = future_age + (at - datetime_to_timestamp(now))
-        if self.polling_timeout is not None and future_age_on_next_poll > self.polling_timeout:
+        if self.config.polling_timeout is not None and future_age_on_next_poll > self.config.polling_timeout:
             logger.debug("Polling timeout exceeded before next poll: %.2f sec > %.2f sec, aborting polling!",
-                         future_age_on_next_poll, self.polling_timeout)
+                         future_age_on_next_poll, self.config.polling_timeout)
             raise PollingTimeout
 
         self._poll_queue.put((at, future))
