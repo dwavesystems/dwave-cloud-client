@@ -18,6 +18,7 @@ import logging
 from collections import abc
 from typing import Optional, Union, Literal, Tuple, Dict, Any
 
+import urllib3
 from pydantic import BaseModel
 
 from dwave.cloud.config.loaders import update_config
@@ -63,6 +64,25 @@ class RequestRetryConfig(BaseModel, GetterMixin):
 
     #: No backoff will ever be longer than `backoff_max` seconds.
     backoff_max: Optional[float] = 60
+
+    def to_urllib3_retry(self) -> urllib3.Retry:
+        """Return :class:`urllib3.Retry` configuration matching the model.
+        """
+        # dev note: after we drop support for urllib3<2, this whole function can
+        # be replaced with `Retry(**self.model_dump())`
+
+        params = self.model_dump()
+
+        # `urllib3<2` doesn't support `backoff_max` in `Retry()`
+        del params['backoff_max']
+
+        retry = urllib3.Retry(**params)
+
+        if self.backoff_max is not None:
+            # handle `urllib3>=1.21.1,<1.27` AND `urllib3>=1.21.1,<3`
+            retry.BACKOFF_MAX = retry.backoff_max = self.backoff_max
+
+        return retry
 
 
 class PollingSchedule(BaseModel, GetterMixin):

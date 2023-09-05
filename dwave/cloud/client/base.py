@@ -573,32 +573,15 @@ class Client(object):
         if not endpoint.endswith('/'):
             endpoint += '/'
 
-        # create http idempotent Retry config
-        def get_retry_conf():
-            retry = urllib3.Retry(
-                total=self.http_retry_total,
-                connect=self.http_retry_connect,
-                read=self.http_retry_read,
-                redirect=self.http_retry_redirect,
-                status=self.http_retry_status,
-                backoff_factor=self.http_retry_backoff_factor,
-                raise_on_redirect=True,
-                raise_on_status=True,
-                respect_retry_after_header=True)
-
-            if self.http_retry_backoff_max is not None:
-                # handle `urllib3>=1.21.1,<1.27` AND `urllib3>=1.21.1,<3`
-                retry.BACKOFF_MAX = retry.backoff_max = self.http_retry_backoff_max
-
-            return retry
-
         session = BaseUrlSession(base_url=endpoint)
         session.mount('http://',
-            TimeoutingHTTPAdapter(timeout=self.request_timeout,
-                                  max_retries=get_retry_conf()))
+            TimeoutingHTTPAdapter(
+                timeout=self.config.request_timeout,
+                max_retries=self.config.request_retry.to_urllib3_retry()))
         session.mount('https://',
-            TimeoutingHTTPAdapter(timeout=self.request_timeout,
-                                  max_retries=get_retry_conf()))
+            TimeoutingHTTPAdapter(
+                timeout=self.config.request_timeout,
+                max_retries=self.config.request_retry.to_urllib3_retry()))
 
         session.headers.update({'User-Agent': self._user_agent})
         if self.headers:
