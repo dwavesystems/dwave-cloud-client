@@ -318,7 +318,10 @@ class DWaveAPIClient:
         """
         logger.trace(f"{cls.__name__}.from_client_config(config={config!r}, **{kwargs!r})")
 
-        headers = config.headers.copy()
+        if config.headers:
+            headers = config.headers.copy()
+        else:
+            headers = {}
         if config.connection_close:
             headers.update({'Connection': 'close'})
 

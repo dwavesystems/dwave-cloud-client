@@ -19,7 +19,9 @@ import requests
 import requests_mock
 
 from dwave.cloud.api import exceptions, constants
-from dwave.cloud.api.client import DWaveAPIClient, SolverAPIClient, MetadataAPIClient
+from dwave.cloud.api.client import (
+    DWaveAPIClient, SolverAPIClient, MetadataAPIClient, LeapAPIClient)
+from dwave.cloud.config import ClientConfig
 from dwave.cloud.package_info import __packagename__, __version__
 
 
@@ -80,6 +82,43 @@ class TestConfig(unittest.TestCase):
         with MetadataAPIClient() as client:
             self.assertEqual(client.session.base_url,
                              constants.DEFAULT_METADATA_API_ENDPOINT)
+
+    def test_leap_client(self):
+        with LeapAPIClient() as client:
+            self.assertEqual(client.session.base_url,
+                             constants.DEFAULT_LEAP_API_ENDPOINT)
+
+    def test_from_client_config_factory(self):
+        config = ClientConfig(region='ignored', connection_close=True,
+                              permissive_ssl=True)
+        kwargs = dict(endpoint='https://test.com/path/')
+
+        def _verify(client):
+            # note: region is removed due to endpoint kwarg update
+            self.assertIsNone(client.config.get('region'))
+            self.assertEqual(client.session.base_url, kwargs['endpoint'])
+            self.assertIn('Connection', client.session.headers)
+            self.assertFalse(client.session.verify)
+
+        with DWaveAPIClient.from_client_config(config, **kwargs) as client:
+            _verify(client)
+
+        # also test .from_config dispatch
+        with DWaveAPIClient.from_config(config, **kwargs) as client:
+            _verify(client)
+
+    def test_from_config_file(self):
+        # `load_config` is already tested thoroughly in `tests.test_config`,
+        # so it's ok to just mock it here
+        config = dict(endpoint='https://test.com/path/')
+        with unittest.mock.patch("dwave.cloud.api.client.load_config",
+                                 lambda *a, **kw: config):
+            with DWaveAPIClient.from_config_file() as client:
+                self.assertEqual(client.session.base_url, config['endpoint'])
+
+            # also test .from_config dispatch
+            with DWaveAPIClient.from_config() as client:
+                self.assertEqual(client.session.base_url, config['endpoint'])
 
 
 class TestRequests(unittest.TestCase):

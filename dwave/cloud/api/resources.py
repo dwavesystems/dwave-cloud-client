@@ -62,7 +62,7 @@ class ResourceBase:
     resource_path: str = None
 
     def __init__(self, client: Optional[DWaveAPIClient] = None, **config):
-        if client is not None:
+        if isinstance(client, DWaveAPIClient):
             self.client = client
         else:
             self.client = self.client_class(**config)
