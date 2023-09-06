@@ -302,7 +302,12 @@ class DWaveAPIClient:
     def __init__(self, **config):
         self.config = {}
         for opt, default in self.DEFAULTS.items():
-            self.config[opt] = config.get(opt, default)
+            val = config.get(opt)
+            if val is None:
+                val = default
+            self.config[opt] = val
+
+        logger.debug(f"{type(self).__name__} initialized with config={self.config!r}")
 
         self.session = self._create_session(self.config)
 
