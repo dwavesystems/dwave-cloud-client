@@ -316,6 +316,8 @@ class DWaveAPIClient:
         """Create class instance based on
         :class:`~dwave.cloud.config.models.ClientConfig` config.
         """
+        logger.trace(f"{cls.__name__}.from_client_config(config={config!r}, **{kwargs!r})")
+
         headers = config.headers.copy()
         if config.connection_close:
             headers.update({'Connection': 'close'})
@@ -342,6 +344,9 @@ class DWaveAPIClient:
         """Create class instance based on config file / environment / kwarg options
         (same format as :class:`~dwave.cloud.client.base.Client`).
         """
+        logger.trace(f"{cls.__name__}.from_config_file("
+                     f"config_file={config_file!r}, profile={profile!r}, **{kwargs!r})")
+
         options = load_config(config_file=config_file, profile=profile, **kwargs)
         config = validate_config_v1(options)
         return cls.from_client_config(config)
@@ -360,6 +365,8 @@ class DWaveAPIClient:
             **kwargs:
                 Arguments passed to the dispatched method. See `config`.
         """
+        logger.trace(f"{cls.__name__}.from_config(config={config!r}, **{kwargs!r}")
+
         if isinstance(config, ClientConfig):
             return cls.from_client_config(config, **kwargs)
 
@@ -514,6 +521,11 @@ class MetadataAPIClient(DWaveAPIClient):
 
         super().__init__(**config)
 
+    @classmethod
+    def from_client_config(cls, config: ClientConfig, **kwargs):
+        kwargs.setdefault('endpoint', config.metadata_api_endpoint)
+        return super().from_client_config(config, **kwargs)
+
 
 class LeapAPIClient(DWaveAPIClient):
     """Client for D-Wave's Leap API."""
@@ -529,3 +541,10 @@ class LeapAPIClient(DWaveAPIClient):
         self.DEFAULTS.update(endpoint=constants.DEFAULT_LEAP_API_ENDPOINT)
 
         super().__init__(**config)
+
+    @classmethod
+    def from_client_config(cls, config: ClientConfig, **kwargs):
+        # XXX: replace endpoint with `leap_api_endpoint` after we implement
+        # https://github.com/dwavesystems/dwave-cloud-client/issues/569
+        kwargs.setdefault('endpoint', constants.DEFAULT_LEAP_API_ENDPOINT)
+        return super().from_client_config(config, **kwargs)
