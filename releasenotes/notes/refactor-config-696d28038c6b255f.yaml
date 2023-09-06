@@ -6,6 +6,10 @@ features:
   - |
     Consolidate client runtime configuration options under ``Client.config``,
     a data model defined with ``dwave.cloud.config.models.ClientConfig``.
+  - |
+    Add ``from_config()`` family of factories to ``dwave.cloud.api.client.DWaveAPIClient``
+    and subclasses for SolverAPI, MetadataAPI and LeapAPI. ``from_config()`` dispatches
+    to ``from_client_config()`` or ``from_config_file()``, depending on arguments.
 deprecations:
   - |
     Individual config options exposed as ``dwave.cloud.Client`` attributes are

@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import logging
 from collections import deque, namedtuple
-from typing import Optional
+from typing import Optional, Union
 
 import requests
 import urllib3
@@ -22,6 +24,8 @@ from packaging.specifiers import SpecifierSet
 from werkzeug.http import parse_options_header, dump_options_header
 
 from dwave.cloud.api import constants, exceptions
+from dwave.cloud.config import load_config, validate_config_v1, update_config
+from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.utils import (
     TimeoutingHTTPAdapter, BaseUrlSession, user_agent, is_caused_by)
@@ -302,6 +306,60 @@ class DWaveAPIClient:
 
         self.session = self._create_session(self.config)
 
+    @classmethod
+    def from_client_config(cls, config: ClientConfig, **kwargs):
+        """Create class instance based on
+        :class:`~dwave.cloud.config.models.ClientConfig` config.
+        """
+        headers = config.headers.copy()
+        if config.connection_close:
+            headers.update({'Connection': 'close'})
+
+        opts = dict(
+            endpoint=config.endpoint,
+            token=config.token,
+            cert=config.cert,
+            headers=headers,
+            timeout=config.request_timeout,
+            retry=config.request_retry.model_dump(),
+            proxies=dict(http=config.proxy, https=config.proxy),
+            verify=not config.permissive_ssl,
+        )
+
+        # context-sensitive config update
+        update_config(opts, kwargs)
+
+        return cls(**opts)
+
+    @classmethod
+    def from_config_file(cls, config_file: Optional[str] = None,
+                         profile: Optional[str] = None, **kwargs):
+        """Create class instance based on config file / environment / kwarg options
+        (same format as :class:`~dwave.cloud.client.base.Client`).
+        """
+        options = load_config(config_file=config_file, profile=profile, **kwargs)
+        config = validate_config_v1(options)
+        return cls.from_client_config(config)
+
+    @classmethod
+    def from_config(cls, config: Optional[Union[ClientConfig, str]] = None, **kwargs):
+        """Create class instance based on client config or config file.
+
+        Args:
+            config:
+                Path to configuration file or client config model. Based on `config`
+                type, we dispatch object creation to either :meth:`.from_config_file`
+                or :meth:`.from_client_config`. If omitted, config load from file is
+                attempted.
+
+            **kwargs:
+                Arguments passed to the dispatched method. See `config`.
+        """
+        if isinstance(config, ClientConfig):
+            return cls.from_client_config(config, **kwargs)
+
+        return cls.from_config_file(config_file=config, **kwargs)
+
     def close(self):
         self.session.close()
 
@@ -314,9 +372,6 @@ class DWaveAPIClient:
     @staticmethod
     def _retry_config(backoff_max=None, **kwargs):
         """Create http idempotent urllib3.Retry config."""
-
-        if not kwargs:
-            return None
 
         retry = urllib3.Retry(**kwargs)
 
@@ -437,52 +492,21 @@ class SolverAPIClient(DWaveAPIClient):
     """Client for D-Wave's Solver API."""
 
     def __init__(self, **config):
-        config.setdefault('endpoint', constants.DEFAULT_SOLVER_API_ENDPOINT)
+        # TODO: make endpoint region-sensitive
+        self.DEFAULTS = super().DEFAULTS.copy()
+        self.DEFAULTS.update(endpoint=constants.DEFAULT_SOLVER_API_ENDPOINT)
+
         super().__init__(**config)
-
-    @classmethod
-    def from_client_config(cls, client):
-        """Create SAPI client instance configured from a
-        :class:`~dwave.cloud.client.base.Client' instance.
-        """
-
-        headers = client.headers.copy()
-        if client.connection_close:
-            headers.update({'Connection': 'close'})
-
-        opts = dict(
-            endpoint=client.endpoint,
-            token=client.token,
-            cert=client.client_cert,
-            timeout=client.request_timeout,
-            proxies=dict(
-                http=client.proxy,
-                https=client.proxy,
-            ),
-            retry=dict(
-                total=client.http_retry_total,
-                connect=client.http_retry_connect,
-                read=client.http_retry_read,
-                redirect=client.http_retry_redirect,
-                status=client.http_retry_status,
-                raise_on_redirect=True,
-                raise_on_status=True,
-                respect_retry_after_header=True,
-                backoff_factor=client.http_retry_backoff_factor,
-                backoff_max=client.http_retry_backoff_max,
-            ),
-            headers=client.headers,
-            verify=not client.permissive_ssl,
-        )
-
-        return cls(**opts)
 
 
 class MetadataAPIClient(DWaveAPIClient):
     """Client for D-Wave's Metadata API."""
 
     def __init__(self, **config):
-        config.setdefault('endpoint', constants.DEFAULT_METADATA_API_ENDPOINT)
+        # TODO: make endpoint region-sensitive
+        self.DEFAULTS = super().DEFAULTS.copy()
+        self.DEFAULTS.update(endpoint=constants.DEFAULT_METADATA_API_ENDPOINT)
+
         super().__init__(**config)
 
 
@@ -495,5 +519,8 @@ class LeapAPIClient(DWaveAPIClient):
             session.headers.update({'Authorization': f"Bearer {config['token']}"})
 
     def __init__(self, **config):
-        config.setdefault('endpoint', constants.DEFAULT_LEAP_API_ENDPOINT)
+        # TODO: make endpoint region-sensitive
+        self.DEFAULTS = super().DEFAULTS.copy()
+        self.DEFAULTS.update(endpoint=constants.DEFAULT_LEAP_API_ENDPOINT)
+
         super().__init__(**config)
