@@ -15,3 +15,13 @@ deprecations:
     Individual config options exposed as ``dwave.cloud.Client`` attributes are
     deprecated since ``dwave-cloud-client==0.11.0`` and will be removed in
     ``dwave-cloud-client==0.12.0``. Use ``Client.config`` data model instead.
+upgrade:
+  - |
+    Behavior of ``from_client_config()`` on all ``dwave.cloud.api.resources.ResourceBase``
+    resource classes changed. Previously a (cloud-)client instance was accepted and now
+    ``dwave.cloud.config.models.ClientConfig`` is required.
+
+    To upgrade, replace ``{ResourceBase}.from_client_config(cloud_client)`` with
+    ``{ResourceBase}.from_client_config(client.config)``,
+    and ``{ResourceBase}.from_client_config(dwave_api_client)`` with
+    ``{ResourceBase}(dwave_api_client)``.

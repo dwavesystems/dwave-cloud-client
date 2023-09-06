@@ -61,8 +61,11 @@ class ResourceBase:
     # endpoint path prefix (base path) specific to all methods on the resource
     resource_path: str = None
 
-    def __init__(self, **config):
-        self.client = self.client_class(**config)
+    def __init__(self, client: Optional[DWaveAPIClient] = None, **config):
+        if client is not None:
+            self.client = client
+        else:
+            self.client = self.client_class(**config)
 
     @property
     def session(self):
@@ -86,16 +89,9 @@ class ResourceBase:
         self.close()
 
     @classmethod
-    def from_client_config(cls, client: Union[DWaveAPIClient, 'dwave.cloud.client.base.Client']):
-        """Create Resource instance configured from a
-        :class:`~dwave.cloud.client.base.Client' instance.
-        """
-        # TODO: also accept configuration dict/dataclass when config/client refactored
-        if isinstance(client, DWaveAPIClient):
-            return cls(**client.config)
-        else: # assume isinstance(client, dwave.cloud.Client), without importing
-            sapiclient = SolverAPIClient.from_client_config(client)
-            return cls(**sapiclient.config)
+    def from_config(cls, config=None, **kwargs):
+        client = cls.client_class.from_config(config, **kwargs)
+        return cls(client=client)
 
 
 class Regions(ResourceBase):
