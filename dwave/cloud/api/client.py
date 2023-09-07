@@ -28,7 +28,7 @@ from dwave.cloud.config import load_config, validate_config_v1, update_config
 from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.utils import (
-    TimeoutingHTTPAdapter, BaseUrlSession, user_agent, is_caused_by)
+    PretimedHTTPAdapter, BaseUrlSession, user_agent, is_caused_by)
 
 __all__ = ['DWaveAPIClient', 'SolverAPIClient', 'MetadataAPIClient', 'LeapAPIClient']
 
@@ -421,12 +421,10 @@ class DWaveAPIClient:
             strict_mode=config['version_strict_mode'])
         timeout = config['timeout']
         retry = config['retry']
-        session.mount('http://',
-            TimeoutingHTTPAdapter(
-                timeout=timeout, max_retries=cls._retry_config(**retry)))
-        session.mount('https://',
-            TimeoutingHTTPAdapter(
-                timeout=timeout, max_retries=cls._retry_config(**retry)))
+        session.mount('http://', PretimedHTTPAdapter(
+            timeout=timeout, max_retries=cls._retry_config(**retry)))
+        session.mount('https://', PretimedHTTPAdapter(
+            timeout=timeout, max_retries=cls._retry_config(**retry)))
 
         # configure headers
         session.headers.update({'User-Agent': cls.user_agent})

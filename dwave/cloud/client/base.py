@@ -72,7 +72,7 @@ from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.upload import ChunkedData
 from dwave.cloud.events import dispatches_events
 from dwave.cloud.utils import (
-    TimeoutingHTTPAdapter, BaseUrlSession, user_agent,
+    PretimedHTTPAdapter, BaseUrlSession, user_agent,
     datetime_to_timestamp, utcnow, cached, retried, is_caused_by)
 
 __all__ = ['Client']
@@ -574,14 +574,12 @@ class Client(object):
             endpoint += '/'
 
         session = BaseUrlSession(base_url=endpoint)
-        session.mount('http://',
-            TimeoutingHTTPAdapter(
-                timeout=self.config.request_timeout,
-                max_retries=self.config.request_retry.to_urllib3_retry()))
-        session.mount('https://',
-            TimeoutingHTTPAdapter(
-                timeout=self.config.request_timeout,
-                max_retries=self.config.request_retry.to_urllib3_retry()))
+        session.mount('http://', PretimedHTTPAdapter(
+            timeout=self.config.request_timeout,
+            max_retries=self.config.request_retry.to_urllib3_retry()))
+        session.mount('https://', PretimedHTTPAdapter(
+            timeout=self.config.request_timeout,
+            max_retries=self.config.request_retry.to_urllib3_retry()))
 
         session.headers.update({'User-Agent': self._user_agent})
         if self.config.headers:
