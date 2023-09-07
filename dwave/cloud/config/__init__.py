@@ -38,7 +38,7 @@ order (with 1 the highest ranked):
    :attr:`~dwave.cloud.client.Client.DEFAULTS`.
 
 Configuration files comply with standard Windows INI-like format,
-parsable with Python's :mod:`configparser`. An optional `defaults` section
+parsable with Python's :mod:`configparser`. An optional ``defaults`` section
 provides default key-value pairs for all other sections. User-defined key-value
 pairs (unrecognized keys) are passed through to the client.
 

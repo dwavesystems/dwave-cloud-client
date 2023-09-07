@@ -230,7 +230,7 @@ def dump_config_v1(config: ClientConfig) -> dict:
 
     # invert transformations during validation
     if h := raw_config['headers']:
-        raw_config['headers'] = '\n'.join("{k}: {v}" for k, v in h.items())
+        raw_config['headers'] = '\n'.join(f"{k}: {v}" for k, v in h.items())
 
     cert_pair = (None, None)
     if c := raw_config.get('cert'):

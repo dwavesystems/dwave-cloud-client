@@ -21,6 +21,7 @@ from pydantic import TypeAdapter
 from dwave.cloud.api.client import (
     DWaveAPIClient, SolverAPIClient, MetadataAPIClient, LeapAPIClient)
 from dwave.cloud.api import constants, models
+from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.utils import NumpyEncoder
 
 __all__ = ['Solvers', 'Problems', 'Regions']
@@ -89,7 +90,7 @@ class ResourceBase:
         self.close()
 
     @classmethod
-    def from_config(cls, config=None, **kwargs):
+    def from_config(cls, config: Optional[Union[ClientConfig, str]] = None, **kwargs):
         client = cls.client_class.from_config(config, **kwargs)
         return cls(client=client)
 
