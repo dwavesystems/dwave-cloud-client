@@ -18,6 +18,9 @@ import unittest
 import configparser
 from unittest import mock
 from functools import partial
+from typing import Any, Dict, Callable
+
+from parameterized import parameterized
 
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import ConfigFileParseError, ConfigFileReadError
@@ -25,7 +28,8 @@ from dwave.cloud.testing import iterable_mock_open
 from dwave.cloud.config import (
     get_configfile_paths, load_config_from_files, load_config,
     parse_float, parse_int, parse_boolean, get_cache_dir, update_config)
-
+from dwave.cloud.config.models import ClientConfig
+from dwave.cloud.config.models import validate_config_v1, load_config_v1, dump_config_v1
 
 class TestConfigParsing(unittest.TestCase):
 
@@ -58,7 +62,7 @@ class TestConfigParsing(unittest.TestCase):
         return config
 
     def test_config_load_from_file(self):
-        with mock.patch('dwave.cloud.config.open', iterable_mock_open(self.config_body), create=True):
+        with mock.patch('dwave.cloud.config.loaders.open', iterable_mock_open(self.config_body), create=True):
             config = load_config_from_files(filenames=["filename"])
             self.assertEqual(config.sections(), ['dw2000', 'software', 'alpha'])
             self.assertEqual(config['dw2000']['client'], 'qpu')
@@ -80,14 +84,14 @@ class TestConfigParsing(unittest.TestCase):
             [section]
             key = val
         """
-        with mock.patch('dwave.cloud.config.open', iterable_mock_open(myconfig), create=True):
+        with mock.patch('dwave.cloud.config.loaders.open', iterable_mock_open(myconfig), create=True):
             self.assertRaises(ConfigFileParseError, load_config_from_files, filenames=["filename"])
             self.assertRaises(ConfigFileParseError, load_config, config_file="filename", profile="section")
 
     def test_no_config_detected(self):
         """When no config file detected, `load_config_from_files` should return
         empty config."""
-        with mock.patch("dwave.cloud.config.get_configfile_paths", lambda: []):
+        with mock.patch("dwave.cloud.config.loaders.get_configfile_paths", lambda: []):
             self.assertFalse(load_config_from_files().sections())
 
     def test_invalid_filename_given(self):
@@ -143,13 +147,13 @@ class TestConfigParsing(unittest.TestCase):
 
         # config file via kwarg
         with mock.patch.dict(os.environ, env):
-            with mock.patch('dwave.cloud.config.open', mock_open) as m:
+            with mock.patch('dwave.cloud.config.loaders.open', mock_open) as m:
                 conf = load_config(config_file=config_file, profile=profile)
                 self.assertEqual(conf['valid'], 'yes')
 
         # config file via env var
         with mock.patch.dict(os.environ, env, DWAVE_CONFIG_FILE=config_file):
-            with mock.patch('dwave.cloud.config.open', mock_open) as m:
+            with mock.patch('dwave.cloud.config.loaders.open', mock_open) as m:
                 conf = load_config(profile=profile)
                 self.assertEqual(conf['valid'], 'yes')
 
@@ -169,23 +173,23 @@ class TestConfigParsing(unittest.TestCase):
 
 
     def test_config_load_configfile_arg(self):
-        with mock.patch("dwave.cloud.config.load_config_from_files",
+        with mock.patch("dwave.cloud.config.loaders.load_config_from_files",
                         partial(self._load_config_from_files, provided=['myfile'])):
             self._assert_config_valid(load_config(config_file='myfile', profile='alpha'))
 
     def test_config_load_configfile_env(self):
-        with mock.patch("dwave.cloud.config.load_config_from_files",
+        with mock.patch("dwave.cloud.config.loaders.load_config_from_files",
                         partial(self._load_config_from_files, provided=['myfile'])):
             with mock.patch.dict(os.environ, {'DWAVE_CONFIG_FILE': 'myfile'}):
                 self._assert_config_valid(load_config(config_file=None, profile='alpha'))
 
     def test_config_load_configfile_detect(self):
-        with mock.patch("dwave.cloud.config.load_config_from_files",
+        with mock.patch("dwave.cloud.config.loaders.load_config_from_files",
                         partial(self._load_config_from_files, provided=None)):
             self._assert_config_valid(load_config(config_file=None, profile='alpha'))
 
     def test_config_load_skip_configfiles(self):
-        with mock.patch("dwave.cloud.config.load_config_from_files",
+        with mock.patch("dwave.cloud.config.loaders.load_config_from_files",
                         self._load_config_from_files):
 
             # don't load from file, use arg or env
@@ -201,7 +205,7 @@ class TestConfigParsing(unittest.TestCase):
                 self.assertEqual(load_config(config_file=False, endpoint='test')['endpoint'], 'test')
 
     def test_config_load_force_autodetection(self):
-        with mock.patch("dwave.cloud.config.load_config_from_files",
+        with mock.patch("dwave.cloud.config.loaders.load_config_from_files",
                         partial(self._load_config_from_files, provided=None)):
 
             # load from file
@@ -220,13 +224,13 @@ class TestConfigParsing(unittest.TestCase):
                     self._assert_config_valid(load_config(config_file=True))
 
     def test_config_load_configfile_detect_profile_env(self):
-        with mock.patch("dwave.cloud.config.load_config_from_files",
+        with mock.patch("dwave.cloud.config.loaders.load_config_from_files",
                         partial(self._load_config_from_files, provided=None)):
             with mock.patch.dict(os.environ, {'DWAVE_PROFILE': 'alpha'}):
                 self._assert_config_valid(load_config())
 
     def test_config_load_configfile_env_profile_env(self):
-        with mock.patch("dwave.cloud.config.load_config_from_files",
+        with mock.patch("dwave.cloud.config.loaders.load_config_from_files",
                         partial(self._load_config_from_files, provided=['myfile'])):
             with mock.patch.dict(os.environ, {'DWAVE_CONFIG_FILE': 'myfile',
                                               'DWAVE_PROFILE': 'alpha'}):
@@ -234,7 +238,7 @@ class TestConfigParsing(unittest.TestCase):
 
     def test_config_load_configfile_env_profile_env_key_arg(self):
         """Explicitly provided values should override env/file."""
-        with mock.patch("dwave.cloud.config.load_config_from_files",
+        with mock.patch("dwave.cloud.config.loaders.load_config_from_files",
                         partial(self._load_config_from_files, provided=['myfile'])):
             with mock.patch.dict(os.environ, {'DWAVE_CONFIG_FILE': 'myfile',
                                               'DWAVE_PROFILE': 'alpha'}):
@@ -249,7 +253,7 @@ class TestConfigParsing(unittest.TestCase):
         """load_config should fail if the profile specified in kwargs or env in
         non-existing.
         """
-        with mock.patch("dwave.cloud.config.load_config_from_files",
+        with mock.patch("dwave.cloud.config.loaders.load_config_from_files",
                         partial(self._load_config_from_files, provided=None)):
             self.assertRaises(ValueError, load_config, profile="nonexisting")
             with mock.patch.dict(os.environ, {'DWAVE_PROFILE': 'nonexisting'}):
@@ -259,7 +263,7 @@ class TestConfigParsing(unittest.TestCase):
         """Check the right profile is loaded when `profile` specified only in
         [defaults] section.
         """
-        with mock.patch("dwave.cloud.config.load_config_from_files",
+        with mock.patch("dwave.cloud.config.loaders.load_config_from_files",
                         partial(self._load_config_from_files, provided=['myfile'])):
             profile = load_config(config_file='myfile')
             self.assertEqual(profile['solver'], 'c4-sw_sample')
@@ -272,7 +276,7 @@ class TestConfigParsing(unittest.TestCase):
             [first]
             solver = DW_2000Q_1
         """
-        with mock.patch("dwave.cloud.config.load_config_from_files",
+        with mock.patch("dwave.cloud.config.loaders.load_config_from_files",
                         partial(self._load_config_from_files,
                                 provided=None, data=myconfig)):
             profile = load_config()
@@ -288,7 +292,7 @@ class TestConfigParsing(unittest.TestCase):
             [defaults]
             solver = DW_2000Q_1
         """
-        with mock.patch("dwave.cloud.config.load_config_from_files",
+        with mock.patch("dwave.cloud.config.loaders.load_config_from_files",
                         partial(self._load_config_from_files,
                                 provided=None, data=myconfig)):
             profile = load_config()
@@ -306,7 +310,7 @@ class TestConfigParsing(unittest.TestCase):
             [some]
             solver = DW_2000Q_1
         """
-        with mock.patch("dwave.cloud.config.load_config_from_files",
+        with mock.patch("dwave.cloud.config.loaders.load_config_from_files",
                         partial(self._load_config_from_files,
                                 provided=['myfile'], data=myconfig)):
             self.assertRaises(ValueError, load_config, config_file='myfile')
@@ -327,11 +331,11 @@ class TestConfigParsing(unittest.TestCase):
             endpoint = beta
         """
 
-        with mock.patch("dwave.cloud.config.get_configfile_paths",
+        with mock.patch("dwave.cloud.config.loaders.get_configfile_paths",
                         lambda: ['config_system', 'config_user']):
 
             # test per-key override
-            with mock.patch('dwave.cloud.config.open', create=True) as m:
+            with mock.patch('dwave.cloud.config.loaders.open', create=True) as m:
                 m.side_effect = [iterable_mock_open(config_system)(),
                                  iterable_mock_open(config_user)()]
                 section = load_config(profile='alpha')
@@ -339,7 +343,7 @@ class TestConfigParsing(unittest.TestCase):
                 self.assertEqual(section['solver'], 'DW_2000Q_2')
 
             # test per-section override (section addition)
-            with mock.patch('dwave.cloud.config.open', create=True) as m:
+            with mock.patch('dwave.cloud.config.loaders.open', create=True) as m:
                 m.side_effect = [iterable_mock_open(config_system)(),
                                  iterable_mock_open(config_user)()]
                 section = load_config(profile='beta')
@@ -359,7 +363,7 @@ class TestConfigParsing(unittest.TestCase):
             solver = DW_2000Q_2
         """
 
-        with mock.patch('dwave.cloud.config.open', create=True) as m:
+        with mock.patch('dwave.cloud.config.loaders.open', create=True) as m:
             m.side_effect=[iterable_mock_open(file1)(),
                            iterable_mock_open(file2)()]
             section = load_config(config_file=['file1', 'file2'], profile='alpha')
@@ -368,7 +372,7 @@ class TestConfigParsing(unittest.TestCase):
             self.assertEqual(section['solver'], 'DW_2000Q_2')
 
     def test_config_load_env_override(self):
-        with mock.patch("dwave.cloud.config.load_config_from_files",
+        with mock.patch("dwave.cloud.config.loaders.load_config_from_files",
                         partial(self._load_config_from_files, data="", provided=['myfile'])):
 
             with mock.patch.dict(os.environ, {'DWAVE_API_CLIENT': 'test'}):
@@ -506,3 +510,125 @@ class TestConfigUtils(unittest.TestCase):
         update = {'endpoint': 2, 'region': 2}
         update_config(config, update)
         self.assertEqual(config, update)
+
+
+class TestConfigModel(unittest.TestCase):
+
+    def _verify(self,
+                raw_config: Dict[str, Any],
+                get_field: Callable[[ClientConfig], Any],
+                model_value: Any):
+        """For a given ``raw_config``, test both model validate and dump."""
+
+        config = validate_config_v1(raw_config)
+
+        with self.subTest("validate"):
+            self.assertEqual(get_field(config), model_value)
+
+        with self.subTest("dump"):
+            config = validate_config_v1(dump_config_v1(config))
+            self.assertEqual(get_field(config), model_value)
+
+    @parameterized.expand([
+        ("null", {"client_cert": None, "client_cert_key": None}, None),
+        ("pem", {"client_cert": "/path/to/pem", "client_cert_key": None}, "/path/to/pem"),
+        ("pair", {"client_cert": "cert", "client_cert_key": "key"}, ("cert", "key")),
+    ])
+    def test_cert(self, name, raw_config, model_value):
+        self._verify(raw_config=raw_config,
+                     get_field=lambda config: config.cert,
+                     model_value=model_value)
+
+    @parameterized.expand([
+        ("null", None, {}),
+        ("blank", '', {}),
+        ("empty", '  ', {}),
+        ("dict", {"Accept": "*/*"}, {"Accept": "*/*"}),
+        ("valid string", "Field-1: value-1\nField-2: value-2",
+                         {"Field-1": "value-1", "Field-2": "value-2"}),
+        ("invalid string", "Field", {}),
+        ("empty field", "Field:", {"Field": ""}),
+        ("empty value", "\n", {}),
+    ])
+    def test_headers(self, name, raw_value, model_value):
+        self._verify(raw_config={"headers": raw_value},
+                     get_field=lambda config: config.headers,
+                     model_value=model_value)
+
+    @parameterized.expand([
+        ("null", None, {}),
+        ("blank", '', {}),
+        ("empty", '  ', {}),
+        ("string", "name", dict(name__eq="name")),
+        ("simple dict", dict(name="name"), dict(name="name")),
+        ("features dict", dict(feature__op="val", x="y"), dict(feature__op="val", x="y")),
+        ("valid json", '{"key": "val"}', dict(key="val")),
+        ("valid json non-dict", '"name"', dict(name__eq='"name"')),
+        ("invalid json", "{name}", dict(name__eq="{name}")),
+    ])
+    def test_solver(self, name, raw_value, model_value):
+        self._verify(raw_config={"solver": raw_value},
+                     get_field=lambda config: config.solver,
+                     model_value=model_value)
+
+    @parameterized.expand([
+        ("cert missing", {"client_cert": None, "client_cert_key": "key"}, ValueError),
+        ("invalid headers", {"headers": [1,2,3]}, ValueError),
+        ("invalid solver", {"solver": {1,2,3}}, ValueError),
+    ])
+    def test_validation_errors(self, name, raw_config, error):
+        with self.assertRaises(error):
+            validate_config_v1(raw_config)
+
+    @parameterized.expand([
+        ("total", 1, 1),
+        ("total", 1.0, 1),
+        ("total", False, False),
+        ("connect", 1.0, 1),
+        ("read", 1, 1),
+        ("redirect", 1, 1),
+        ("redirect", False, False),
+        ("status", 1, 1),
+        ("other", 1, 1),
+        ("backoff_factor", 1, 1.0),
+        ("backoff_max", 1, 1.0),
+    ])
+    def test_request_retry(self, key, raw_value, model_value):
+        self._verify(raw_config={f"http_retry_{key}": raw_value},
+                     get_field=lambda config: getattr(config.request_retry, key),
+                     model_value=model_value)
+
+    @parameterized.expand([
+        ("backoff_min", 1, 1.0),
+        ("backoff_min", 1.5, 1.5),
+        ("backoff_max", 1, 1.0),
+        ("backoff_max", 1.5, 1.5),
+        ("backoff_base", 1, 1.0),
+        ("backoff_base", 1.5, 1.5),
+    ])
+    def test_polling_schedule(self, key, raw_value, model_value):
+        self._verify(raw_config={f"poll_{key}": raw_value},
+                     get_field=lambda config: getattr(config.polling_schedule, key),
+                     model_value=model_value)
+
+    @parameterized.expand([
+        ("1", True), ("on", True), ("On", True), ("true", True), ("True", True),
+        ("0", False), ("off", False), ("Off", False), ("false", False), ("False", False),
+    ])
+    def test_scalars(self, value, model_value):
+        for flag in ("permissive_ssl", "connection_close"):
+            with self.subTest(flag):
+                self._verify(raw_config={flag: value},
+                             get_field=lambda config: getattr(config, flag),
+                             model_value=model_value)
+
+    def test_model_getter_mixin(self):
+        val = "https://some.url/path/"
+        config = validate_config_v1({"endpoint": val})
+        self.assertEqual(config.endpoint, val)
+        self.assertEqual(config['endpoint'], val)
+
+    def test_full_load_defaults(self):
+        # just a smoke test of `load_config_v1` for now
+        from dwave.cloud.config.models import _V1_CONFIG_DEFAULTS
+        self.assertEqual(load_config_v1({}),  validate_config_v1(_V1_CONFIG_DEFAULTS))

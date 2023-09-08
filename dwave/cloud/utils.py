@@ -284,7 +284,7 @@ class NumpyEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
-class TimeoutingHTTPAdapter(requests.adapters.HTTPAdapter):
+class PretimedHTTPAdapter(requests.adapters.HTTPAdapter):
     """Sets a default timeout for all adapter (think session) requests. It is
     overridden with per-request timeout. But it can not be reset back to
     infinite wait (``None``).
@@ -292,8 +292,8 @@ class TimeoutingHTTPAdapter(requests.adapters.HTTPAdapter):
     Usage:
 
         s = requests.Session()
-        s.mount("http://", TimeoutingHTTPAdapter(timeout=5))
-        s.mount("https://", TimeoutingHTTPAdapter(timeout=5))
+        s.mount("http://", PretimedHTTPAdapter(timeout=5))
+        s.mount("https://", PretimedHTTPAdapter(timeout=5))
 
         s.get('http://httpbin.org/delay/6')                 # -> timeouts after 5sec
         s.get('http://httpbin.org/delay/6', timeout=10)     # -> completes after 6sec
@@ -310,6 +310,12 @@ class TimeoutingHTTPAdapter(requests.adapters.HTTPAdapter):
         # can't use setdefault because caller always sets timeout kwarg
         kwargs['timeout'] = self.timeout
         return super().send(*args, **kwargs)
+
+
+class TimeoutingHTTPAdapter(PretimedHTTPAdapter):
+    """Alias for :class:`~dwave.cloud.utils.PretimedHTTPAdapter`. Deprecated,
+    but retained for backward compatibility.
+    """
 
 
 # Note: BaseUrlSession is taken from https://github.com/requests/toolbelt under
@@ -608,8 +614,9 @@ class deprecated(object):
     decorated function.
     """
 
-    def __init__(self, msg=None):
+    def __init__(self, msg=None, stacklevel=2):
         self.msg = msg
+        self.stacklevel = stacklevel
 
     def __call__(self, fn):
         if not callable(fn):
@@ -621,7 +628,7 @@ class deprecated(object):
             if not msg:
                 fn_name = getattr(fn, '__name__', 'unnamed')
                 msg = "{}() has been deprecated".format(fn_name)
-            warnings.warn(msg, DeprecationWarning)
+            warnings.warn(msg, DeprecationWarning, stacklevel=self.stacklevel)
 
             return fn(*args, **kwargs)
 

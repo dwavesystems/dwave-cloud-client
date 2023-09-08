@@ -1,0 +1,41 @@
+---
+features:
+  - |
+    Add Pydantic-based data model for cloud-client configuration,
+    ``dwave.cloud.config.models.ClientConfig``.
+  - |
+    Consolidate client runtime configuration options under ``Client.config``,
+    a data model defined with ``dwave.cloud.config.models.ClientConfig`` and
+    decouple config parsing from ``dwave.cloud.Client`` construction.
+    See `#504 <https://github.com/dwavesystems/dwave-cloud-client/issues/504>`_.
+  - |
+    Add ``from_config()`` family of factories to ``dwave.cloud.api.client.DWaveAPIClient``
+    and subclasses for SolverAPI, MetadataAPI and LeapAPI. ``from_config()`` dispatches
+    to ``from_client_config()`` or ``from_config_file()``, depending on arguments.
+    See `#572 <https://github.com/dwavesystems/dwave-cloud-client/issues/572>`_.
+  - |
+    Use full client config for Metadata API access during region/endpoint resolution
+    on ``dwave.cloud.Client`` construction.
+    See `#505 <https://github.com/dwavesystems/dwave-cloud-client/issues/505>`_.
+fixes:
+  - |
+    Fix region/endpoint resolution during ``dwave.cloud.Client`` construction
+    when insecure connection is required (config: ``permissive_ssl = On``) and/or
+    a proxy is used (config: ``proxy = socks5://...``). Previously client
+    construction would fail completely.
+    See `#507 <https://github.com/dwavesystems/dwave-cloud-client/issues/507>`_.
+deprecations:
+  - |
+    Individual config options exposed as ``dwave.cloud.Client`` attributes are
+    deprecated since ``dwave-cloud-client==0.11.0`` and will be removed in
+    ``dwave-cloud-client==0.12.0``. Use ``Client.config`` data model instead.
+upgrade:
+  - |
+    Behavior of ``from_client_config()`` on all ``dwave.cloud.api.resources.ResourceBase``
+    resource classes changed. Previously a (cloud-)client instance was accepted and now
+    ``dwave.cloud.config.models.ClientConfig`` is required.
+
+    To upgrade, replace ``{ResourceBase}.from_client_config(cloud_client)`` with
+    ``{ResourceBase}.from_client_config(client.config)``,
+    and ``{ResourceBase}.from_client_config(dwave_api_client)`` with
+    ``{ResourceBase}(dwave_api_client)``.

@@ -36,7 +36,6 @@ Examples:
 
 import re
 import time
-import json
 import copy
 import queue
 import logging
@@ -52,7 +51,7 @@ import concurrent.futures
 
 from itertools import chain, zip_longest
 from functools import partial, wraps, cached_property
-from collections import abc, namedtuple
+from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Tuple, Dict, Any
 from pydantic import TypeAdapter
@@ -66,19 +65,47 @@ from dwave.cloud import api
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *    # TODO: fix
 from dwave.cloud.computation import Future
-from dwave.cloud.config import (
-    load_config, parse_float, parse_int, parse_boolean, update_config)
+from dwave.cloud.config import load_config, update_config, validate_config_v1
+from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.upload import ChunkedData
 from dwave.cloud.events import dispatches_events
 from dwave.cloud.utils import (
-    TimeoutingHTTPAdapter, BaseUrlSession, user_agent,
+    PretimedHTTPAdapter, BaseUrlSession, user_agent,
     datetime_to_timestamp, utcnow, cached, retried, is_caused_by)
 
 __all__ = ['Client']
 
 logger = logging.getLogger(__name__)
+
+
+def _deprecated_config_properties_to_config_map(options):
+    # Return a map of old/deprecated config property name to new lookup path
+    # in the config model.
+
+    def _translate(old_prefix, new_prefix):
+        return {k: f"{new_prefix}{k[len(old_prefix):]}"
+                for k in options if k.startswith(old_prefix)}
+
+    properties_map = {
+        'metadata_api_endpoint': 'metadata_api_endpoint',
+        'region': 'region',
+        'endpoint': 'endpoint',
+        'token': 'token',
+        'default_solver': 'solver',
+        'client_cert': 'cert',
+        'request_timeout': 'request_timeout',
+        'polling_timeout': 'polling_timeout',
+        'headers': 'headers',
+        'proxy': 'proxy',
+        'permissive_ssl': 'permissive_ssl',
+        'connection_close': 'connection_close',
+    }
+    properties_map.update(_translate("poll_", "polling_schedule."))
+    properties_map.update(_translate("http_retry_", "request_retry."))
+
+    return properties_map
 
 
 class Client(object):
@@ -271,6 +298,9 @@ class Client(object):
         'http_retry_backoff_max': 60,
     }
 
+    _DEPRECATED_CONFIG_PROPERTIES_MAP = \
+        _deprecated_config_properties_to_config_map(DEFAULTS)
+
     # Number of problems to include in a submit/status query
     _SUBMIT_BATCH_SIZE = 20
     _STATUS_QUERY_SIZE = 100
@@ -298,6 +328,15 @@ class Client(object):
     _UPLOAD_PART_RETRIES = 2
     _UPLOAD_REQUEST_RETRIES = 2
     _UPLOAD_RETRIES_BACKOFF = lambda retry: 2 ** retry
+
+    @staticmethod
+    def _legacy_config_property_proxy(self, legacy_property, config_path):
+        warnings.warn(
+            f"`Client.{legacy_property}` property is deprecated since "
+            f"dwave-cloud-client 0.11.0, and will be removed in 0.12.0. "
+            f"Use `Client.config.{config_path}` instead.",
+            DeprecationWarning, stacklevel=2)
+        return pluck(self.config, config_path)
 
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None, **kwargs):
@@ -423,6 +462,13 @@ class Client(object):
 
         logger.debug("Client init called with: %r", kwargs)
 
+        # insert deprecated config properties that proxy values from the new `Client.config`
+        for legacy_property, config_path in Client._DEPRECATED_CONFIG_PROPERTIES_MAP.items():
+            proxy = partial(Client._legacy_config_property_proxy,
+                            legacy_property=legacy_property,
+                            config_path=config_path)
+            setattr(Client, legacy_property, property(proxy))
+
         # derive instance-level defaults from class defaults and init defaults
         self.defaults = copy.deepcopy(self.DEFAULTS)
         user_defaults = kwargs.pop('defaults', None)
@@ -434,114 +480,23 @@ class Client(object):
         # note: treat empty string values (e.g. from file/env) as undefined/None
         options = copy.deepcopy(self.defaults)
         update_config(options, kwargs)
+        logger.debug("Client options over defaults: %r", options)
 
-        logger.debug("Client options with defaults: %r", options)
-
-        # configure MetadataAPI access -- needed by Client.get_regions()
-        self.metadata_api_endpoint = options['metadata_api_endpoint']
-
-        # parse headers as they might be needed by Client.get_regions()
-        headers = options['headers']
-        if not headers:
-            headers_dict = {}
-        elif isinstance(headers, abc.Mapping):
-            headers_dict = headers
-        elif isinstance(headers, str):
-            try:
-                # valid  headers = "Field-1: value-1\nField-2: value-2"
-                headers_dict = {key.strip(): val.strip()
-                                for key, val in [line.split(':')
-                                                 for line in headers.strip().split('\n')]}
-            except Exception as e:
-                logger.debug("Invalid headers: %r", headers)
-                headers_dict = {}
-        else:
-            raise ValueError("HTTP headers expected in a dict, or a string")
-        logger.debug("Parsed headers=%r", headers_dict)
-        self.headers = headers_dict
+        self.config: ClientConfig = validate_config_v1(options)
+        logger.debug("Validated client config=%r", self.config)
 
         # resolve endpoint using region
-        region, endpoint = self._resolve_region_endpoint(
-            region=options.get('region'), endpoint=options.get('endpoint'))
+        self.config.region, self.config.endpoint = self._resolve_region_endpoint(
+            region=self.config.region, endpoint=self.config.endpoint)
+
+        logger.debug("Final client config=%r", self.config)
 
         # sanity check
-        if not endpoint:
+        if not self.config.endpoint:
             raise ValueError("API endpoint not defined")
 
-        token = options['token']
-        if not token:
+        if not self.config.token:
             raise ValueError("API token not defined")
-
-        # parse optional client certificate
-        client_cert = options['client_cert']
-        client_cert_key = options['client_cert_key']
-        if client_cert_key is not None:
-            if client_cert is not None:
-                client_cert = (client_cert, client_cert_key)
-            else:
-                raise ValueError(
-                    "Client certificate key given, but the cert is missing")
-
-        # parse solver
-        solver = options['solver']
-        if not solver:
-            solver_def = {}
-        elif isinstance(solver, abc.Mapping):
-            solver_def = solver
-        elif isinstance(solver, str):
-            # support features dict encoded as JSON in our config INI file
-            # TODO: push this decoding to the config module, once we switch to a
-            #       richer config format (JSON or YAML)
-            try:
-                solver_def = json.loads(solver)
-            except Exception:
-                # unparseable json, assume string name for solver
-                # we'll deprecate this eventually, but for now just convert it to
-                # features dict (equality constraint on full solver name)
-                logger.debug("Invalid solver JSON, assuming string name: %r", solver)
-                solver_def = dict(name__eq=solver)
-        else:
-            raise ValueError("Expecting a features dictionary or a string name for 'solver'")
-        logger.debug("Parsed solver=%r", solver_def)
-
-        # Store connection/session parameters
-        # TODO: consolidate all options under Client.options or similar
-        self.region = region    # for record only
-        self.endpoint = endpoint
-        self.token = token
-        self.default_solver = solver_def
-
-        self.client_cert = client_cert
-        self.request_timeout = parse_float(options['request_timeout'])
-        self.polling_timeout = parse_float(options['polling_timeout'])
-
-        self.proxy = options['proxy']
-        self.permissive_ssl = parse_boolean(options['permissive_ssl'])
-        self.connection_close = parse_boolean(options['connection_close'])
-
-        self.poll_backoff_min = parse_float(options['poll_backoff_min'])
-        self.poll_backoff_max = parse_float(options['poll_backoff_max'])
-        self.poll_backoff_base = parse_float(options['poll_backoff_base'])
-
-        self.http_retry_total = parse_int(options['http_retry_total'])
-        self.http_retry_connect = parse_int(options['http_retry_connect'])
-        self.http_retry_read = parse_int(options['http_retry_read'])
-        self.http_retry_redirect = parse_int(options['http_retry_redirect'])
-        self.http_retry_status = parse_int(options['http_retry_status'])
-        self.http_retry_backoff_factor = parse_float(options['http_retry_backoff_factor'])
-        self.http_retry_backoff_max = parse_float(options['http_retry_backoff_max'])
-
-        opts = (
-            'region', 'endpoint', 'token', 'default_solver',
-            'client_cert', 'request_timeout', 'polling_timeout',
-            'proxy', 'headers', 'permissive_ssl', 'connection_close',
-            'poll_backoff_min', 'poll_backoff_max', 'poll_backoff_base',
-            'http_retry_total', 'http_retry_connect', 'http_retry_read',
-            'http_retry_redirect', 'http_retry_status',
-            'http_retry_backoff_factor', 'http_retry_backoff_max')
-        logger.debug(
-            "Client initialized with (%s)",
-            ", ".join("{}={!r}".format(o, getattr(self, o)) for o in opts))
 
         # Create session for main thread only
         self.session = self.create_session()
@@ -616,49 +571,30 @@ class Client(object):
         """
 
         # allow endpoint path to not end with /
-        endpoint = self.endpoint
+        endpoint = self.config.endpoint
         if not endpoint.endswith('/'):
             endpoint += '/'
 
-        # create http idempotent Retry config
-        def get_retry_conf():
-            retry = urllib3.Retry(
-                total=self.http_retry_total,
-                connect=self.http_retry_connect,
-                read=self.http_retry_read,
-                redirect=self.http_retry_redirect,
-                status=self.http_retry_status,
-                backoff_factor=self.http_retry_backoff_factor,
-                raise_on_redirect=True,
-                raise_on_status=True,
-                respect_retry_after_header=True)
-
-            if self.http_retry_backoff_max is not None:
-                # handle `urllib3>=1.21.1,<1.27` AND `urllib3>=1.21.1,<3`
-                retry.BACKOFF_MAX = retry.backoff_max = self.http_retry_backoff_max
-
-            return retry
-
         session = BaseUrlSession(base_url=endpoint)
-        session.mount('http://',
-            TimeoutingHTTPAdapter(timeout=self.request_timeout,
-                                  max_retries=get_retry_conf()))
-        session.mount('https://',
-            TimeoutingHTTPAdapter(timeout=self.request_timeout,
-                                  max_retries=get_retry_conf()))
+        session.mount('http://', PretimedHTTPAdapter(
+            timeout=self.config.request_timeout,
+            max_retries=self.config.request_retry.to_urllib3_retry()))
+        session.mount('https://', PretimedHTTPAdapter(
+            timeout=self.config.request_timeout,
+            max_retries=self.config.request_retry.to_urllib3_retry()))
 
         session.headers.update({'User-Agent': self._user_agent})
-        if self.headers:
-            session.headers.update(self.headers)
-        if self.token:
-            session.headers.update({'X-Auth-Token': self.token})
-        if self.client_cert:
-            session.cert = self.client_cert
+        if self.config.headers:
+            session.headers.update(self.config.headers)
+        if self.config.token:
+            session.headers.update({'X-Auth-Token': self.config.token})
+        if self.config.cert:
+            session.cert = self.config.cert
 
-        session.proxies = {'http': self.proxy, 'https': self.proxy}
-        if self.permissive_ssl:
+        session.proxies = {'http': self.config.proxy, 'https': self.config.proxy}
+        if self.config.permissive_ssl:
             session.verify = False
-        if self.connection_close:
+        if self.config.connection_close:
             session.headers.update({'Connection': 'close'})
 
         # Debug-log headers
@@ -755,11 +691,11 @@ class Client(object):
 
     @staticmethod
     @cached.ondisk(maxage=_REGIONS_CACHE_MAXAGE)
-    def _fetch_available_regions(metadata_api_endpoint: str, **config) -> Dict[str, str]:
+    def _fetch_available_regions(config: ClientConfig) -> Dict[str, str]:
         logger.info("Fetching available regions from the Metadata API at %r",
-                    metadata_api_endpoint)
+                    config.metadata_api_endpoint)
 
-        with api.Regions(endpoint=metadata_api_endpoint, **config) as regions:
+        with api.Regions.from_config(config) as regions:
             regions = regions.list_regions()
             data = TypeAdapter(Any).dump_python(regions)
 
@@ -777,15 +713,17 @@ class Client(object):
         Returns:
             Mapping of region details (name and endpoint) over region codes.
         """
+        # make sure we don't cache by noise in config
+        config = self.config.model_copy(
+            update=dict(region=None, endpoint=None, token=None, client=None,
+                        solver=None, polling_schedule=None, polling_timeout=None),
+            deep=True)
         try:
-            rs = Client._fetch_available_regions(
-                metadata_api_endpoint=self.metadata_api_endpoint,
-                headers=self.headers,
-                refresh_=refresh)
+            rs = Client._fetch_available_regions(config=config, refresh_=refresh)
         except api.exceptions.RequestError as exc:
             logger.debug("Metadata API unavailable", exc_info=True)
             raise ValueError(
-                f"Metadata API unavailable at {self.metadata_api_endpoint!r}")
+                f"Metadata API unavailable at {self.config.metadata_api_endpoint!r}")
 
         logger.info("Using region metadata: %r", rs)
 
@@ -1245,8 +1183,8 @@ class Client(object):
         order_by = filters.pop('order_by', None)
 
         # in absence of other filters, config/env solver filters/name are used
-        if not filters and self.default_solver:
-            filters = copy.deepcopy(self.default_solver)
+        if not filters and self.config.solver:
+            filters = copy.deepcopy(self.config.solver)
 
         # allow `order_by` from default config/init override
         if order_by is None:
@@ -1517,13 +1455,13 @@ class Client(object):
 
         if future._poll_backoff is None:
             # on first poll, start with minimal back-off
-            future._poll_backoff = self.poll_backoff_min
+            future._poll_backoff = self.config.polling_schedule.backoff_min
         else:
             # on subsequent polls, do exponential back-off, clipped to a range
             future._poll_backoff = \
-                max(self.poll_backoff_min,
-                    min(future._poll_backoff * self.poll_backoff_base,
-                        self.poll_backoff_max))
+                max(self.config.polling_schedule.backoff_min,
+                    min(future._poll_backoff * self.config.polling_schedule.backoff_base,
+                        self.config.polling_schedule.backoff_max))
 
         # for poll priority we use timestamp of next scheduled poll
         at = time.time() + future._poll_backoff
@@ -1535,9 +1473,9 @@ class Client(object):
 
         # don't enqueue for next poll if polling_timeout is exceeded by then
         future_age_on_next_poll = future_age + (at - datetime_to_timestamp(now))
-        if self.polling_timeout is not None and future_age_on_next_poll > self.polling_timeout:
+        if self.config.polling_timeout is not None and future_age_on_next_poll > self.config.polling_timeout:
             logger.debug("Polling timeout exceeded before next poll: %.2f sec > %.2f sec, aborting polling!",
-                         future_age_on_next_poll, self.polling_timeout)
+                         future_age_on_next_poll, self.config.polling_timeout)
             raise PollingTimeout
 
         self._poll_queue.put((at, future))

@@ -512,9 +512,10 @@ class MockSubmission(_QueryTest):
                 future.result()
 
                 # after third poll, back-off interval should be 4 x initial back-off
+                schedule = client.config.polling_schedule
                 self.assertAlmostEqual(
                     future._poll_backoff,
-                    client.poll_backoff_min * client.poll_backoff_base**2)
+                    schedule.backoff_min * schedule.backoff_base**2)
 
     def test_immediate_polling(self):
         "First poll happens with minimal delay"
@@ -537,8 +538,9 @@ class MockSubmission(_QueryTest):
                 solver = Solver(client, self.sapi.solver.data)
 
                 def assert_no_delay(s):
-                    s and self.assertTrue(
-                        abs(s - client.poll_backoff_min) < client.DEFAULTS['poll_backoff_min'])
+                    s = s or 0
+                    delay = abs(s - client.config.polling_schedule.backoff_min)
+                    self.assertLess(delay, client.DEFAULTS['poll_backoff_min'])
 
                 with mock.patch('time.sleep', assert_no_delay):
                     future = solver.sample_qubo({})
@@ -567,8 +569,9 @@ class MockSubmission(_QueryTest):
                 solver = Solver(client, self.sapi.solver.data)
 
                 def assert_no_delay(s):
-                    s and self.assertTrue(
-                        abs(s - client.poll_backoff_min) < client.DEFAULTS['poll_backoff_min'])
+                    s = s or 0
+                    delay = abs(s - client.config.polling_schedule.backoff_min)
+                    self.assertLess(delay, client.DEFAULTS['poll_backoff_min'])
 
                 with mock.patch('time.sleep', assert_no_delay):
                     future = solver.sample_qubo({})
@@ -619,9 +622,10 @@ class MockSubmission(_QueryTest):
                 future.result()
 
                 # after third poll, back-off interval should be 4 x initial back-off
+                schedule = client.config.polling_schedule
                 self.assertAlmostEqual(
                     future._poll_backoff,
-                    client.poll_backoff_min * client.poll_backoff_base**2)
+                    schedule.backoff_min * schedule.backoff_base**2)
 
 
 class DeleteEvent(Exception):
