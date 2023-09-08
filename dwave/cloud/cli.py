@@ -31,6 +31,7 @@ import requests.exceptions
 
 import dwave.cloud
 from dwave.cloud import Client
+from dwave.cloud import api
 from dwave.cloud.solver import StructuredSolver, BaseUnstructuredSolver
 from dwave.cloud.utils import (
     default_text_input, generate_random_ising_problem,
@@ -46,7 +47,6 @@ from dwave.cloud.config import (
     load_profile_from_files, load_config_from_files, get_default_config,
     get_configfile_path, get_default_configfile_path,
     get_configfile_paths)
-from dwave.cloud.api.constants import DEFAULT_METADATA_API_ENDPOINT
 
 
 # show defaults for all click options when printing --help
@@ -232,9 +232,16 @@ def _config_create(config_file, profile, ask_full=False):
     """Full/simplified dwave create flows."""
 
     if ask_full:
-        rs = Client._fetch_available_regions(DEFAULT_METADATA_API_ENDPOINT)
+        # try using existing file/env/kwarg=cli config for metadata api access,
+        # but fall back to Regions defaults
+        try:
+            rs = api.Regions.from_config(config_file=config_file, profile=profile)
+        except:
+            rs = api.Regions()
+
+        region_choices = [r.code for r in rs.list_regions()]
         prompts = dict(
-            region=dict(prompt="Solver API region", choices=[r['code'] for r in rs]),
+            region=dict(prompt="Solver API region", choices=region_choices),
             endpoint=dict(prompt="Solver API endpoint URL (overwrites 'region')"),
             token=dict(prompt="Authentication token"),
             client=dict(prompt="Client class", choices='base qpu sw hybrid'.split()),
