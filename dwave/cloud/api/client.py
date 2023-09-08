@@ -360,10 +360,10 @@ class DWaveAPIClient:
 
         Args:
             config:
-                Path to configuration file or client config model. Based on `config`
-                type, we dispatch object creation to either :meth:`.from_config_file`
-                or :meth:`.from_client_config`. If omitted, config load from file is
-                attempted.
+                Client config model or path to configuration file. Based on `config`
+                type, dispatches object creation to either :meth:`.from_client_config`
+                or :meth:`.from_config_file`. If omitted, attempts to load
+                configuration from file.
 
             **kwargs:
                 Arguments passed to the dispatched method. See `config`.
