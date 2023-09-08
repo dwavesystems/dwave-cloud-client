@@ -113,7 +113,7 @@ class ClientConfig(BaseModel, GetterMixin):
     solver: Optional[Dict[str, Any]] = None
 
     # [sapi client specific] poll back-off schedule defaults [sec]
-    polling_schedule: PollingSchedule = PollingSchedule()
+    polling_schedule: Optional[PollingSchedule] = PollingSchedule()
     polling_timeout: Optional[float] = None
 
     # general http(s) connection params
@@ -158,7 +158,7 @@ def validate_config_v1(raw_config: dict) -> ClientConfig:
             headers_dict = {}
     else:
         raise ValueError("HTTP headers expected in a dict, or a string")
-    logger.debug("parsed headers: %r", headers_dict)
+    logger.trace("parsed headers: %r", headers_dict)
     config['headers'] = headers_dict
 
     # parse optional client certificate
@@ -171,7 +171,7 @@ def validate_config_v1(raw_config: dict) -> ClientConfig:
         else:
             raise ValueError(
                 "Client certificate key given, but the cert is missing")
-    logger.debug("parsed client cert: %r", client_cert)
+    logger.trace("parsed client cert: %r", client_cert)
     config['cert'] = client_cert
 
     # parse solver
@@ -199,7 +199,7 @@ def validate_config_v1(raw_config: dict) -> ClientConfig:
                 solver_def = dict(name__eq=solver)
     else:
         raise ValueError("Expecting a features dictionary or a string name for 'solver'")
-    logger.debug("parsed solver definition: %r", solver_def)
+    logger.trace("parsed solver definition: %r", solver_def)
     config['solver'] = solver_def
 
     # polling

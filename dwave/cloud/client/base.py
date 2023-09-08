@@ -36,7 +36,6 @@ Examples:
 
 import re
 import time
-import json
 import copy
 import queue
 import logging
@@ -52,7 +51,7 @@ import concurrent.futures
 
 from itertools import chain, zip_longest
 from functools import partial, wraps, cached_property
-from collections import abc, namedtuple
+from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Tuple, Dict, Any
 from pydantic import TypeAdapter
@@ -481,14 +480,16 @@ class Client(object):
         # note: treat empty string values (e.g. from file/env) as undefined/None
         options = copy.deepcopy(self.defaults)
         update_config(options, kwargs)
-        logger.debug("Client options with defaults: %r", options)
+        logger.debug("Client options over defaults: %r", options)
 
-        self.config = validate_config_v1(options)
-        logger.debug("Client initialized with config=%r", self.config)
+        self.config: ClientConfig = validate_config_v1(options)
+        logger.debug("Validated client config=%r", self.config)
 
         # resolve endpoint using region
         self.config.region, self.config.endpoint = self._resolve_region_endpoint(
             region=self.config.region, endpoint=self.config.endpoint)
+
+        logger.debug("Final client config=%r", self.config)
 
         # sanity check
         if not self.config.endpoint:
