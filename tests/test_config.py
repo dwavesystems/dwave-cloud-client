@@ -18,7 +18,7 @@ import unittest
 import configparser
 from unittest import mock
 from functools import partial
-from typing import Callable, Any
+from typing import Any, Dict, Callable
 
 from parameterized import parameterized
 
@@ -515,7 +515,7 @@ class TestConfigUtils(unittest.TestCase):
 class TestConfigModel(unittest.TestCase):
 
     def _verify(self,
-                raw_config: dict[str, Any],
+                raw_config: Dict[str, Any],
                 get_field: Callable[[ClientConfig], Any],
                 model_value: Any):
         """For a given ``raw_config``, test both model validate and dump."""
