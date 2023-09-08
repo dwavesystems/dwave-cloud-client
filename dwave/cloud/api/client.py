@@ -373,7 +373,8 @@ class DWaveAPIClient:
         if isinstance(config, ClientConfig):
             return cls.from_client_config(config, **kwargs)
 
-        return cls.from_config_file(config_file=config, **kwargs)
+        kwargs['config_file'] = config
+        return cls.from_config_file(**kwargs)
 
     def close(self):
         self.session.close()
