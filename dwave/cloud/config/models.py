@@ -63,7 +63,7 @@ class RequestRetryConfig(BaseModel, GetterMixin):
     backoff_factor: Optional[float] = 0.01
 
     #: No backoff will ever be longer than `backoff_max` seconds.
-    backoff_max: Optional[float] = 60
+    backoff_max: Optional[float] = 60.0
 
     def to_urllib3_retry(self) -> urllib3.Retry:
         """Return :class:`urllib3.Retry` configuration matching the model.
@@ -92,7 +92,7 @@ class PollingSchedule(BaseModel, GetterMixin):
     backoff_min: Optional[float] = 0.05
 
     #: Maximum back-off period, in seconds.
-    backoff_max: Optional[float] = 60
+    backoff_max: Optional[float] = 60.0
 
     #: Exponential function base. For poll `i`, back-off period (in seconds) is
     #: defined as `backoff_min * (backoff_base ** i)`.
@@ -127,7 +127,7 @@ class ClientConfig(BaseModel, GetterMixin):
 
     # api request retry params
     request_retry: RequestRetryConfig = RequestRetryConfig()
-    request_timeout: Optional[Union[float, Tuple[float, float]]] = (60, 120)
+    request_timeout: Optional[Union[float, Tuple[float, float]]] = (60.0, 120.0)
 
 
 def validate_config_v1(raw_config: dict) -> ClientConfig:
