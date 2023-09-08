@@ -67,6 +67,7 @@ from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *    # TODO: fix
 from dwave.cloud.computation import Future
 from dwave.cloud.config import load_config, update_config, validate_config_v1
+from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.upload import ChunkedData
@@ -689,11 +690,11 @@ class Client(object):
 
     @staticmethod
     @cached.ondisk(maxage=_REGIONS_CACHE_MAXAGE)
-    def _fetch_available_regions(metadata_api_endpoint: str, **config) -> Dict[str, str]:
+    def _fetch_available_regions(config: ClientConfig) -> Dict[str, str]:
         logger.info("Fetching available regions from the Metadata API at %r",
-                    metadata_api_endpoint)
+                    config.metadata_api_endpoint)
 
-        with api.Regions(endpoint=metadata_api_endpoint, **config) as regions:
+        with api.Regions.from_config(config) as regions:
             regions = regions.list_regions()
             data = TypeAdapter(Any).dump_python(regions)
 
@@ -711,11 +712,13 @@ class Client(object):
         Returns:
             Mapping of region details (name and endpoint) over region codes.
         """
+        # make sure we don't cache by noise in config
+        config = self.config.model_copy(
+            update=dict(region=None, endpoint=None, token=None, client=None,
+                        solver=None, polling_schedule=None, polling_timeout=None),
+            deep=True)
         try:
-            rs = Client._fetch_available_regions(
-                metadata_api_endpoint=self.config.metadata_api_endpoint,
-                headers=self.config.headers,
-                refresh_=refresh)
+            rs = Client._fetch_available_regions(config=config, refresh_=refresh)
         except api.exceptions.RequestError as exc:
             logger.debug("Metadata API unavailable", exc_info=True)
             raise ValueError(

@@ -10,6 +10,18 @@ features:
     Add ``from_config()`` family of factories to ``dwave.cloud.api.client.DWaveAPIClient``
     and subclasses for SolverAPI, MetadataAPI and LeapAPI. ``from_config()`` dispatches
     to ``from_client_config()`` or ``from_config_file()``, depending on arguments.
+    See `#572 <https://github.com/dwavesystems/dwave-cloud-client/issues/572>`_.
+  - |
+    Use full client config for Metadata API access during region/endpoint resolution
+    on ``dwave.cloud.Client`` construction.
+    See `#505 <https://github.com/dwavesystems/dwave-cloud-client/issues/505>`_.
+fixes:
+  - |
+    Fix region/endpoint resolution during ``dwave.cloud.Client`` construction
+    when insecure connection is required (config: ``permissive_ssl = On``) and/or
+    a proxy is used (config: ``proxy = socks5://...``). Previously client
+    construction would fail completely.
+    See `#507 <https://github.com/dwavesystems/dwave-cloud-client/issues/507>`_.
 deprecations:
   - |
     Individual config options exposed as ``dwave.cloud.Client`` attributes are

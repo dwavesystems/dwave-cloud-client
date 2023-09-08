@@ -28,7 +28,7 @@ from collections import defaultdict
 import requests
 from plucky import merge
 
-from dwave.cloud.api import constants
+from dwave.cloud.api import constants, Regions
 from dwave.cloud.client import Client
 from dwave.cloud.config.models import dump_config_v1
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
@@ -683,11 +683,16 @@ class MultiRegionSupport(unittest.TestCase):
         selected_region = regions_response[0]['code']
         selected_endpoint = regions_response[0]['endpoint']
 
+        permissive_ssl = True
+        proxy = 'http://127.0.0.1/'
+
         config_body = f"""
             [defaults]
             metadata_api_endpoint = {metadata_api_endpoint}
-            region = {selected_region}
             token = token
+            region = {selected_region}
+            proxy = {proxy}
+            permissive_ssl = {permissive_ssl}
         """
 
         expected_get_regions_return = {
@@ -709,9 +714,19 @@ class MultiRegionSupport(unittest.TestCase):
 
             return session
 
+        def _mocked_regions_factory(config, **kwargs):
+            # verify full client config is passed to `Regions.from_config` factory
+            self.assertEqual(config.metadata_api_endpoint, metadata_api_endpoint)
+            self.assertEqual(config.permissive_ssl, permissive_ssl)
+            self.assertEqual(config.proxy, proxy)
+
+            regions = Regions()
+            regions._session = _mocked_session()
+            return regions
+
         with mock.patch("dwave.cloud.config.loaders.open", iterable_mock_open(config_body)):
             with mock.patch.multiple(Client._fetch_available_regions._cached, cache={}):
-                with mock.patch("dwave.cloud.client.base.api.Regions._session", _mocked_session(), create=True):
+                with mock.patch("dwave.cloud.client.base.api.Regions.from_config", _mocked_regions_factory):
                     # note: we specify config_file, otherwise reading from files
                     # might be skipped altogether if zero config files found on disk
                     # (i.e. config open mock above fails on CI)
