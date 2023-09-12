@@ -1,7 +1,7 @@
 ---
 features:
   - |
-    Add config options for defining Leap API endpoint: ``leap_api_endpoint``
-    config file option (and keyword argument), and ``DWAVE_LEAP_API_ENDPOINT``
-    environment variable.
+    Add configuration options for defining Leap API endpoint: ``leap_api_endpoint``
+    option in configuration file or as keyword argument, and
+    ``DWAVE_LEAP_API_ENDPOINT`` environment variable.
     See `#569  <https://github.com/dwavesystems/dwave-cloud-client/issues/569>`_.

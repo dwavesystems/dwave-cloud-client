@@ -222,7 +222,7 @@ class Client(object):
             regional SAPI endpoint discovery.
 
         leap_api_endpoint (str, optional):
-            D-Wave Leap API endpoint.
+            Leap API endpoint.
 
         defaults (dict, optional):
             Defaults for the client instance that override the class
