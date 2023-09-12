@@ -23,7 +23,7 @@ from pydantic import BaseModel
 
 from dwave.cloud.config.loaders import update_config
 from dwave.cloud.api.constants import (
-    DEFAULT_REGION, DEFAULT_METADATA_API_ENDPOINT)
+    DEFAULT_REGION, DEFAULT_METADATA_API_ENDPOINT, DEFAULT_LEAP_API_ENDPOINT)
 
 __all__ = ['RequestRetryConfig', 'PollingSchedule', 'ClientConfig',
            'validate_config_v1', 'dump_config_v1', 'load_config_v1']
@@ -105,6 +105,7 @@ class ClientConfig(BaseModel, GetterMixin):
     region: Optional[str] = DEFAULT_REGION
 
     # resolved api endpoint
+    leap_api_endpoint: Optional[str] = DEFAULT_LEAP_API_ENDPOINT
     endpoint: Optional[str] = None
     token: Optional[str] = None
 
@@ -263,6 +264,7 @@ def dump_config_v1(config: ClientConfig) -> dict:
 _V1_CONFIG_DEFAULTS = {
     'client': 'base',
     'metadata_api_endpoint': DEFAULT_METADATA_API_ENDPOINT,
+    'leap_api_endpoint': DEFAULT_LEAP_API_ENDPOINT,
     'region': DEFAULT_REGION,
     'endpoint': None,
     'token': None,
