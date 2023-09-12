@@ -231,9 +231,13 @@ class Client(object):
         Instance-level defaults can be specified via ``defaults`` argument.
 
     .. deprecated:: 0.10.0
-
         Positional arguments in :class:`.Client` constructor are deprecated and
         will be removed in 0.12.0.
+
+    .. deprecated:: 0.11.0
+        Config attributes on :class:`.Client` are deprecated in favor of config
+        model attributes available on ``Client.config`` and will be removed
+        in 0.12.0.
 
     Examples:
         This example directly initializes a :class:`.Client`.

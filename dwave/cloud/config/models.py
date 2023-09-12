@@ -101,7 +101,7 @@ class PollingSchedule(BaseModel, GetterMixin):
 
 class ClientConfig(BaseModel, GetterMixin):
     # api region
-    metadata_api_endpoint: str = DEFAULT_METADATA_API_ENDPOINT
+    metadata_api_endpoint: Optional[str] = DEFAULT_METADATA_API_ENDPOINT
     region: Optional[str] = DEFAULT_REGION
 
     # resolved api endpoint
@@ -122,11 +122,11 @@ class ClientConfig(BaseModel, GetterMixin):
     proxy: Optional[str] = None
 
     # specific connection options
-    permissive_ssl: bool = False
-    connection_close: bool = False
+    permissive_ssl: Optional[bool] = False
+    connection_close: Optional[bool] = False
 
     # api request retry params
-    request_retry: RequestRetryConfig = RequestRetryConfig()
+    request_retry: Optional[RequestRetryConfig] = RequestRetryConfig()
     request_timeout: Optional[Union[float, Tuple[float, float]]] = (60.0, 120.0)
 
 
