@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import ast
 import copy
 import json
 import logging
 from collections import abc
 from typing import Optional, Union, Literal, Tuple, Dict, Any
+from typing_extensions import Annotated     # backport for py37, py38
 
 import urllib3
-from pydantic import BaseModel
+from pydantic import BaseModel, BeforeValidator
 
 from dwave.cloud.config.loaders import update_config
 from dwave.cloud.api.constants import (
@@ -99,6 +101,12 @@ class PollingSchedule(BaseModel, GetterMixin):
     backoff_base: Optional[float] = 1.3
 
 
+def _literal_eval(obj):
+    if isinstance(obj, str):
+        return ast.literal_eval(obj)
+    return obj
+
+
 class ClientConfig(BaseModel, GetterMixin):
     # api region
     metadata_api_endpoint: Optional[str] = DEFAULT_METADATA_API_ENDPOINT
@@ -128,7 +136,8 @@ class ClientConfig(BaseModel, GetterMixin):
 
     # api request retry params
     request_retry: Optional[RequestRetryConfig] = RequestRetryConfig()
-    request_timeout: Optional[Union[float, Tuple[float, float]]] = (60.0, 120.0)
+    request_timeout: Annotated[Optional[Union[float, Tuple[float, float]]],
+                               BeforeValidator(_literal_eval)] = (60.0, 120.0)
 
 
 def validate_config_v1(raw_config: dict) -> ClientConfig:
@@ -243,11 +252,6 @@ def dump_config_v1(config: ClientConfig) -> dict:
     del raw_config['cert']
 
     raw_config['solver'] = json.dumps(raw_config['solver'])
-
-    # TODO: undo this downcast once we support tuple input for `request_timeout` in the v1
-    # config format (issue https://github.com/dwavesystems/dwave-cloud-client/issues/440).
-    if isinstance(rt := raw_config['request_timeout'], tuple):
-        raw_config['request_timeout'] = rt[0]
 
     # expand/translate polling
     raw_config.update({f"poll_{k}": v for k, v in raw_config['polling_schedule'].items()})

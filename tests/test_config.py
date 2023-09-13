@@ -652,6 +652,23 @@ class TestConfigModel(unittest.TestCase):
                              get_field=lambda config: getattr(config, flag),
                              model_value=model_value)
 
+    @parameterized.expand([
+        ("null", None, None),
+        ("omitted", OMITTED, (60.0, 120.0)),    # default
+        ("int", 10, 10.0),
+        ("float", 10.0, 10.0),
+        ("tuple[int]", (10, 20), (10.0, 20.0)),
+        ("tuple[float]", (10.0, 20.0), (10.0, 20.0)),
+        ("literal scalar", '10', 10.0),
+        ("literal tuple", '(20, 30)', (20.0, 30.0)),
+        ("literal list", '[20, 30]', (20.0, 30.0)),
+    ])
+    def test_request_timeout(self, name, raw_value, model_value):
+        raw_config = {} if raw_value is self.OMITTED else {"request_timeout": raw_value}
+        self._verify(raw_config=raw_config,
+                     get_field=lambda config: config.request_timeout,
+                     model_value=model_value)
+
     def test_model_getter_mixin(self):
         val = "https://some.url/path/"
         config = validate_config_v1({"endpoint": val})
