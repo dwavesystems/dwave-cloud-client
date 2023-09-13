@@ -647,7 +647,7 @@ class ClientConfigIntegration(unittest.TestCase):
         """Test custom options (request_timeout, polling_timeout, permissive_ssl)
         are propagated to Client."""
 
-        request_timeout = 15
+        request_timeout = (15, 30)
         polling_timeout = 180
 
         config_body = """

@@ -1,0 +1,8 @@
+---
+features:
+  - |
+    Add support for specifying connection read timeout separately from connect
+    timeout. Previously, both read and connect timeouts were set to the same
+    value, specified with the ``request_timeout`` configuration parameter. We
+    now accept a ``(read, connect)`` tuple for the ``request_timeout`` parameter.
+    See `#440 <https://github.com/dwavesystems/dwave-cloud-client/issues/440>`_.
