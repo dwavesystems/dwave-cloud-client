@@ -90,6 +90,7 @@ def _deprecated_config_properties_to_config_map(options):
 
     properties_map = {
         'metadata_api_endpoint': 'metadata_api_endpoint',
+        'leap_api_endpoint': 'leap_api_endpoint',
         'region': 'region',
         'endpoint': 'endpoint',
         'token': 'token',
@@ -220,9 +221,16 @@ class Client(object):
             D-Wave Metadata API endpoint. Central for all regions, used for
             regional SAPI endpoint discovery.
 
+        leap_api_endpoint (str, optional):
+            Leap API endpoint.
+
         defaults (dict, optional):
             Defaults for the client instance that override the class
             :attr:`.Client.DEFAULTS`.
+
+    .. versionchanged:: 0.11.0
+        Added the ``leap_api_endpoint`` parameter and config option (also
+        available via environment variable ``DWAVE_LEAP_API_ENDPOINT``).
 
     Note:
         Default values of all constructor arguments listed above are kept in
@@ -231,9 +239,13 @@ class Client(object):
         Instance-level defaults can be specified via ``defaults`` argument.
 
     .. deprecated:: 0.10.0
-
         Positional arguments in :class:`.Client` constructor are deprecated and
         will be removed in 0.12.0.
+
+    .. deprecated:: 0.11.0
+        Config attributes on :class:`.Client` are deprecated in favor of config
+        model attributes available on ``Client.config`` and will be removed
+        in 0.12.0.
 
     Examples:
         This example directly initializes a :class:`.Client`.
@@ -271,6 +283,7 @@ class Client(object):
         'client': 'base',
         # constructor (and factory)
         'metadata_api_endpoint': api.constants.DEFAULT_METADATA_API_ENDPOINT,
+        'leap_api_endpoint': api.constants.DEFAULT_LEAP_API_ENDPOINT,
         'region': DEFAULT_API_REGION,
         # NOTE: should we rename endpoint to solver_api_endpoint for clarity?
         'endpoint': None,       # defined via region, resolved on client init

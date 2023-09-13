@@ -56,6 +56,7 @@ Environment variables:
 *   ``DWAVE_API_SOLVER``: Default solver.
 *   ``DWAVE_API_TOKEN``: Solver API authorization token.
 *   ``DWAVE_CONFIG_FILE``: Configuration file path.
+*   ``DWAVE_LEAP_API_ENDPOINT``: Leap API endpoint URL.
 *   ``DWAVE_METADATA_API_ENDPOINT``: Metadata API endpoint URL.
 *   ``DWAVE_PROFILE``: Name of profile (section).
 
@@ -148,9 +149,9 @@ Examples:
 
     >>> from dwave.cloud import Client
     >>> client = Client.from_config()  # doctest: +SKIP
-    >>> print(client.endpoint)      # doctest: +SKIP
+    >>> print(client.config.endpoint)      # doctest: +SKIP
     https://eu-central-1.cloud.dwavesys.com/sapi/v2/
-    >>> print(client.token)  # doctest: +SKIP
+    >>> print(client.config.token)  # doctest: +SKIP
     DEF-987654321987654321987654321
     >>> # code that uses client
     >>> client.close() # doctest: +SKIP

@@ -23,7 +23,7 @@ from pydantic import BaseModel
 
 from dwave.cloud.config.loaders import update_config
 from dwave.cloud.api.constants import (
-    DEFAULT_REGION, DEFAULT_METADATA_API_ENDPOINT)
+    DEFAULT_REGION, DEFAULT_METADATA_API_ENDPOINT, DEFAULT_LEAP_API_ENDPOINT)
 
 __all__ = ['RequestRetryConfig', 'PollingSchedule', 'ClientConfig',
            'validate_config_v1', 'dump_config_v1', 'load_config_v1']
@@ -101,10 +101,11 @@ class PollingSchedule(BaseModel, GetterMixin):
 
 class ClientConfig(BaseModel, GetterMixin):
     # api region
-    metadata_api_endpoint: str = DEFAULT_METADATA_API_ENDPOINT
+    metadata_api_endpoint: Optional[str] = DEFAULT_METADATA_API_ENDPOINT
     region: Optional[str] = DEFAULT_REGION
 
     # resolved api endpoint
+    leap_api_endpoint: Optional[str] = DEFAULT_LEAP_API_ENDPOINT
     endpoint: Optional[str] = None
     token: Optional[str] = None
 
@@ -122,11 +123,11 @@ class ClientConfig(BaseModel, GetterMixin):
     proxy: Optional[str] = None
 
     # specific connection options
-    permissive_ssl: bool = False
-    connection_close: bool = False
+    permissive_ssl: Optional[bool] = False
+    connection_close: Optional[bool] = False
 
     # api request retry params
-    request_retry: RequestRetryConfig = RequestRetryConfig()
+    request_retry: Optional[RequestRetryConfig] = RequestRetryConfig()
     request_timeout: Optional[Union[float, Tuple[float, float]]] = (60.0, 120.0)
 
 
@@ -263,6 +264,7 @@ def dump_config_v1(config: ClientConfig) -> dict:
 _V1_CONFIG_DEFAULTS = {
     'client': 'base',
     'metadata_api_endpoint': DEFAULT_METADATA_API_ENDPOINT,
+    'leap_api_endpoint': DEFAULT_LEAP_API_ENDPOINT,
     'region': DEFAULT_REGION,
     'endpoint': None,
     'token': None,

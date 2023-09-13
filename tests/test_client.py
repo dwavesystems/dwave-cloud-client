@@ -26,6 +26,7 @@ from contextlib import contextmanager
 from collections import defaultdict
 
 import requests
+from parameterized import parameterized
 from plucky import merge
 
 from dwave.cloud.api import constants, Regions
@@ -186,7 +187,7 @@ class ClientConstruction(unittest.TestCase):
     """Test Client constructor and Client.from_config() factory."""
 
     def setUp(self):
-        # prevent run-time env vars interferring with tests
+        # prevent run-time env vars interfering with tests
         self._env = isolated_environ(empty=True).start()
 
     def tearDown(self):
@@ -209,6 +210,8 @@ class ClientConstruction(unittest.TestCase):
             with dwave.cloud.Client.from_config() as client:
                 self.assertEqual(client.config.region, constants.DEFAULT_REGION)
                 self.assertEqual(client.config.endpoint, constants.DEFAULT_SOLVER_API_ENDPOINT)
+                self.assertEqual(client.config.leap_api_endpoint, constants.DEFAULT_LEAP_API_ENDPOINT)
+                self.assertEqual(client.config.metadata_api_endpoint, constants.DEFAULT_METADATA_API_ENDPOINT)
                 self.assertEqual(client.config.token, 'token')
                 self.assertIsInstance(client, dwave.cloud.client.Client)
                 self.assertNotIsInstance(client, dwave.cloud.sw.Client)
@@ -264,13 +267,16 @@ class ClientConstruction(unittest.TestCase):
                         self.assertEqual(client.config.region, region_code)
                         self.assertEqual(client.config.endpoint, region_endpoint)
 
-    def test_metadata_api_endpoint_from_env_accepted(self):
-        metadata_api_endpoint = 'metadata-endpoint'
-        with isolated_environ(add={'DWAVE_METADATA_API_ENDPOINT': metadata_api_endpoint}):
-            conf = {k: k for k in 'endpoint metadata_api_endpoint token'.split()}
+    @parameterized.expand([
+        ("DWAVE_METADATA_API_ENDPOINT", "metadata-api-endpoint", "metadata_api_endpoint"),
+        ("DWAVE_LEAP_API_ENDPOINT", "leap-api-endpoint", "leap_api_endpoint"),
+    ])
+    def test_metadata_api_endpoint_from_env_accepted(self, env_key, env_val, config_key):
+        with isolated_environ(add={env_key: env_val}):
+            conf = {k: k for k in 'endpoint token'.split()}
             with mock.patch("dwave.cloud.config.loaders.load_profile_from_files", lambda *pa, **kw: conf):
                 with dwave.cloud.Client.from_config() as client:
-                    self.assertEqual(client.config.metadata_api_endpoint, metadata_api_endpoint)
+                    self.assertEqual(client.config[config_key], env_val)
 
     def test_client_type(self):
         conf = {k: k for k in 'endpoint token'.split()}
@@ -389,9 +395,12 @@ class ClientConstruction(unittest.TestCase):
                 # explicit None kwargs do not modify defaults
                 with dwave.cloud.Client(
                         endpoint=None, token=None, solver=None,
-                        connection_close=None, poll_backoff_min=None) as client:
+                        connection_close=None, poll_backoff_min=None,
+                        metadata_api_endpoint=None, leap_api_endpoint=None) as client:
 
                     self.assertEqual(client.config.endpoint, client.DEFAULT_API_ENDPOINT)
+                    self.assertEqual(client.config.leap_api_endpoint, DEFAULTS['leap_api_endpoint'])
+                    self.assertEqual(client.config.metadata_api_endpoint, DEFAULTS['metadata_api_endpoint'])
                     self.assertEqual(client.config.token, token)
                     self.assertEqual(client.config.solver, {})
 

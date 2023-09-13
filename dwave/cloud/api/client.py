@@ -546,7 +546,5 @@ class LeapAPIClient(DWaveAPIClient):
 
     @classmethod
     def from_client_config(cls, config: ClientConfig, **kwargs):
-        # XXX: replace endpoint with `leap_api_endpoint` after we implement
-        # https://github.com/dwavesystems/dwave-cloud-client/issues/569
-        kwargs.setdefault('endpoint', constants.DEFAULT_LEAP_API_ENDPOINT)
+        kwargs.setdefault('endpoint', config.leap_api_endpoint)
         return super().from_client_config(config, **kwargs)

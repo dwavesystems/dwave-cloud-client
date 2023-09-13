@@ -22,6 +22,7 @@ from typing import Any, Dict, Callable
 
 from parameterized import parameterized
 
+from dwave.cloud.api import constants
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import ConfigFileParseError, ConfigFileReadError
 from dwave.cloud.testing import iterable_mock_open
@@ -30,6 +31,7 @@ from dwave.cloud.config import (
     parse_float, parse_int, parse_boolean, get_cache_dir, update_config)
 from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.config.models import validate_config_v1, load_config_v1, dump_config_v1
+
 
 class TestConfigParsing(unittest.TestCase):
 
@@ -393,6 +395,15 @@ class TestConfigParsing(unittest.TestCase):
             with mock.patch.dict(os.environ, {'DWAVE_API_HEADERS': 'test'}):
                 self.assertEqual(load_config(config_file='myfile')['headers'], 'test')
 
+            with mock.patch.dict(os.environ, {'DWAVE_API_REGION': 'test'}):
+                self.assertEqual(load_config(config_file='myfile')['region'], 'test')
+
+            with mock.patch.dict(os.environ, {'DWAVE_METADATA_API_ENDPOINT': 'test'}):
+                self.assertEqual(load_config(config_file='myfile')['metadata_api_endpoint'], 'test')
+
+            with mock.patch.dict(os.environ, {'DWAVE_LEAP_API_ENDPOINT': 'test'}):
+                self.assertEqual(load_config(config_file='myfile')['leap_api_endpoint'], 'test')
+
 
 class TestConfigUtils(unittest.TestCase):
 
@@ -514,6 +525,8 @@ class TestConfigUtils(unittest.TestCase):
 
 class TestConfigModel(unittest.TestCase):
 
+    OMITTED = object()
+
     def _verify(self,
                 raw_config: Dict[str, Any],
                 get_field: Callable[[ClientConfig], Any],
@@ -569,6 +582,23 @@ class TestConfigModel(unittest.TestCase):
     def test_solver(self, name, raw_value, model_value):
         self._verify(raw_config={"solver": raw_value},
                      get_field=lambda config: config.solver,
+                     model_value=model_value)
+
+    @parameterized.expand([
+        ("null meta", "metadata_api_endpoint", None, None),
+        ("null leap", "leap_api_endpoint", None, None),
+        ("null sapi", "endpoint", None, None),
+        ("omitted meta", "metadata_api_endpoint", OMITTED, constants.DEFAULT_METADATA_API_ENDPOINT),
+        ("omitted leap", "leap_api_endpoint", OMITTED, constants.DEFAULT_LEAP_API_ENDPOINT),
+        ("omitted sapi", "endpoint", OMITTED, None),
+        ("url meta", "metadata_api_endpoint", "https://metadata.api/v1", "https://metadata.api/v1"),
+        ("url leap", "leap_api_endpoint", "https://leap.api/v1", "https://leap.api/v1"),
+        ("url sapi", "endpoint", "https://solver.api/v1", "https://solver.api/v1"),
+    ])
+    def test_endpoints(self, name, key, raw_value, model_value):
+        raw_config = {} if raw_value is self.OMITTED else {key: raw_value}
+        self._verify(raw_config=raw_config,
+                     get_field=lambda config: config[key],
                      model_value=model_value)
 
     @parameterized.expand([
