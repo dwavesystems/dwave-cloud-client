@@ -279,6 +279,9 @@ class TestCli(unittest.TestCase):
             solver.sample_ising.assert_called_with(
                 {3: 0}, {}, label=label, **params)
 
+            # verify output contains timing data
+            self.assertIn('Wall clock time', result.output)
+
         self.assertEqual(result.exit_code, 0)
 
     @parameterized.expand([
@@ -324,6 +327,9 @@ class TestCli(unittest.TestCase):
             s = c.get_solver.return_value
             s.sample_ising.assert_called_with(
                 {0: 0}, {(0, 4): 1}, num_reads=10, label=label)
+
+            # verify output contains timing data
+            self.assertIn('Wall clock time', result.output)
 
         self.assertEqual(result.exit_code, 0)
 

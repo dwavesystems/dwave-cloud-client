@@ -584,6 +584,7 @@ def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
         endpoint=endpoint, region=region,
         client=client_type, solver=solver_def)
 
+    t0 = timer()
     client, solver = _get_client_solver(config, output)
 
     if random_problem:
@@ -617,8 +618,11 @@ def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
     output("Using couplings: {quadratic}", quadratic=list(quadratic.items()), maxlen=maxlen)
     output("Sampling parameters: {sampling_params}", sampling_params=params)
 
+    t1 = timer()
     response = _sample(
         solver, problem=(linear, quadratic), params=params, output=output)
+
+    t2 = timer()
 
     if verbose:
         output("Result: {response!r}", response=response.result())
@@ -626,6 +630,17 @@ def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
     output("Samples: {samples!r}", samples=response.samples, maxlen=maxlen)
     output("Occurrences: {num_occurrences!r}", num_occurrences=response.num_occurrences, maxlen=maxlen)
     output("Energies: {energies!r}", energies=response.energies, maxlen=maxlen)
+
+    output("\nWall clock time:")
+    output(" * Solver definition fetch: {wallclock_solver_definition:.3f} ms", wallclock_solver_definition=(t1-t0)*1000.0)
+    output(" * Problem submit and results fetch: {wallclock_sampling:.3f} ms", wallclock_sampling=(t2-t1)*1000.0)
+    output(" * Total: {wallclock_total:.3f} ms", wallclock_total=(t2-t0)*1000.0)
+    if response.timing:
+        output("\nQPU timing:")
+        for component, duration in sorted(response.timing.items()):
+            output(" * %(name)s = {%(name)s} us" % {"name": component}, **{component: duration})
+    else:
+        output("\nQPU timing data not available.")
 
 
 @cli.command()

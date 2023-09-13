@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Add wall time and QPU timing to ``dwave sample`` output.
+    See `#570 <https://github.com/dwavesystems/dwave-cloud-client/issues/570>`_.
