@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Add ``leap_api_endpoint`` and ``solver_api_endpoint`` properties to
+    ``dwave.cloud.api.models.Region``.

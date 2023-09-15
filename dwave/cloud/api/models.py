@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from datetime import datetime
 from typing import List, Union, Optional, Dict, Any
 from typing_extensions import Annotated     # backport for py37, py38
-from datetime import datetime
+from urllib.parse import  urlsplit
 
 from pydantic import BaseModel, RootModel
 from pydantic.functional_validators import AfterValidator
@@ -140,6 +141,26 @@ class Region(BaseModel):
     code: str
     name: str
     endpoint: str
+
+    @property
+    def solver_api_endpoint(self) -> str:
+        return self.endpoint
+
+    @property
+    def leap_api_endpoint(self) -> str:
+        # shim until metadata api includes leap endpoint in region data
+
+        parts = urlsplit(self.endpoint)
+
+        # update path
+        path = urlsplit(constants.DEFAULT_LEAP_API_ENDPOINT).path
+
+        # strip region from netloc
+        netloc = parts.netloc
+        if parts.netloc.startswith(f"{self.code}."):
+            netloc = parts.netloc[len(self.code)+1:]
+
+        return parts._replace(netloc=netloc, path=path).geturl()
 
 
 # LeapAPI types, provisional
