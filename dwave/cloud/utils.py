@@ -484,11 +484,16 @@ class cached:
 
     def argshash(self, args, kwargs):
         "Hash mutable arguments' containers with immutable keys and values."
-        a = repr(args)
-        b = repr(sorted((repr(k), repr(v)) for k, v in kwargs.items()))
-        return a + b
+        if self.key is None:
+            # the default: use all args and kwargs for cache key
+            a = repr(args)
+            b = repr(sorted((repr(k), repr(v)) for k, v in kwargs.items()))
+            return a + b
 
-    def __init__(self, maxage=None, cache=None):
+        # use a single named argument (required!) as the cache key
+        return repr(kwargs[self.key])
+
+    def __init__(self, maxage=None, cache=None, key=None):
         if maxage is None:
             maxage = 0
         self.maxage = maxage
@@ -496,6 +501,8 @@ class cached:
         if cache is None:
             cache = {}
         self.cache = cache
+
+        self.key = key
 
     def __call__(self, fn):
         @wraps(fn)

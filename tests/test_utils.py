@@ -237,7 +237,7 @@ class TestCachedInMemoryDecorator(unittest.TestCase):
     def setUp(self):
         self.cached = cached
 
-    def test_args_hashing(self):
+    def test_all_args_hashing(self):
         counter = count()
 
         @self.cached(maxage=300)
@@ -259,6 +259,21 @@ class TestCachedInMemoryDecorator(unittest.TestCase):
 
             self.assertEqual(f(2), 6)
             self.assertEqual(f(1), 3)
+
+    def test_single_arg_hashing(self):
+        counter = count()
+
+        @self.cached(maxage=300, key='key')
+        def f(*a, key, **b):
+            return next(counter)
+
+        with mock.patch('dwave.cloud.utils.epochnow', lambda: 0):
+            self.assertEqual(f(key=None), 0)
+            self.assertEqual(f(1, key=None), 0)
+            self.assertEqual(f(1, 2, key=None), 0)
+            self.assertEqual(f(key=1), 1)
+            self.assertEqual(f(key=1, b=2), 1)
+            self.assertEqual(f(key=1, refresh_=True), 2)
 
     def test_args_collision(self):
         counter = count()
