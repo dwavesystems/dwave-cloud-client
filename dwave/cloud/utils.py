@@ -513,14 +513,19 @@ class cached:
             key = self.argshash(args, kwargs)
             data = self.cache.get(key, {})
 
-            logger.trace("cached: refresh=%r, store=%r key=%r, data=%r",
-                         refresh_, self.cache, key, data)
+            callee = type(self).__name__
+            logger.trace("[%s] call(refresh=%r, store=%r, key=%r, data=%r)",
+                         callee, refresh_, self.cache, key, data)
+            found = False
             if not refresh_ and data.get('expires', 0) > now:
                 val = data.get('val')
+                found = True
             else:
                 val = fn(*args, **kwargs)
                 self.cache[key] = dict(expires=now+self.maxage, val=val)
 
+            logger.trace("[%s] call(...) = %r (cache %s)", callee, val,
+                         'hit' if found else 'miss')
             return val
 
         # expose @cached internals for testing and debugging
