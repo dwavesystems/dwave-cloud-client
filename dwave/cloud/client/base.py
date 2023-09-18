@@ -69,6 +69,7 @@ from dwave.cloud.config import load_config, update_config, validate_config_v1
 from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
+from dwave.cloud.regions import get_regions
 from dwave.cloud.upload import ChunkedData
 from dwave.cloud.events import dispatches_events
 from dwave.cloud.utils import (
@@ -119,7 +120,7 @@ class Client(object):
     Args:
         region (str, optional, default='na-west-1'):
             D-Wave Solver API region. To see available regions use
-            :meth:`.Client.get_regions`.
+            :func:`~dwave.cloud.regions.get_regions`.
 
         endpoint (str, optional):
             D-Wave Solver API endpoint URL. If undefined, inferred from
@@ -702,20 +703,6 @@ class Client(object):
         """
         return True
 
-    @staticmethod
-    @cached.ondisk(maxage=_REGIONS_CACHE_MAXAGE)
-    def _fetch_available_regions(config: ClientConfig) -> Dict[str, str]:
-        logger.info("Fetching available regions from the Metadata API at %r",
-                    config.metadata_api_endpoint)
-
-        with api.Regions.from_config(config) as regions:
-            regions = regions.list_regions()
-            data = TypeAdapter(Any).dump_python(regions)
-
-        logger.debug("Received region metadata: %r", data)
-
-        return data
-
     def get_regions(self, refresh: bool = False) -> Dict[str, Dict[str, str]]:
         """Retrieve available API regions.
 
@@ -725,22 +712,23 @@ class Client(object):
 
         Returns:
             Mapping of region details (name and endpoint) over region codes.
+
+        .. deprecated:: 0.11.0
+            :meth:`.Client.get_regions` method is deprecated in favor of
+            :func:`dwave.cloud.regions.get_regions` function and will be
+            removed in 0.13.0.
+
         """
-        # make sure we don't cache by noise in config
-        config = self.config.model_copy(
-            update=dict(region=None, endpoint=None, token=None, client=None,
-                        solver=None, polling_schedule=None, polling_timeout=None),
-            deep=True)
-        try:
-            rs = Client._fetch_available_regions(config=config, refresh_=refresh)
-        except api.exceptions.RequestError as exc:
-            logger.debug("Metadata API unavailable", exc_info=True)
-            raise ValueError(
-                f"Metadata API unavailable at {self.config.metadata_api_endpoint!r}")
+        warnings.warn(
+            f"`Client.get_regions` method is deprecated since "
+            f"dwave-cloud-client 0.11.0, and will be removed in 0.13.0. "
+            f"Use `dwave.cloud.regions.get_regions` for greater flexibility instead.",
+            DeprecationWarning, stacklevel=2)
 
-        logger.info("Using region metadata: %r", rs)
+        rs = get_regions(config=self.config, refresh=refresh,
+                         maxage=self._REGIONS_CACHE_MAXAGE)
 
-        return {r['code']: {"name": r['name'], "endpoint": r['endpoint']} for r in rs}
+        return {r.code: {"name": r.name, "endpoint": r.endpoint} for r in rs}
 
     @cached(maxage=_SOLVERS_CACHE_MAXAGE)
     def _fetch_solvers(self, name=None):

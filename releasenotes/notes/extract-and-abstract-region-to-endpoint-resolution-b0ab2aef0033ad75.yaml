@@ -3,3 +3,12 @@ features:
   - |
     Add ``leap_api_endpoint`` and ``solver_api_endpoint`` properties to
     ``dwave.cloud.api.models.Region``.
+  - |
+    Move ``dwave.cloud.Client.get_regions`` to ``dwave.cloud.regions.get_regions``
+    in a new ``regions`` submodule, and refactor for flexibility of use and
+    better caching control.
+    See `#577 <https://github.com/dwavesystems/dwave-cloud-client/issues/577>`_.
+deprecations:
+  - |
+    Client method ``get_regions`` is deprecated in favor of
+    ``dwave.cloud.regions.get_regions``.

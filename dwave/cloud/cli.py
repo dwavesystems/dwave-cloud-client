@@ -44,9 +44,10 @@ from dwave.cloud.exceptions import (
     ConfigFileReadError, ConfigFileParseError, SolverNotFoundError, SolverOfflineError,
     RequestTimeout, PollingTimeout)
 from dwave.cloud.config import (
-    load_profile_from_files, load_config_from_files, get_default_config,
+    load_profile_from_files, load_config_from_files, load_config, get_default_config,
     get_configfile_path, get_default_configfile_path,
     get_configfile_paths)
+from dwave.cloud.regions import get_regions
 
 
 # show defaults for all click options when printing --help
@@ -235,11 +236,12 @@ def _config_create(config_file, profile, ask_full=False):
         # try using existing file/env/kwarg=cli config for metadata api access,
         # but fall back to Regions defaults
         try:
-            rs = api.Regions.from_config(config_file=config_file, profile=profile)
+            raw_config = load_config(config_file=config_file, profile=profile)
         except:
-            rs = api.Regions()
+            raw_config = {}
 
-        region_choices = [r.code for r in rs.list_regions()]
+        regions = get_regions(config=raw_config)
+        region_choices = [r.code for r in regions]
         prompts = dict(
             region=dict(prompt="Solver API region", choices=region_choices),
             endpoint=dict(prompt="Solver API endpoint URL (overwrites 'region')"),
