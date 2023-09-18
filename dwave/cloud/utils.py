@@ -14,6 +14,7 @@
 
 import sys
 import json
+import math
 import time
 import random
 import logging
@@ -23,13 +24,12 @@ import numbers
 import warnings
 
 from collections import OrderedDict
-from collections.abc import Mapping, Sequence
 from urllib.parse import urljoin
 from datetime import datetime, timedelta
 from dateutil.tz import UTC
 from functools import partial, wraps
 from pkg_resources import iter_entry_points
-from typing import Any, Optional, Sequence, Union
+from typing import Any, Optional, Union, List, Dict, Mapping, Sequence
 
 import requests
 import diskcache
@@ -217,7 +217,7 @@ def utcnow():
     return datetime.utcnow().replace(tzinfo=UTC)
 
 
-def epochnow():
+def epochnow() -> float:
     """Returns now as UNIX timestamp.
 
     Invariant:
@@ -480,9 +480,19 @@ class cached:
 
             get_solvers(count=5, name='asd', refresh_=True)
 
+        By default, cache indefinitely::
+
+            @cached()
+            def f(x):
+                return x**2
+
+        Specify per-call value max-age::
+
+            f(x, maxage_=10)
+
     """
 
-    def argshash(self, args, kwargs):
+    def argshash(self, args: List, kwargs: Dict):
         "Hash mutable arguments' containers with immutable keys and values."
         if self.key is None:
             # the default: use all args and kwargs for cache key
@@ -493,10 +503,12 @@ class cached:
         # use a single named argument (required!) as the cache key
         return repr(kwargs[self.key])
 
-    def __init__(self, maxage=None, cache=None, key=None):
-        if maxage is None:
-            maxage = 0
-        self.maxage = maxage
+    def __init__(self, *,
+                 maxage: Optional[float] = None,
+                 cache: Optional[Mapping] = None,
+                 key: Optional[str] = None):
+
+        self.default_maxage = maxage
 
         if cache is None:
             cache = {}
@@ -507,22 +519,25 @@ class cached:
     def __call__(self, fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
-            refresh_ = kwargs.pop('refresh_', False)
-            now = epochnow()
+            refresh = kwargs.pop('refresh_', False)
+            maxage = kwargs.pop('maxage_', self.default_maxage)
+            if maxage is None:
+                maxage = math.inf
 
+            now = epochnow()
             key = self.argshash(args, kwargs)
-            data = self.cache.get(key, {})
+            data = self.cache.get(key)
 
             callee = type(self).__name__
-            logger.trace("[%s] call(refresh=%r, store=%r, key=%r, data=%r)",
-                         callee, refresh_, self.cache, key, data)
+            logger.trace("[%s] call(refresh=%r, maxage=%r, now=%r, store=%r, key=%r, data=%r)",
+                         callee, refresh, maxage, now, self.cache, key, data)
             found = False
-            if not refresh_ and data.get('expires', 0) > now:
-                val = data.get('val')
+            if not refresh and data and (now - data['created'] <= maxage):
+                val = data['val']
                 found = True
             else:
                 val = fn(*args, **kwargs)
-                self.cache[key] = dict(expires=now+self.maxage, val=val)
+                self.cache[key] = dict(created=now, val=val)
 
             logger.trace("[%s] call(...) = %r (cache %s)", callee, val,
                          'hit' if found else 'miss')

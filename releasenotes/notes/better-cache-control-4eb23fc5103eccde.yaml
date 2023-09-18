@@ -1,0 +1,8 @@
+---
+features:
+  - |
+    Add a per-call cached value maximum age (``maxage_``) for functions
+    decorated with ``@cached``.
+  - |
+    Allow specifying cache key explicitly, instead of using all arguments of a
+    function decorated with ``@cached``.
