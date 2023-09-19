@@ -6,3 +6,6 @@ features:
   - |
     Allow specifying cache key explicitly, instead of using all arguments of a
     function decorated with ``@cached``.
+  - |
+    Add cache bypass control via ``disable()`` and ``enable()`` on the decorated
+    function.

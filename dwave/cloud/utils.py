@@ -457,7 +457,22 @@ class cached:
     """Caching decorator with max-age/expiry, forced refresh, and
     per-arguments-combo keys.
 
-    Example:
+    Args:
+        maxage:
+            Default cache max-age. Overridden with cached function's ``maxage_``
+            argument.
+        cache:
+            Data store.
+        key:
+            Name of cached function's argument to be used as a cache key.
+
+    The decorated function accepts two additional keyword arguments:
+        refresh_ (bool):
+            Force cache miss.
+        maxage_ (float):
+            Value's maximum allowed age for a cache hit.
+
+    Examples:
         Cache for 5 minutes::
 
             @cached(maxage=300)
@@ -495,7 +510,24 @@ class cached:
 
     """
 
-    def argshash(self, args: List, kwargs: Dict):
+    _disabled = False
+
+    def disable(self):
+        """Disable/bypass cache on the decorated function."""
+
+        # set on instance
+        self._disabled = True
+
+    def enable(self):
+        """Enable cache on the decorated function."""
+
+        # revert to class attr
+        try:
+            del self._disabled
+        except:
+            pass
+
+    def _argshash(self, args: List[Any], kwargs: Dict[Any, Any]):
         "Hash mutable arguments' containers with immutable keys and values."
         if self.key is None:
             # the default: use all args and kwargs for cache key
@@ -522,13 +554,16 @@ class cached:
     def __call__(self, fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
+            if self._disabled:
+                return fn(*args, **kwargs)
+
             refresh = kwargs.pop('refresh_', False)
             maxage = kwargs.pop('maxage_', self.default_maxage)
             if maxage is None:
                 maxage = math.inf
 
             now = epochnow()
-            key = self.argshash(args, kwargs)
+            key = self._argshash(args, kwargs)
             data = self.cache.get(key)
 
             callee = type(self).__name__
@@ -546,8 +581,9 @@ class cached:
                          'hit' if found else 'miss')
             return val
 
-        # expose @cached internals for testing and debugging
-        wrapper._cached = self
+        # expose @cached internals for testing, debugging and cache control via
+        # :meth:`.disable()`
+        wrapper.cached = self
 
         return wrapper
 

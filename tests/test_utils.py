@@ -375,6 +375,39 @@ class TestCachedInMemoryDecorator(unittest.TestCase):
         self.assertEqual(f(), 1)
         self.assertEqual(f(), 0.5)
 
+    def test_disable(self):
+        counter = count()
+
+        @self.cached()
+        def f():
+            return next(counter)
+
+        self.assertEqual(f(), 0)
+
+        f.cached.disable()
+        self.assertEqual(f(), 1)
+
+        f.cached.enable()
+        self.assertEqual(f(), 0)
+
+    def test_disable_is_isolated(self):
+        counter = count()
+
+        @self.cached()
+        def f():
+            return next(counter)
+
+        @self.cached()
+        def g():
+            return next(counter)
+
+        self.assertEqual(f(), 0)
+        self.assertEqual(g(), 1)
+
+        f.cached.disable()
+        self.assertEqual(f(), 2)
+        self.assertEqual(g(), 1)
+
 
 class TestCachedOnDiskDecorator(TestCachedInMemoryDecorator):
     """Test @cached using on-disk store (via @cached.ondisk)."""
