@@ -342,14 +342,14 @@ class TestCachedInMemoryDecorator(unittest.TestCase):
         # expired for default maxage
         with mock.patch('dwave.cloud.utils.epochnow', lambda: 15):
             self.assertEqual(f(maxage_=20), 0)
-            self.assertEqual(f(maxage_=15), 0)
-            self.assertEqual(f(maxage_=14), 1)
+            self.assertEqual(f(maxage_=15.01), 0)
+            self.assertEqual(f(maxage_=15), 1)
 
         # cache hot for default maxage
         with mock.patch('dwave.cloud.utils.epochnow', lambda: 25):
             self.assertEqual(f(maxage_=11), 1)
-            self.assertEqual(f(), 1)
-            self.assertEqual(f(maxage_=9), 2)
+            self.assertEqual(f(), 2)
+            self.assertEqual(f(maxage_=1), 2)
 
     def test_default_zero_maxage(self):
         counter = count()

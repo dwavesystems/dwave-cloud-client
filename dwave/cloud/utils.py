@@ -490,6 +490,9 @@ class cached:
 
             f(x, maxage_=10)
 
+        For stability reasons, for a cache hit, we require item age to be
+        strictly less than `maxage`.
+
     """
 
     def argshash(self, args: List, kwargs: Dict):
@@ -532,7 +535,7 @@ class cached:
             logger.trace("[%s] call(refresh=%r, maxage=%r, now=%r, store=%r, key=%r, data=%r)",
                          callee, refresh, maxage, now, self.cache, key, data)
             found = False
-            if not refresh and data and (now - data['created'] <= maxage):
+            if not refresh and data and (now - data['created'] < maxage):
                 val = data['val']
                 found = True
             else:
