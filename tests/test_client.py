@@ -33,6 +33,7 @@ from dwave.cloud.api import constants, Regions
 from dwave.cloud.client import Client
 from dwave.cloud.config.models import dump_config_v1
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
+from dwave.cloud.utils import cached
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, SolverError, SolverNotFoundError)
 from dwave.cloud.testing import iterable_mock_open, isolated_environ
@@ -734,7 +735,7 @@ class MultiRegionSupport(unittest.TestCase):
             return regions
 
         with mock.patch("dwave.cloud.config.loaders.open", iterable_mock_open(config_body)):
-            with mock.patch.multiple(Client._fetch_available_regions._cached, cache={}):
+            with cached.disabled():
                 with mock.patch("dwave.cloud.client.base.api.Regions.from_config", _mocked_regions_factory):
                     # note: we specify config_file, otherwise reading from files
                     # might be skipped altogether if zero config files found on disk
@@ -795,7 +796,7 @@ class MultiRegionSupport(unittest.TestCase):
                 self.assertEqual(client.config.endpoint, Client.DEFAULT_API_ENDPOINT)
 
     @unittest.skipUnless(config, "No live server configuration available.")
-    @mock.patch.multiple(Client._fetch_available_regions._cached, cache={})
+    @cached.disabled()
     def test_region_selection_live_end_to_end(self):
         with Client(**config) as client:
             self.assertEqual(client.config.region, constants.DEFAULT_REGION)

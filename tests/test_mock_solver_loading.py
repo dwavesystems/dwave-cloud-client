@@ -152,13 +152,13 @@ class MockSolverLoading(unittest.TestCase):
     def test_load_all_solvers(self):
         """Load the list of solver names."""
 
-        def spoof_cache(client, clear_val=False, clear_expires=False):
-            cache = client._fetch_solvers._cached.cache
+        def spoof_cache(client, clear_val=False, clear_created=False):
+            cache = client._fetch_solvers.cached.cache
             for args in cache:
                 if clear_val:
                     cache[args]['val'] = []
-                if clear_expires:
-                    cache[args]['expires'] = 0
+                if clear_created:
+                    cache[args]['created'] = 0
 
         with requests_mock.mock() as m:
             setup_server(m)
@@ -170,7 +170,7 @@ class MockSolverLoading(unittest.TestCase):
                 self.assertEqual(len(solvers), 2)
 
                 # test default refresh
-                spoof_cache(client, clear_expires=True)
+                spoof_cache(client, clear_created=True)
                 self.assertEqual(len(client.get_solvers()), 2)      # should refresh
 
                 # test no refresh
