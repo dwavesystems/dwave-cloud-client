@@ -231,8 +231,8 @@ class TestNumpyTypesEncoding(unittest.TestCase):
         self.assertEqual(py_val, coerce_numpy_to_python(np_val))
 
 
-class TestCachedInMemoryDecorator(unittest.TestCase):
-    """Test @cached using in-memory store."""
+class TestCachedCommon(unittest.TestCase):
+    """@cached tests common to in-memory and on-disk caches."""
 
     def setUp(self):
         self.cached = cached
@@ -439,7 +439,42 @@ class TestCachedInMemoryDecorator(unittest.TestCase):
         self.assertEqual(f(), 0)
 
 
-class TestCachedOnDiskDecorator(TestCachedInMemoryDecorator):
+class TestCachedInMemoryDecorator(TestCachedCommon):
+
+    def test_cached_isolation(self):
+        counter = count()
+        store = {}
+
+        @self.cached(cache=store)
+        def f():
+            return next(counter)
+
+        @self.cached(cache=store)
+        def g():
+            return next(counter)
+
+        self.assertEqual(f(), 0)
+        self.assertEqual(g(), 1)
+        self.assertEqual(f(), 0)
+        self.assertEqual(g(), 1)
+
+    def test_shared_cache_bucket(self):
+        counter = count()
+        store = {}
+
+        @self.cached(cache=store, bucket='f')
+        def f():
+            return next(counter)
+
+        @self.cached(cache=store, bucket='f')
+        def g():
+            return next(counter)
+
+        self.assertEqual(f(), 0)
+        self.assertEqual(g(), 0)
+
+
+class TestCachedOnDiskDecorator(TestCachedCommon):
     """Test @cached using on-disk store (via @cached.ondisk)."""
 
     def setUp(self):
@@ -452,16 +487,15 @@ class TestCachedOnDiskDecorator(TestCachedInMemoryDecorator):
         with contextlib.suppress(OSError):
             self.tmpdir.cleanup()
 
-    @mock.patch('dwave.cloud.utils.epochnow', lambda: 0)
     def test_persistency(self):
         counter = count()
         def f():
             return next(counter)
 
-        f1 = self.cached(maxage=1)(f)
+        f1 = self.cached(bucket='fixed')(f)
         self.assertEqual(f1(), 0)
 
-        f2 = self.cached(maxage=1)(f)
+        f2 = self.cached(bucket='fixed')(f)
         self.assertEqual(f2(), 0)
 
 

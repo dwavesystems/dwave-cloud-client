@@ -29,6 +29,7 @@ from datetime import datetime, timedelta
 from dateutil.tz import UTC
 from functools import partial, wraps
 from pkg_resources import iter_entry_points
+from secrets import token_hex
 from typing import Any, Optional, Union, List, Dict, Mapping, Sequence
 from unittest import mock
 
@@ -466,6 +467,9 @@ class cached:
             Data store.
         key:
             Name of cached function's argument to be used as a cache key.
+        bucket:
+            Cache bucket prefix. By default, ``@cached`` instances use isolated
+            buckets.
 
     The decorated function accepts two additional keyword arguments:
         refresh_ (bool):
@@ -529,20 +533,22 @@ class cached:
             pass
 
     def _argshash(self, args: List[Any], kwargs: Dict[Any, Any]):
-        "Hash mutable arguments' containers with immutable keys and values."
+        """Hash mutable arguments' containers with immutable keys and values."""
         if self.key is None:
             # the default: use all args and kwargs for cache key
-            a = repr(args)
-            b = repr(sorted((repr(k), repr(v)) for k, v in kwargs.items()))
-            return a + b
+            tokens = (repr(args),
+                      repr(sorted((repr(k), repr(v)) for k, v in kwargs.items())))
+        else:
+            # use a single named argument (required!) as the cache key
+            tokens = (repr(kwargs[self.key]), )
 
-        # use a single named argument (required!) as the cache key
-        return repr(kwargs[self.key])
+        return '-'.join((self.bucket, *tokens))
 
     def __init__(self, *,
                  maxage: Optional[float] = None,
                  cache: Optional[Mapping] = None,
-                 key: Optional[str] = None):
+                 key: Optional[str] = None,
+                 bucket: Optional[str] = None):
 
         self.default_maxage = maxage
 
@@ -551,17 +557,19 @@ class cached:
         self.cache = cache
 
         self.key = key
+        self.bucket = bucket
 
     def __call__(self, fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
-            if self._disabled:
-                return fn(*args, **kwargs)
-
+            # pop additional params before calling the fn
             refresh = kwargs.pop('refresh_', False)
             maxage = kwargs.pop('maxage_', self.default_maxage)
             if maxage is None:
                 maxage = math.inf
+
+            if self._disabled:
+                return fn(*args, **kwargs)
 
             now = epochnow()
             key = self._argshash(args, kwargs)
@@ -585,6 +593,10 @@ class cached:
         # expose @cached internals for testing, debugging and cache control via
         # :meth:`.disable()`
         wrapper.cached = self
+
+        # set bucket prefix
+        if self.bucket is None:
+            self.bucket = f"{fn.__name__}-{token_hex(8)}"
 
         return wrapper
 

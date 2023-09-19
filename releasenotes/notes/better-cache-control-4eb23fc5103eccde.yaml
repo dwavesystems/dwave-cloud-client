@@ -13,3 +13,7 @@ features:
     Add ``@cached.disabled`` context manager (and a function decorator) that
     temporarily disables cache within the context (i.e. the decorated function).
     See `#503 <https://github.com/dwavesystems/dwave-cloud-client/issues/503>`_.
+fixes:
+  - |
+    Fix ``@cached`` instances isolation when using a shared storage (e.g. disk
+    cache), via ``bucket`` argument (cache key prefix).
