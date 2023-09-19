@@ -30,6 +30,7 @@ from dateutil.tz import UTC
 from functools import partial, wraps
 from pkg_resources import iter_entry_points
 from typing import Any, Optional, Union, List, Dict, Mapping, Sequence
+from unittest import mock
 
 import requests
 import diskcache
@@ -596,6 +597,59 @@ class cached:
         cache = diskcache.Cache(disk=diskcache.JSONDisk, directory=directory,
                                 disk_compress_level=compression_level)
         return cls(cache=cache, **kwargs)
+
+    class disabled:
+        """Context manager and decorator that disables the cache within the
+        context or the decorated function.
+
+        Decorator use example::
+            @cached()
+            def f(x):
+                return x**2
+
+            @cached.disabled
+            def no_cache(x):
+                return f(x)
+
+            f(1)            # cache miss
+            f(1)            # cache hit
+            no_cache(1)     # identical to the undecorated f(x) call; cache untouched
+
+        Context manager use example::
+            @cached()
+            def f(x):
+                return x**2
+
+            with cached.disabled():
+                f(1)        # identical to the undecorated f(x) call; cache untouched
+
+            f(1)            # cache miss
+
+        """
+
+        def start(self):
+            self.patcher = mock.patch.object(cached, '_disabled', True)
+            self.patcher.start()
+
+        def stop(self):
+            self.patcher.stop()
+
+        def __enter__(self):
+            return self.start()
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            self.stop()
+
+        def __call__(self, fn):
+            @wraps(fn)
+            def wrapper(*args, **kwargs):
+                self.start()
+                try:
+                    return fn(*args, **kwargs)
+                finally:
+                    self.stop()
+
+            return wrapper
 
 
 class retried(object):
