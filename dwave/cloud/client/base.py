@@ -53,8 +53,7 @@ from itertools import chain, zip_longest
 from functools import partial, wraps, cached_property
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional, Tuple, Dict, Any
-from pydantic import TypeAdapter
+from typing import Dict
 
 import requests
 import urllib3
@@ -69,7 +68,7 @@ from dwave.cloud.config import load_config, update_config, validate_config_v1
 from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
-from dwave.cloud.regions import get_regions
+from dwave.cloud.regions import get_regions, resolve_endpoints
 from dwave.cloud.upload import ChunkedData
 from dwave.cloud.events import dispatches_events
 from dwave.cloud.utils import (
@@ -422,39 +421,6 @@ class Client(object):
         logger.debug("Creating %s.Client() with: %r", _client, config)
         return _clients[_client](**config)
 
-    def _resolve_region_endpoint(self, *,
-                                 region: Optional[str] = None,
-                                 endpoint: Optional[str] = None) -> Tuple[str, str]:
-        """For a region/endpoint pair from config, return the Solver API
-        endpoint to use (and the matching region).
-
-        Explicit endpoint will override the region (i.e. region extension is
-        backwards-compatible).
-
-        Regional endpoint is fetched from Metadata API. If Metadata API is not
-        available, default global endpoint is used.
-        """
-        if endpoint:
-            return (region, endpoint)
-
-        if not region:
-            return (self.DEFAULT_API_REGION, self.DEFAULT_API_ENDPOINT)
-
-        try:
-            # XXX: suppress deprecation warnings until we refactor this resolver
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=DeprecationWarning)
-                regions = self.get_regions()
-        except (api.exceptions.RequestError, ValueError) as exc:
-            logger.warning("Failed to fetch available regions: %r. "
-                           "Using the default Solver API endpoint.", exc)
-            return (self.DEFAULT_API_REGION, self.DEFAULT_API_ENDPOINT)
-
-        if region not in regions:
-            raise ValueError(f"Region {region!r} unknown. "
-                             f"Try one of {list(regions.keys())!r}.")
-        return (region, regions[region]['endpoint'])
-
     @dispatches_events('client_init')
     def __init__(self, *args, **kwargs):
         # for (reasonable) backwards compatibility, accept only the first few
@@ -503,9 +469,7 @@ class Client(object):
         logger.debug("Validated client config=%r", self.config)
 
         # resolve endpoint using region
-        self.config.region, self.config.endpoint = self._resolve_region_endpoint(
-            region=self.config.region, endpoint=self.config.endpoint)
-
+        resolve_endpoints(self.config, inplace=True)
         logger.debug("Final client config=%r", self.config)
 
         # sanity check

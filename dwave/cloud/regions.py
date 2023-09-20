@@ -130,3 +130,54 @@ def _infer_leap_api_endpoint(solver_api_endpoint: str,
         netloc = parts.netloc[len(region_code)+1:]
 
     return parts._replace(netloc=netloc, path=path).geturl()
+
+
+def resolve_endpoints(config: ClientConfig, *, inplace: bool = False) -> ClientConfig:
+    """Use region and endpoint from config to resolve all config endpoints.
+
+    Explicit endpoint will override the region (i.e. region extension is
+    backwards-compatible).
+
+    Regional endpoint is fetched from Metadata API. If Metadata API is not
+    available, default global endpoint is used.
+    """
+
+    # Note: this function is currently indirectly tested with `Client`
+    # multi-region support tests.
+
+    if not inplace:
+        config = config.model_copy(deep=True)
+
+    def set_defaults(config):
+        config.region = DEFAULT_REGION
+        config.endpoint = DEFAULT_SOLVER_API_ENDPOINT
+        config.leap_api_endpoint = DEFAULT_LEAP_API_ENDPOINT
+
+    # for backward-compat: endpoint overrides region
+    if config.endpoint:
+        if not config.leap_api_endpoint:
+            config.leap_api_endpoint = _infer_leap_api_endpoint(
+                solver_api_endpoint=config.endpoint, region_code=config.region)
+        return config
+
+    if not config.region:
+        set_defaults(config)
+        return config
+
+    try:
+        regions = get_regions(config=config)
+        regions = {r.code: r for r in regions}
+    except (api.exceptions.RequestError, ValueError) as exc:
+        logger.warning("Failed to fetch available regions: %r. "
+                       "Using default endpoints.", exc)
+        set_defaults(config)
+        return config
+
+    if config.region not in regions:
+        raise ValueError(f"Region {config.region!r} unknown. "
+                         f"Try one of {list(regions.keys())!r}.")
+
+    region = regions[config.region]
+    config.endpoint = region.solver_api_endpoint
+    config.leap_api_endpoint = region.leap_api_endpoint
+    return config

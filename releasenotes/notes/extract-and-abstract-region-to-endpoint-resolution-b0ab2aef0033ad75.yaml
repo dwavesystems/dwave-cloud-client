@@ -8,6 +8,9 @@ features:
     in a new ``regions`` submodule, and refactor for flexibility of use and
     better caching control.
     See `#577 <https://github.com/dwavesystems/dwave-cloud-client/issues/577>`_.
+  - |
+    Add endpoints-from-region resolver, ``dwave.cloud.regions.resolve_endpoints``.
+    Previously, similar resolver was part of the ``Client`` class.
 deprecations:
   - |
     Client method ``get_regions`` is deprecated in favor of

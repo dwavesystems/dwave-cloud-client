@@ -29,7 +29,7 @@ import requests
 from parameterized import parameterized
 from plucky import merge
 
-from dwave.cloud.api import constants, Regions
+from dwave.cloud.api import constants, models, Regions
 from dwave.cloud.client import Client
 from dwave.cloud.config.models import dump_config_v1
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
@@ -42,9 +42,13 @@ import dwave.cloud
 from tests import config
 
 
-DEFAULT_REGIONS = {
-    constants.DEFAULT_REGION: dict(
-        endpoint=constants.DEFAULT_SOLVER_API_ENDPOINT)}
+DEFAULT_REGIONS = [
+    models.Region(
+        code=constants.DEFAULT_REGION,
+        name=constants.DEFAULT_REGION,
+        endpoint=constants.DEFAULT_SOLVER_API_ENDPOINT
+    ),
+]
 
 def get_default_regions(*args, **kwargs):
     return DEFAULT_REGIONS
@@ -183,7 +187,7 @@ class SolverLoading(unittest.TestCase):
                     self.assertRaises(SolverError, client.get_solver)
 
 
-@mock.patch.multiple(Client, get_regions=get_default_regions)
+@mock.patch("dwave.cloud.regions.get_regions", get_default_regions)
 class ClientConstruction(unittest.TestCase):
     """Test Client constructor and Client.from_config() factory."""
 
@@ -222,11 +226,12 @@ class ClientConstruction(unittest.TestCase):
     def test_region_selection_over_defaults(self):
         conf = {k: k for k in 'token'.split()}
         region_code = 'region-code'
+        region_name = 'region-name'
         region_endpoint = 'region-endpoint'
-        region_conf = {region_code: {"endpoint": region_endpoint}}
+        region_conf = [models.Region(code=region_code, name=region_name, endpoint=region_endpoint)]
 
         with mock.patch("dwave.cloud.config.loaders.load_profile_from_files", lambda *pa, **kw: conf):
-            with mock.patch("dwave.cloud.Client.get_regions", lambda s: region_conf):
+            with mock.patch("dwave.cloud.regions.get_regions", lambda config: region_conf):
                 with dwave.cloud.Client.from_config(region=region_code) as client:
                     self.assertEqual(client.config.region, region_code)
                     self.assertEqual(client.config.endpoint, region_endpoint)
@@ -234,11 +239,12 @@ class ClientConstruction(unittest.TestCase):
     def test_region_kwarg_overrides_endpoint_from_config(self):
         conf = {k: k for k in 'endpoint token'.split()}
         region_code = 'region-code'
+        region_name = 'region-name'
         region_endpoint = 'region-endpoint'
-        region_conf = {region_code: {"endpoint": region_endpoint}}
+        region_conf = [models.Region(code=region_code, name=region_name, endpoint=region_endpoint)]
 
         with mock.patch("dwave.cloud.config.loaders.load_profile_from_files", lambda *pa, **kw: conf):
-            with mock.patch("dwave.cloud.Client.get_regions", lambda s: region_conf):
+            with mock.patch("dwave.cloud.regions.get_regions", lambda config: region_conf):
                 with dwave.cloud.Client.from_config(region=region_code) as client:
                     self.assertEqual(client.config.region, region_code)
                     self.assertEqual(client.config.endpoint, region_endpoint)
@@ -246,11 +252,12 @@ class ClientConstruction(unittest.TestCase):
     def test_region_endpoint_pair_kwarg_overrides_region_endpoint_pair_from_config(self):
         conf = {k: k for k in 'region endpoint token'.split()}
         region_code = 'region-code'
+        region_name = 'region-name'
         region_endpoint = 'region-endpoint'
-        region_conf = {region_code: {"endpoint": region_endpoint}}
+        region_conf = [models.Region(code=region_code, name=region_name, endpoint=region_endpoint)]
 
         with mock.patch("dwave.cloud.config.loaders.load_profile_from_files", lambda *pa, **kw: conf):
-            with mock.patch("dwave.cloud.Client.get_regions", lambda s: region_conf):
+            with mock.patch("dwave.cloud.regions.get_regions", lambda config: region_conf):
                 with dwave.cloud.Client.from_config(region=region_code, endpoint=region_endpoint) as client:
                     self.assertEqual(client.config.region, region_code)
                     self.assertEqual(client.config.endpoint, region_endpoint)
@@ -258,12 +265,13 @@ class ClientConstruction(unittest.TestCase):
     def test_region_from_env_overrides_endpoint_from_config(self):
         conf = {k: k for k in 'endpoint token'.split()}
         region_code = 'region-code'
+        region_name = 'region-name'
         region_endpoint = 'region-endpoint'
-        region_conf = {region_code: {"endpoint": region_endpoint}}
+        region_conf = [models.Region(code=region_code, name=region_name, endpoint=region_endpoint)]
 
         with isolated_environ(add={'DWAVE_API_REGION': region_code}):
             with mock.patch("dwave.cloud.config.loaders.load_profile_from_files", lambda *pa, **kw: conf):
-                with mock.patch("dwave.cloud.Client.get_regions", lambda s: region_conf):
+                with mock.patch("dwave.cloud.regions.get_regions", lambda config: region_conf):
                     with dwave.cloud.Client.from_config() as client:
                         self.assertEqual(client.config.region, region_code)
                         self.assertEqual(client.config.endpoint, region_endpoint)
@@ -641,7 +649,7 @@ class ClientConstruction(unittest.TestCase):
                 self.assertEqual(client.config.token, token)
 
 
-@mock.patch.multiple(Client, get_regions=get_default_regions)
+@mock.patch("dwave.cloud.regions.get_regions", get_default_regions)
 class ClientConfigIntegration(unittest.TestCase):
 
     def test_custom_options(self):
@@ -755,7 +763,7 @@ class MultiRegionSupport(unittest.TestCase):
         when Client is initialized from config and MetadataAPI is down,
         then the client is initialized to use the default (old) endpoint and region.
         """
-        # test Client._resolve_region_endpoint
+        # test regions.resolve_endpoint
 
         conf = dict(token='token', metadata_api_endpoint='invalid')
         region = Client.DEFAULT_API_REGION
@@ -765,13 +773,13 @@ class MultiRegionSupport(unittest.TestCase):
                 self.assertEqual(client.config.region, Client.DEFAULT_API_REGION)
                 self.assertEqual(client.config.endpoint, Client.DEFAULT_API_ENDPOINT)
 
-    @mock.patch.multiple(Client, get_regions=get_default_regions)
+    @mock.patch("dwave.cloud.regions.get_regions", get_default_regions)
     def test_region_endpoint_fallback_when_region_unknown(self):
         """Given invalid region in config, and endpoint omitted,
         when Client is initialized from config,
         then ValueError is raised.
         """
-        # test Client._resolve_region_endpoint
+        # test regions.resolve_endpoint
 
         conf = dict(token='token')
         region = 'invalid-region-code'
@@ -780,13 +788,13 @@ class MultiRegionSupport(unittest.TestCase):
             with self.assertRaises(ValueError):
                 Client.from_config(region=region)
 
-    @mock.patch.multiple(Client, get_regions=get_default_regions)
+    @mock.patch("dwave.cloud.regions.get_regions", get_default_regions)
     def test_region_endpoint_null_case(self):
         """Given region as None, and endpoint as None,
         when Client is initialized from config,
         then the client is initialized to use the default (old) endpoint and region.
         """
-        # test Client._resolve_region_endpoint
+        # test regions.resolve_endpoint
 
         conf = dict(token='token', region='')
 

@@ -14,3 +14,4 @@ Methods
    :toctree: generated
 
    get_regions
+   resolve_endpoints
