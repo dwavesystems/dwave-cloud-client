@@ -12,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 import logging
 from functools import partial
 from typing import Any, Dict, List, Optional, Union
+from urllib.parse import urlsplit
 
 from pydantic import TypeAdapter
 
 from dwave.cloud import api
+from dwave.cloud.api.constants import (
+    DEFAULT_REGION, DEFAULT_SOLVER_API_ENDPOINT, DEFAULT_LEAP_API_ENDPOINT)
 from dwave.cloud.config.models import ClientConfig, validate_config_v1
 from dwave.cloud.utils import cached
 
@@ -102,3 +106,27 @@ def get_regions(config: Optional[Union[ClientConfig, str, dict]] = None,
 
     regions = TypeAdapter(List[api.models.Region]).validate_python(obj)
     return regions
+
+
+def _infer_leap_api_endpoint(solver_api_endpoint: str,
+                             region_code: Optional[str] = None) -> str:
+    # shim until metadata api includes leap endpoint in region data
+
+    parts = urlsplit(solver_api_endpoint)
+
+    # infer region code if necessary
+    if not region_code:
+        if m := re.match(r'([a-z]+-[a-z]+-\d+)\.', parts.netloc, re.I):
+            region_code = m.group(1)
+        else:
+            region_code = DEFAULT_REGION
+
+    # update path
+    path = urlsplit(DEFAULT_LEAP_API_ENDPOINT).path
+
+    # strip region from netloc
+    netloc = parts.netloc
+    if parts.netloc.startswith(f"{region_code}."):
+        netloc = parts.netloc[len(region_code)+1:]
+
+    return parts._replace(netloc=netloc, path=path).geturl()
