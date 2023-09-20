@@ -441,7 +441,10 @@ class Client(object):
             return (self.DEFAULT_API_REGION, self.DEFAULT_API_ENDPOINT)
 
         try:
-            regions = self.get_regions()
+            # XXX: suppress deprecation warnings until we refactor this resolver
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=DeprecationWarning)
+                regions = self.get_regions()
         except (api.exceptions.RequestError, ValueError) as exc:
             logger.warning("Failed to fetch available regions: %r. "
                            "Using the default Solver API endpoint.", exc)
