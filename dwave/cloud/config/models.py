@@ -110,15 +110,15 @@ def _literal_eval(obj):
 class ClientConfig(BaseModel, GetterMixin):
     # api region
     metadata_api_endpoint: Optional[str] = DEFAULT_METADATA_API_ENDPOINT
-    region: Optional[str] = DEFAULT_REGION
+    region: Optional[str] = None
 
     # resolved api endpoint
-    leap_api_endpoint: Optional[str] = DEFAULT_LEAP_API_ENDPOINT
+    leap_api_endpoint: Optional[str] = None
     endpoint: Optional[str] = None
     token: Optional[str] = None
 
     # [sapi client specific] feature-based solver selection query
-    client: Optional[str] = 'base'
+    client: Optional[str] = None
     solver: Optional[Dict[str, Any]] = None
 
     # [sapi client specific] poll back-off schedule defaults [sec]

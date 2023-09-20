@@ -589,7 +589,7 @@ class TestConfigModel(unittest.TestCase):
         ("null leap", "leap_api_endpoint", None, None),
         ("null sapi", "endpoint", None, None),
         ("omitted meta", "metadata_api_endpoint", OMITTED, constants.DEFAULT_METADATA_API_ENDPOINT),
-        ("omitted leap", "leap_api_endpoint", OMITTED, constants.DEFAULT_LEAP_API_ENDPOINT),
+        ("omitted leap", "leap_api_endpoint", OMITTED, None),
         ("omitted sapi", "endpoint", OMITTED, None),
         ("url meta", "metadata_api_endpoint", "https://metadata.api/v1", "https://metadata.api/v1"),
         ("url leap", "leap_api_endpoint", "https://leap.api/v1", "https://leap.api/v1"),
