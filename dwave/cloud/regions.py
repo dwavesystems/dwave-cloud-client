@@ -51,7 +51,13 @@ def get_regions(config: Optional[Union[ClientConfig, str, dict]] = None,
 
     Args:
         config:
-            Client configuration used for requests to Metadata API.
+            Client configuration used for requests to Metadata API. Given as
+            a :class:`~dwave.cloud.config.models.ClientConfig` object it defines
+            connection parameters in full. Raw config (full or partial) loaded
+            from a file/env with :meth:`~dwave.cloud.config.loaders.load_config`
+            can be passed in as a :class:`dict` and it will be validated as
+            :class:`~dwave.cloud.config.models.ClientConfig`. A string ``config``
+            value is interpreted as ``metadata_api_endpoint``.
         refresh:
             Force regions cache refresh.
         maxage:
@@ -60,7 +66,8 @@ def get_regions(config: Optional[Union[ClientConfig, str, dict]] = None,
             Don't use cache.
 
     Returns:
-        List of regions with details.
+        List of :class:`~dwave.cloud.api.models.Region` objects, each describing
+        one region.
 
     .. versionadded:: 0.11.0
         Added :func:`.get_regions`.
