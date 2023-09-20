@@ -89,7 +89,7 @@ def get_regions(config: Optional[Union[ClientConfig, str, dict]] = None,
     try:
         obj = fetch()
     except api.exceptions.RequestError as exc:
-        logger.error("Metadata API unavailable", exc_info=True)
+        logger.debug("Metadata API unavailable", exc_info=True)
         raise ValueError(
             f"Metadata API unavailable at {config.metadata_api_endpoint!r}")
 
