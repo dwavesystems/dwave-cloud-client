@@ -13,14 +13,16 @@
 # limitations under the License.
 
 import logging
-from typing import List, Optional, Union, Dict, Any
+from functools import partial
+from typing import Any, Dict, List, Optional, Union
+
+from pydantic import TypeAdapter
 
 from dwave.cloud import api
 from dwave.cloud.config.models import ClientConfig, validate_config_v1
 from dwave.cloud.utils import cached
-from pydantic import TypeAdapter
 
-__all__ = []
+__all__ = ['get_regions']
 
 logger = logging.getLogger(__name__)
 
@@ -43,18 +45,19 @@ def _fetch_available_regions(cache_key: Any, config: ClientConfig) -> Dict[str, 
 def get_regions(config: Optional[Union[ClientConfig, str, dict]] = None,
                 *,
                 refresh: bool = False,
-                maxage: Optional[float] = None) -> List[api.models.Region]:
+                maxage: Optional[float] = None,
+                no_cache: bool = False) -> List[api.models.Region]:
     """Retrieve available API regions.
 
     Args:
         config:
             Client configuration used for requests to Metadata API.
-
         refresh:
             Force regions cache refresh.
-
         maxage:
             Maximum allowed age of cached regions metadata.
+        no_cache:
+            Don't use cache.
 
     Returns:
         List of regions with details.
@@ -77,9 +80,14 @@ def get_regions(config: Optional[Union[ClientConfig, str, dict]] = None,
                  config.proxy, config.permissive_ssl,
                  config.request_retry, config.request_timeout)
 
+    fetch = partial(_fetch_available_regions,
+        cache_key=cache_key, config=config, refresh_=refresh, maxage_=maxage)
+
+    if no_cache:
+        fetch = cached.disabled()(fetch)
+
     try:
-        obj = _fetch_available_regions(
-            cache_key=cache_key, config=config, refresh_=refresh, maxage_=maxage)
+        obj = fetch()
     except api.exceptions.RequestError as exc:
         logger.error("Metadata API unavailable", exc_info=True)
         raise ValueError(
