@@ -231,47 +231,59 @@ class TestNumpyTypesEncoding(unittest.TestCase):
         self.assertEqual(py_val, coerce_numpy_to_python(np_val))
 
 
-class TestCachedInMemoryDecorator(unittest.TestCase):
-    """Test @cached using in-memory store."""
+class TestCachedCommon(unittest.TestCase):
+    """@cached tests common to in-memory and on-disk caches."""
 
     def setUp(self):
         self.cached = cached
 
-    def test_args_hashing(self):
+    def test_all_args_hashing(self):
         counter = count()
 
-        @self.cached(maxage=300)
+        @self.cached()
         def f(*a, **b):
             return next(counter)
 
-        with mock.patch('dwave.cloud.utils.epochnow', lambda: 0):
-            self.assertEqual(f(), 0)
-            self.assertEqual(f(1), 1)
-            self.assertEqual(f(1, 2), 2)
-            self.assertEqual(f(1), 1)
-            self.assertEqual(f(1, refresh_=True), 3)
-            self.assertEqual(f(1, 2), 2)
+        self.assertEqual(f(), 0)
+        self.assertEqual(f(1), 1)
+        self.assertEqual(f(1, 2), 2)
+        self.assertEqual(f(1), 1)
+        self.assertEqual(f(1, refresh_=True), 3)
+        self.assertEqual(f(1, 2), 2)
 
-            self.assertEqual(f(a=1, b=2), 4)
-            self.assertEqual(f(b=2, a=1), 4)
-            self.assertEqual(f(b=2, a=1, refresh_=1), 5)
-            self.assertEqual(f(), 0)
+        self.assertEqual(f(a=1, b=2), 4)
+        self.assertEqual(f(b=2, a=1), 4)
+        self.assertEqual(f(b=2, a=1, refresh_=1), 5)
+        self.assertEqual(f(), 0)
 
-            self.assertEqual(f(2), 6)
-            self.assertEqual(f(1), 3)
+        self.assertEqual(f(2), 6)
+        self.assertEqual(f(1), 3)
+
+    def test_single_arg_hashing(self):
+        counter = count()
+
+        @self.cached(key='key')
+        def f(*a, key, **b):
+            return next(counter)
+
+        self.assertEqual(f(key=None), 0)
+        self.assertEqual(f(1, key=None), 0)
+        self.assertEqual(f(1, 2, key=None), 0)
+        self.assertEqual(f(key=1), 1)
+        self.assertEqual(f(key=1, b=2), 1)
+        self.assertEqual(f(key=1, refresh_=True), 2)
 
     def test_args_collision(self):
         counter = count()
 
-        @self.cached(maxage=300)
+        @self.cached()
         def f(*a, **b):
             return next(counter)
 
-        with mock.patch('dwave.cloud.utils.epochnow', lambda: 0):
-            # NB: in python2, without hash seed randomization,
-            # hash('\0B') == hash('\0\0C')
-            self.assertEqual(f(x='\0B'), 0)
-            self.assertEqual(f(x='\0\0C'), 1)
+        # NB: in python2, without hash seed randomization,
+        # hash('\0B') == hash('\0\0C')
+        self.assertEqual(f(x='\0B'), 0)
+        self.assertEqual(f(x='\0\0C'), 1)
 
     @parameterized.expand([
         (1, ),
@@ -279,11 +291,10 @@ class TestCachedInMemoryDecorator(unittest.TestCase):
         ([1, 'b', None], ),
         ({"a": 1, "b": {"c": 2}}, ),
     ])
-    @mock.patch('dwave.cloud.utils.epochnow', lambda: 0)
     def test_value_serialization(self, val):
         counter = count()
 
-        @self.cached(maxage=1)
+        @self.cached()
         def f(*a, **b):
             i = next(counter)
             if i == 0:
@@ -295,7 +306,7 @@ class TestCachedInMemoryDecorator(unittest.TestCase):
     def test_expiry(self):
         counter = count()
 
-        @self.cached(maxage=300)
+        @self.cached(maxage=10)
         def f(*a, **b):
             return next(counter)
 
@@ -305,46 +316,165 @@ class TestCachedInMemoryDecorator(unittest.TestCase):
             self.assertEqual(f(1), 1)
             self.assertEqual(f(a=1, b=2), 2)
 
-        # verify expiry
-        with mock.patch('dwave.cloud.utils.epochnow', lambda: 301):
+        # cache miss, expired
+        with mock.patch('dwave.cloud.utils.epochnow', lambda: 15):
             self.assertEqual(f(), 3)
             self.assertEqual(f(1), 4)
             self.assertEqual(f(a=1, b=2), 5)
 
-        # verify maxage
-        with mock.patch('dwave.cloud.utils.epochnow', lambda: 299):
+        # cache hit, still hot
+        with mock.patch('dwave.cloud.utils.epochnow', lambda: 5):
             self.assertEqual(f(), 3)
             self.assertEqual(f(1), 4)
             self.assertEqual(f(a=1, b=2), 5)
+
+    def test_per_call_maxage(self):
+        counter = count()
+
+        @self.cached(maxage=10)
+        def f(*a, **b):
+            return next(counter)
+
+        # populate
+        with mock.patch('dwave.cloud.utils.epochnow', lambda: 0):
+            self.assertEqual(f(), 0)
+
+        # expired for default maxage
+        with mock.patch('dwave.cloud.utils.epochnow', lambda: 15):
+            self.assertEqual(f(maxage_=20), 0)
+            self.assertEqual(f(maxage_=15.01), 0)
+            self.assertEqual(f(maxage_=15), 1)
+
+        # cache hot for default maxage
+        with mock.patch('dwave.cloud.utils.epochnow', lambda: 25):
+            self.assertEqual(f(maxage_=11), 1)
+            self.assertEqual(f(), 2)
+            self.assertEqual(f(maxage_=1), 2)
 
     def test_default_zero_maxage(self):
         counter = count()
 
-        @self.cached()
+        @self.cached(maxage=0)
         def f(*a, **b):
             return next(counter)
 
-        with mock.patch('dwave.cloud.utils.epochnow', lambda: 0):
-            self.assertEqual(f(), 0)
-            self.assertEqual(f(), 1)
-            self.assertEqual(f(), 2)
+        self.assertEqual(f(), 0)
+        self.assertEqual(f(), 1)
+        self.assertEqual(f(), 2)
 
     def test_exceptions(self):
         counter = count(0)
 
-        @self.cached()
+        @self.cached(maxage=0)
         def f():
             # raises ZeroDivisionError only on first call
             # we do not want to cache that!
             return 1.0 / next(counter)
 
-        with mock.patch('dwave.cloud.utils.epochnow', lambda: 0):
-            self.assertRaises(ZeroDivisionError, f)
+        self.assertRaises(ZeroDivisionError, f)
+        self.assertEqual(f(), 1)
+        self.assertEqual(f(), 0.5)
+
+    def test_disable(self):
+        counter = count()
+
+        @self.cached()
+        def f():
+            return next(counter)
+
+        self.assertEqual(f(), 0)
+
+        f.cached.disable()
+        self.assertEqual(f(), 1)
+
+        f.cached.enable()
+        self.assertEqual(f(), 0)
+
+    def test_disable_is_isolated(self):
+        counter = count()
+
+        @self.cached()
+        def f():
+            return next(counter)
+
+        @self.cached()
+        def g():
+            return next(counter)
+
+        self.assertEqual(f(), 0)
+        self.assertEqual(g(), 1)
+
+        f.cached.disable()
+        self.assertEqual(f(), 2)
+        self.assertEqual(g(), 1)
+
+    def test_disabled_context(self):
+        counter = count()
+
+        @self.cached()
+        def f():
+            return next(counter)
+
+        self.assertEqual(f(), 0)
+
+        with cached.disabled():
             self.assertEqual(f(), 1)
-            self.assertEqual(f(), 0.5)
+
+        self.assertEqual(f(), 0)
+
+    def test_disabled_decorator(self):
+        counter = count()
+
+        @self.cached()
+        def f():
+            return next(counter)
+
+        self.assertEqual(f(), 0)
+
+        @cached.disabled()
+        def no_cache():
+            return f()
+
+        self.assertEqual(no_cache(), 1)
+        self.assertEqual(f(), 0)
 
 
-class TestCachedOnDiskDecorator(TestCachedInMemoryDecorator):
+class TestCachedInMemoryDecorator(TestCachedCommon):
+
+    def test_cached_isolation(self):
+        counter = count()
+        store = {}
+
+        @self.cached(cache=store)
+        def f():
+            return next(counter)
+
+        @self.cached(cache=store)
+        def g():
+            return next(counter)
+
+        self.assertEqual(f(), 0)
+        self.assertEqual(g(), 1)
+        self.assertEqual(f(), 0)
+        self.assertEqual(g(), 1)
+
+    def test_shared_cache_bucket(self):
+        counter = count()
+        store = {}
+
+        @self.cached(cache=store, bucket='f')
+        def f():
+            return next(counter)
+
+        @self.cached(cache=store, bucket='f')
+        def g():
+            return next(counter)
+
+        self.assertEqual(f(), 0)
+        self.assertEqual(g(), 0)
+
+
+class TestCachedOnDiskDecorator(TestCachedCommon):
     """Test @cached using on-disk store (via @cached.ondisk)."""
 
     def setUp(self):
@@ -357,16 +487,15 @@ class TestCachedOnDiskDecorator(TestCachedInMemoryDecorator):
         with contextlib.suppress(OSError):
             self.tmpdir.cleanup()
 
-    @mock.patch('dwave.cloud.utils.epochnow', lambda: 0)
     def test_persistency(self):
         counter = count()
         def f():
             return next(counter)
 
-        f1 = self.cached(maxage=1)(f)
+        f1 = self.cached(bucket='fixed')(f)
         self.assertEqual(f1(), 0)
 
-        f2 = self.cached(maxage=1)(f)
+        f2 = self.cached(bucket='fixed')(f)
         self.assertEqual(f2(), 0)
 
 

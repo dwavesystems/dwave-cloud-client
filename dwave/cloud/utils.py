@@ -14,6 +14,7 @@
 
 import sys
 import json
+import math
 import time
 import random
 import logging
@@ -23,13 +24,14 @@ import numbers
 import warnings
 
 from collections import OrderedDict
-from collections.abc import Mapping, Sequence
 from urllib.parse import urljoin
 from datetime import datetime, timedelta
 from dateutil.tz import UTC
 from functools import partial, wraps
 from pkg_resources import iter_entry_points
-from typing import Any, Optional, Sequence, Union
+from secrets import token_hex
+from typing import Any, Optional, Union, List, Dict, Mapping, Sequence
+from unittest import mock
 
 import requests
 import diskcache
@@ -217,7 +219,7 @@ def utcnow():
     return datetime.utcnow().replace(tzinfo=UTC)
 
 
-def epochnow():
+def epochnow() -> float:
     """Returns now as UNIX timestamp.
 
     Invariant:
@@ -457,7 +459,25 @@ class cached:
     """Caching decorator with max-age/expiry, forced refresh, and
     per-arguments-combo keys.
 
-    Example:
+    Args:
+        maxage:
+            Default cache max-age. Overridden with cached function's ``maxage_``
+            argument.
+        cache:
+            Data store.
+        key:
+            Name of cached function's argument to be used as a cache key.
+        bucket:
+            Cache bucket prefix. By default, ``@cached`` instances use isolated
+            buckets.
+
+    The decorated function accepts two additional keyword arguments:
+        refresh_ (bool):
+            Force cache miss.
+        maxage_ (float):
+            Value's maximum allowed age for a cache hit.
+
+    Examples:
         Cache for 5 minutes::
 
             @cached(maxage=300)
@@ -480,44 +500,103 @@ class cached:
 
             get_solvers(count=5, name='asd', refresh_=True)
 
+        By default, cache indefinitely::
+
+            @cached()
+            def f(x):
+                return x**2
+
+        Specify per-call value max-age::
+
+            f(x, maxage_=10)
+
+        For stability reasons, for a cache hit, we require item age to be
+        strictly less than `maxage`.
+
     """
 
-    def argshash(self, args, kwargs):
-        "Hash mutable arguments' containers with immutable keys and values."
-        a = repr(args)
-        b = repr(sorted((repr(k), repr(v)) for k, v in kwargs.items()))
-        return a + b
+    _disabled = False
 
-    def __init__(self, maxage=None, cache=None):
-        if maxage is None:
-            maxage = 0
-        self.maxage = maxage
+    def disable(self):
+        """Disable/bypass cache on the decorated function."""
+
+        # set on instance
+        self._disabled = True
+
+    def enable(self):
+        """Enable cache on the decorated function."""
+
+        # revert to class attr
+        try:
+            del self._disabled
+        except:
+            pass
+
+    def _argshash(self, args: List[Any], kwargs: Dict[Any, Any]):
+        """Hash mutable arguments' containers with immutable keys and values."""
+        if self.key is None:
+            # the default: use all args and kwargs for cache key
+            tokens = (repr(args),
+                      repr(sorted((repr(k), repr(v)) for k, v in kwargs.items())))
+        else:
+            # use a single named argument (required!) as the cache key
+            tokens = (repr(kwargs[self.key]), )
+
+        return '-'.join((self.bucket, *tokens))
+
+    def __init__(self, *,
+                 maxage: Optional[float] = None,
+                 cache: Optional[Mapping] = None,
+                 key: Optional[str] = None,
+                 bucket: Optional[str] = None):
+
+        self.default_maxage = maxage
 
         if cache is None:
             cache = {}
         self.cache = cache
 
+        self.key = key
+        self.bucket = bucket
+
     def __call__(self, fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
-            refresh_ = kwargs.pop('refresh_', False)
+            # pop additional params before calling the fn
+            refresh = kwargs.pop('refresh_', False)
+            maxage = kwargs.pop('maxage_', self.default_maxage)
+            if maxage is None:
+                maxage = math.inf
+
+            if self._disabled:
+                return fn(*args, **kwargs)
+
             now = epochnow()
+            key = self._argshash(args, kwargs)
+            data = self.cache.get(key)
 
-            key = self.argshash(args, kwargs)
-            data = self.cache.get(key, {})
-
-            logger.trace("cached: refresh=%r, store=%r key=%r, data=%r",
-                         refresh_, self.cache, key, data)
-            if not refresh_ and data.get('expires', 0) > now:
-                val = data.get('val')
+            callee = type(self).__name__
+            logger.trace("[%s] call(refresh=%r, maxage=%r, now=%r, store=%r, key=%r, data=%r)",
+                         callee, refresh, maxage, now, self.cache, key, data)
+            found = False
+            if not refresh and data and (now - data['created'] < maxage):
+                val = data['val']
+                found = True
             else:
                 val = fn(*args, **kwargs)
-                self.cache[key] = dict(expires=now+self.maxage, val=val)
+                self.cache[key] = dict(created=now, val=val)
 
+            logger.trace("[%s] call(...) = %r (cache %s)", callee, val,
+                         'hit' if found else 'miss')
             return val
 
-        # expose @cached internals for testing and debugging
-        wrapper._cached = self
+        # expose @cached internals for testing, debugging and cache control via
+        # :meth:`.disable()`
+        wrapper.cached = self
+
+        # set bucket prefix
+        if self.bucket is None:
+            self.bucket = f"{fn.__name__}-{token_hex(8)}"
 
         return wrapper
 
@@ -530,6 +609,59 @@ class cached:
         cache = diskcache.Cache(disk=diskcache.JSONDisk, directory=directory,
                                 disk_compress_level=compression_level)
         return cls(cache=cache, **kwargs)
+
+    class disabled:
+        """Context manager and decorator that disables the cache within the
+        context or the decorated function.
+
+        Decorator use example::
+            @cached()
+            def f(x):
+                return x**2
+
+            @cached.disabled
+            def no_cache(x):
+                return f(x)
+
+            f(1)            # cache miss
+            f(1)            # cache hit
+            no_cache(1)     # identical to the undecorated f(x) call; cache untouched
+
+        Context manager use example::
+            @cached()
+            def f(x):
+                return x**2
+
+            with cached.disabled():
+                f(1)        # identical to the undecorated f(x) call; cache untouched
+
+            f(1)            # cache miss
+
+        """
+
+        def start(self):
+            self.patcher = mock.patch.object(cached, '_disabled', True)
+            self.patcher.start()
+
+        def stop(self):
+            self.patcher.stop()
+
+        def __enter__(self):
+            return self.start()
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            self.stop()
+
+        def __call__(self, fn):
+            @wraps(fn)
+            def wrapper(*args, **kwargs):
+                self.start()
+                try:
+                    return fn(*args, **kwargs)
+                finally:
+                    self.stop()
+
+            return wrapper
 
 
 class retried(object):
