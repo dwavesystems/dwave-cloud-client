@@ -74,6 +74,14 @@ class TestMockRegions(unittest.TestCase):
         self.assertEqual(region.code, code)
         self.assertEqual(region.endpoint, urljoin(self.endpoint, f"regions/{code}"))
 
+    def test_shimmed_endpoints(self):
+        code = self.region_codes[0]
+
+        region = self.api.get_region(code)
+
+        self.assertEqual(region.solver_api_endpoint, region.endpoint)
+        self.assertEqual(region.leap_api_endpoint, urljoin(self.endpoint, f"/leap/api/"))
+
     def test_nonexisting_region(self):
         with self.assertRaises(exceptions.ResourceNotFoundError):
             self.api.get_region('non-existing-region')

@@ -53,8 +53,7 @@ from itertools import chain, zip_longest
 from functools import partial, wraps, cached_property
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional, Tuple, Dict, Any
-from pydantic import TypeAdapter
+from typing import Dict
 
 import requests
 import urllib3
@@ -69,6 +68,7 @@ from dwave.cloud.config import load_config, update_config, validate_config_v1
 from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.solver import Solver, available_solvers
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
+from dwave.cloud.regions import get_regions, resolve_endpoints
 from dwave.cloud.upload import ChunkedData
 from dwave.cloud.events import dispatches_events
 from dwave.cloud.utils import (
@@ -119,7 +119,7 @@ class Client(object):
     Args:
         region (str, optional, default='na-west-1'):
             D-Wave Solver API region. To see available regions use
-            :meth:`.Client.get_regions`.
+            :func:`~dwave.cloud.regions.get_regions`.
 
         endpoint (str, optional):
             D-Wave Solver API endpoint URL. If undefined, inferred from
@@ -421,36 +421,6 @@ class Client(object):
         logger.debug("Creating %s.Client() with: %r", _client, config)
         return _clients[_client](**config)
 
-    def _resolve_region_endpoint(self, *,
-                                 region: Optional[str] = None,
-                                 endpoint: Optional[str] = None) -> Tuple[str, str]:
-        """For a region/endpoint pair from config, return the Solver API
-        endpoint to use (and the matching region).
-
-        Explicit endpoint will override the region (i.e. region extension is
-        backwards-compatible).
-
-        Regional endpoint is fetched from Metadata API. If Metadata API is not
-        available, default global endpoint is used.
-        """
-        if endpoint:
-            return (region, endpoint)
-
-        if not region:
-            return (self.DEFAULT_API_REGION, self.DEFAULT_API_ENDPOINT)
-
-        try:
-            regions = self.get_regions()
-        except (api.exceptions.RequestError, ValueError) as exc:
-            logger.warning("Failed to fetch available regions: %r. "
-                           "Using the default Solver API endpoint.", exc)
-            return (self.DEFAULT_API_REGION, self.DEFAULT_API_ENDPOINT)
-
-        if region not in regions:
-            raise ValueError(f"Region {region!r} unknown. "
-                             f"Try one of {list(regions.keys())!r}.")
-        return (region, regions[region]['endpoint'])
-
     @dispatches_events('client_init')
     def __init__(self, *args, **kwargs):
         # for (reasonable) backwards compatibility, accept only the first few
@@ -499,9 +469,7 @@ class Client(object):
         logger.debug("Validated client config=%r", self.config)
 
         # resolve endpoint using region
-        self.config.region, self.config.endpoint = self._resolve_region_endpoint(
-            region=self.config.region, endpoint=self.config.endpoint)
-
+        resolve_endpoints(self.config, inplace=True)
         logger.debug("Final client config=%r", self.config)
 
         # sanity check
@@ -702,20 +670,6 @@ class Client(object):
         """
         return True
 
-    @staticmethod
-    @cached.ondisk(maxage=_REGIONS_CACHE_MAXAGE)
-    def _fetch_available_regions(config: ClientConfig) -> Dict[str, str]:
-        logger.info("Fetching available regions from the Metadata API at %r",
-                    config.metadata_api_endpoint)
-
-        with api.Regions.from_config(config) as regions:
-            regions = regions.list_regions()
-            data = TypeAdapter(Any).dump_python(regions)
-
-        logger.debug("Received region metadata: %r", data)
-
-        return data
-
     def get_regions(self, refresh: bool = False) -> Dict[str, Dict[str, str]]:
         """Retrieve available API regions.
 
@@ -725,22 +679,23 @@ class Client(object):
 
         Returns:
             Mapping of region details (name and endpoint) over region codes.
+
+        .. deprecated:: 0.11.0
+            :meth:`.Client.get_regions` method is deprecated in favor of
+            :func:`dwave.cloud.regions.get_regions` function and will be
+            removed in 0.13.0.
+
         """
-        # make sure we don't cache by noise in config
-        config = self.config.model_copy(
-            update=dict(region=None, endpoint=None, token=None, client=None,
-                        solver=None, polling_schedule=None, polling_timeout=None),
-            deep=True)
-        try:
-            rs = Client._fetch_available_regions(config=config, refresh_=refresh)
-        except api.exceptions.RequestError as exc:
-            logger.debug("Metadata API unavailable", exc_info=True)
-            raise ValueError(
-                f"Metadata API unavailable at {self.config.metadata_api_endpoint!r}")
+        warnings.warn(
+            f"`Client.get_regions` method is deprecated since "
+            f"dwave-cloud-client 0.11.0, and will be removed in 0.13.0. "
+            f"Use `dwave.cloud.regions.get_regions` for greater flexibility instead.",
+            DeprecationWarning, stacklevel=2)
 
-        logger.info("Using region metadata: %r", rs)
+        rs = get_regions(config=self.config, refresh=refresh,
+                         maxage=self._REGIONS_CACHE_MAXAGE)
 
-        return {r['code']: {"name": r['name'], "endpoint": r['endpoint']} for r in rs}
+        return {r.code: {"name": r.name, "endpoint": r.endpoint} for r in rs}
 
     @cached(maxage=_SOLVERS_CACHE_MAXAGE)
     def _fetch_solvers(self, name=None):

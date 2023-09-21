@@ -21,7 +21,6 @@ Methods
    :toctree: generated
 
    Future.result
-   Future.error
    Future.exception
    Future.as_completed
    Future.wait
@@ -41,7 +40,6 @@ Properties
    Future.variables
    Future.energies
    Future.num_occurrences
-   Future.occurrences
    Future.sampleset
 
    Future.id

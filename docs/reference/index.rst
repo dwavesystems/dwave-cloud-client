@@ -11,6 +11,7 @@ Reference Documentation
    :maxdepth: 2
 
    configuration
+   regions
    resources
    solver
    computation

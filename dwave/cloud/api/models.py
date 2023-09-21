@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from datetime import datetime
 from typing import List, Union, Optional, Dict, Any
 from typing_extensions import Annotated     # backport for py37, py38
-from datetime import datetime
 
 from pydantic import BaseModel, RootModel
 from pydantic.functional_validators import AfterValidator
@@ -140,6 +140,16 @@ class Region(BaseModel):
     code: str
     name: str
     endpoint: str
+
+    @property
+    def solver_api_endpoint(self) -> str:
+        return self.endpoint
+
+    @property
+    def leap_api_endpoint(self) -> str:
+        # guess until metadata api includes leap endpoint in region data
+        from dwave.cloud.regions import _infer_leap_api_endpoint
+        return _infer_leap_api_endpoint(self.endpoint, self.code)
 
 
 # LeapAPI types, provisional
