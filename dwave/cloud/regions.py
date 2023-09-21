@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
 import logging
+import re
 from functools import partial
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlsplit
@@ -51,23 +51,23 @@ def get_regions(config: Optional[Union[ClientConfig, str, dict]] = None,
                 refresh: bool = False,
                 maxage: Optional[float] = None,
                 no_cache: bool = False) -> List[api.models.Region]:
-    """Retrieve available API regions.
+    """Retrieve available Solver API regions.
 
     Args:
         config:
             Client configuration used for requests to Metadata API. Given as
-            a :class:`~dwave.cloud.config.models.ClientConfig` object it defines
+            a :class:`~dwave.cloud.config.models.ClientConfig` object, it defines
             connection parameters in full. Raw config (full or partial) loaded
             from a file/env with :meth:`~dwave.cloud.config.loaders.load_config`
-            can be passed in as a :class:`dict` and it will be validated as
+            can be passed in as a :class:`dict` and is validated as
             :class:`~dwave.cloud.config.models.ClientConfig`. A string ``config``
             value is interpreted as ``metadata_api_endpoint``.
         refresh:
             Force regions cache refresh.
         maxage:
-            Maximum allowed age of cached regions metadata.
+            Maximum allowed age, in seconds, of cached regions metadata.
         no_cache:
-            Don't use cache.
+            Do not use cache.
 
     Returns:
         List of :class:`~dwave.cloud.api.models.Region` objects, each describing
@@ -133,9 +133,9 @@ def _infer_leap_api_endpoint(solver_api_endpoint: str,
 
 
 def resolve_endpoints(config: ClientConfig, *, inplace: bool = False) -> ClientConfig:
-    """Use region and endpoint from config to resolve all config endpoints.
+    """Use region and endpoint from configuration to resolve all endpoints.
 
-    Explicit endpoint will override the region (i.e. region extension is
+    Explicit endpoint overrides the region (i.e. region extension is
     backwards-compatible).
 
     Regional endpoint is fetched from Metadata API. If Metadata API is not
