@@ -54,7 +54,7 @@ class accepts:
 
 
 class ResourceBase:
-    """A class for interacting with a SAPI resource."""
+    """A class for interacting with a Leap resource."""
 
     # api client used by the resource class
     client_class: DWaveAPIClient = DWaveAPIClient
