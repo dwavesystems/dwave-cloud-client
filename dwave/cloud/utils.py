@@ -463,7 +463,7 @@ class cached:
         maxage:
             Default cache max-age. Overridden with cached function's ``maxage_``
             argument.
-        cache:
+        store:
             Data store.
         key:
             Name of cached function's argument to be used as a cache key.
@@ -546,15 +546,15 @@ class cached:
 
     def __init__(self, *,
                  maxage: Optional[float] = None,
-                 cache: Optional[Mapping] = None,
+                 store: Optional[Mapping] = None,
                  key: Optional[str] = None,
                  bucket: Optional[str] = None):
 
         self.default_maxage = maxage
 
-        if cache is None:
-            cache = {}
-        self.cache = cache
+        if store is None:
+            store = {}
+        self.store = store
 
         self.key = key
         self.bucket = bucket
@@ -573,18 +573,18 @@ class cached:
 
             now = epochnow()
             key = self._argshash(args, kwargs)
-            data = self.cache.get(key)
+            data = self.store.get(key)
 
             callee = type(self).__name__
             logger.trace("[%s] call(refresh=%r, maxage=%r, now=%r, store=%r, key=%r, data=%r)",
-                         callee, refresh, maxage, now, self.cache, key, data)
+                         callee, refresh, maxage, now, self.store, key, data)
             found = False
             if not refresh and data and (now - data['created'] < maxage):
                 val = data['val']
                 found = True
             else:
                 val = fn(*args, **kwargs)
-                self.cache[key] = dict(created=now, val=val)
+                self.store[key] = dict(created=now, val=val)
 
             logger.trace("[%s] call(...) = %r (cache %s)", callee, val,
                          'hit' if found else 'miss')
@@ -608,7 +608,7 @@ class cached:
         compression_level = kwargs.pop('compression_level', 6)
         cache = diskcache.Cache(disk=diskcache.JSONDisk, directory=directory,
                                 disk_compress_level=compression_level)
-        return cls(cache=cache, **kwargs)
+        return cls(store=cache, **kwargs)
 
     class disabled:
         """Context manager and decorator that disables the cache within the

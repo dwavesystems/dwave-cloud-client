@@ -1,0 +1,5 @@
+---
+upgrade:
+  - |
+    ``@dwave.cloud.utils.cached`` parameter ``cache`` has been renamed
+    to ``store``.
