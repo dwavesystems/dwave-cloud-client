@@ -632,8 +632,8 @@ class TestCloudProblemsStructured(StructuredProblemTestsMixin,
         """Configure attributes required (used) by ProblemResourcesBaseTests."""
 
         with Client(**config) as client:
-            cls.token = config['token']
-            cls.api = Problems.from_client_config(client)
+            cls.token = client.config.token
+            cls.api = Problems.from_config(client.config)
 
             # submit and solve an Ising problem as a fixture
             solver = client.get_solver(qpu=True)
@@ -672,8 +672,8 @@ class TestCloudProblemsUnstructured(UnstructuredProblemTestsMixin,
         """Configure attributes required (used) by ProblemResourcesBaseTests."""
 
         with Client(**config) as client:
-            cls.token = config['token']
-            cls.api = Problems.from_client_config(client)
+            cls.token = client.config.token
+            cls.api = Problems.from_config(client.config)
 
             # submit and solve an Ising problem as a fixture
             solver = client.get_solver(hybrid=True)

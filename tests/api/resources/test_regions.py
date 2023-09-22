@@ -19,6 +19,7 @@ import requests_mock
 
 from dwave.cloud.api.resources import Regions
 from dwave.cloud.api import exceptions, models
+from dwave.cloud.config import validate_config_v1
 
 from tests import config
 
@@ -92,7 +93,7 @@ class TestCloudRegions(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.api = Regions()
+        cls.api = Regions.from_config(validate_config_v1(config))
 
     @classmethod
     def tearDownClass(cls):

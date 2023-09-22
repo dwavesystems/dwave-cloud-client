@@ -20,7 +20,7 @@ import requests_mock
 
 from dwave.cloud.api.resources import Solvers
 from dwave.cloud.api import exceptions, models
-from dwave.cloud.client.base import Client
+from dwave.cloud.config import validate_config_v1
 from dwave.cloud.testing.mocks import qpu_clique_solver_data
 
 from tests import config
@@ -106,8 +106,7 @@ class TestCloudSolvers(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        with Client(**config) as client:
-            cls.api = Solvers.from_client_config(client)
+        cls.api = Solvers.from_config(validate_config_v1(config))
 
     @classmethod
     def tearDownClass(cls):
