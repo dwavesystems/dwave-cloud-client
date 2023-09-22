@@ -11,7 +11,7 @@ features:
   - |
     Add ``from_config()`` family of factories to ``dwave.cloud.api.client.DWaveAPIClient``
     and subclasses for SolverAPI, MetadataAPI and LeapAPI. ``from_config()`` dispatches
-    to ``from_client_config()`` or ``from_config_file()``, depending on arguments.
+    to ``from_config_model()`` or ``from_config_file()``, depending on arguments.
     See `#572 <https://github.com/dwavesystems/dwave-cloud-client/issues/572>`_.
   - |
     Use full client config for Metadata API access during region/endpoint resolution
@@ -31,11 +31,14 @@ deprecations:
     ``dwave-cloud-client==0.12.0``. Use ``Client.config`` data model instead.
 upgrade:
   - |
-    Behavior of ``from_client_config()`` on all ``dwave.cloud.api.resources.ResourceBase``
-    resource classes changed. Previously a (cloud-)client instance was accepted and now
-    ``dwave.cloud.config.models.ClientConfig`` is required.
+    Method ``from_client_config()`` is removed from ``dwave.cloud.api.resources.ResourceBase``,
+    (affecting instantiation of its subclasses), in favor of a new method
+    ``from_config_model()`` (or alternatively, a more general ``from_config()``).
+    Previously an instance of either ``dwave.cloud.Client`` or ``dwave.cloud.api.DWaveAPIClient``
+    was required, and now it's possible to use just the configuration, a
+    ``dwave.cloud.config.models.ClientConfig`` object.
 
     To upgrade, replace ``{ResourceBase}.from_client_config(cloud_client)`` with
-    ``{ResourceBase}.from_client_config(client.config)``,
+    ``{ResourceBase}.from_config_model(client.config)``,
     and ``{ResourceBase}.from_client_config(dwave_api_client)`` with
     ``{ResourceBase}(dwave_api_client)``.

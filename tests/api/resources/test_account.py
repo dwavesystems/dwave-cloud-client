@@ -16,12 +16,14 @@ import os
 import uuid
 import unittest
 from urllib.parse import urljoin
-from dwave.cloud.api.client import LeapAPIClient
 
 import requests_mock
 
 from dwave.cloud.api.resources import LeapAccount
 from dwave.cloud.api import exceptions, models
+from dwave.cloud.config import validate_config_v1
+
+from tests import config
 
 
 class TestMockAccount(unittest.TestCase):
@@ -125,8 +127,9 @@ class TestCloudAccount(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        with LeapAPIClient(token=os.getenv('LEAP_API_ACCESS_TOKEN')) as client:
-            cls.api = LeapAccount.from_client_config(client)
+        cls.api = LeapAccount.from_config(
+            config=validate_config_v1(config),
+            token=os.getenv('LEAP_API_ACCESS_TOKEN'))
 
     @classmethod
     def tearDownClass(cls):

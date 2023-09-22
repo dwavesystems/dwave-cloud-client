@@ -88,7 +88,7 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(client.session.base_url,
                              constants.DEFAULT_LEAP_API_ENDPOINT)
 
-    def test_from_client_config_factory(self):
+    def test_from_config_model_factory(self):
         config = ClientConfig(region='ignored', connection_close=True,
                               permissive_ssl=True)
         kwargs = dict(endpoint='https://test.com/path/')
@@ -100,7 +100,7 @@ class TestConfig(unittest.TestCase):
             self.assertIn('Connection', client.session.headers)
             self.assertFalse(client.session.verify)
 
-        with DWaveAPIClient.from_client_config(config, **kwargs) as client:
+        with DWaveAPIClient.from_config_model(config, **kwargs) as client:
             _verify(client)
 
         # also test .from_config dispatch

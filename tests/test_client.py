@@ -408,8 +408,8 @@ class ClientConstruction(unittest.TestCase):
                         metadata_api_endpoint=None, leap_api_endpoint=None) as client:
 
                     self.assertEqual(client.config.endpoint, client.DEFAULT_API_ENDPOINT)
-                    self.assertEqual(client.config.leap_api_endpoint, DEFAULTS['leap_api_endpoint'])
-                    self.assertEqual(client.config.metadata_api_endpoint, DEFAULTS['metadata_api_endpoint'])
+                    self.assertEqual(client.config.leap_api_endpoint, constants.DEFAULT_LEAP_API_ENDPOINT)
+                    self.assertEqual(client.config.metadata_api_endpoint, constants.DEFAULT_METADATA_API_ENDPOINT)
                     self.assertEqual(client.config.token, token)
                     self.assertEqual(client.config.solver, {})
 

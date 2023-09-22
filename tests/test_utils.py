@@ -445,11 +445,11 @@ class TestCachedInMemoryDecorator(TestCachedCommon):
         counter = count()
         store = {}
 
-        @self.cached(cache=store)
+        @self.cached(store=store)
         def f():
             return next(counter)
 
-        @self.cached(cache=store)
+        @self.cached(store=store)
         def g():
             return next(counter)
 
@@ -462,11 +462,11 @@ class TestCachedInMemoryDecorator(TestCachedCommon):
         counter = count()
         store = {}
 
-        @self.cached(cache=store, bucket='f')
+        @self.cached(store=store, bucket='f')
         def f():
             return next(counter)
 
-        @self.cached(cache=store, bucket='f')
+        @self.cached(store=store, bucket='f')
         def g():
             return next(counter)
 

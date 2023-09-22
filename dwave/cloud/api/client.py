@@ -312,11 +312,11 @@ class DWaveAPIClient:
         self.session = self._create_session(self.config)
 
     @classmethod
-    def from_client_config(cls, config: ClientConfig, **kwargs):
-        """Create class instance based on
+    def from_config_model(cls, config: ClientConfig, **kwargs):
+        """Create class instance based on a
         :class:`~dwave.cloud.config.models.ClientConfig` config.
         """
-        logger.trace(f"{cls.__name__}.from_client_config(config={config!r}, **{kwargs!r})")
+        logger.trace(f"{cls.__name__}.from_config_model(config={config!r}, **{kwargs!r})")
 
         if config.headers:
             headers = config.headers.copy()
@@ -352,7 +352,7 @@ class DWaveAPIClient:
 
         options = load_config(config_file=config_file, profile=profile, **kwargs)
         config = validate_config_v1(options)
-        return cls.from_client_config(config)
+        return cls.from_config_model(config)
 
     @classmethod
     def from_config(cls, config: Optional[Union[ClientConfig, str]] = None, **kwargs):
@@ -361,17 +361,17 @@ class DWaveAPIClient:
         Args:
             config:
                 Client config model or path to configuration file. Based on `config`
-                type, dispatches object creation to either :meth:`.from_client_config`
+                type, dispatches object creation to either :meth:`.from_config_model`
                 or :meth:`.from_config_file`. If omitted, attempts to load
                 configuration from file.
 
             **kwargs:
-                Arguments passed to the dispatched method. See `config`.
+                Arguments passed to the dispatched method. See ``config`` above.
         """
         logger.trace(f"{cls.__name__}.from_config(config={config!r}, **{kwargs!r}")
 
         if isinstance(config, ClientConfig):
-            return cls.from_client_config(config, **kwargs)
+            return cls.from_config_model(config, **kwargs)
 
         kwargs['config_file'] = config
         return cls.from_config_file(**kwargs)
@@ -524,9 +524,9 @@ class MetadataAPIClient(DWaveAPIClient):
         super().__init__(**config)
 
     @classmethod
-    def from_client_config(cls, config: ClientConfig, **kwargs):
+    def from_config_model(cls, config: ClientConfig, **kwargs):
         kwargs.setdefault('endpoint', config.metadata_api_endpoint)
-        return super().from_client_config(config, **kwargs)
+        return super().from_config_model(config, **kwargs)
 
 
 class LeapAPIClient(DWaveAPIClient):
@@ -545,6 +545,6 @@ class LeapAPIClient(DWaveAPIClient):
         super().__init__(**config)
 
     @classmethod
-    def from_client_config(cls, config: ClientConfig, **kwargs):
+    def from_config_model(cls, config: ClientConfig, **kwargs):
         kwargs.setdefault('endpoint', config.leap_api_endpoint)
-        return super().from_client_config(config, **kwargs)
+        return super().from_config_model(config, **kwargs)
