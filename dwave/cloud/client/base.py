@@ -283,9 +283,8 @@ class Client(object):
         'client': 'base',
         # constructor (and factory)
         'metadata_api_endpoint': api.constants.DEFAULT_METADATA_API_ENDPOINT,
-        'leap_api_endpoint': api.constants.DEFAULT_LEAP_API_ENDPOINT,
         'region': DEFAULT_API_REGION,
-        # NOTE: should we rename endpoint to solver_api_endpoint for clarity?
+        'leap_api_endpoint': None,
         'endpoint': None,       # defined via region, resolved on client init
         'token': None,
         'solver': None,
@@ -468,7 +467,7 @@ class Client(object):
         self.config: ClientConfig = validate_config_v1(options)
         logger.debug("Validated client config=%r", self.config)
 
-        # resolve endpoint using region
+        # resolve endpoints using region
         resolve_endpoints(self.config, inplace=True)
         logger.debug("Final client config=%r", self.config)
 
