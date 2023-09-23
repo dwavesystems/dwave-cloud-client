@@ -16,12 +16,16 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Dict, Optional, Sequence
+from urllib.parse import urljoin
 
 from authlib.integrations.requests_client import OAuth2Session
 from authlib.common.security import generate_token
 
+from dwave.cloud.auth.config import OCEAN_SDK_CLIENT_ID, OCEAN_SDK_SCOPES
+from dwave.cloud.config.models import ClientConfig
 
-__all__ = ['AuthFlow']
+
+__all__ = ['AuthFlow', 'LeapAuthFlow']
 
 logger = logging.getLogger(__name__)
 
@@ -86,3 +90,44 @@ class AuthFlow:
             grant_type='authorization_code',
             code=code,
             **kwargs)
+
+
+class LeapAuthFlow(AuthFlow):
+    """:class:`.AuthFlow` specialized for Ocean and Leap."""
+
+    _OOB_REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
+
+    # note: in the future we might want to replace these url resolvers with a
+    # OpenID Provider Metadata server query
+    @staticmethod
+    def _infer_auth_endpoint(leap_api_endpoint: str) -> str:
+        return urljoin(leap_api_endpoint, '/leap/openid/authorize')
+
+    @staticmethod
+    def _infer_token_endpoint(leap_api_endpoint: str) -> str:
+        return urljoin(leap_api_endpoint, '/leap/openid/token')
+
+    @classmethod
+    def from_config_model(cls, config: ClientConfig, **kwargs) -> LeapAuthFlow:
+        """Construct a :class:`.LeapAuthModel` initialized with Ocean SDK's
+        ``client_id``, and Leap authorization/token endpoint.
+        """
+        authorization_endpoint = cls._infer_auth_endpoint(config.leap_api_endpoint)
+        token_endpoint = cls._infer_token_endpoint(config.leap_api_endpoint)
+
+        # note: possible to de-dup via `DWaveAPIClient.from_config_model`, but
+        # currently not worth the extra complexity (indirection layer).
+        session_config = dict(
+            cert=config.cert,
+            headers=config.headers,
+            proxies=dict(http=config.proxy, https=config.proxy),
+            timeout=config.request_timeout,
+            verify=not config.permissive_ssl)
+
+        return cls(
+            client_id=kwargs.pop('client_id', OCEAN_SDK_CLIENT_ID),
+            scopes=kwargs.pop('scopes', OCEAN_SDK_SCOPES),
+            redirect_uri=kwargs.pop('redirect_uri', cls._OOB_REDIRECT_URI),
+            authorization_endpoint=authorization_endpoint,
+            token_endpoint=token_endpoint,
+            session_config=session_config)
