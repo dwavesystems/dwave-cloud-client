@@ -82,7 +82,7 @@ class AuthFlow:
         """Update OAuth2Session/requests.Session with config values for:
         ``cert``, ``cookies``, ``headers``, ``proxies``, ``timeout``, ``verify``.
         """
-        self.session.headers.update(config.get('headers', {}))
+        self.session.headers.update(config.get('headers') or {})
         self.session.default_timeout = config.get('timeout', None)
 
         for key in ('cert', 'cookies', 'proxies', 'verify'):

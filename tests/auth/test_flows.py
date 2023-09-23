@@ -13,11 +13,13 @@
 # limitations under the License.
 
 import unittest
-from urllib.parse import urlsplit, parse_qs, parse_qsl
+from urllib.parse import urlsplit, parse_qsl
 
 import requests_mock
 
-from dwave.cloud.auth.flows import AuthFlow
+from dwave.cloud.auth.flows import AuthFlow, LeapAuthFlow
+from dwave.cloud.auth.config import OCEAN_SDK_CLIENT_ID, OCEAN_SDK_SCOPES
+from dwave.cloud.config import ClientConfig
 
 
 class TestAuthFlow(unittest.TestCase):
@@ -98,3 +100,45 @@ class TestAuthFlow(unittest.TestCase):
             flow = AuthFlow(**self.test_args)
             flow.update_session(config)
             verify(flow.session, config)
+
+
+class TestLeapAuthFlow(unittest.TestCase):
+
+    def test_from_minimal_config(self):
+        config = ClientConfig(leap_api_endpoint='https://example.com/leap')
+
+        flow = LeapAuthFlow.from_config_model(config)
+
+        # endpoint urls are generated?
+        self.assertTrue(flow.authorization_endpoint.startswith(config.leap_api_endpoint))
+        self.assertTrue(flow.token_endpoint.startswith(config.leap_api_endpoint))
+        # Leap-specific:
+        self.assertTrue(flow.authorization_endpoint.endswith('authorize'))
+        self.assertTrue(flow.token_endpoint.endswith('token'))
+
+        self.assertEqual(flow.client_id, OCEAN_SDK_CLIENT_ID)
+        self.assertEqual(flow.scopes, ' '.join(OCEAN_SDK_SCOPES))
+        self.assertEqual(flow.redirect_uri, LeapAuthFlow._OOB_REDIRECT_URI)
+
+    def test_from_minimal_config_with_overrides(self):
+        config = ClientConfig(leap_api_endpoint='https://example.com/leap')
+        client_id = '123'
+        scopes = ['email']
+        redirect_uri = 'https://example.com/callback'
+
+        flow = LeapAuthFlow.from_config_model(
+            config=config, client_id=client_id,
+            scopes=scopes, redirect_uri=redirect_uri)
+
+        self.assertEqual(flow.client_id, client_id)
+        self.assertEqual(flow.scopes, ' '.join(scopes))
+        self.assertEqual(flow.redirect_uri, redirect_uri)
+
+    def test_from_common_config(self):
+        config = ClientConfig(leap_api_endpoint='https://example.com/leap',
+                              headers=dict(injected='value'), request_timeout=10)
+
+        flow = LeapAuthFlow.from_config_model(config)
+
+        self.assertEqual(flow.session.headers.get('injected'), 'value')
+        self.assertEqual(flow.session.default_timeout, 10)
