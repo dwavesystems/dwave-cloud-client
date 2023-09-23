@@ -312,11 +312,11 @@ class DWaveAPIClient:
         self.session = self._create_session(self.config)
 
     @classmethod
-    def from_config_model(cls, config: ClientConfig, **kwargs):
+    def from_config_model(cls, config: ClientConfig, **options):
         """Create class instance based on a
         :class:`~dwave.cloud.config.models.ClientConfig` config.
         """
-        logger.trace(f"{cls.__name__}.from_config_model(config={config!r}, **{kwargs!r})")
+        logger.trace(f"{cls.__name__}.from_config_model(config={config!r}, **{options!r})")
 
         if config.headers:
             headers = config.headers.copy()
@@ -336,8 +336,8 @@ class DWaveAPIClient:
             verify=not config.permissive_ssl,
         )
 
-        # context-sensitive config update
-        update_config(opts, kwargs)
+        # add class-specific options not existing in ClientConfig
+        opts.update(**options)
 
         return cls(**opts)
 
