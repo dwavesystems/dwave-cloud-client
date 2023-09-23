@@ -34,6 +34,23 @@ class AuthFlow:
     """`OAuth 2.0 Authorization Code`_ exchange flow with `PKCE`_ extension
     for public (secretless) clients.
 
+    Args:
+        client_id:
+            OAuth 2.0 Client ID.
+        scopes:
+            List of requested scopes.
+        redirect_uri:
+            Redirect URI that was registered as callback for client identified
+            with ``client_id``.
+        authorization_endpoint:
+            URL of the authorization server's authorization endpoint.
+        token_endpoint:
+            URL of the authorization server's token endpoint.
+        session_config:
+            Configuration options for the low-level ``requests.Session`` used
+            for all OAuth 2 requests. Supported options are: ``cert``,
+            ``cookies``, ``headers``, ``proxies``, ``timeout``, ``verify``.
+
     .. _OAuth 2.0 Authorization Code:
         https://datatracker.ietf.org/doc/html/rfc6749#section-4.1
     .. _PKCE:
@@ -63,7 +80,7 @@ class AuthFlow:
 
     def update_session(self, config: Dict[str, Any]) -> None:
         """Update OAuth2Session/requests.Session with config values for:
-        `cert`, `cookies`, `headers`, `proxies`, `timeout`, `verify`.
+        ``cert``, ``cookies``, ``headers``, ``proxies``, ``timeout``, ``verify``.
         """
         self.session.headers.update(config.get('headers', {}))
         self.session.default_timeout = config.get('timeout', None)
@@ -93,7 +110,21 @@ class AuthFlow:
 
 
 class LeapAuthFlow(AuthFlow):
-    """:class:`.AuthFlow` specialized for Ocean and Leap."""
+    """:class:`.AuthFlow` specialized for Ocean and Leap.
+
+    Example::
+        from dwave.cloud.auth import LeapAuthFlow
+        from dwave.cloud.config import load_config, validate_config_v1
+
+        config = validate_config_v1(load_config(profile='eu'))
+        flow = LeapAuthFlow.from_config_model(config)
+
+        url = flow.get_authorization_url()
+        print('Visit and authorize:', url)
+
+        code = input('code: ')
+        token = flow.fetch_token(code=code)
+    """
 
     _OOB_REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
 
@@ -111,6 +142,16 @@ class LeapAuthFlow(AuthFlow):
     def from_config_model(cls, config: ClientConfig, **kwargs) -> LeapAuthFlow:
         """Construct a :class:`.LeapAuthModel` initialized with Ocean SDK's
         ``client_id``, and Leap authorization/token endpoint.
+
+        Args:
+            config:
+                Client configuration model. Only generic request properties
+                are used: ``cert``, ``headers``, ``proxy``, ``request_timeout``,
+                and ``permissive_ssl``.
+            **kwargs:
+                Keyword arguments to optionally override: ``client_id``,
+                ``scopes`` and ``redirect_uri``. For description of these
+                parameters, see :class:`.AuthFlow`.
         """
         authorization_endpoint = cls._infer_auth_endpoint(config.leap_api_endpoint)
         token_endpoint = cls._infer_token_endpoint(config.leap_api_endpoint)
