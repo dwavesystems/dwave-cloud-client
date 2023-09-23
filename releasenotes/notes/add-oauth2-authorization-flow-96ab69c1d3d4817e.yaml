@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Add OAuth 2.0 Authorization Code exchange flow to enable users to authorize
+    Ocean SDK to access Leap API on their behalf.

@@ -8,6 +8,7 @@ diskcache>=5.2.1
 packaging>=19
 werkzeug>=2.2
 typing-extensions>=4.5.0
+authlib>=1.2,<2
 
 # optional bqm support
 # note: dqm supported in dimod>0.9.6
