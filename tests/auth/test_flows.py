@@ -29,12 +29,15 @@ class TestAuthFlow(unittest.TestCase):
         self.authorization_endpoint = 'https://example.com/authorize'
         self.token_endpoint = 'https://example.com/token'
 
+        self.test_args = dict(
+            client_id=self.client_id,
+            scopes=self.scopes,
+            redirect_uri=self.redirect_uri_oob,
+            authorization_endpoint=self.authorization_endpoint,
+            token_endpoint=self.token_endpoint)
+
     def test_auth_url(self):
-        flow = AuthFlow(client_id=self.client_id,
-                        scopes=self.scopes,
-                        redirect_uri=self.redirect_uri_oob,
-                        authorization_endpoint=self.authorization_endpoint,
-                        token_endpoint=self.token_endpoint)
+        flow = AuthFlow(**self.test_args)
 
         url = flow.get_authorization_url()
         q = dict(parse_qsl(urlsplit(url).query))
@@ -67,11 +70,31 @@ class TestAuthFlow(unittest.TestCase):
         m.post(self.token_endpoint, additional_matcher=post_body_matcher, json=token)
 
         # verify token fetch flow
-        flow = AuthFlow(client_id=self.client_id,
-                        scopes=self.scopes,
-                        redirect_uri=self.redirect_uri_oob,
-                        authorization_endpoint=self.authorization_endpoint,
-                        token_endpoint=self.token_endpoint)
+        flow = AuthFlow(**self.test_args)
 
         response = flow.fetch_token(code=code)
         self.assertEqual(response, token)
+
+    def test_session_config(self):
+        config = dict(
+            cert='/path/to/cert',
+            headers={'X-Field': 'Value'},
+            proxies=dict(https='socks5://localhost'),
+            timeout=60,
+            verify=False)
+
+        def verify(session, config):
+            self.assertEqual(session.cert, config['cert'])
+            self.assertEqual({**session.headers, **config['headers']}, session.headers)
+            self.assertEqual(session.proxies, config['proxies'])
+            self.assertEqual(session.default_timeout, config['timeout'])
+            self.assertEqual(session.verify, config['verify'])
+
+        with self.subTest('on construction'):
+            flow = AuthFlow(session_config=config, **self.test_args)
+            verify(flow.session, config)
+
+        with self.subTest('post-construction'):
+            flow = AuthFlow(**self.test_args)
+            flow.update_session(config)
+            verify(flow.session, config)

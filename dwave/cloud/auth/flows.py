@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Sequence
+from typing import Any, Dict, Optional, Sequence
 
 from authlib.integrations.requests_client import OAuth2Session
 from authlib.common.security import generate_token
@@ -42,6 +42,7 @@ class AuthFlow:
                  redirect_uri: str,
                  authorization_endpoint: str,
                  token_endpoint: str,
+                 session_config: Optional[Dict[str, Any]] = None,
                  ):
         self.client_id = client_id
         self.scopes = ' '.join(scopes)
@@ -52,6 +53,20 @@ class AuthFlow:
         self.session = OAuth2Session(
             client_id=client_id, scope=scopes, redirect_uri=redirect_uri,
             code_challenge_method='S256')
+
+        if session_config is not None:
+            self.update_session(session_config)
+
+    def update_session(self, config: Dict[str, Any]) -> None:
+        """Update OAuth2Session/requests.Session with config values for:
+        `cert`, `cookies`, `headers`, `proxies`, `timeout`, `verify`.
+        """
+        self.session.headers.update(config.get('headers', {}))
+        self.session.default_timeout = config.get('timeout', None)
+
+        for key in ('cert', 'cookies', 'proxies', 'verify'):
+            if key in config:
+                setattr(self.session, key, config[key])
 
     def get_authorization_url(self) -> str:
         self.state = generate_token(30)
@@ -65,7 +80,7 @@ class AuthFlow:
         return url
 
     # todo: propagate headers, currently via kwargs
-    def fetch_token(self, code, **kwargs) -> dict:
+    def fetch_token(self, code: str, **kwargs) -> dict:
         return self.session.fetch_token(
             url=self.token_endpoint,
             grant_type='authorization_code',
