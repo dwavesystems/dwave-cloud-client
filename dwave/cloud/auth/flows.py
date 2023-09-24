@@ -106,6 +106,26 @@ class AuthFlow:
         return url
 
     def fetch_token(self, *, code: str, **kwargs) -> dict:
+        """Exchange ``code`` for access token.
+
+        Args:
+            code:
+                OAuth 2.0 authorization code to be exchanged for access token.
+            state:
+                Authorization state; should match the one generated when creating
+                the authorize URL.
+
+                Note: except for the out-of-band flow, be sure to pass in the
+                ``state`` parameter received on the ``redirect_uri`` for added
+                security.
+        """
+        # make sure states match before proceeding, we shouldn't be tricked
+        # into exchanging arbitrary auth codes.
+        state = kwargs.get('state', None)
+        if state is not None:
+            if state != self.state:
+                raise ValueError('State mismatch')
+
         token = self.session.fetch_token(
             url=self.token_endpoint,
             grant_type='authorization_code',
