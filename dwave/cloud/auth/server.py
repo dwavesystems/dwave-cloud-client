@@ -12,12 +12,54 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
 import random
 import logging
+import traceback
 import threading
 from wsgiref.simple_server import make_server, WSGIRequestHandler, WSGIServer
 
 logger = logging.getLogger(__name__)
+
+
+class LoggingStream:
+    """Provide file-like interface to a logger."""
+
+    def __init__(self, logger, level):
+        self.logger = logger
+        self.level = level
+
+    def write(self, message):
+        for line in message.split('\n'):
+            if line:
+                self.logger.log(self.level, line)
+
+    def flush(self):
+        pass
+
+# stream interface to our local logger
+request_logging_stream = LoggingStream(logger, logging.DEBUG)
+
+
+class LoggingWSGIRequestHandler(WSGIRequestHandler):
+    """WSGIRequestHandler subclass that logs to our logger, instead of to
+    ``sys.stderr`` (as hardcoded in ``http.server.BaseHTTPRequestHandler``).
+    """
+
+    def log_message(self, format, *args):
+        logger.info(format, *args)
+
+    def get_stderr(self):
+        return request_logging_stream
+
+
+class LoggingWSGIServer(WSGIServer):
+    """WSGIServer subclass that logs to our logger, instead of to ``sys.stderr``
+    (as hardcoded in ``socketserver.BaseServer.handle_error``).
+    """
+
+    def handle_error(self, request, client_address):
+        traceback.print_exception(*sys.exc_info(), file=request_logging_stream)
 
 
 class WSGIAsyncServer(threading.Thread):
@@ -42,8 +84,8 @@ class WSGIAsyncServer(threading.Thread):
         for _, port in zip(range(tries), ports(start=base_port)):
             try:
                 return make_server(host, port, app,
-                                   server_class=WSGIServer,
-                                   handler_class=WSGIRequestHandler)
+                                   server_class=LoggingWSGIServer,
+                                   handler_class=LoggingWSGIRequestHandler)
             except OSError as exc:
                 # handle only "[Errno 98] Address already in use"
                 if exc.errno != 98:
@@ -92,7 +134,6 @@ class WSGIAsyncServer(threading.Thread):
     def ensure_started(self):
         if not self.is_alive():
             self.start()
-
         return True
 
     def ensure_stopped(self):
