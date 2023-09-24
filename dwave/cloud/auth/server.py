@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import random
 import logging
-import traceback
+import random
+import sys
 import threading
+import traceback
+from socketserver import ThreadingMixIn
 from wsgiref.simple_server import make_server, WSGIRequestHandler, WSGIServer
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,10 @@ class LoggingWSGIServer(WSGIServer):
         traceback.print_exception(*sys.exc_info(), file=request_logging_stream)
 
 
+class ThreadingWSGIServer(ThreadingMixIn, LoggingWSGIServer):
+    daemon_threads = True
+
+
 class WSGIAsyncServer(threading.Thread):
     """WSGI server container for a wsgi app that runs asynchronously (in a
     separate thread).
@@ -84,7 +89,7 @@ class WSGIAsyncServer(threading.Thread):
         for _, port in zip(range(tries), ports(start=base_port)):
             try:
                 return make_server(host, port, app,
-                                   server_class=LoggingWSGIServer,
+                                   server_class=ThreadingWSGIServer,
                                    handler_class=LoggingWSGIRequestHandler)
             except OSError as exc:
                 # handle only "[Errno 98] Address already in use"
