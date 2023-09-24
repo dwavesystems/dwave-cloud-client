@@ -23,7 +23,7 @@ from authlib.common.security import generate_token
 
 from dwave.cloud.auth.config import OCEAN_SDK_CLIENT_ID, OCEAN_SDK_SCOPES
 from dwave.cloud.config.models import ClientConfig
-
+from dwave.cloud.utils import pretty_argvalues
 
 __all__ = ['AuthFlow', 'LeapAuthFlow']
 
@@ -57,7 +57,7 @@ class AuthFlow:
         https://datatracker.ietf.org/doc/html/rfc7636
     """
 
-    def __init__(self,
+    def __init__(self, *,
                  client_id: str,
                  scopes: Sequence[str],
                  redirect_uri: str,
@@ -78,10 +78,14 @@ class AuthFlow:
         if session_config is not None:
             self.update_session(session_config)
 
+        logger.debug(f"{type(self).__name__} initialized with: {pretty_argvalues()}")
+
     def update_session(self, config: Dict[str, Any]) -> None:
         """Update OAuth2Session/requests.Session with config values for:
         ``cert``, ``cookies``, ``headers``, ``proxies``, ``timeout``, ``verify``.
         """
+        logger.trace(f"{type(self).__name__}.update_session(config={config!r})")
+
         self.session.headers.update(config.get('headers') or {})
         self.session.default_timeout = config.get('timeout', None)
 
@@ -98,15 +102,18 @@ class AuthFlow:
             state=self.state,
             code_verifier=self.code_verifier)
 
+        logger.debug(f"{type(self).__name__}.get_authorization_url() = {url!r}")
         return url
 
-    # todo: propagate headers, currently via kwargs
-    def fetch_token(self, code: str, **kwargs) -> dict:
-        return self.session.fetch_token(
+    def fetch_token(self, *, code: str, **kwargs) -> dict:
+        token = self.session.fetch_token(
             url=self.token_endpoint,
             grant_type='authorization_code',
             code=code,
             **kwargs)
+
+        logger.debug(f"{type(self).__name__}.fetch_token() = {token!r}")
+        return token
 
 
 class LeapAuthFlow(AuthFlow):
@@ -153,6 +160,9 @@ class LeapAuthFlow(AuthFlow):
                 ``scopes`` and ``redirect_uri``. For description of these
                 parameters, see :class:`.AuthFlow`.
         """
+        logger.trace(f"{cls.__name__}.from_config_model("
+                     f"config={config!r}, **kwargs={kwargs!r})")
+
         authorization_endpoint = cls._infer_auth_endpoint(config.leap_api_endpoint)
         token_endpoint = cls._infer_token_endpoint(config.leap_api_endpoint)
 
