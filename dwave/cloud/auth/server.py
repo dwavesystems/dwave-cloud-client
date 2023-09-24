@@ -18,6 +18,7 @@ import sys
 import threading
 import traceback
 from socketserver import ThreadingMixIn
+from typing import Optional, Callable
 from wsgiref.simple_server import make_server, WSGIRequestHandler, WSGIServer
 
 logger = logging.getLogger(__name__)
@@ -67,41 +68,64 @@ class ThreadingWSGIServer(ThreadingMixIn, LoggingWSGIServer):
     daemon_threads = True
 
 
-class WSGIAsyncServer(threading.Thread):
+def _ports(start, end, n_lin, n_rand=None):
+    """Server port proposal generator. Starts with a linear search, then
+    switches to a randomized search (random permutation of remaining ports).
+    """
+    # sanity checks
+    if start < 0 or end < 0 or n_lin < 0 or (n_rand is not None and n_rand < 0):
+        raise ValueError("Non-negative integers required for all parameters")
+    if n_rand is None:
+        n_rand = end - start + 1 - n_lin
+    if n_lin + n_rand > end - start + 1:
+        raise ValueError("Sum of tries must be less or equal to population size")
+
+    # linear search
+    yield from range(start, start + n_lin)
+
+    # randomized search
+    yield from random.sample(range(start + n_lin, end + 1), k=n_rand)
+
+
+def _adaptive_make_server(
+        app: Callable,
+        host: str,
+        base_port: int,
+        max_port: int,
+        linear_tries: int = 1,
+        randomized_tries: Optional[int] = None
+        ) -> ThreadingWSGIServer:
+    """Instantiate a http server, similarly to :func:`~wsgiref.simple_server.make_server`,
+    but bounding it to the first port available, instead of failing if the specified
+    port is unavailable.
+
+    Port search is a combination of linear and randomized search, starting at
+    ``base_port`` and ending with ``max_port`` (both ends inclusive).
+    """
+    for port in _ports(start=base_port, end=max_port,
+                       n_lin=linear_tries, n_rand=randomized_tries):
+        try:
+            return make_server(host, port, app,
+                               server_class=ThreadingWSGIServer,
+                               handler_class=LoggingWSGIRequestHandler)
+        except OSError as exc:
+            # handle only "[Errno 98] Address already in use"
+            if exc.errno != 98:
+                raise
+
+    raise RuntimeError("Unable to find available port in range: "
+                       f"[{base_port}, {max_port}].")
+
+
+class BackgroundAppServer(threading.Thread):
     """WSGI server container for a wsgi app that runs asynchronously (in a
     separate thread).
     """
 
-    def _safe_make_server(self, host, base_port, app, tries=20):
-        """Instantiate a http server. Discover available port starting with
-        `base_port` (use linear and random search).
-        """
-
-        def ports(start, linear=5):
-            """Server port proposal generator. Starts with a linear search, then
-            converts to a random look up.
-            """
-            for port in range(start, start + linear):
-                yield port
-            while True:
-                yield random.randint(port + 1, (1<<16) - 1)
-
-        for _, port in zip(range(tries), ports(start=base_port)):
-            try:
-                return make_server(host, port, app,
-                                   server_class=ThreadingWSGIServer,
-                                   handler_class=LoggingWSGIRequestHandler)
-            except OSError as exc:
-                # handle only "[Errno 98] Address already in use"
-                if exc.errno != 98:
-                    raise
-
-        raise RuntimeError("unable to find available port to bind local "
-                           "webserver to even after {} tries".format(tries))
-
     def _make_server(self):
         # create http server, and bind it to first available port >= base_port
-        return self._safe_make_server(self.host, self.base_port, self.app)
+        return _adaptive_make_server(host=self.host, base_port=self.base_port,
+                                     max_port=self.max_port, app=self.app)
 
     @property
     def server(self):
@@ -117,12 +141,13 @@ class WSGIAsyncServer(threading.Thread):
 
             return self._server
 
-    def __init__(self, host, base_port, app):
-        super(WSGIAsyncServer, self).__init__(daemon=True)
+    def __init__(self, host, base_port, max_port, app):
+        super().__init__(daemon=True)
 
         # store config, but start the web server (and bind to address) on run()
         self.host = host
         self.base_port = base_port
+        self.max_port = max_port
         self.app = app
         self._server_lock = threading.RLock()
 
@@ -134,7 +159,7 @@ class WSGIAsyncServer(threading.Thread):
         self.join()
 
     def get_callback_url(self):
-        return 'http://{}:{}/callback'.format(*self.server.server_address)
+        return 'http://{}:{}/'.format(*self.server.server_address)
 
     def ensure_started(self):
         if not self.is_alive():
