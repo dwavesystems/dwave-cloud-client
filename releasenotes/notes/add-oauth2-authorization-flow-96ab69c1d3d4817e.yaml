@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Add OAuth 2.0 Authorization Code exchange flow to enable users to authorize
+    Ocean SDK to access Leap API on their behalf.
+    See `#564 <https://github.com/dwavesystems/dwave-cloud-client/issues/564>`_.
