@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import concurrent.futures
+import socket
+import time
 import unittest
 
 import requests
@@ -90,10 +92,9 @@ class TestBackgroundAppServer(unittest.TestCase):
     def test_multithreading(self):
         base_port = 64000
         response = 'It works!'
-        response_delay = 3
+        response_delay = 2
         n_requests = 2
 
-        import time
         def app(environ, start_response):
             start_response("200 OK", [('Content-Type', 'text/plain; charset=utf-8')])
             time.sleep(response_delay)
@@ -118,5 +119,47 @@ class TestBackgroundAppServer(unittest.TestCase):
         # all responses correct
         for f in fs:
             self.assertEqual(f.result(), response)
+
+        srv.stop()
+
+    def test_timeout(self):
+        # XXX: not the most elegant method of checking if server closes the
+        # connection after `timeout`, so we should revisit this at some point.
+        # I have manually verified the behavior is correct, thought, with
+        # telnet, curl and wireshark.
+
+        base_port = 64000
+        timeout = 0.5
+
+        def app(environ, start_response):
+            start_response("200 OK", [('Content-Type', 'text/plain; charset=utf-8')])
+            return ['It works!'.encode('utf-8')]
+
+        srv = BackgroundAppServer(
+            host='127.0.0.1', base_port=base_port, max_port=base_port+10,
+            app=app, timeout=timeout)
+        srv.start()
+
+        def do_get(timeout=0):
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect(srv.server.server_address)
+
+            time.sleep(timeout)
+
+            try:
+                sock.send('GET /\n\n'.encode('utf-8'))
+                data = sock.recv(1024)
+                sock.close()
+            except ConnectionError:
+                # seems to work only on macos and win
+                data = ''
+
+            return data
+
+        # base case, no timeout, server returns data
+        self.assertTrue(len(do_get(timeout=0)) > 0)
+
+        # client waits 2*connection_timeout, so receives nothing
+        self.assertTrue(len(do_get(timeout=timeout*2)) == 0)
 
         srv.stop()
