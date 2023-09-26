@@ -55,20 +55,23 @@ class LoggingWSGIRequestHandler(WSGIRequestHandler):
         return request_logging_stream
 
 
-class LoggingWSGIServer(WSGIServer):
-    """WSGIServer subclass that logs to our logger, instead of to ``sys.stderr``
-    (as hardcoded in ``socketserver.BaseServer.handle_error``).
+class ErrorLoggingTCPServerMixin:
+    """Extend :class:`http.server.HTTPServer`/:class:`socketserver.TCPServer`
+    to log errors to our logger, instead of to a hard-coded ``sys.stderr`` stream.
     """
 
     def handle_error(self, request, client_address):
         traceback.print_exception(*sys.exc_info(), file=request_logging_stream)
 
 
-class ThreadingWSGIServer(ThreadingMixIn, LoggingWSGIServer):
-    daemon_threads = True
+class ThreadingWSGIServer(ThreadingMixIn, ErrorLoggingTCPServerMixin, WSGIServer):
+    """:class:`~wsgiref.simple_server.WSGIServer` subclass that:
+    - supports multithreading, i.e. handles each request in a new thread,
+    - logs errors to our configured logger, instead of to stderr.
+    """
 
 
-def _ports(start, end, n_lin, n_rand=None):
+def iterports(start, end, n_lin, n_rand=None):
     """Server port proposal generator. Starts with a linear search, then
     switches to a randomized search (random permutation of remaining ports).
     """
@@ -87,48 +90,36 @@ def _ports(start, end, n_lin, n_rand=None):
     yield from random.sample(range(start + n_lin, end + 1), k=n_rand)
 
 
-def _adaptive_make_server(
-        app: Callable,
-        host: str,
-        base_port: int,
-        max_port: int,
-        linear_tries: int = 1,
-        randomized_tries: Optional[int] = None
-        ) -> ThreadingWSGIServer:
-    """Instantiate a http server, similarly to :func:`~wsgiref.simple_server.make_server`,
-    but bounding it to the first port available, instead of failing if the specified
-    port is unavailable.
-
-    Port search is a combination of linear and randomized search, starting at
-    ``base_port`` and ending with ``max_port`` (both ends inclusive).
-    """
-    for port in _ports(start=base_port, end=max_port,
-                       n_lin=linear_tries, n_rand=randomized_tries):
-        try:
-            return make_server(host, port, app,
-                               server_class=ThreadingWSGIServer,
-                               handler_class=LoggingWSGIRequestHandler)
-        except OSError as exc:
-            # handle only "[Errno 98] Address already in use"
-            if exc.errno != 98:
-                raise
-
-    raise RuntimeError("Unable to find available port in range: "
-                       f"[{base_port}, {max_port}].")
-
-
 class BackgroundAppServer(threading.Thread):
-    """WSGI server container for a wsgi app that runs asynchronously (in a
-    separate thread).
+    """WSGI application server container that runs in a background thread,
+    handling each request in its own thread.
     """
 
-    def _make_server(self):
-        # create http server, and bind it to first available port >= base_port
-        return _adaptive_make_server(host=self.host, base_port=self.base_port,
-                                     max_port=self.max_port, app=self.app)
+    def _make_server(self) -> ThreadingWSGIServer:
+        """Instantiate a http server, similarly to :func:`~wsgiref.simple_server.make_server`,
+        but bounding it to the first port available, instead of failing if the specified
+        port is unavailable.
+
+        Port search is a combination of linear and randomized search, starting at
+        ``base_port`` and ending with ``max_port`` (both ends inclusive).
+        """
+
+        for port in iterports(start=self.base_port, end=self.max_port,
+                              n_lin=self.linear_tries, n_rand=self.randomized_tries):
+            try:
+                return make_server(self.host, port, self.app,
+                                   server_class=ThreadingWSGIServer,
+                                   handler_class=LoggingWSGIRequestHandler)
+            except OSError as exc:
+                # handle only "[Errno 98] Address already in use"
+                if exc.errno != 98:
+                    raise
+
+        raise RuntimeError("Unable to find available port in range: "
+                           f"[{self.base_port}, {self.max_port}].")
 
     @property
-    def server(self):
+    def server(self) -> ThreadingWSGIServer:
         """HTTP server accessor that creates the actual server instance
         (and binds it to host:port) on first access.
         """
@@ -141,35 +132,33 @@ class BackgroundAppServer(threading.Thread):
 
             return self._server
 
-    def __init__(self, host, base_port, max_port, app):
+    def __init__(self, *, host: str, base_port: int, max_port: int, app: Callable,
+                 linear_tries: int = 1, randomized_tries: Optional[int] = None):
         super().__init__(daemon=True)
 
         # store config, but start the web server (and bind to address) on run()
         self.host = host
         self.base_port = base_port
         self.max_port = max_port
+        self.linear_tries = linear_tries
+        self.randomized_tries = randomized_tries
         self.app = app
         self._server_lock = threading.RLock()
 
     def run(self):
+        """Don't call this method directly. Instead call `.start()`."""
+        logger.debug(f"Running {type(self).__name__} worker thread")
         self.server.serve_forever()
+        logger.debug(f"{type(self).__name__} worker thread done.")
 
     def stop(self):
+        logger.debug(f"{type(self).__name__}.stop()")
         self.server.shutdown()
         self.join()
 
-    def get_callback_url(self):
+    def root_url(self):
         return 'http://{}:{}/'.format(*self.server.server_address)
 
-    def ensure_started(self):
-        if not self.is_alive():
-            self.start()
-        return True
-
-    def ensure_stopped(self):
-        if self.is_alive():
-            self.stop()
-
     def wait_shutdown(self, timeout=None):
-        logger.debug('%s.wait_shutdown(timeout=%r)', type(self).__name__, timeout)
+        logger.debug(f"{type(self).__name__}.wait_shutdown(timeout={timeout})")
         self.join(timeout)
