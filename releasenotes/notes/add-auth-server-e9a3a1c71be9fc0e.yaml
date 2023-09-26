@@ -1,0 +1,7 @@
+---
+features:
+  - |
+    Add a general-purpose, multi-threaded, WSGI application server,
+    ``dwave.cloud.auth.server.BackgroundAppServer``. This server can handle
+    redirect URIs in the OAuth2 authorization code flow.
+    See `#563 <https://github.com/dwavesystems/dwave-cloud-client/issues/563>`_.

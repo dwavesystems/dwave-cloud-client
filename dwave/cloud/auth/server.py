@@ -169,7 +169,10 @@ class BackgroundAppServer(threading.Thread):
     def run(self):
         """Don't call this method directly. Instead call `.start()`."""
         logger.debug(f"Running {type(self).__name__} worker thread")
-        self.server.serve_forever()
+        try:
+            self.server.serve_forever()
+        finally:
+            self.server.server_close()
         logger.debug(f"{type(self).__name__} worker thread done.")
 
     def stop(self):
