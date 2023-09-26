@@ -20,7 +20,8 @@ import unittest
 import requests
 from parameterized import parameterized
 
-from dwave.cloud.auth.server import iterports, BackgroundAppServer
+from dwave.cloud.auth.server import (
+    iterports, BackgroundAppServer, SingleRequestAppServer)
 
 
 class TestPortsGenerator(unittest.TestCase):
@@ -163,3 +164,25 @@ class TestBackgroundAppServer(unittest.TestCase):
         self.assertTrue(len(do_get(timeout=timeout*2)) == 0)
 
         srv.stop()
+
+
+class TestSingleRequestAppServer(unittest.TestCase):
+
+    def test_function(self):
+        base_port = 64000
+        response = 'It works!'
+
+        def app(environ, start_response):
+            start_response("200 OK", [('Content-Type', 'text/plain; charset=utf-8')])
+            return [response.encode('utf-8')]
+
+        srv = SingleRequestAppServer(
+            host='127.0.0.1', base_port=base_port, max_port=base_port+10, app=app)
+        srv.start()
+
+        # test response
+        self.assertEqual(requests.get(srv.root_url()).text, response)
+
+        # test server shuts down within reasonable time
+        srv.wait_shutdown(timeout=0.5)
+        self.assertFalse(srv.is_alive())

@@ -186,3 +186,25 @@ class BackgroundAppServer(threading.Thread):
     def wait_shutdown(self, timeout=None):
         logger.debug(f"{type(self).__name__}.wait_shutdown(timeout={timeout})")
         self.join(timeout)
+
+
+class SingleRequestAppServer(BackgroundAppServer):
+    """An extension of :class:`.BackgroundAppServer` that terminates after a
+    single request has completed.
+    """
+
+    # note: we can't simply use `server.handle_request()` to handle a single request
+    # because of the problem with some browsers (pre-)opening "ghost" connection (not
+    # sending any data), as it is described in python's `ThreadingHTTPServer` docs
+    # (https://docs.python.org/3/library/http.server.html#http.server.ThreadingHTTPServer)
+
+    def __init__(self, **kwargs):
+        app = kwargs.pop('app')
+
+        def single_request_app(*args, **kwargs):
+            ret = app(*args, **kwargs)
+            # we're done after the first successful request
+            self.server.shutdown()
+            return ret
+
+        super().__init__(app=single_request_app, **kwargs)
