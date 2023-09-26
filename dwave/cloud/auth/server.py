@@ -18,7 +18,7 @@ import sys
 import threading
 import traceback
 from socketserver import ThreadingMixIn
-from typing import Optional, Callable
+from typing import Optional, Callable, Iterator
 from wsgiref.simple_server import make_server, WSGIRequestHandler, WSGIServer
 
 logger = logging.getLogger(__name__)
@@ -71,15 +71,16 @@ class ThreadingWSGIServer(ThreadingMixIn, ErrorLoggingTCPServerMixin, WSGIServer
     """
 
 
-def iterports(start, end, n_lin, n_rand=None):
+def iterports(start: int, end: int,
+              n_lin: int, n_rand: Optional[int] = None) -> Iterator[int]:
     """Server port proposal generator. Starts with a linear search, then
     switches to a randomized search (random permutation of remaining ports).
     """
     # sanity checks
-    if start < 0 or end < 0 or n_lin < 0 or (n_rand is not None and n_rand < 0):
-        raise ValueError("Non-negative integers required for all parameters")
     if n_rand is None:
         n_rand = end - start + 1 - n_lin
+    if start < 0 or end < 0 or n_lin < 0 or (n_rand is not None and n_rand < 0):
+        raise ValueError("Non-negative integers required for all parameters")
     if n_lin + n_rand > end - start + 1:
         raise ValueError("Sum of tries must be less or equal to population size")
 
