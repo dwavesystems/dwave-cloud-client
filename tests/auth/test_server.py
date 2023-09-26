@@ -63,7 +63,7 @@ class TestBackgroundAppServer(unittest.TestCase):
         self.assertEqual(first.server.server_port, base_port)
 
         second = BackgroundAppServer(
-            host='', base_port=base_port, max_port=base_port+10, linear_tries=2, app=None)
+            host='', base_port=base_port, max_port=base_port+9, linear_tries=2, app=None)
         second.start()
         self.assertEqual(second.server.server_port, base_port+1)
 
@@ -71,7 +71,7 @@ class TestBackgroundAppServer(unittest.TestCase):
         second.stop()
 
     def test_basics(self):
-        base_port = 64000
+        base_port = 64010
         response = 'It works!'
 
         def app(environ, start_response):
@@ -79,7 +79,7 @@ class TestBackgroundAppServer(unittest.TestCase):
             return [response.encode('utf-8')]
 
         srv = BackgroundAppServer(
-            host='127.0.0.1', base_port=base_port, max_port=base_port+10, app=app)
+            host='127.0.0.1', base_port=base_port, max_port=base_port+9, app=app)
         srv.start()
 
         # test root url
@@ -91,7 +91,7 @@ class TestBackgroundAppServer(unittest.TestCase):
         srv.stop()
 
     def test_multithreading(self):
-        base_port = 64000
+        base_port = 64020
         response = 'It works!'
         response_delay = 2
         n_requests = 2
@@ -102,7 +102,7 @@ class TestBackgroundAppServer(unittest.TestCase):
             return [response.encode('utf-8')]
 
         srv = BackgroundAppServer(
-            host='127.0.0.1', base_port=base_port, max_port=base_port+10, app=app)
+            host='127.0.0.1', base_port=base_port, max_port=base_port+9, app=app)
         srv.start()
 
         url = srv.root_url()
@@ -129,7 +129,7 @@ class TestBackgroundAppServer(unittest.TestCase):
         # I have manually verified the behavior is correct, thought, with
         # telnet, curl and wireshark.
 
-        base_port = 64000
+        base_port = 64030
         timeout = 0.5
 
         def app(environ, start_response):
@@ -137,7 +137,7 @@ class TestBackgroundAppServer(unittest.TestCase):
             return ['It works!'.encode('utf-8')]
 
         srv = BackgroundAppServer(
-            host='127.0.0.1', base_port=base_port, max_port=base_port+10,
+            host='127.0.0.1', base_port=base_port, max_port=base_port+9,
             app=app, timeout=timeout)
         srv.start()
 
@@ -169,7 +169,7 @@ class TestBackgroundAppServer(unittest.TestCase):
 class TestSingleRequestAppServer(unittest.TestCase):
 
     def test_function(self):
-        base_port = 64000
+        base_port = 64040
         response = 'It works!'
 
         def app(environ, start_response):
@@ -177,7 +177,7 @@ class TestSingleRequestAppServer(unittest.TestCase):
             return [response.encode('utf-8')]
 
         srv = SingleRequestAppServer(
-            host='127.0.0.1', base_port=base_port, max_port=base_port+10, app=app)
+            host='127.0.0.1', base_port=base_port, max_port=base_port+9, app=app)
         srv.start()
 
         # test response
