@@ -141,10 +141,11 @@ class BackgroundAppServer(threading.Thread):
                                      handler_class=LoggingWSGIRequestHandler)
                 server.connection_timeout = self.timeout
                 return server
-            except OSError as exc:
-                # handle only "[Errno 98] Address already in use"
-                if exc.errno != 98:
-                    raise
+            except OSError:
+                # linux: "OSError: [Errno 98] Address already in use"
+                # macos: "OSError: [Errno 48] Address already in use"
+                # win: "OSError: [WinError 10048] Only one usage of each socket address ... permitted"
+                pass
 
         raise RuntimeError("Unable to find available port in range: "
                            f"[{self.base_port}, {self.max_port}].")
