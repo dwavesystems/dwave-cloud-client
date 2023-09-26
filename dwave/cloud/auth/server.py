@@ -64,9 +64,25 @@ class ErrorLoggingTCPServerMixin:
         traceback.print_exception(*sys.exc_info(), file=request_logging_stream)
 
 
-class ThreadingWSGIServer(ThreadingMixIn, ErrorLoggingTCPServerMixin, WSGIServer):
+class SocketTimeoutTCPServerMixin:
+    """Extend :class:`http.server.HTTPServer`/:class:`socketserver.TCPServer`
+    by setting a timeout on each client connection socket.
+
+    This prevents hanging connections waiting for client data.
+    """
+    connection_timeout = None
+
+    def get_request(self):
+        conn, addr = super().get_request()
+        if self.connection_timeout is not None:
+            conn.settimeout(self.connection_timeout)
+        return conn, addr
+
+
+class ThreadingWSGIServer(ThreadingMixIn, SocketTimeoutTCPServerMixin, ErrorLoggingTCPServerMixin, WSGIServer):
     """:class:`~wsgiref.simple_server.WSGIServer` subclass that:
     - supports multithreading, i.e. handles each request in a new thread,
+    - set a timeout on socket connections, and
     - logs errors to our configured logger, instead of to stderr.
     """
 
@@ -108,9 +124,11 @@ class BackgroundAppServer(threading.Thread):
         for port in iterports(start=self.base_port, end=self.max_port,
                               n_lin=self.linear_tries, n_rand=self.randomized_tries):
             try:
-                return make_server(self.host, port, self.app,
-                                   server_class=ThreadingWSGIServer,
-                                   handler_class=LoggingWSGIRequestHandler)
+                server = make_server(self.host, port, self.app,
+                                     server_class=ThreadingWSGIServer,
+                                     handler_class=LoggingWSGIRequestHandler)
+                server.connection_timeout = self.timeout
+                return server
             except OSError as exc:
                 # handle only "[Errno 98] Address already in use"
                 if exc.errno != 98:
@@ -134,7 +152,8 @@ class BackgroundAppServer(threading.Thread):
             return self._server
 
     def __init__(self, *, host: str, base_port: int, max_port: int, app: Callable,
-                 linear_tries: int = 1, randomized_tries: Optional[int] = None):
+                 linear_tries: int = 1, randomized_tries: Optional[int] = None,
+                 timeout: Optional[float] = 10):
         super().__init__(daemon=True)
 
         # store config, but start the web server (and bind to address) on run()
@@ -144,6 +163,7 @@ class BackgroundAppServer(threading.Thread):
         self.linear_tries = linear_tries
         self.randomized_tries = randomized_tries
         self.app = app
+        self.timeout = timeout
         self._server_lock = threading.RLock()
 
     def run(self):
