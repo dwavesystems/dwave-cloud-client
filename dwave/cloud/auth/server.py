@@ -79,7 +79,19 @@ class SocketTimeoutTCPServerMixin:
         return conn, addr
 
 
-class ThreadingWSGIServer(ThreadingMixIn, SocketTimeoutTCPServerMixin, ErrorLoggingTCPServerMixin, WSGIServer):
+class NoAddrReuseTCPServerMixin:
+    """Disable address reuse for a TCPServer while socket in TIME_WAIT on Linux,
+    or unless SO_EXCLUSIVEADDRUSE is set on Windows. It's set to truthy value by
+    HTTPServer subclass, so this mixin reverts the TCPServer default.
+
+    See https://learn.microsoft.com/en-us/windows/win32/winsock/so-exclusiveaddruse.
+    """
+    allow_reuse_address = False
+
+
+class ThreadingWSGIServer(ThreadingMixIn, SocketTimeoutTCPServerMixin,
+                          ErrorLoggingTCPServerMixin, NoAddrReuseTCPServerMixin,
+                          WSGIServer):
     """:class:`~wsgiref.simple_server.WSGIServer` subclass that:
     - supports multithreading, i.e. handles each request in a new thread,
     - set a timeout on socket connections, and
