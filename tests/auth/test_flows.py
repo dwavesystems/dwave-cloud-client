@@ -54,6 +54,16 @@ class TestAuthFlow(unittest.TestCase):
         self.assertIn('code_challenge', q)
         self.assertEqual(q['code_challenge_method'], 'S256')
 
+    def test_fetch_token_state(self):
+        flow = AuthFlow(**self.test_args)
+
+        # generate auth request (state)
+        _ = flow.get_authorization_url()
+
+        # try exchanging the code with wrong state
+        with self.assertRaisesRegex(ValueError, "State mismatch"):
+            flow.fetch_token(code='not important', state='invalid')
+
     @requests_mock.Mocker()
     def test_fetch_token(self, m):
         # mock the token_endpoint
