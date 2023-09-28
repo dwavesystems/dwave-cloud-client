@@ -213,9 +213,14 @@ class BackgroundAppServer(threading.Thread):
 
         return 'http://{}:{}/'.format(*self.server.server_address)
 
-    def wait_shutdown(self, timeout=None):
+    def wait_shutdown(self, timeout: Optional[float] = None):
+        """Waits for ``timeout`` in seconds for server to shutdown before
+        raising a ``TimeoutError``.
+        """
         logger.debug(f"{type(self).__name__}.wait_shutdown(timeout={timeout})")
         self.join(timeout)
+        if self.is_alive():
+            raise TimeoutError("Server has not shut down in the allotted timeout.")
 
 
 class SingleRequestAppServer(BackgroundAppServer):

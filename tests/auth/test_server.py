@@ -131,13 +131,26 @@ class TestBackgroundAppServer(unittest.TestCase):
 
         srv.stop()
 
+    def test_wait_shutdown(self):
+        base_port = 64030
+        srv = BackgroundAppServer(
+            host='127.0.0.1', base_port=base_port, max_port=base_port+9, app=None)
+        srv.start()
+
+        with self.assertRaises(TimeoutError):
+            srv.wait_shutdown(0.5)
+
+        srv.stop()
+        srv.wait_shutdown()
+        self.assertFalse(srv.is_alive())
+
     def test_timeout(self):
         # XXX: not the most elegant method of checking if server closes the
         # connection after `timeout`, so we should revisit this at some point.
         # I have manually verified the behavior is correct, thought, with
         # telnet, curl and wireshark.
 
-        base_port = 64030
+        base_port = 64040
         timeout = 0.5
 
         def app(environ, start_response):
