@@ -92,10 +92,10 @@ class TestBackgroundAppServer(unittest.TestCase):
         srv.start()
 
         # test root url
-        self.assertEqual(srv.root_url(), f'http://127.0.0.1:{srv.server.server_port}/')
+        self.assertEqual(srv.root_url, f'http://127.0.0.1:{srv.server.server_port}/')
 
         # test response
-        self.assertEqual(requests.get(srv.root_url()).text, response)
+        self.assertEqual(requests.get(srv.root_url).text, response)
 
         srv.stop()
 
@@ -114,7 +114,7 @@ class TestBackgroundAppServer(unittest.TestCase):
             host='127.0.0.1', base_port=base_port, max_port=base_port+9, app=app)
         srv.start()
 
-        url = srv.root_url()
+        url = srv.root_url
         def get_url(url, timeout=10):
             return requests.get(url, timeout=timeout).text
 
@@ -191,7 +191,7 @@ class TestBackgroundAppServer(unittest.TestCase):
 class TestSingleRequestAppServer(unittest.TestCase):
 
     def test_function(self):
-        base_port = 64040
+        base_port = 64050
         response = 'It works!'
 
         def app(environ, start_response):
@@ -203,7 +203,7 @@ class TestSingleRequestAppServer(unittest.TestCase):
         srv.start()
 
         # test response
-        self.assertEqual(requests.get(srv.root_url()).text, response)
+        self.assertEqual(requests.get(srv.root_url).text, response)
 
         # test server shuts down within reasonable time
         srv.wait_shutdown(timeout=0.5)

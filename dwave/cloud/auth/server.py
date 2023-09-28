@@ -161,6 +161,7 @@ class BackgroundAppServer(threading.Thread):
 
             if self._server is None:
                 self._server = self._make_server()
+                self._root_url = 'http://{}:{}/'.format(*self._server.server_address)
 
             return self._server
 
@@ -178,12 +179,15 @@ class BackgroundAppServer(threading.Thread):
         self.app = app
         self.timeout = timeout
         self._server_lock = threading.RLock()
+        self._server_ready = threading.Event()
 
     def run(self):
         """Don't call this method directly. Instead call `.start()`."""
         logger.debug(f"Running {type(self).__name__} worker thread")
         try:
-            self.server.serve_forever()
+            srv = self.server
+            self._server_ready.set()
+            srv.serve_forever()
         except:
             # make exception discoverable from the main thread
             self._exc_info = sys.exc_info()
@@ -206,12 +210,19 @@ class BackgroundAppServer(threading.Thread):
         self.server.shutdown()
         self.join()
 
+    @property
     def root_url(self):
-        if not self.is_alive():
-            # make sure server runs in a thread
-            self.start()
+        """Server root URL, or None if server not started yet."""
+        self.wait_ready()
+        return self._root_url
 
-        return 'http://{}:{}/'.format(*self.server.server_address)
+    def wait_ready(self, timeout: Optional[float] = None):
+        """Waits for ``timeout`` in seconds for server to become ready (thread
+        is spawned, http server is created, address is bound, etc).
+        """
+        self._server_ready.wait(timeout)
+        if not self._server_ready.is_set():
+            raise TimeoutError("Server has not become ready in the allotted period.")
 
     def wait_shutdown(self, timeout: Optional[float] = None):
         """Waits for ``timeout`` in seconds for server to shutdown before
