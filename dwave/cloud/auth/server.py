@@ -184,9 +184,22 @@ class BackgroundAppServer(threading.Thread):
         logger.debug(f"Running {type(self).__name__} worker thread")
         try:
             self.server.serve_forever()
+        except:
+            # make exception discoverable from the main thread
+            self._exc_info = sys.exc_info()
         finally:
             self.server.server_close()
         logger.debug(f"{type(self).__name__} worker thread done.")
+
+    def exception(self):
+        """Raises an exception that was uncaught in the worker thread.
+        Intended to be called from your main thread.
+        """
+
+        # this idea for exception propagation from thread to main comes from
+        # https://stackoverflow.com/a/1854263, published under CC BY-SA 4.0.
+        if hasattr(self, '_exc_info') and self._exc_info:
+            raise self._exc_info[1].with_traceback(self._exc_info[2])
 
     def stop(self):
         logger.debug(f"{type(self).__name__}.stop()")
