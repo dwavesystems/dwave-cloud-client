@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    For OAuth 2.0 Authorization Code exchange flow, add support for both the
+    redirect flow, and the "out of band" flow.
+    See `#564 <https://github.com/dwavesystems/dwave-cloud-client/issues/564>`_.

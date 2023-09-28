@@ -12,9 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import threading
 import unittest
+from functools import partial
+from unittest import mock
 from urllib.parse import urlsplit, parse_qsl
 
+import requests
 import requests_mock
 
 from dwave.cloud.auth.flows import AuthFlow, LeapAuthFlow
@@ -152,3 +156,44 @@ class TestLeapAuthFlow(unittest.TestCase):
 
         self.assertEqual(flow.session.headers.get('injected'), 'value')
         self.assertEqual(flow.session.default_timeout, 10)
+
+
+class TestLeapAuthFlowRunners(unittest.TestCase):
+
+    @mock.patch('builtins.print', return_value=None)
+    def test_oob(self, m):
+        config = ClientConfig(leap_api_endpoint='https://example.com/leap')
+        flow = LeapAuthFlow.from_config_model(config)
+
+        mock_code = '1234'
+
+        with mock.patch('builtins.input', return_value=mock_code):
+            with mock.patch.object(flow, 'fetch_token') as fetch_token:
+                flow.run_oob_flow()
+                fetch_token.assert_called_once_with(code=mock_code)
+
+    @mock.patch('builtins.print', return_value=None)
+    def test_redirect(self, m):
+        config = ClientConfig(leap_api_endpoint='https://example.com/leap')
+        flow = LeapAuthFlow.from_config_model(config)
+
+        mock_code = '1234'
+
+        ctx = {}
+        ready = threading.Event()
+        def url_open(url, *args, **kwargs):
+            ctx.update(parse_qsl(urlsplit(url).query))
+            ready.set()
+
+        with mock.patch.object(flow, 'fetch_token') as fetch_token:
+            f = threading.Thread(
+                target=partial(flow.run_redirect_flow, open_browser=url_open))
+            f.start()
+
+            ready.wait()
+            response = requests.get(ctx['redirect_uri'],
+                                    params=dict(code=mock_code, state=ctx['state'])).text
+            self.assertEqual(response, flow._REDIRECT_DONE_MSG)
+
+            f.join()
+            fetch_token.assert_called_once_with(code=mock_code, state=ctx['state'])
