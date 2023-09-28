@@ -16,12 +16,14 @@ import concurrent.futures
 import socket
 import time
 import unittest
+from secrets import token_hex
+from urllib.parse import parse_qsl
 
 import requests
 from parameterized import parameterized
 
 from dwave.cloud.auth.server import (
-    iterports, BackgroundAppServer, SingleRequestAppServer)
+    iterports, BackgroundAppServer, SingleRequestAppServer, RequestCaptureApp)
 
 
 class TestPortsGenerator(unittest.TestCase):
@@ -208,3 +210,27 @@ class TestSingleRequestAppServer(unittest.TestCase):
         # test server shuts down within reasonable time
         srv.wait_shutdown(timeout=0.5)
         self.assertFalse(srv.is_alive())
+
+
+class TestRequestCaptureApp(unittest.TestCase):
+
+    def test_function(self):
+        base_port = 64060
+        response = 'Got it!'
+
+        app = RequestCaptureApp(response)
+        srv = SingleRequestAppServer(
+            host='127.0.0.1', base_port=base_port, max_port=base_port+9, app=app)
+        srv.start()
+
+        query = dict(a=token_hex(8), b=token_hex(16))
+
+        # test response
+        self.assertEqual(requests.get(srv.root_url, params=query).text, response)
+
+        # wait for server shutdown to make sure request is done
+        srv.wait_shutdown()
+
+        # test url/query capture
+        self.assertTrue(app.uri.startswith(f"{srv.root_url}?"))
+        self.assertEqual(dict(parse_qsl(app.query)), query)

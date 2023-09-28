@@ -19,7 +19,9 @@ import threading
 import traceback
 from socketserver import ThreadingMixIn
 from typing import Optional, Callable, Iterator
+from urllib.parse import urlsplit
 from wsgiref.simple_server import make_server, WSGIRequestHandler, WSGIServer
+from wsgiref.util import request_uri
 
 logger = logging.getLogger(__name__)
 
@@ -254,3 +256,24 @@ class SingleRequestAppServer(BackgroundAppServer):
             return ret
 
         super().__init__(app=single_request_app, **kwargs)
+
+
+class RequestCaptureApp:
+    """A simple WSGI application that stores request data (currently only URL),
+    and displays a static message in response.
+    """
+
+    def __init__(self, message: str):
+        self.message = message
+        self.uri = None
+        self.query = None
+
+    def __call__(self, environ: dict, start_response: Callable):
+        # store the URI accessed
+        self.uri = request_uri(environ, include_query=True)
+        self.query = urlsplit(self.uri).query
+        # in the future, we might also store: method, body data, headers, etc,
+        # but we don't need that for now
+
+        start_response("200 OK", [('Content-Type', 'text/plain; charset=utf-8')])
+        return [self.message.encode('utf-8')]
