@@ -207,6 +207,10 @@ class BackgroundAppServer(threading.Thread):
         self.join()
 
     def root_url(self):
+        if not self.is_alive():
+            # make sure server runs in a thread
+            self.start()
+
         return 'http://{}:{}/'.format(*self.server.server_address)
 
     def wait_shutdown(self, timeout=None):
