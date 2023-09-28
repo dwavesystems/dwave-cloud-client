@@ -67,6 +67,14 @@ class TestBackgroundAppServer(unittest.TestCase):
         second.start()
         self.assertEqual(second.server.server_port, base_port+1)
 
+        # test port search exhaustion
+        with self.assertRaises(RuntimeError):
+            third = BackgroundAppServer(
+                host='', base_port=base_port, max_port=base_port+1, app=None)
+            third.start()
+            third.wait_shutdown()
+            third.exception()
+
         first.stop()
         second.stop()
 
