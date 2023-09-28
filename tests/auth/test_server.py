@@ -54,6 +54,7 @@ class TestPortsGenerator(unittest.TestCase):
 
 class TestBackgroundAppServer(unittest.TestCase):
 
+    @unittest.mock.patch('threading.excepthook', lambda *a, **kw: None)
     def test_port_search(self):
         base_port = 64000
 
