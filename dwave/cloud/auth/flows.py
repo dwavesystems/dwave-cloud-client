@@ -107,6 +107,10 @@ class AuthFlow:
     def token(self):
         return self.session.token
 
+    @token.setter
+    def token(self, value):
+        self.session.token = value
+
     def get_authorization_url(self) -> str:
         self.state = generate_token(30)
         self.code_verifier = generate_token(48)
