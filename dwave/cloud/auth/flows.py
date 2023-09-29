@@ -224,8 +224,10 @@ class LeapAuthFlow(AuthFlow):
             session_config=session_config)
 
     def run_oob_flow(self):
-        """Run the OAuth 2.0 Authorization Code exchange flow, using the out of
-        band code exchange.
+        """Run OAuth 2.0 code exchange (out-of-band flow.) 
+        
+        Runs the OAuth 2.0 Authorization Code exchange flow using the out-of-band code 
+        exchange.
 
         After authorizing access by visiting the authorization URL displayed,
         user has to copy the authorization code and paste it back in their
@@ -242,10 +244,12 @@ class LeapAuthFlow(AuthFlow):
 
     def run_redirect_flow(self, *, open_browser: Union[bool,Callable] = False,
                           timeout: Optional[float] = None):
-        """Run the OAuth 2.0 Authorization Code exchange flow, using a redirect
+        """Run the OAuth 2.0 code exchange (using locally hosted redirect URI). 
+        
+        Run the OAuth 2.0 Authorization Code exchange flow, using a redirect
         URI hosted on a local server.
 
-        This flow is the preferred one, but can only be used if you can access
+        This flow is preferred to :meth:`.run_oob_flow` if you can access 
         localhost addresses serviced by Ocean running in your (development)
         environment from your browser.
 
