@@ -75,7 +75,10 @@ class AuthFlow:
 
         self.session = OAuth2Session(
             client_id=client_id, scope=scopes, redirect_uri=redirect_uri,
-            code_challenge_method='S256')
+            code_challenge_method='S256',
+            # metadata set via kwargs
+            authorization_endpoint=authorization_endpoint,
+            token_endpoint=token_endpoint)
 
         if session_config is not None:
             self.update_session(session_config)
@@ -152,6 +155,12 @@ class AuthFlow:
 
         logger.debug(f"{type(self).__name__}.fetch_token() = {token!r}")
         return token
+
+    def refresh_token(self):
+        return self.session.refresh_token(url=self.token_endpoint)
+
+    def ensure_active_token(self):
+        return self.session.ensure_active_token(token=self.session.token)
 
 
 class LeapAuthFlow(AuthFlow):
