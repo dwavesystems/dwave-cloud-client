@@ -19,7 +19,9 @@ import threading
 import traceback
 from socketserver import ThreadingMixIn
 from typing import Optional, Callable, Iterator
+from urllib.parse import urlsplit
 from wsgiref.simple_server import make_server, WSGIRequestHandler, WSGIServer
+from wsgiref.util import request_uri
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +163,7 @@ class BackgroundAppServer(threading.Thread):
 
             if self._server is None:
                 self._server = self._make_server()
+                self._root_url = 'http://{}:{}/'.format(*self._server.server_address)
 
             return self._server
 
@@ -178,27 +181,59 @@ class BackgroundAppServer(threading.Thread):
         self.app = app
         self.timeout = timeout
         self._server_lock = threading.RLock()
+        self._server_ready = threading.Event()
 
     def run(self):
         """Don't call this method directly. Instead call `.start()`."""
         logger.debug(f"Running {type(self).__name__} worker thread")
         try:
-            self.server.serve_forever()
+            srv = self.server
+            self._server_ready.set()
+            srv.serve_forever()
+        except:
+            # make exception discoverable from the main thread
+            self._exc_info = sys.exc_info()
         finally:
             self.server.server_close()
         logger.debug(f"{type(self).__name__} worker thread done.")
+
+    def exception(self):
+        """Raises an exception that was uncaught in the worker thread.
+        Intended to be called from your main thread.
+        """
+
+        # this idea for exception propagation from thread to main comes from
+        # https://stackoverflow.com/a/1854263, published under CC BY-SA 4.0.
+        if hasattr(self, '_exc_info') and self._exc_info:
+            raise self._exc_info[1].with_traceback(self._exc_info[2])
 
     def stop(self):
         logger.debug(f"{type(self).__name__}.stop()")
         self.server.shutdown()
         self.join()
 
+    @property
     def root_url(self):
-        return 'http://{}:{}/'.format(*self.server.server_address)
+        """Server root URL, or None if server not started yet."""
+        self.wait_ready()
+        return self._root_url
 
-    def wait_shutdown(self, timeout=None):
+    def wait_ready(self, timeout: Optional[float] = None):
+        """Waits for ``timeout`` in seconds for server to become ready (thread
+        is spawned, http server is created, address is bound, etc).
+        """
+        self._server_ready.wait(timeout)
+        if not self._server_ready.is_set():
+            raise TimeoutError("Server has not become ready in the allotted period.")
+
+    def wait_shutdown(self, timeout: Optional[float] = None):
+        """Waits for ``timeout`` in seconds for server to shutdown before
+        raising a ``TimeoutError``.
+        """
         logger.debug(f"{type(self).__name__}.wait_shutdown(timeout={timeout})")
         self.join(timeout)
+        if self.is_alive():
+            raise TimeoutError("Server has not shut down in the allotted timeout.")
 
 
 class SingleRequestAppServer(BackgroundAppServer):
@@ -221,3 +256,24 @@ class SingleRequestAppServer(BackgroundAppServer):
             return ret
 
         super().__init__(app=single_request_app, **kwargs)
+
+
+class RequestCaptureApp:
+    """A simple WSGI application that stores request data (currently only URL),
+    and displays a static message in response.
+    """
+
+    def __init__(self, message: str):
+        self.message = message
+        self.uri = None
+        self.query = None
+
+    def __call__(self, environ: dict, start_response: Callable):
+        # store the URI accessed
+        self.uri = request_uri(environ, include_query=True)
+        self.query = urlsplit(self.uri).query
+        # in the future, we might also store: method, body data, headers, etc,
+        # but we don't need that for now
+
+        start_response("200 OK", [('Content-Type', 'text/plain; charset=utf-8')])
+        return [self.message.encode('utf-8')]

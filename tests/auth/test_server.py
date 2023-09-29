@@ -16,12 +16,14 @@ import concurrent.futures
 import socket
 import time
 import unittest
+from secrets import token_hex
+from urllib.parse import parse_qsl
 
 import requests
 from parameterized import parameterized
 
 from dwave.cloud.auth.server import (
-    iterports, BackgroundAppServer, SingleRequestAppServer)
+    iterports, BackgroundAppServer, SingleRequestAppServer, RequestCaptureApp)
 
 
 class TestPortsGenerator(unittest.TestCase):
@@ -54,6 +56,7 @@ class TestPortsGenerator(unittest.TestCase):
 
 class TestBackgroundAppServer(unittest.TestCase):
 
+    @unittest.mock.patch('threading.excepthook', lambda *a, **kw: None)
     def test_port_search(self):
         base_port = 64000
 
@@ -66,6 +69,14 @@ class TestBackgroundAppServer(unittest.TestCase):
             host='', base_port=base_port, max_port=base_port+9, linear_tries=2, app=None)
         second.start()
         self.assertEqual(second.server.server_port, base_port+1)
+
+        # test port search exhaustion
+        with self.assertRaises(RuntimeError):
+            third = BackgroundAppServer(
+                host='', base_port=base_port, max_port=base_port+1, app=None)
+            third.start()
+            third.wait_shutdown()
+            third.exception()
 
         first.stop()
         second.stop()
@@ -83,10 +94,10 @@ class TestBackgroundAppServer(unittest.TestCase):
         srv.start()
 
         # test root url
-        self.assertEqual(srv.root_url(), f'http://127.0.0.1:{srv.server.server_port}/')
+        self.assertEqual(srv.root_url, f'http://127.0.0.1:{srv.server.server_port}/')
 
         # test response
-        self.assertEqual(requests.get(srv.root_url()).text, response)
+        self.assertEqual(requests.get(srv.root_url).text, response)
 
         srv.stop()
 
@@ -105,7 +116,7 @@ class TestBackgroundAppServer(unittest.TestCase):
             host='127.0.0.1', base_port=base_port, max_port=base_port+9, app=app)
         srv.start()
 
-        url = srv.root_url()
+        url = srv.root_url
         def get_url(url, timeout=10):
             return requests.get(url, timeout=timeout).text
 
@@ -123,13 +134,26 @@ class TestBackgroundAppServer(unittest.TestCase):
 
         srv.stop()
 
+    def test_wait_shutdown(self):
+        base_port = 64030
+        srv = BackgroundAppServer(
+            host='127.0.0.1', base_port=base_port, max_port=base_port+9, app=None)
+        srv.start()
+
+        with self.assertRaises(TimeoutError):
+            srv.wait_shutdown(0.5)
+
+        srv.stop()
+        srv.wait_shutdown()
+        self.assertFalse(srv.is_alive())
+
     def test_timeout(self):
         # XXX: not the most elegant method of checking if server closes the
         # connection after `timeout`, so we should revisit this at some point.
         # I have manually verified the behavior is correct, thought, with
         # telnet, curl and wireshark.
 
-        base_port = 64030
+        base_port = 64040
         timeout = 0.5
 
         def app(environ, start_response):
@@ -169,7 +193,7 @@ class TestBackgroundAppServer(unittest.TestCase):
 class TestSingleRequestAppServer(unittest.TestCase):
 
     def test_function(self):
-        base_port = 64040
+        base_port = 64050
         response = 'It works!'
 
         def app(environ, start_response):
@@ -181,8 +205,32 @@ class TestSingleRequestAppServer(unittest.TestCase):
         srv.start()
 
         # test response
-        self.assertEqual(requests.get(srv.root_url()).text, response)
+        self.assertEqual(requests.get(srv.root_url).text, response)
 
         # test server shuts down within reasonable time
         srv.wait_shutdown(timeout=0.5)
         self.assertFalse(srv.is_alive())
+
+
+class TestRequestCaptureApp(unittest.TestCase):
+
+    def test_function(self):
+        base_port = 64060
+        response = 'Got it!'
+
+        app = RequestCaptureApp(response)
+        srv = SingleRequestAppServer(
+            host='127.0.0.1', base_port=base_port, max_port=base_port+9, app=app)
+        srv.start()
+
+        query = dict(a=token_hex(8), b=token_hex(16))
+
+        # test response
+        self.assertEqual(requests.get(srv.root_url, params=query).text, response)
+
+        # wait for server shutdown to make sure request is done
+        srv.wait_shutdown()
+
+        # test url/query capture
+        self.assertTrue(app.uri.startswith(f"{srv.root_url}?"))
+        self.assertEqual(dict(parse_qsl(app.query)), query)

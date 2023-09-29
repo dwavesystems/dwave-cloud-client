@@ -15,13 +15,16 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, Sequence
-from urllib.parse import urljoin
+import webbrowser
+from operator import sub
+from typing import Any, Callable, Dict, Optional, Union, Sequence
+from urllib.parse import urljoin, parse_qsl
 
 from authlib.integrations.requests_client import OAuth2Session
 from authlib.common.security import generate_token
 
 from dwave.cloud.auth.config import OCEAN_SDK_CLIENT_ID, OCEAN_SDK_SCOPES
+from dwave.cloud.auth.server import SingleRequestAppServer, RequestCaptureApp
 from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.utils import pretty_argvalues
 
@@ -67,7 +70,6 @@ class AuthFlow:
                  ):
         self.client_id = client_id
         self.scopes = ' '.join(scopes)
-        self.redirect_uri = redirect_uri
         self.authorization_endpoint = authorization_endpoint
         self.token_endpoint = token_endpoint
 
@@ -92,6 +94,14 @@ class AuthFlow:
         for key in ('cert', 'cookies', 'proxies', 'verify'):
             if key in config:
                 setattr(self.session, key, config[key])
+
+    @property
+    def redirect_uri(self):
+        return self.session.redirect_uri
+
+    @redirect_uri.setter
+    def redirect_uri(self, value):
+        self.session.redirect_uri = value
 
     def get_authorization_url(self) -> str:
         self.state = generate_token(30)
@@ -155,6 +165,16 @@ class LeapAuthFlow(AuthFlow):
 
     _OOB_REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
 
+    _VISIT_AUTH_MSG = 'Please visit the following URL to authorize Ocean: '
+    _INPUT_CODE_MSG = 'Authorization code: '
+
+    _REDIRECT_HOST = '127.0.0.1'
+    _REDIRECT_PORT_RANGE = (36000, 36050)
+    _REDIRECT_DONE_MSG = ('The authorization code exchange flow has completed. '
+                          'You can now close this browser tab.')
+
+    _AUTH_TIMEOUT_MSG = 'Authorization flow did not complete in the allotted time.'
+
     # note: in the future we might want to replace these url resolvers with a
     # OpenID Provider Metadata server query
     @staticmethod
@@ -202,3 +222,76 @@ class LeapAuthFlow(AuthFlow):
             authorization_endpoint=authorization_endpoint,
             token_endpoint=token_endpoint,
             session_config=session_config)
+
+    def run_oob_flow(self):
+        """Run OAuth 2.0 code exchange (out-of-band flow.) 
+        
+        Runs the OAuth 2.0 Authorization Code exchange flow using the out-of-band code 
+        exchange.
+
+        After authorizing access by visiting the authorization URL displayed,
+        user has to copy the authorization code and paste it back in their
+        terminal. On successful completion Leap API access and refresh tokens
+        are returned.
+        """
+        self.redirect_uri = self._OOB_REDIRECT_URI
+
+        url = self.get_authorization_url()
+        print(self._VISIT_AUTH_MSG, url)
+
+        code = input(self._INPUT_CODE_MSG)
+        return self.fetch_token(code=code)
+
+    def run_redirect_flow(self, *, open_browser: Union[bool,Callable] = False,
+                          timeout: Optional[float] = None):
+        """Run the OAuth 2.0 code exchange (using locally hosted redirect URI). 
+        
+        Run the OAuth 2.0 Authorization Code exchange flow, using a redirect
+        URI hosted on a local server.
+
+        This flow is preferred to :meth:`.run_oob_flow` if you can access 
+        localhost addresses serviced by Ocean running in your (development)
+        environment from your browser.
+
+        After authorizing access by visiting the authorization URL displayed,
+        the flow will continue on the localhost redirect URI. The authorization
+        code is exchanged automatically, and on successful completion, Leap API
+        access and refresh tokens are returned.
+
+        Example::
+            from dwave.cloud.auth.flows import LeapAuthFlow
+            from dwave.cloud.config import load_config, validate_config_v1
+
+            config = validate_config_v1(load_config())
+            flow = LeapAuthFlow.from_config_model(config)
+
+            flow.run_redirect_flow(open_browser=True)
+
+        """
+        app = RequestCaptureApp(message=self._REDIRECT_DONE_MSG)
+        srv = SingleRequestAppServer(
+            host=self._REDIRECT_HOST,
+            base_port=self._REDIRECT_PORT_RANGE[0],
+            max_port=self._REDIRECT_PORT_RANGE[1],
+            linear_tries=max(1, -sub(*self._REDIRECT_PORT_RANGE) // 10),
+            app=app)
+        srv.start()
+
+        self.redirect_uri = srv.root_url
+
+        url = self.get_authorization_url()
+        print(self._VISIT_AUTH_MSG, url)
+        if open_browser:
+            if callable(open_browser):
+                open_browser(url)
+            else:
+                webbrowser.open(url)
+
+        try:
+            srv.wait_shutdown(timeout)
+        except TimeoutError:
+            print(self._AUTH_TIMEOUT_MSG)
+            return
+
+        q = dict(parse_qsl(app.query))
+        return self.fetch_token(code=q.get('code'), state=q.get('state'))
