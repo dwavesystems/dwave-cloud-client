@@ -91,6 +91,9 @@ class TestAuthFlow(unittest.TestCase):
         response = flow.fetch_token(code=code)
         self.assertEqual(response, token)
 
+        # verify token proxy to oauth2 session
+        self.assertEqual(flow.token, token)
+
     def test_session_config(self):
         config = dict(
             cert='/path/to/cert',

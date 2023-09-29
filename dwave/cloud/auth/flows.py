@@ -103,6 +103,10 @@ class AuthFlow:
     def redirect_uri(self, value):
         self.session.redirect_uri = value
 
+    @property
+    def token(self):
+        return self.session.token
+
     def get_authorization_url(self) -> str:
         self.state = generate_token(30)
         self.code_verifier = generate_token(48)
