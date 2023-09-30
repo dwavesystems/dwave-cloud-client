@@ -341,7 +341,7 @@ class Client(object):
     _SOLVERS_CACHE_MAXAGE = 300     # 5 min
 
     # Downloaded region metadata cache maxage [sec]
-    _REGIONS_CACHE_MAXAGE = 86400   # 1 day
+    _REGIONS_CACHE_MAXAGE = 7 * 86400   # 7 days
 
     # Multipart upload parameters
     _UPLOAD_PART_SIZE_BYTES = 5 * 1024 * 1024

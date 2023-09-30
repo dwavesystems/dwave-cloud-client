@@ -30,7 +30,7 @@ __all__ = ['get_regions']
 
 logger = logging.getLogger(__name__)
 
-_REGIONS_CACHE_MAXAGE = 86400   # 1 day
+_REGIONS_CACHE_MAXAGE = 7 * 86400   # 7 days
 
 
 @cached.ondisk(maxage=_REGIONS_CACHE_MAXAGE, key='cache_key', bucket='regions')
