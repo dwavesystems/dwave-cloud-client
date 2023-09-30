@@ -187,6 +187,15 @@ class TestLeapAuthFlow(unittest.TestCase):
         self.assertEqual(flow.session.headers.get('injected'), 'value')
         self.assertEqual(flow.session.default_timeout, 10)
 
+    def test_client_id_from_config(self):
+        client_id = '123'
+        config = ClientConfig(leap_api_endpoint='https://example.com/leap',
+                              leap_client_id=client_id)
+
+        flow = LeapAuthFlow.from_config_model(config)
+
+        self.assertEqual(flow.client_id, client_id)
+
 
 class TestLeapAuthFlowRunners(unittest.TestCase):
 

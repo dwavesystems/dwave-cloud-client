@@ -233,7 +233,7 @@ class LeapAuthFlow(AuthFlow):
             verify=not config.permissive_ssl)
 
         return cls(
-            client_id=kwargs.pop('client_id', OCEAN_SDK_CLIENT_ID),
+            client_id=kwargs.pop('client_id', config.leap_client_id or OCEAN_SDK_CLIENT_ID),
             scopes=kwargs.pop('scopes', OCEAN_SDK_SCOPES),
             redirect_uri=kwargs.pop('redirect_uri', cls._OOB_REDIRECT_URI),
             authorization_endpoint=authorization_endpoint,

@@ -13,7 +13,6 @@
 # limitations under the License.
 
 # XXX: update before releasing 0.11.0
-# TODO: make it externally configurable
 OCEAN_SDK_CLIENT_ID = '968678'
 
 OCEAN_SDK_SCOPES = (
