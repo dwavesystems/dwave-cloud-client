@@ -16,7 +16,7 @@ import threading
 import unittest
 from functools import partial
 from unittest import mock
-from urllib.parse import urlsplit, parse_qsl
+from urllib.parse import urlsplit, parse_qsl, urljoin
 
 import requests
 import requests_mock
@@ -24,6 +24,7 @@ import requests_mock
 from dwave.cloud.auth.flows import AuthFlow, LeapAuthFlow
 from dwave.cloud.auth.config import OCEAN_SDK_CLIENT_ID, OCEAN_SDK_SCOPES
 from dwave.cloud.config import ClientConfig
+from dwave.cloud.api.constants import DEFAULT_LEAP_API_ENDPOINT
 
 
 class TestAuthFlow(unittest.TestCase):
@@ -147,6 +148,16 @@ class TestAuthFlow(unittest.TestCase):
 
 
 class TestLeapAuthFlow(unittest.TestCase):
+
+    def test_from_default_config(self):
+        config = ClientConfig()
+
+        flow = LeapAuthFlow.from_config_model(config)
+
+        # endpoint urls are generated?
+        prefix = urljoin(DEFAULT_LEAP_API_ENDPOINT, '/')
+        self.assertTrue(flow.authorization_endpoint.startswith(prefix))
+        self.assertTrue(flow.token_endpoint.startswith(prefix))
 
     def test_from_minimal_config(self):
         config = ClientConfig(leap_api_endpoint='https://example.com/leap')

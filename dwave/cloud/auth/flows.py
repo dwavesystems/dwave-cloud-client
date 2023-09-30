@@ -26,6 +26,7 @@ from authlib.common.security import generate_token
 from dwave.cloud.auth.config import OCEAN_SDK_CLIENT_ID, OCEAN_SDK_SCOPES
 from dwave.cloud.auth.server import SingleRequestAppServer, RequestCaptureApp
 from dwave.cloud.config.models import ClientConfig
+from dwave.cloud.regions import resolve_endpoints
 from dwave.cloud.utils import pretty_argvalues
 
 __all__ = ['AuthFlow', 'LeapAuthFlow']
@@ -219,6 +220,8 @@ class LeapAuthFlow(AuthFlow):
         """
         logger.trace(f"{cls.__name__}.from_config_model("
                      f"config={config!r}, **kwargs={kwargs!r})")
+
+        config = resolve_endpoints(config, inplace=False)
 
         authorization_endpoint = cls._infer_auth_endpoint(config.leap_api_endpoint)
         token_endpoint = cls._infer_token_endpoint(config.leap_api_endpoint)
