@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 _REGIONS_CACHE_MAXAGE = 86400   # 1 day
 
 
-@cached.ondisk(maxage=_REGIONS_CACHE_MAXAGE, key='cache_key')
+@cached.ondisk(maxage=_REGIONS_CACHE_MAXAGE, key='cache_key', bucket='regions')
 def _fetch_available_regions(cache_key: Any, config: ClientConfig) -> Dict[str, str]:
     logger.debug("Fetching available regions from the Metadata API at %r",
                  config.metadata_api_endpoint)
