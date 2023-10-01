@@ -26,6 +26,7 @@ from authlib.common.security import generate_token
 from dwave.cloud.auth.config import OCEAN_SDK_CLIENT_ID, OCEAN_SDK_SCOPES
 from dwave.cloud.auth.server import SingleRequestAppServer, RequestCaptureApp
 from dwave.cloud.config.models import ClientConfig
+from dwave.cloud.regions import resolve_endpoints
 from dwave.cloud.utils import pretty_argvalues
 
 __all__ = ['AuthFlow', 'LeapAuthFlow']
@@ -75,7 +76,10 @@ class AuthFlow:
 
         self.session = OAuth2Session(
             client_id=client_id, scope=scopes, redirect_uri=redirect_uri,
-            code_challenge_method='S256')
+            code_challenge_method='S256',
+            # metadata set via kwargs
+            authorization_endpoint=authorization_endpoint,
+            token_endpoint=token_endpoint)
 
         if session_config is not None:
             self.update_session(session_config)
@@ -102,6 +106,14 @@ class AuthFlow:
     @redirect_uri.setter
     def redirect_uri(self, value):
         self.session.redirect_uri = value
+
+    @property
+    def token(self):
+        return self.session.token
+
+    @token.setter
+    def token(self, value):
+        self.session.token = value
 
     def get_authorization_url(self) -> str:
         self.state = generate_token(30)
@@ -144,6 +156,12 @@ class AuthFlow:
 
         logger.debug(f"{type(self).__name__}.fetch_token() = {token!r}")
         return token
+
+    def refresh_token(self):
+        return self.session.refresh_token(url=self.token_endpoint)
+
+    def ensure_active_token(self):
+        return self.session.ensure_active_token(token=self.session.token)
 
 
 class LeapAuthFlow(AuthFlow):
@@ -203,6 +221,8 @@ class LeapAuthFlow(AuthFlow):
         logger.trace(f"{cls.__name__}.from_config_model("
                      f"config={config!r}, **kwargs={kwargs!r})")
 
+        config = resolve_endpoints(config, inplace=False)
+
         authorization_endpoint = cls._infer_auth_endpoint(config.leap_api_endpoint)
         token_endpoint = cls._infer_token_endpoint(config.leap_api_endpoint)
 
@@ -216,7 +236,7 @@ class LeapAuthFlow(AuthFlow):
             verify=not config.permissive_ssl)
 
         return cls(
-            client_id=kwargs.pop('client_id', OCEAN_SDK_CLIENT_ID),
+            client_id=kwargs.pop('client_id', config.leap_client_id or OCEAN_SDK_CLIENT_ID),
             scopes=kwargs.pop('scopes', OCEAN_SDK_SCOPES),
             redirect_uri=kwargs.pop('redirect_uri', cls._OOB_REDIRECT_URI),
             authorization_endpoint=authorization_endpoint,

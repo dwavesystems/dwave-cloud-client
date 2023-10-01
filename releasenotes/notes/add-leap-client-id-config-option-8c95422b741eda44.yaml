@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Add a  configuration option for setting Leap OAuth 2.0 Ocean client id,
+    ``leap_client_id``. Primarily used for testing.

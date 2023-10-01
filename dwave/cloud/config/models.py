@@ -117,6 +117,9 @@ class ClientConfig(BaseModel, GetterMixin):
     endpoint: Optional[str] = None
     token: Optional[str] = None
 
+    # oauth 2.0 support
+    leap_client_id: Optional[str] = None
+
     # [sapi client specific] feature-based solver selection query
     client: Optional[str] = None
     solver: Optional[Dict[str, Any]] = None
@@ -272,6 +275,7 @@ _V1_CONFIG_DEFAULTS = {
     'region': DEFAULT_REGION,
     'endpoint': None,
     'token': None,
+    'leap_client_id': None,
     'solver': None,
     'proxy': None,
     'permissive_ssl': False,

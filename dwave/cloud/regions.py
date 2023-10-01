@@ -22,7 +22,8 @@ from pydantic import TypeAdapter
 
 from dwave.cloud import api
 from dwave.cloud.api.constants import (
-    DEFAULT_REGION, DEFAULT_SOLVER_API_ENDPOINT, DEFAULT_LEAP_API_ENDPOINT)
+    DEFAULT_REGION, DEFAULT_SOLVER_API_ENDPOINT, DEFAULT_LEAP_API_ENDPOINT,
+    DEFAULT_METADATA_API_ENDPOINT)
 from dwave.cloud.config.models import ClientConfig, validate_config_v1
 from dwave.cloud.utils import cached
 
@@ -30,10 +31,10 @@ __all__ = ['get_regions']
 
 logger = logging.getLogger(__name__)
 
-_REGIONS_CACHE_MAXAGE = 86400   # 1 day
+_REGIONS_CACHE_MAXAGE = 7 * 86400   # 7 days
 
 
-@cached.ondisk(maxage=_REGIONS_CACHE_MAXAGE, key='cache_key')
+@cached.ondisk(maxage=_REGIONS_CACHE_MAXAGE, key='cache_key', bucket='regions')
 def _fetch_available_regions(cache_key: Any, config: ClientConfig) -> Dict[str, str]:
     logger.debug("Fetching available regions from the Metadata API at %r",
                  config.metadata_api_endpoint)
@@ -132,7 +133,17 @@ def _infer_leap_api_endpoint(solver_api_endpoint: str,
     return parts._replace(netloc=netloc, path=path).geturl()
 
 
-def resolve_endpoints(config: ClientConfig, *, inplace: bool = False) -> ClientConfig:
+def _infer_solver_api_endpoint(leap_api_endpoint: str) -> str:
+    # solver_api_endpoint from leap_api_endpoint
+
+    # sapi path
+    path = urlsplit(DEFAULT_SOLVER_API_ENDPOINT).path
+
+    return urlsplit(leap_api_endpoint)._replace(path=path).geturl()
+
+
+def resolve_endpoints(config: ClientConfig, *, inplace: bool = False,
+                      shortcircuit: bool = True) -> ClientConfig:
     """Use region and endpoint from configuration to resolve all endpoints.
 
     Explicit endpoint overrides the region (i.e. region extension is
@@ -142,9 +153,6 @@ def resolve_endpoints(config: ClientConfig, *, inplace: bool = False) -> ClientC
     available, default global endpoint is used.
     """
 
-    # Note: this function is currently indirectly tested with `Client`
-    # multi-region support tests.
-
     if not inplace:
         config = config.model_copy(deep=True)
 
@@ -153,6 +161,10 @@ def resolve_endpoints(config: ClientConfig, *, inplace: bool = False) -> ClientC
         config.endpoint = DEFAULT_SOLVER_API_ENDPOINT
         config.leap_api_endpoint = DEFAULT_LEAP_API_ENDPOINT
 
+    # we always need metadata endpoint
+    if config.metadata_api_endpoint is None:
+        config.metadata_api_endpoint = DEFAULT_METADATA_API_ENDPOINT
+
     # for backward-compat: endpoint overrides region
     if config.endpoint:
         if not config.leap_api_endpoint:
@@ -160,7 +172,19 @@ def resolve_endpoints(config: ClientConfig, *, inplace: bool = False) -> ClientC
                 solver_api_endpoint=config.endpoint, region_code=config.region)
         return config
 
+    # for consistency: any endpoint overrides region
+    if config.leap_api_endpoint:
+        if not config.endpoint:
+            config.endpoint = _infer_solver_api_endpoint(
+                leap_api_endpoint=config.leap_api_endpoint)
+        return config
+
     if not config.region:
+        config.region = DEFAULT_REGION
+
+    # short-circuit a Metadata API hit if we just need default values
+    if (shortcircuit and config.region == DEFAULT_REGION
+        and config.metadata_api_endpoint == DEFAULT_METADATA_API_ENDPOINT):
         set_defaults(config)
         return config
 

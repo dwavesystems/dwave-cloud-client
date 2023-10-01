@@ -620,7 +620,7 @@ class cached:
             def f(x):
                 return x**2
 
-            @cached.disabled
+            @cached.disabled()
             def no_cache(x):
                 return f(x)
 

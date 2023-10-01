@@ -224,6 +224,10 @@ class Client(object):
         leap_api_endpoint (str, optional):
             Leap API endpoint.
 
+        leap_client_id (str, optional):
+            Leap OAuth 2.0 Ocean client id. Reserved for testing, otherwise
+            don't override.
+
         defaults (dict, optional):
             Defaults for the client instance that override the class
             :attr:`.Client.DEFAULTS`.
@@ -231,6 +235,9 @@ class Client(object):
     .. versionchanged:: 0.11.0
         Added the ``leap_api_endpoint`` parameter and config option (also
         available via environment variable ``DWAVE_LEAP_API_ENDPOINT``).
+
+        Added the ``leap_client_id`` parameter and config option (reserved for
+        testing).
 
     Note:
         Default values of all constructor arguments listed above are kept in
@@ -285,6 +292,7 @@ class Client(object):
         'metadata_api_endpoint': api.constants.DEFAULT_METADATA_API_ENDPOINT,
         'region': DEFAULT_API_REGION,
         'leap_api_endpoint': None,
+        'leap_client_id': None,
         'endpoint': None,       # defined via region, resolved on client init
         'token': None,
         'solver': None,
@@ -333,7 +341,7 @@ class Client(object):
     _SOLVERS_CACHE_MAXAGE = 300     # 5 min
 
     # Downloaded region metadata cache maxage [sec]
-    _REGIONS_CACHE_MAXAGE = 86400   # 1 day
+    _REGIONS_CACHE_MAXAGE = 7 * 86400   # 7 days
 
     # Multipart upload parameters
     _UPLOAD_PART_SIZE_BYTES = 5 * 1024 * 1024

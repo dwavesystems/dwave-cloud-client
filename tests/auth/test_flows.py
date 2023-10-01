@@ -16,7 +16,7 @@ import threading
 import unittest
 from functools import partial
 from unittest import mock
-from urllib.parse import urlsplit, parse_qsl
+from urllib.parse import urlsplit, parse_qsl, urljoin
 
 import requests
 import requests_mock
@@ -24,6 +24,7 @@ import requests_mock
 from dwave.cloud.auth.flows import AuthFlow, LeapAuthFlow
 from dwave.cloud.auth.config import OCEAN_SDK_CLIENT_ID, OCEAN_SDK_SCOPES
 from dwave.cloud.config import ClientConfig
+from dwave.cloud.api.constants import DEFAULT_LEAP_API_ENDPOINT
 
 
 class TestAuthFlow(unittest.TestCase):
@@ -34,6 +35,7 @@ class TestAuthFlow(unittest.TestCase):
         self.redirect_uri_oob = 'oob'
         self.authorization_endpoint = 'https://example.com/authorize'
         self.token_endpoint = 'https://example.com/token'
+        self.token = dict(access_token='123', refresh_token='456', id_token='789')
 
         self.test_args = dict(
             client_id=self.client_id,
@@ -72,7 +74,6 @@ class TestAuthFlow(unittest.TestCase):
     def test_fetch_token(self, m):
         # mock the token_endpoint
         code = '123456'
-        token = dict(access_token='123', refresh_token='456', id_token='789')
         expected_params = dict(
             grant_type='authorization_code', client_id=self.client_id,
             redirect_uri=self.redirect_uri_oob, code=code)
@@ -83,13 +84,43 @@ class TestAuthFlow(unittest.TestCase):
 
         m.get(requests_mock.ANY, status_code=404)
         m.post(requests_mock.ANY, status_code=404)
-        m.post(self.token_endpoint, additional_matcher=post_body_matcher, json=token)
+        m.post(self.token_endpoint, additional_matcher=post_body_matcher, json=self.token)
 
         # verify token fetch flow
         flow = AuthFlow(**self.test_args)
 
         response = flow.fetch_token(code=code)
-        self.assertEqual(response, token)
+        self.assertEqual(response, self.token)
+
+        # verify token proxy to oauth2 session
+        self.assertEqual(flow.token, self.token)
+
+    def test_token_setter(self):
+        flow = AuthFlow(**self.test_args)
+
+        self.assertIsNone(flow.session.token)
+
+        flow.token = self.token
+
+        self.assertIsNotNone(flow.session.token)
+        self.assertEqual(flow.session.token['access_token'], self.token['access_token'])
+
+    def test_refresh_token(self):
+        flow = AuthFlow(**self.test_args)
+
+        with mock.patch.object(flow.session, 'refresh_token') as m:
+            flow.refresh_token()
+
+        m.assert_called_once_with(url=flow.token_endpoint)
+
+    def test_ensure_active_token(self):
+        flow = AuthFlow(**self.test_args)
+        flow.token = self.token
+
+        with mock.patch.object(flow.session, 'ensure_active_token') as m:
+            flow.ensure_active_token()
+
+        m.assert_called_once_with(token=self.token)
 
     def test_session_config(self):
         config = dict(
@@ -117,6 +148,16 @@ class TestAuthFlow(unittest.TestCase):
 
 
 class TestLeapAuthFlow(unittest.TestCase):
+
+    def test_from_default_config(self):
+        config = ClientConfig()
+
+        flow = LeapAuthFlow.from_config_model(config)
+
+        # endpoint urls are generated?
+        prefix = urljoin(DEFAULT_LEAP_API_ENDPOINT, '/')
+        self.assertTrue(flow.authorization_endpoint.startswith(prefix))
+        self.assertTrue(flow.token_endpoint.startswith(prefix))
 
     def test_from_minimal_config(self):
         config = ClientConfig(leap_api_endpoint='https://example.com/leap')
@@ -156,6 +197,15 @@ class TestLeapAuthFlow(unittest.TestCase):
 
         self.assertEqual(flow.session.headers.get('injected'), 'value')
         self.assertEqual(flow.session.default_timeout, 10)
+
+    def test_client_id_from_config(self):
+        client_id = '123'
+        config = ClientConfig(leap_api_endpoint='https://example.com/leap',
+                              leap_client_id=client_id)
+
+        flow = LeapAuthFlow.from_config_model(config)
+
+        self.assertEqual(flow.client_id, client_id)
 
 
 class TestLeapAuthFlowRunners(unittest.TestCase):
