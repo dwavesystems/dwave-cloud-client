@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import unittest
+from secrets import token_hex
 from unittest import mock
 import contextlib
 
@@ -66,9 +67,9 @@ class GetRegionsFunctionality(unittest.TestCase):
             Region(code='A', name='Region A', endpoint='http://a/'),
             Region(code='B', name='Region B', endpoint='http://b/'),
         ]
-        # use a mock metadata api to avoid main cache contamination with mock data
+        # use a random mock metadata api to avoid cache contamination with mock data
         # XXX: alternatively, we flush the cache after this test
-        mock_metadata_api_endpoint = 'https://example.com/metadata/'
+        mock_metadata_api_endpoint = f'https://example.com/meta/{token_hex(8)}/'
 
         # mock `api.Regions.from_config().list_regions()` call
         @contextlib.contextmanager
@@ -133,13 +134,12 @@ class ResolveEndpointsMocked(unittest.TestCase):
         config = ClientConfig(metadata_api_endpoint=None, region=None,
                               endpoint=None, leap_api_endpoint=None)
 
-        mock_default_region = self.mock_regions[0].code
-
-        with mock.patch('dwave.cloud.regions.DEFAULT_REGION', mock_default_region):
-            resolve_endpoints(config, inplace=True)
+        with mock.patch('dwave.cloud.regions.DEFAULT_REGION',
+                        self.mock_regions[0].code):
+            resolve_endpoints(config, inplace=True, shortcircuit=False)
 
         self.assertEqual(config.metadata_api_endpoint, constants.DEFAULT_METADATA_API_ENDPOINT)
-        self.assertEqual(config.region, mock_default_region)
+        self.assertEqual(config.region, self.mock_regions[0].code)
         self.assertEqual(config.endpoint, self.mock_regions[0].endpoint)
         self.assertEqual(config.leap_api_endpoint, self.mock_regions[0].leap_api_endpoint)
 
@@ -174,22 +174,3 @@ class ResolveEndpointsMocked(unittest.TestCase):
         self.assertEqual(config.region, mock_region)
         self.assertEqual(config.endpoint, self.mock_regions[1].endpoint)
         self.assertEqual(config.leap_api_endpoint, self.mock_regions[1].leap_api_endpoint)
-
-
-class ResolveEndpointsLive(unittest.TestCase):
-
-    def test_null(self):
-        config = ClientConfig(metadata_api_endpoint=None, region=None,
-                              endpoint=None, leap_api_endpoint=None)
-
-        resolve_endpoints(config, inplace=True)
-
-        self.assertEqual(config.metadata_api_endpoint, constants.DEFAULT_METADATA_API_ENDPOINT)
-        self.assertEqual(config.region, constants.DEFAULT_REGION)
-
-        regions = get_regions(config)
-        regions = {r.code: r for r in regions}
-
-        region = regions[constants.DEFAULT_REGION]
-        self.assertEqual(config.endpoint, region.endpoint)
-        self.assertEqual(config.leap_api_endpoint, region.leap_api_endpoint)

@@ -142,7 +142,8 @@ def _infer_solver_api_endpoint(leap_api_endpoint: str) -> str:
     return urlsplit(leap_api_endpoint)._replace(path=path).geturl()
 
 
-def resolve_endpoints(config: ClientConfig, *, inplace: bool = False) -> ClientConfig:
+def resolve_endpoints(config: ClientConfig, *, inplace: bool = False,
+                      shortcircuit: bool = True) -> ClientConfig:
     """Use region and endpoint from configuration to resolve all endpoints.
 
     Explicit endpoint overrides the region (i.e. region extension is
@@ -180,6 +181,12 @@ def resolve_endpoints(config: ClientConfig, *, inplace: bool = False) -> ClientC
 
     if not config.region:
         config.region = DEFAULT_REGION
+
+    # short-circuit a Metadata API hit if we just need default values
+    if (shortcircuit and config.region == DEFAULT_REGION
+        and config.metadata_api_endpoint == DEFAULT_METADATA_API_ENDPOINT):
+        set_defaults(config)
+        return config
 
     try:
         regions = get_regions(config=config)
