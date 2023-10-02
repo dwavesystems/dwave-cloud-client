@@ -183,8 +183,8 @@ class LeapAuthFlow(AuthFlow):
 
     _OOB_REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
 
-    _VISIT_AUTH_MSG = 'Please visit the following URL to authorize Ocean: '
-    _INPUT_CODE_MSG = 'Authorization code: '
+    _VISIT_AUTH_MSG = 'Please visit the following URL to authorize Ocean:'
+    _INPUT_CODE_MSG = 'Authorization code:'
 
     _REDIRECT_HOST = '127.0.0.1'
     _REDIRECT_PORT_RANGE = (36000, 36050)
@@ -235,13 +235,18 @@ class LeapAuthFlow(AuthFlow):
             timeout=config.request_timeout,
             verify=not config.permissive_ssl)
 
-        return cls(
+        flow = cls(
             client_id=kwargs.pop('client_id', config.leap_client_id or OCEAN_SDK_CLIENT_ID),
             scopes=kwargs.pop('scopes', OCEAN_SDK_SCOPES),
             redirect_uri=kwargs.pop('redirect_uri', cls._OOB_REDIRECT_URI),
             authorization_endpoint=authorization_endpoint,
             token_endpoint=token_endpoint,
             session_config=session_config)
+
+        # save full config if needed later
+        flow.config = config
+
+        return flow
 
     def run_oob_flow(self):
         """Run OAuth 2.0 code exchange (out-of-band flow.) 

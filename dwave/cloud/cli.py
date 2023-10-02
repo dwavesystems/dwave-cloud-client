@@ -923,10 +923,10 @@ def login(*, config_file, profile, oob):
     else:
         token = flow.run_redirect_flow(open_browser=True)
 
-    click.echo('Authorization successfully completed. '
-               'You can now use "dwave auth get" to fetch token(s)')
+    click.echo('\nAuthorization successfully completed. '
+               'You can now use "dwave auth get" to fetch a token.')
 
-    creds[config.leap_api_endpoint] = token
+    creds[flow.config.leap_api_endpoint] = token
 
 
 @auth.command()
@@ -950,3 +950,28 @@ def get(*, config_file, profile, token_type, json_output, output):
         raise CLIError('Token not found. Please run "dwave auth login".', code=100)
 
     output("{token}", token=token)
+
+
+@auth.command()
+@config_file_options()
+@standardized_output
+def refresh(*, config_file, profile, output):
+    """Refresh access token."""
+
+    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
+    creds = Credentials()
+    flow = LeapAuthFlow.from_config_model(config)
+
+    # check we have a token
+    token = creds.get(flow.config.leap_api_endpoint, {})
+    if not token or 'refresh_token' not in token:
+        raise CLIError('Token not found. Please run "dwave auth login".', code=100)
+
+    # refresh
+    flow.token = token
+    token = flow.refresh_token()
+
+    # save
+    creds[flow.config.leap_api_endpoint] = token
+    output('Token successfully refreshed. '
+           'You can now use "dwave auth get" to fetch a token.')
