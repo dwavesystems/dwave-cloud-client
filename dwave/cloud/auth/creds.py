@@ -16,15 +16,14 @@ import logging
 from pathlib import Path
 from typing import List, Optional, Type, Union
 
-import diskcache
-
+from dwave.cloud.auth._creds import _Cache
 from dwave.cloud.config import get_configfile_paths, get_default_configfile_path
 
 __all__ = ['Credentials']
 
 logger = logging.getLogger(__name__)
 
-CREDS_FILENAME = diskcache.core.DBNAME = "credentials.db"
+CREDS_FILENAME = "credentials.db"
 
 class AutoDetect:
     """Sentinel value for creds_file auto-detect."""
@@ -41,7 +40,7 @@ def _get_default_creds_path() -> str:
     return get_default_configfile_path(filename=CREDS_FILENAME)
 
 
-class Credentials(diskcache.Cache):
+class Credentials(_Cache):
     """Proxy to an on-disk credentials SQLite database.
 
     Use :class:`Credentials` dictionary interface for transparent reads and
@@ -86,7 +85,7 @@ class Credentials(diskcache.Cache):
     # (https://github.com/python/typing/issues/689)
     def __init__(self, *,
                  creds_file: Optional[Union[str, Type[AutoDetect]]] = AutoDetect,
-                 create: bool = True, **kwargs):
+                 create: bool = True):
 
         if creds_file is AutoDetect:
             if paths := _get_creds_paths(only_existing=True):
@@ -107,6 +106,6 @@ class Credentials(diskcache.Cache):
                      f"creds_file={self.creds_file!r} and create={create!r}.")
 
         directory = self.creds_file.parent if create else None
-        super().__init__(directory=directory, **kwargs)
+        super().__init__(directory=directory, dbname=CREDS_FILENAME)
 
         logger.debug(f"{type(self).__name__} db loaded from {self.directory!r}.")

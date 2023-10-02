@@ -19,6 +19,7 @@ from unittest import mock
 
 from dwave.cloud.auth.creds import (
     Credentials, _get_creds_paths, _get_default_creds_path, CREDS_FILENAME)
+from dwave.cloud.auth._creds import _Cache
 
 
 class TestCredentials(unittest.TestCase):
@@ -39,6 +40,11 @@ class TestCredentials(unittest.TestCase):
 
         default = _get_default_creds_path()
         self.assertGreater(len(default), 0)
+
+    def test_cache_subclass_smoke(self):
+        dbname = 'custom.db'
+        cache = _Cache(dbname=dbname)
+        self.assertEqual(cache.dbname, dbname)
 
     def setUp(self):
         self.default_file = Path('/path/to/creds.db').resolve()
