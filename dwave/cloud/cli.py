@@ -1015,3 +1015,40 @@ def list_leap_projects(*, config_file, profile, json_output, output):
     output("Leap projects:", projects=[p.model_dump() for p in projects])
     for project in projects:
         output(f" - {project!r}")
+
+
+@project.command(name='token')
+@config_file_options()
+@click.option('--project', 'project_slug', required=True, type=str,
+              help='Leap project ID, name or code.')
+@json_output
+@standardized_output
+def leap_project_token(*, config_file, profile, project_slug, json_output, output):
+    """Get Solver API token for a selected Leap project."""
+
+    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
+    resolve_endpoints(config=config, inplace=True)
+
+    creds = Credentials()
+
+    token = creds.get(config.leap_api_endpoint, {}).get('access_token')
+    if not token:
+        raise CLIError('Leap API access token not found. Please run "dwave auth login".', code=100)
+
+    account = api.LeapAccount.from_config(config=config, token=token)
+    projects = account.list_projects()
+
+    # find project id
+    needle = str(project_slug).strip().lower()
+    project = [p for p in projects if needle in (str(p.id), p.name.lower(), p.code.lower())]
+
+    if not project:
+        raise CLIError(f'Project with {project_slug!r} ID, name or code not found. '
+                       'Please run "dwave leap project ls" to list available projects.', code=101)
+
+    # get token
+    project = project[0]
+    token = account.get_project_token(project=project)
+
+    output(f"Solver API token for project {project.name} ({project.code}) is {token}",
+           token=token)
