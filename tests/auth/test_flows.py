@@ -210,19 +210,19 @@ class TestLeapAuthFlow(unittest.TestCase):
 
 class TestLeapAuthFlowRunners(unittest.TestCase):
 
-    @mock.patch('builtins.print', return_value=None)
+    @mock.patch('click.echo', return_value=None)
     def test_oob(self, m):
         config = ClientConfig(leap_api_endpoint='https://example.com/leap')
         flow = LeapAuthFlow.from_config_model(config)
 
         mock_code = '1234'
 
-        with mock.patch('builtins.input', return_value=mock_code):
+        with mock.patch('click.prompt', return_value=mock_code):
             with mock.patch.object(flow, 'fetch_token') as fetch_token:
                 flow.run_oob_flow()
                 fetch_token.assert_called_once_with(code=mock_code)
 
-    @mock.patch('builtins.print', return_value=None)
+    @mock.patch('click.echo', return_value=None)
     def test_redirect(self, m):
         config = ClientConfig(leap_api_endpoint='https://example.com/leap')
         flow = LeapAuthFlow.from_config_model(config)

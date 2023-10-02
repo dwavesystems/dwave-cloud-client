@@ -20,6 +20,7 @@ from operator import sub
 from typing import Any, Callable, Dict, Optional, Union, Sequence
 from urllib.parse import urljoin, parse_qsl
 
+import click
 from authlib.integrations.requests_client import OAuth2Session
 from authlib.common.security import generate_token
 
@@ -183,8 +184,8 @@ class LeapAuthFlow(AuthFlow):
 
     _OOB_REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
 
-    _VISIT_AUTH_MSG = 'Please visit the following URL to authorize Ocean:'
-    _INPUT_CODE_MSG = 'Authorization code:'
+    _VISIT_AUTH_MSG = 'Please visit the following URL to authorize Ocean: '
+    _INPUT_CODE_MSG = 'Authorization code'
 
     _REDIRECT_HOST = '127.0.0.1'
     _REDIRECT_PORT_RANGE = (36000, 36050)
@@ -248,7 +249,7 @@ class LeapAuthFlow(AuthFlow):
 
         return flow
 
-    def run_oob_flow(self):
+    def run_oob_flow(self, *, open_browser: Union[bool,Callable] = False):
         """Run OAuth 2.0 code exchange (out-of-band flow.) 
         
         Runs the OAuth 2.0 Authorization Code exchange flow using the out-of-band code 
@@ -262,9 +263,16 @@ class LeapAuthFlow(AuthFlow):
         self.redirect_uri = self._OOB_REDIRECT_URI
 
         url = self.get_authorization_url()
-        print(self._VISIT_AUTH_MSG, url)
+        click.echo(click.style(self._VISIT_AUTH_MSG, bold=True), nl=False)
+        click.echo(click.style(url, underline=True))
+        click.echo()
+        if open_browser:
+            if callable(open_browser):
+                open_browser(url)
+            else:
+                webbrowser.open(url)
 
-        code = input(self._INPUT_CODE_MSG)
+        code = click.prompt(click.style(self._INPUT_CODE_MSG, bold=True))
         return self.fetch_token(code=code)
 
     def run_redirect_flow(self, *, open_browser: Union[bool,Callable] = False,
@@ -305,7 +313,8 @@ class LeapAuthFlow(AuthFlow):
         self.redirect_uri = srv.root_url
 
         url = self.get_authorization_url()
-        print(self._VISIT_AUTH_MSG, url)
+        click.echo(click.style(self._VISIT_AUTH_MSG, bold=True), nl=False)
+        click.echo(click.style(url, underline=True))
         if open_browser:
             if callable(open_browser):
                 open_browser(url)
