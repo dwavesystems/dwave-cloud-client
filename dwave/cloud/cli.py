@@ -18,11 +18,9 @@ import ast
 import json
 import subprocess
 import pkg_resources
-
 from collections.abc import Sequence
 from functools import wraps, partial
 from timeit import default_timer as timer
-
 from typing import Dict
 from configparser import ConfigParser
 
@@ -112,6 +110,15 @@ def endpoint_options(fn):
     fn = click.option(
         '--region', default=None, metavar='CODE',
         help='Solver API region [default: from config]')(fn)
+
+    return fn
+
+
+def json_output(fn):
+    """Decorate `fn` with `--json` option."""
+
+    fn = click.option('--json', 'json_output', default=False, is_flag=True,
+                      help='JSON output')(fn)
 
     return fn
 
@@ -975,3 +982,36 @@ def refresh(*, config_file, profile, output):
     creds[flow.config.leap_api_endpoint] = token
     output('Token successfully refreshed. '
            'You can now use "dwave auth get" to fetch a token.')
+
+
+@cli.group()
+def leap():
+    """Interact with Leap API."""
+
+
+@leap.group()
+def project():
+    """Leap projects."""
+
+
+@project.command(name='ls')
+@config_file_options()
+@json_output
+@standardized_output
+def list_leap_projects(*, config_file, profile, json_output, output):
+    """List available Leap projects."""
+
+    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
+    resolve_endpoints(config=config, inplace=True)
+
+    creds = Credentials()
+
+    token = creds.get(config.leap_api_endpoint, {}).get('access_token')
+    if not token:
+        raise CLIError('Leap API access token not found. Please run "dwave auth login".', code=100)
+
+    account = api.LeapAccount.from_config(config=config, token=token)
+    projects = account.list_projects()
+    output("Leap projects:", projects=[p.model_dump() for p in projects])
+    for project in projects:
+        output(f" - {project!r}")
