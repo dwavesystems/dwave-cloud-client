@@ -926,7 +926,9 @@ def login(*, config_file, profile, oob):
     creds = Credentials()
 
     if oob:
-        token = flow.run_oob_flow()
+        # XXX: until the standard OOB URI is supported
+        flow._OOB_REDIRECT_URI = 'oob'
+        token = flow.run_oob_flow(open_browser=True)
     else:
         token = flow.run_redirect_flow(open_browser=True)
 
@@ -1050,5 +1052,5 @@ def leap_project_token(*, config_file, profile, project_slug, json_output, outpu
     project = project[0]
     token = account.get_project_token(project=project)
 
-    output(f"Solver API token for project {project.name} ({project.code}) is {token}",
+    output(f"Solver API token for project {project.name} ({project.code}) is {token}.",
            token=token)
