@@ -14,7 +14,7 @@
 
 import logging
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, Type, Union
 
 import diskcache
 
@@ -26,7 +26,8 @@ logger = logging.getLogger(__name__)
 
 CREDS_FILENAME = diskcache.core.DBNAME = "credentials.db"
 
-AutoDetect = object()
+class AutoDetect:
+    """Sentinel value for creds_file auto-detect."""
 
 
 def _get_creds_paths(
@@ -49,7 +50,7 @@ class Credentials(diskcache.Cache):
     Args:
         creds_file:
             Credentials file path on disk. Special value
-            :obj:`~dwave.cloud.auth.creds.AutoDetect` initiates a search for
+            :class:`~dwave.cloud.auth.creds.AutoDetect` initiates a search for
             credentials file in the expected system/user/local configuration
             directories, with a fallback to the default credentials location,
             a user configuration directory.
@@ -84,9 +85,8 @@ class Credentials(diskcache.Cache):
     # note: no consensus yet on annotating sentinel value types
     # (https://github.com/python/typing/issues/689)
     def __init__(self, *,
-                 creds_file: Optional[Union[str, AutoDetect]] = AutoDetect,
-                 create: bool = True,
-                 **kwargs):
+                 creds_file: Optional[Union[str, Type[AutoDetect]]] = AutoDetect,
+                 create: bool = True, **kwargs):
 
         if creds_file is AutoDetect:
             if paths := _get_creds_paths(only_existing=True):
@@ -97,17 +97,16 @@ class Credentials(diskcache.Cache):
         if creds_file is None:
             creds_file = _get_default_creds_path()
 
-        self._creds_file: Path = Path(creds_file).expanduser().resolve()
-        self._create = create
+        self.creds_file: Path = Path(creds_file).expanduser().resolve()
 
         # stage the ground for db creation; i.e. fail early in case of access limited
-        if create and not self._creds_file.exists():
-            self._creds_file.parent.mkdir(parents=True, exist_ok=True)
+        if create and not self.creds_file.exists():
+            self.creds_file.parent.mkdir(parents=True, exist_ok=True)
 
         logger.debug(f"{type(self).__name__}() initialized with "
-                     f"creds_file={self._creds_file!r} and create={self._create!r}.")
+                     f"creds_file={self.creds_file!r} and create={create!r}.")
 
-        directory = directory=self._creds_file.parent if create else None
+        directory = self.creds_file.parent if create else None
         super().__init__(directory=directory, **kwargs)
 
         logger.debug(f"{type(self).__name__} db loaded from {self.directory!r}.")
