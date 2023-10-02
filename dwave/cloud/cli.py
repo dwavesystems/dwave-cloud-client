@@ -19,6 +19,7 @@ import json
 import subprocess
 import pkg_resources
 from collections.abc import Sequence
+from datetime import datetime
 from functools import wraps, partial
 from timeit import default_timer as timer
 from typing import Dict
@@ -34,7 +35,7 @@ from dwave.cloud.solver import StructuredSolver, BaseUnstructuredSolver
 from dwave.cloud.utils import (
     default_text_input, generate_random_ising_problem,
     datetime_to_timestamp, utcnow, strtrunc, CLIError, set_loglevel,
-    get_contrib_packages, user_agent)
+    get_contrib_packages, user_agent, epochnow)
 from dwave.cloud.coders import bqm_as_file
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
@@ -954,11 +955,21 @@ def get(*, config_file, profile, token_type, json_output, output):
     creds = Credentials()
 
     token_name = token_type.replace('-', '_')
-    token = creds.get(config.leap_api_endpoint, {}).get(token_name)
-    if not token:
+    token = creds.get(config.leap_api_endpoint, {})
+    value = token.get(token_name)
+    if not value:
         raise CLIError('Token not found. Please run "dwave auth login".', code=100)
 
-    output("{token}", token=token)
+    expires_at = int(token['expires_at'])
+    expired = expires_at < epochnow()
+    output("Token: {token}", token=value)
+    output("Expires at: {expires_at_iso}Z (timestamp={expires_at}) ({is_valid})",
+           expires_at_iso=datetime.utcfromtimestamp(expires_at).isoformat(),
+           expires_at=expires_at,
+           is_valid="expired" if expired else "valid")
+
+    if expired:
+        output('\nTo refresh the token, please run "dwave auth refresh".')
 
 
 @auth.command()
@@ -1016,7 +1027,7 @@ def list_leap_projects(*, config_file, profile, json_output, output):
     projects = account.list_projects()
     output("Leap projects:", projects=[p.model_dump() for p in projects])
     for project in projects:
-        output(f" - {project!r}")
+        output(f" - {project.name} (code={project.code!r}, id={project.id})")
 
 
 @project.command(name='token')
