@@ -41,7 +41,7 @@ class TestCredentials(unittest.TestCase):
         self.assertGreater(len(default), 0)
 
     def setUp(self):
-        self.default_file = Path('/path/to/creds.db')
+        self.default_file = Path('/path/to/creds.db').resolve()
         self.mocker = mock.patch('dwave.cloud.auth.creds._get_default_creds_path',
                                  return_value=str(self.default_file))
         self.mocker.start()
@@ -57,7 +57,7 @@ class TestCredentials(unittest.TestCase):
             self.assertEqual(c.creds_file, self.default_file)
 
         # creds file exists
-        existing_file = Path('/path/to/existing.db')
+        existing_file = Path('/path/to/existing.db').resolve()
         with mock.patch('dwave.cloud.auth.creds._get_creds_paths',
                         return_value=[str(existing_file)]):
             c = Credentials(create=False)
@@ -69,7 +69,7 @@ class TestCredentials(unittest.TestCase):
 
     def test_create(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir).joinpath('some/deep/path', CREDS_FILENAME)
+            path = Path(tmpdir).joinpath('some/deep/path', CREDS_FILENAME).resolve()
             self.assertFalse(path.exists())
 
             c = Credentials(creds_file=path, create=True)
@@ -78,9 +78,12 @@ class TestCredentials(unittest.TestCase):
             self.assertEqual(c.creds_file, path)
             self.assertEqual(c.directory, str(path.parent))
 
+            # enable temp dir deletion on windows
+            c.close()
+
     def test_no_create(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir).joinpath('some/deep/path', CREDS_FILENAME)
+            path = Path(tmpdir).joinpath('some/deep/path', CREDS_FILENAME).resolve()
             self.assertFalse(path.exists())
 
             c = Credentials(creds_file=path, create=False)
@@ -88,3 +91,6 @@ class TestCredentials(unittest.TestCase):
 
             self.assertEqual(c.creds_file, path)
             self.assertIn('diskcache-', c.directory)
+
+            # enable temp dir deletion on windows
+            c.close()
