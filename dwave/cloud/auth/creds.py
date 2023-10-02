@@ -41,6 +41,42 @@ def _get_default_creds_path() -> str:
 
 
 class Credentials(diskcache.Cache):
+    """Proxy to an on-disk credentials SQLite database.
+
+    Use :class:`Credentials` dictionary interface for transparent reads and
+    writes to the on-disk database.
+
+    Args:
+        creds_file:
+            Credentials file path on disk. Special value
+            :obj:`~dwave.cloud.auth.creds.AutoDetect` initiates a search for
+            credentials file in the expected system/user/local configuration
+            directories, with a fallback to the default credentials location,
+            a user configuration directory.
+            Special value of ``None`` is a shortcut to auto-detect fallback:
+            using the default location.
+
+        create:
+            Boolean flag used to disable creation of a new credentials file,
+            if one does not exist. By default, :class:`Credentials` acts as
+            a transparent proxy and file creation on-the-fly is enabled.
+            By setting ``create=False``, :class:`Credentials` will
+            effectively act as an in-memory credentials store.
+
+        **kwargs:
+            Arguments passed-thru to the underlying disk cache.
+
+    Examples:
+        This example searches for an existing credentials file, and if one is not
+        found, it creates it in the default location, inside user-level config
+        directory. It then, fetches a token, if one exists.
+
+        >>> from dwave.cloud.auth.creds import Credentials
+        >>> creds = Credentials()
+        >>> token = creds.get('token')
+
+    """
+
     # wrapper around on-disk cache; we keep this layer very thin for simplicity,
     # at least for now. in the future, we might want to hide internals, and
     # expose a token interface with transparent on-the-fly persistency.
