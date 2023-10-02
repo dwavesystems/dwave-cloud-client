@@ -19,11 +19,11 @@ import json
 import subprocess
 import pkg_resources
 from collections.abc import Sequence
+from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps, partial
 from timeit import default_timer as timer
-from typing import Dict
-from configparser import ConfigParser
+from typing import Dict, Tuple
 
 import click
 import requests.exceptions
@@ -44,8 +44,8 @@ from dwave.cloud.exceptions import (
     RequestTimeout, PollingTimeout)
 from dwave.cloud.config import (
     load_profile_from_files, load_config_from_files, load_config, get_default_config,
-    get_configfile_path, get_default_configfile_path,
-    get_configfile_paths, validate_config_v1)
+    get_configfile_path, get_default_configfile_path, get_configfile_paths)
+from dwave.cloud.config.models import ClientConfig, validate_config_v1
 from dwave.cloud.regions import get_regions, resolve_endpoints
 from dwave.cloud.auth.creds import Credentials
 from dwave.cloud.auth.flows import LeapAuthFlow
@@ -939,6 +939,16 @@ def login(*, config_file, profile, oob):
     creds[flow.config.leap_api_endpoint] = token
 
 
+def _get_token_from_creds(config_file: str, profile: str) -> Tuple[ClientConfig, dict]:
+    """Fetch token from creds."""
+
+    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
+    resolve_endpoints(config=config, inplace=True)
+
+    creds = Credentials()
+    return (config, creds.get(config.leap_api_endpoint, {}))
+
+
 @auth.command()
 @config_file_options()
 @click.argument('token_type',
@@ -949,13 +959,8 @@ def login(*, config_file, profile, oob):
 def get(*, config_file, profile, token_type, json_output, output):
     """Fetch token."""
 
-    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
-    resolve_endpoints(config=config, inplace=True)
-
-    creds = Credentials()
-
+    _, token = _get_token_from_creds(config_file, profile)
     token_name = token_type.replace('-', '_')
-    token = creds.get(config.leap_api_endpoint, {})
     value = token.get(token_name)
     if not value:
         raise CLIError('Token not found. Please run "dwave auth login".', code=100)
@@ -1014,12 +1019,8 @@ def project():
 def list_leap_projects(*, config_file, profile, json_output, output):
     """List available Leap projects."""
 
-    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
-    resolve_endpoints(config=config, inplace=True)
-
-    creds = Credentials()
-
-    token = creds.get(config.leap_api_endpoint, {}).get('access_token')
+    config, token = _get_token_from_creds(config_file, profile)
+    token = token.get('access_token')
     if not token:
         raise CLIError('Leap API access token not found. Please run "dwave auth login".', code=100)
 
@@ -1039,12 +1040,8 @@ def list_leap_projects(*, config_file, profile, json_output, output):
 def leap_project_token(*, config_file, profile, project_slug, json_output, output):
     """Get Solver API token for a selected Leap project."""
 
-    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
-    resolve_endpoints(config=config, inplace=True)
-
-    creds = Credentials()
-
-    token = creds.get(config.leap_api_endpoint, {}).get('access_token')
+    config, token = _get_token_from_creds(config_file, profile)
+    token = token.get('access_token')
     if not token:
         raise CLIError('Leap API access token not found. Please run "dwave auth login".', code=100)
 
