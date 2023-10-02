@@ -47,7 +47,7 @@ from dwave.cloud.config import (
     load_profile_from_files, load_config_from_files, load_config, get_default_config,
     get_configfile_path, get_default_configfile_path,
     get_configfile_paths, validate_config_v1)
-from dwave.cloud.regions import get_regions
+from dwave.cloud.regions import get_regions, resolve_endpoints
 from dwave.cloud.auth.creds import Credentials
 from dwave.cloud.auth.flows import LeapAuthFlow
 
@@ -927,3 +927,26 @@ def login(*, config_file, profile, oob):
                'You can now use "dwave auth get" to fetch token(s)')
 
     creds[config.leap_api_endpoint] = token
+
+
+@auth.command()
+@config_file_options()
+@click.argument('token_type',
+                type=click.Choice(['access-token', 'refresh-token', 'id-token']))
+@click.option('--json', 'json_output', default=False, is_flag=True,
+              help='JSON output')
+@standardized_output
+def get(*, config_file, profile, token_type, json_output, output):
+    """Fetch token."""
+
+    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
+    resolve_endpoints(config=config, inplace=True)
+
+    creds = Credentials()
+
+    token_name = token_type.replace('-', '_')
+    token = creds.get(config.leap_api_endpoint, {}).get(token_name)
+    if not token:
+        raise CLIError('Token not found. Please run "dwave auth login".', code=100)
+
+    output("{token}", token=token)
