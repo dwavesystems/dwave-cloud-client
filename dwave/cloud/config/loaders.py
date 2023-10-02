@@ -16,7 +16,7 @@ import os
 import ast
 import logging
 import configparser
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 import homebase
 
@@ -113,7 +113,10 @@ def parse_boolean(s, default=None):
     return bool(s)
 
 
-def get_configfile_paths(system=True, user=True, local=True, only_existing=True):
+def get_configfile_paths(
+        *, system: bool = True, user: bool = True, local: bool = True,
+        only_existing: bool = True, app_author: str = CONF_AUTHOR,
+        app_name: str = CONF_APP, filename: str = CONF_FILENAME) -> List[str]:
     """Return a list of local configuration file paths.
 
     Search paths for configuration files on the local system
@@ -124,21 +127,23 @@ def get_configfile_paths(system=True, user=True, local=True, only_existing=True)
     .. _homebase: https://github.com/dwavesystems/homebase
 
     Args:
-        system (boolean, default=True):
+        system:
             Search for system-wide configuration files.
-
-        user (boolean, default=True):
+        user:
             Search for user-local configuration files.
-
-        local (boolean, default=True):
+        local:
             Search for local configuration files (in CWD).
-
-        only_existing (boolean, default=True):
+        only_existing:
             Return only paths for files that exist on the local system.
+        app_author:
+            Application author, used by ``homebase`` to determine config file paths.
+        app_name:
+            Application name, used by ``homebase`` to determine config file paths.
+        filename:
+            Configuration filename.
 
     Returns:
-        list[str]:
-            List of configuration file paths.
+        List of configuration file paths.
 
     Examples:
         This example displays all paths to configuration files on a Windows system
@@ -161,64 +166,55 @@ def get_configfile_paths(system=True, user=True, local=True, only_existing=True)
     # system-wide has the lowest priority, `/etc/dwave/dwave.conf`
     if system:
         candidates.extend(homebase.site_config_dir_list(
-            app_author=CONF_AUTHOR, app_name=CONF_APP,
+            app_author=app_author, app_name=app_name,
             use_virtualenv=False, create=False))
 
     # user-local will override it, `~/.config/dwave/dwave.conf`
     if user:
         candidates.append(homebase.user_config_dir(
-            app_author=CONF_AUTHOR, app_name=CONF_APP, roaming=False,
+            app_author=app_author, app_name=app_name, roaming=False,
             use_virtualenv=False, create=False))
 
     # highest priority (overrides all): `./dwave.conf`
     if local:
         candidates.append(".")
 
-    paths = [os.path.join(base, CONF_FILENAME) for base in candidates]
+    paths = [os.path.join(base, filename) for base in candidates]
     if only_existing:
         paths = list(filter(os.path.exists, paths))
 
     return paths
 
 
-def get_configfile_path():
+def get_configfile_path(**kwargs) -> str:
     """Return the highest-priority local configuration file.
 
     Selects the top-ranked configuration file path from a list of candidates returned
     by :func:`get_configfile_paths()`, or ``None`` if no candidate path exists.
 
+    Args:
+        **kwargs:
+            Arguments passed-thru to :func:`get_configfile_paths`.
+
     Returns:
-        str:
-            Configuration file path.
-
-    Examples:
-        This example displays the highest-priority configuration file on a
-        Windows system.
-
-        >>> from dwave.cloud import config
-        >>> # Display paths
-        >>> config.get_configfile_paths(only_existing=False)   # doctest: +SKIP
-        ['C:\\ProgramData\\dwavesystem\\dwave\\dwave.conf',
-         'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf',
-         '.\\dwave.conf']
-        >>> # Find highest-priority local configuration file
-        >>> config.get_configfile_path()   # doctest: +SKIP
-        'C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf'
-
+        Configuration file path.
     """
-    paths = get_configfile_paths()
+    paths = get_configfile_paths(**kwargs)
     return paths[-1] if paths else None
 
 
-def get_default_configfile_path():
+def get_default_configfile_path(**kwargs) -> str:
     """Return the default configuration-file path.
 
     Typically returns a user-local configuration file; e.g:
     ``~/.config/dwave/dwave.conf``.
 
+    Args:
+        **kwargs:
+            Arguments passed-thru to :func:`get_configfile_paths`.
+
     Returns:
-        str:
-            Configuration file path.
+        Configuration file path.
 
     Examples:
         This example displays the default configuration file on an Ubuntu Linux
@@ -237,14 +233,11 @@ def get_default_configfile_path():
         '/home/mary/.config/dwave/dwave.conf'
 
     """
-    base = homebase.user_config_dir(
-        app_author=CONF_AUTHOR, app_name=CONF_APP, roaming=False,
-        use_virtualenv=False, create=False)
-    path = os.path.join(base, CONF_FILENAME)
-    return path
+    kwargs.update(system=False, user=True, local=False, only_existing=False)
+    return get_configfile_paths(**kwargs)[0]
 
 
-def get_cache_dir():
+def get_cache_dir() -> str:
     """Return a directory path convenient for storing user-local,
     package-local and version-specific cache data.
     """

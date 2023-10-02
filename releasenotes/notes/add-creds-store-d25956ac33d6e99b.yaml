@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Add ``dwave.cloud.auth.creds.Credentials``, an on-disk credentials store.
+    See `#562 <https://github.com/dwavesystems/dwave-cloud-client/issues/562>`_.
