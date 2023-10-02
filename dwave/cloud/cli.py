@@ -46,8 +46,10 @@ from dwave.cloud.exceptions import (
 from dwave.cloud.config import (
     load_profile_from_files, load_config_from_files, load_config, get_default_config,
     get_configfile_path, get_default_configfile_path,
-    get_configfile_paths)
+    get_configfile_paths, validate_config_v1)
 from dwave.cloud.regions import get_regions
+from dwave.cloud.auth.creds import Credentials
+from dwave.cloud.auth.flows import LeapAuthFlow
 
 
 # show defaults for all click options when printing --help
@@ -896,3 +898,32 @@ def setup(install_all, ask_full, verbose):
 
     click.echo("Creating the D-Wave configuration file.")
     return _config_create(config_file=None, profile=None, ask_full=ask_full)
+
+
+@cli.group()
+def auth():
+    """Authorize Leap access and fetch Leap/Solver API tokens."""
+
+@auth.command()
+@config_file_options()
+@click.option('--oob', is_flag=True,
+              help='Run OAuth 2.0 Authorization Code flow out-of-band, '
+                   'without the use of locally hosted redirect URL.')
+def login(*, config_file, profile, oob):
+    """Authorize Ocean to access Leap API on user's behalf."""
+
+    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
+
+    flow = LeapAuthFlow.from_config_model(config)
+
+    creds = Credentials()
+
+    if oob:
+        token = flow.run_oob_flow()
+    else:
+        token = flow.run_redirect_flow(open_browser=True)
+
+    click.echo('Authorization successfully completed. '
+               'You can now use "dwave auth get" to fetch token(s)')
+
+    creds[config.leap_api_endpoint] = token
