@@ -187,11 +187,14 @@ def inspect(config_file, profile):
 @config_file_options(exists=False)
 @click.option('--full', 'ask_full', is_flag=True,
               help='Configure non-essential options (such as endpoint and solver).')
-def create(config_file, profile, ask_full):
+@click.option('--auto', 'auto_token', is_flag=True, default=False,
+              help='Pull token from Leap API, if "dwave auth login" has been run.')
+def create(*, config_file, profile, ask_full, auto_token):
     """Create or update cloud client configuration file."""
 
     try:
-        _config_create(config_file, profile, ask_full)
+        _config_create(config_file=config_file, profile=profile,
+                       ask_full=ask_full, auto_token=auto_token)
     except CLIError as error:
         click.echo(f"Error: {error!s} (code: {error.code})")
         sys.exit(error.code)
@@ -239,7 +242,7 @@ def _write_config(config: ConfigParser, config_file: str):
     except Exception as e:
         raise CLIError(f"Error writing to configuration file: {e!r}", code=2)
 
-def _config_create(config_file, profile, ask_full=False):
+def _config_create(config_file, profile, ask_full=False, auto_token=False):
     """Full/simplified dwave create flows."""
 
     if ask_full:
@@ -255,13 +258,13 @@ def _config_create(config_file, profile, ask_full=False):
         prompts = dict(
             region=dict(prompt="Solver API region", choices=region_choices),
             endpoint=dict(prompt="Solver API endpoint URL (overwrites 'region')"),
-            token=dict(prompt="Authentication token"),
+            token=dict(prompt="Solver API token"),
             client=dict(prompt="Client class", choices='base qpu sw hybrid'.split()),
             solver=dict(prompt="Solver"))
 
     else:
         prompts = dict(
-            token=dict(prompt="Authentication token"))
+            token=dict(prompt="Solver API token"))
 
         click.echo("Using the simplified configuration flow.\n"
                    "Try 'dwave config create --full' for more options.\n")
@@ -301,6 +304,16 @@ def _config_create(config_file, profile, ask_full=False):
 
     if profile != default_section and not config.has_section(profile):
         config.add_section(profile)
+
+    sapi_token = None
+    if auto_token:
+        config_model, token = _get_token_from_creds(config_file, profile)
+        sapi_token = _get_sapi_token(config=config_model,
+                                     leap_api_token=token.get('access_token'))
+    if sapi_token:
+        del prompts['token']
+        config.set(profile, 'token', sapi_token)
+        click.echo("Using SAPI token from credentials.")
 
     _input_config_variables(config, profile, prompts)
 
@@ -940,13 +953,21 @@ def login(*, config_file, profile, oob):
 
 
 def _get_token_from_creds(config_file: str, profile: str) -> Tuple[ClientConfig, dict]:
-    """Fetch token from creds."""
+    """Fetch Leap API token from creds."""
 
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
     resolve_endpoints(config=config, inplace=True)
 
     creds = Credentials()
     return (config, creds.get(config.leap_api_endpoint, {}))
+
+
+def _get_sapi_token(config: ClientConfig, leap_api_token: str) -> str:
+    """Fetch SAPI token from Leap API for a currently active project."""
+
+    account = api.LeapAccount.from_config(config=config, token=leap_api_token)
+    active_project = account.get_active_project()
+    return account.get_project_token(project=active_project)
 
 
 @auth.command()
