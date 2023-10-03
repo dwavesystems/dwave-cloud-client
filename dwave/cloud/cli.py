@@ -937,7 +937,7 @@ def login(*, config_file, profile, oob):
     flow = LeapAuthFlow.from_config_model(config)
 
     if oob:
-        # XXX: until the standard OOB URI is supported
+        # XXX: until the standard OOB URI is supported on Leap
         flow._OOB_REDIRECT_URI = 'oob'
         flow.run_oob_flow(open_browser=True)
     else:
@@ -967,52 +967,55 @@ def _get_sapi_token(config: ClientConfig, leap_api_token: str) -> str:
 
 @auth.command()
 @config_file_options()
-@click.argument('token_type',
+@click.argument('token_type', default='access-token',
                 type=click.Choice(['access-token', 'refresh-token', 'id-token']))
 @click.option('--json', 'json_output', default=False, is_flag=True,
               help='JSON output')
 @standardized_output
 def get(*, config_file, profile, token_type, json_output, output):
-    """Fetch token."""
+    """Fetch Leap API token."""
 
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
     flow = LeapAuthFlow.from_config_model(config)
 
     token_name = token_type.replace('-', '_')
-    token = flow.token.get(token_name)
-    if not token:
+    token_value = flow.token.get(token_name)
+    if not token_value:
         raise CLIError('Token not found. Please run "dwave auth login".', code=100)
 
-    expires_at = int(token['expires_at'])
-    expired = expires_at < epochnow()
-    output("Token: {token}", token=token)
-    output("Expires at: {expires_at_iso}Z (timestamp={expires_at}) ({is_valid})",
-           expires_at_iso=datetime.utcfromtimestamp(expires_at).isoformat(),
-           expires_at=expires_at,
-           is_valid="expired" if expired else "valid")
+    output("Token: {token}", token=token_value)
 
-    if expired:
-        output('\nTo refresh the token, please run "dwave auth refresh".')
+    if token_type == 'access-token':
+        expires_at = int(flow.token['expires_at'])
+        expired = expires_at < epochnow()
+
+        output("Expires at: {expires_at_iso}Z (timestamp={expires_at}) ({is_valid})",
+            expires_at_iso=datetime.utcfromtimestamp(expires_at).isoformat(),
+            expires_at=expires_at,
+            is_valid="expired" if expired else "valid")
+
+        if expired:
+            output('\nTo refresh the token, please run "dwave auth refresh".')
 
 
 @auth.command()
 @config_file_options()
 @standardized_output
 def refresh(*, config_file, profile, output):
-    """Refresh access token."""
+    """Refresh Leap API access token."""
 
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
     flow = LeapAuthFlow.from_config_model(config)
 
     # check we have a token
     if not flow.token or 'refresh_token' not in flow.token:
-        raise CLIError('Token not found. Please run "dwave auth login".', code=100)
+        raise CLIError('Refresh token not found. Please run "dwave auth login".', code=100)
 
     # refresh
     flow.refresh_token()
 
-    output('Token successfully refreshed. '
-           'You can now use "dwave auth get" to fetch a token.')
+    output('Access and refresh tokens successfully refreshed. '
+           'You can now use "dwave auth get" to view them.')
 
 
 @cli.group()
