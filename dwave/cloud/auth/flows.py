@@ -22,7 +22,7 @@ from typing import Any, Callable, Dict, Optional, Union, Sequence
 from urllib.parse import urljoin, parse_qsl
 
 import click
-from authlib.integrations.requests_client import OAuth2Session
+from authlib.integrations.requests_client import OAuth2Session, OAuthError
 from authlib.oauth2.rfc6749 import OAuth2Token
 from authlib.common.security import generate_token
 
@@ -33,7 +33,7 @@ from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.regions import resolve_endpoints
 from dwave.cloud.utils import pretty_argvalues
 
-__all__ = ['AuthFlow', 'LeapAuthFlow']
+__all__ = ['AuthFlow', 'LeapAuthFlow', 'OAuthError']
 
 logger = logging.getLogger(__name__)
 

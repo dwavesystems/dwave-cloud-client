@@ -47,7 +47,7 @@ from dwave.cloud.config import (
     get_configfile_path, get_default_configfile_path, get_configfile_paths)
 from dwave.cloud.config.models import validate_config_v1
 from dwave.cloud.regions import get_regions
-from dwave.cloud.auth.flows import LeapAuthFlow
+from dwave.cloud.auth.flows import LeapAuthFlow, OAuthError
 
 
 # show defaults for all click options when printing --help
@@ -324,11 +324,16 @@ def _config_create(config_file, profile, ask_full=False, auto_token=False):
         config.add_section(profile)
 
     # set using Leap API
-    sapi_token = _fetch_sapi_token(config_file, profile) if auto_token else None
+    try:
+        sapi_token = _fetch_sapi_token(config_file, profile) if auto_token else None
+    except Exception as error:
+        click.echo(f"Failed to fetch SAPI token from Leap API ({error!s}).")
+        sapi_token = None
+
     if sapi_token:
         del prompts['token']
         config.set(profile, 'token', sapi_token)
-        click.echo("Using SAPI token from credentials.")
+        click.echo("Using SAPI token fetched from Leap API.")
 
     _input_config_variables(config, profile, prompts)
 
@@ -444,6 +449,10 @@ def standardized_output(fn):
         except CLIError as error:
             output("Error: {error} (code: {code})", error=str(error), code=error.code)
             sys.exit(error.code)
+        except OAuthError as error:
+            output("Auth error: {error}", error=str(error))
+            output('Re-authorize with "dwave auth login" and retry.')
+            sys.exit(127)
         except Exception as error:
             output("Unhandled error: {error}", error=str(error))
             sys.exit(127)
