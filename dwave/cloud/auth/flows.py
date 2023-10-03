@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import logging
+import time
 import webbrowser
 from operator import sub
 from typing import Any, Callable, Dict, Optional, Union, Sequence
@@ -203,6 +204,13 @@ class AuthFlow:
         is_active = self.session.ensure_active_token(token=self.session.token)
         self._save_token_to_creds(self.token)
         return is_active
+
+    def token_expires_soon(self, within: int = 60) -> Optional[bool]:
+        """Is the token expired, or expires soon (within the next ``within`` seconds)?"""
+        expires_at = self.token.get('expires_at')
+        if not expires_at:
+            return None
+        return (expires_at - within) < time.time()
 
 
 class LeapAuthFlow(AuthFlow):

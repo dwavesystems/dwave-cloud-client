@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
 import threading
 import unittest
 from functools import partial
@@ -166,6 +167,16 @@ class TestAuthFlow(unittest.TestCase):
             flow = AuthFlow(**self.test_args)
             flow.update_session(config)
             verify(flow.session, config)
+
+    def test_token_expires_soon(self):
+        flow = AuthFlow(**self.test_args)
+        now = time.time()
+
+        with mock.patch.object(flow.session.token_auth, 'token',
+                               dict(expires_at=now + 59)):
+            self.assertTrue(flow.token_expires_soon())
+            self.assertTrue(flow.token_expires_soon(within=60))
+            self.assertFalse(flow.token_expires_soon(within=0))
 
 
 class TestLeapAuthFlow(unittest.TestCase):
