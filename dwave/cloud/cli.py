@@ -934,22 +934,17 @@ def login(*, config_file, profile, oob):
     """Authorize Ocean to access Leap API on user's behalf."""
 
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
-
     flow = LeapAuthFlow.from_config_model(config)
-
-    creds = Credentials()
 
     if oob:
         # XXX: until the standard OOB URI is supported
         flow._OOB_REDIRECT_URI = 'oob'
-        token = flow.run_oob_flow(open_browser=True)
+        flow.run_oob_flow(open_browser=True)
     else:
-        token = flow.run_redirect_flow(open_browser=True)
+        flow.run_redirect_flow(open_browser=True)
 
     click.echo('\nAuthorization successfully completed. '
                'You can now use "dwave auth get" to fetch a token.')
-
-    creds[flow.config.leap_api_endpoint] = token
 
 
 def _get_token_from_creds(config_file: str, profile: str) -> Tuple[ClientConfig, dict]:
@@ -980,15 +975,17 @@ def _get_sapi_token(config: ClientConfig, leap_api_token: str) -> str:
 def get(*, config_file, profile, token_type, json_output, output):
     """Fetch token."""
 
-    _, token = _get_token_from_creds(config_file, profile)
+    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
+    flow = LeapAuthFlow.from_config_model(config)
+
     token_name = token_type.replace('-', '_')
-    value = token.get(token_name)
-    if not value:
+    token = flow.token.get(token_name)
+    if not token:
         raise CLIError('Token not found. Please run "dwave auth login".', code=100)
 
     expires_at = int(token['expires_at'])
     expired = expires_at < epochnow()
-    output("Token: {token}", token=value)
+    output("Token: {token}", token=token)
     output("Expires at: {expires_at_iso}Z (timestamp={expires_at}) ({is_valid})",
            expires_at_iso=datetime.utcfromtimestamp(expires_at).isoformat(),
            expires_at=expires_at,
@@ -1005,20 +1002,15 @@ def refresh(*, config_file, profile, output):
     """Refresh access token."""
 
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
-    creds = Credentials()
     flow = LeapAuthFlow.from_config_model(config)
 
     # check we have a token
-    token = creds.get(flow.config.leap_api_endpoint, {})
-    if not token or 'refresh_token' not in token:
+    if not flow.token or 'refresh_token' not in flow.token:
         raise CLIError('Token not found. Please run "dwave auth login".', code=100)
 
     # refresh
-    flow.token = token
-    token = flow.refresh_token()
+    flow.refresh_token()
 
-    # save
-    creds[flow.config.leap_api_endpoint] = token
     output('Token successfully refreshed. '
            'You can now use "dwave auth get" to fetch a token.')
 
