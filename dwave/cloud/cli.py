@@ -954,7 +954,8 @@ def auth():
 @click.option('--oob', is_flag=True,
               help='Run OAuth 2.0 Authorization Code flow out-of-band, '
                    'without the use of locally hosted redirect URL.')
-def login(*, config_file, profile, oob):
+@standardized_output
+def login(*, config_file, profile, oob, output):
     """Authorize Ocean to access Leap API on user's behalf."""
 
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
@@ -992,7 +993,10 @@ def get(*, config_file, profile, token_type, json_output, output):
     output("Token: {token}", token=token_value)
 
     if token_type == 'access-token':
-        expires_at = int(flow.token['expires_at'])
+        expires_at = flow.token.get('expires_at')
+        if not expires_at:
+            return
+        expires_at = int(expires_at)
         expired = expires_at < epochnow()
 
         output("Expires at: {expires_at_iso}Z (timestamp={expires_at}) ({is_valid})",
