@@ -23,7 +23,7 @@ from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps, partial
 from timeit import default_timer as timer
-from typing import Dict, Tuple
+from typing import Dict, Optional
 
 import click
 import requests.exceptions
@@ -45,9 +45,8 @@ from dwave.cloud.exceptions import (
 from dwave.cloud.config import (
     load_profile_from_files, load_config_from_files, load_config, get_default_config,
     get_configfile_path, get_default_configfile_path, get_configfile_paths)
-from dwave.cloud.config.models import ClientConfig, validate_config_v1
-from dwave.cloud.regions import get_regions, resolve_endpoints
-from dwave.cloud.auth.creds import Credentials
+from dwave.cloud.config.models import validate_config_v1
+from dwave.cloud.regions import get_regions
 from dwave.cloud.auth.flows import LeapAuthFlow
 
 
@@ -242,6 +241,25 @@ def _write_config(config: ConfigParser, config_file: str):
     except Exception as e:
         raise CLIError(f"Error writing to configuration file: {e!r}", code=2)
 
+def _fetch_sapi_token(config_file: str, profile: str) -> Optional[str]:
+    """Fetch SAPI token from Leap API for a currently active project."""
+
+    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
+    flow = LeapAuthFlow.from_config_model(config)
+
+    if not flow.token or 'access_token' not in flow.token:
+        click.echo('Leap API access token not found.')
+        return
+
+    if flow.token_expires_soon(within=60):
+        click.echo("Refreshing Leap access token since it expired.")
+        flow.refresh_token()
+
+    account = api.LeapAccount.from_config(config=flow.config,
+                                          token=flow.token.get('access_token'))
+    active_project = account.get_active_project()
+    return account.get_project_token(project=active_project)
+
 def _config_create(config_file, profile, ask_full=False, auto_token=False):
     """Full/simplified dwave create flows."""
 
@@ -305,11 +323,8 @@ def _config_create(config_file, profile, ask_full=False, auto_token=False):
     if profile != default_section and not config.has_section(profile):
         config.add_section(profile)
 
-    sapi_token = None
-    if auto_token:
-        config_model, token = _get_token_from_creds(config_file, profile)
-        sapi_token = _get_sapi_token(config=config_model,
-                                     leap_api_token=token.get('access_token'))
+    # set using Leap API
+    sapi_token = _fetch_sapi_token(config_file, profile) if auto_token else None
     if sapi_token:
         del prompts['token']
         config.set(profile, 'token', sapi_token)
@@ -430,7 +445,7 @@ def standardized_output(fn):
             output("Error: {error} (code: {code})", error=str(error), code=error.code)
             sys.exit(error.code)
         except Exception as error:
-            output("Unhandled error: {error}", error=repr(error))
+            output("Unhandled error: {error}", error=str(error))
             sys.exit(127)
         finally:
             flush()
@@ -947,24 +962,6 @@ def login(*, config_file, profile, oob):
                'You can now use "dwave auth get" to fetch a token.')
 
 
-def _get_token_from_creds(config_file: str, profile: str) -> Tuple[ClientConfig, dict]:
-    """Fetch Leap API token from creds."""
-
-    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
-    resolve_endpoints(config=config, inplace=True)
-
-    creds = Credentials()
-    return (config, creds.get(config.leap_api_endpoint, {}))
-
-
-def _get_sapi_token(config: ClientConfig, leap_api_token: str) -> str:
-    """Fetch SAPI token from Leap API for a currently active project."""
-
-    account = api.LeapAccount.from_config(config=config, token=leap_api_token)
-    active_project = account.get_active_project()
-    return account.get_project_token(project=active_project)
-
-
 @auth.command()
 @config_file_options()
 @click.argument('token_type', default='access-token',
@@ -1035,12 +1032,18 @@ def project():
 def list_leap_projects(*, config_file, profile, json_output, output):
     """List available Leap projects."""
 
-    config, token = _get_token_from_creds(config_file, profile)
-    token = token.get('access_token')
-    if not token:
+    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
+    flow = LeapAuthFlow.from_config_model(config)
+
+    if not flow.token or 'access_token' not in flow.token:
         raise CLIError('Leap API access token not found. Please run "dwave auth login".', code=100)
 
-    account = api.LeapAccount.from_config(config=config, token=token)
+    if flow.token_expires_soon(within=60):
+        output("Access token expired (or expires soon), refreshing it.")
+        flow.refresh_token()
+
+    account = api.LeapAccount.from_config(config=flow.config,
+                                          token=flow.token.get('access_token'))
     projects = account.list_projects()
     output("Leap projects:", projects=[p.model_dump() for p in projects])
     for project in projects:
@@ -1056,12 +1059,18 @@ def list_leap_projects(*, config_file, profile, json_output, output):
 def leap_project_token(*, config_file, profile, project_slug, json_output, output):
     """Get Solver API token for a selected Leap project."""
 
-    config, token = _get_token_from_creds(config_file, profile)
-    token = token.get('access_token')
-    if not token:
+    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
+    flow = LeapAuthFlow.from_config_model(config)
+
+    if not flow.token or 'access_token' not in flow.token:
         raise CLIError('Leap API access token not found. Please run "dwave auth login".', code=100)
 
-    account = api.LeapAccount.from_config(config=config, token=token)
+    if flow.token_expires_soon(within=120):
+        output("Access token expired (or expires soon), refreshing it.")
+        flow.refresh_token()
+
+    account = api.LeapAccount.from_config(config=flow.config,
+                                          token=flow.token.get('access_token'))
     projects = account.list_projects()
 
     # find project id
