@@ -298,7 +298,7 @@ class LeapAccount(ResourceBase):
 
     def get_project_token(self, *,
                           project: Optional[models.LeapProject] = None,
-                          project_id: Optional[str] = None) -> str:
+                          project_id: Optional[str] = None) -> Optional[str]:
         """Retrieve SAPI token for a given Leap project."""
         if project is not None:
             project_id = project.id
