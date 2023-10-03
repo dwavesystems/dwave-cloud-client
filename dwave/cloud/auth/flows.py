@@ -22,9 +22,11 @@ from urllib.parse import urljoin, parse_qsl
 
 import click
 from authlib.integrations.requests_client import OAuth2Session
+from authlib.oauth2.rfc6749 import OAuth2Token
 from authlib.common.security import generate_token
 
 from dwave.cloud.auth.config import OCEAN_SDK_CLIENT_ID, OCEAN_SDK_SCOPES
+from dwave.cloud.auth.creds import Credentials
 from dwave.cloud.auth.server import SingleRequestAppServer, RequestCaptureApp
 from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.regions import resolve_endpoints
@@ -55,6 +57,12 @@ class AuthFlow:
             Configuration options for the low-level ``requests.Session`` used
             for all OAuth 2 requests. Supported options are: ``cert``,
             ``cookies``, ``headers``, ``proxies``, ``timeout``, ``verify``.
+        leap_api_endpoint:
+            Leap API endpoint, optional. Used to scope the token in credentials
+            store.
+        creds:
+            :class:`~dwave.cloud.auth.creds.Credentials` store used to persist
+            the token fetched.
 
     .. _OAuth 2.0 Authorization Code:
         https://datatracker.ietf.org/doc/html/rfc6749#section-4.1
@@ -69,11 +77,15 @@ class AuthFlow:
                  authorization_endpoint: str,
                  token_endpoint: str,
                  session_config: Optional[Dict[str, Any]] = None,
+                 leap_api_endpoint: Optional[str] = None,
+                 creds: Optional[Credentials] = None
                  ):
         self.client_id = client_id
         self.scopes = ' '.join(scopes)
         self.authorization_endpoint = authorization_endpoint
         self.token_endpoint = token_endpoint
+        self.leap_api_endpoint = leap_api_endpoint
+        self.creds = creds
 
         self.session = OAuth2Session(
             client_id=client_id, scope=scopes, redirect_uri=redirect_uri,
@@ -84,6 +96,8 @@ class AuthFlow:
 
         if session_config is not None:
             self.update_session(session_config)
+
+        self.token = self._load_token_from_creds()
 
         logger.debug(f"{type(self).__name__} initialized with: {pretty_argvalues()}")
 
@@ -100,21 +114,41 @@ class AuthFlow:
             if key in config:
                 setattr(self.session, key, config[key])
 
+    def _load_token_from_creds(self) -> Optional[dict]:
+        """Update session token with value from creds."""
+        if not isinstance(self.creds, Credentials) or not self.leap_api_endpoint:
+            return
+
+        token = self.creds.get(self.leap_api_endpoint)
+        logger.debug(f"{type(self).__name__} loaded token {token!r} from {self.creds}")
+
+        return token
+
+    def _save_token_to_creds(self, token: Union[OAuth2Token, dict]):
+        """Persist session token to creds file."""
+        if not isinstance(self.creds, Credentials) or not self.leap_api_endpoint:
+            return
+
+        if token:
+            self.creds[self.leap_api_endpoint] = token
+            logger.debug(f"{type(self).__name__} saved token {token!r} to {self.creds}")
+
     @property
-    def redirect_uri(self):
+    def redirect_uri(self) -> str:
         return self.session.redirect_uri
 
     @redirect_uri.setter
-    def redirect_uri(self, value):
+    def redirect_uri(self, value: str):
         self.session.redirect_uri = value
 
     @property
-    def token(self):
+    def token(self) -> OAuth2Token:
         return self.session.token
 
     @token.setter
-    def token(self, value):
+    def token(self, value: Union[OAuth2Token, dict]):
         self.session.token = value
+        self._save_token_to_creds(value)
 
     def get_authorization_url(self) -> str:
         self.state = generate_token(30)
@@ -156,13 +190,19 @@ class AuthFlow:
             **kwargs)
 
         logger.debug(f"{type(self).__name__}.fetch_token() = {token!r}")
+        self._save_token_to_creds(token)
+
         return token
 
     def refresh_token(self):
-        return self.session.refresh_token(url=self.token_endpoint)
+        token = self.session.refresh_token(url=self.token_endpoint)
+        self._save_token_to_creds(token)
+        return token
 
     def ensure_active_token(self):
-        return self.session.ensure_active_token(token=self.session.token)
+        is_active = self.session.ensure_active_token(token=self.session.token)
+        self._save_token_to_creds(self.token)
+        return is_active
 
 
 class LeapAuthFlow(AuthFlow):
@@ -223,6 +263,7 @@ class LeapAuthFlow(AuthFlow):
                      f"config={config!r}, **kwargs={kwargs!r})")
 
         config = resolve_endpoints(config, inplace=False)
+        creds = Credentials()
 
         authorization_endpoint = cls._infer_auth_endpoint(config.leap_api_endpoint)
         token_endpoint = cls._infer_token_endpoint(config.leap_api_endpoint)
@@ -242,7 +283,9 @@ class LeapAuthFlow(AuthFlow):
             redirect_uri=kwargs.pop('redirect_uri', cls._OOB_REDIRECT_URI),
             authorization_endpoint=authorization_endpoint,
             token_endpoint=token_endpoint,
-            session_config=session_config)
+            session_config=session_config,
+            leap_api_endpoint=config.leap_api_endpoint,
+            creds=creds)
 
         # save full config if needed later
         flow.config = config
