@@ -488,7 +488,7 @@ class TestAuthCli(unittest.TestCase):
 
             flow.token.get.assert_has_calls(
                 [mock.call('access_token'), mock.call('expires_at')], any_order=True)
-            self.assertIn('Token:', result.output)
+            self.assertIn('Access token:', result.output)
 
             self.assertEqual(result.exit_code, 0)
 
@@ -499,7 +499,7 @@ class TestAuthCli(unittest.TestCase):
                 result = runner.invoke(cli, ['auth', 'get', 'refresh-token'])
 
             flow.token.get.assert_called_with('refresh_token')
-            self.assertIn('Token:', result.output)
+            self.assertIn('Refresh token:', result.output)
 
             self.assertEqual(result.exit_code, 0)
 

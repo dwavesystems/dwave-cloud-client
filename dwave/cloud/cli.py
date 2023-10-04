@@ -985,12 +985,13 @@ def get(*, config_file, profile, token_type, json_output, output):
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
     flow = LeapAuthFlow.from_config_model(config)
 
-    token_name = token_type.replace('-', '_')
-    token_value = flow.token.get(token_name)
+    token_key = token_type.replace('-', '_')
+    token_value = flow.token.get(token_key)
     if not token_value:
         raise CLIError('Token not found. Please run "dwave auth login".', code=100)
 
-    output("Token: {token}", token=token_value)
+    token_pretty = token_type.replace('-', ' ').capitalize()
+    output(f"{token_pretty}: {{%s}}" % token_key , **{token_key: token_value})
 
     if token_type == 'access-token':
         expires_at = flow.token.get('expires_at')
