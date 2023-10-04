@@ -404,6 +404,9 @@ class TestConfigParsing(unittest.TestCase):
             with mock.patch.dict(os.environ, {'DWAVE_LEAP_API_ENDPOINT': 'test'}):
                 self.assertEqual(load_config(config_file='myfile')['leap_api_endpoint'], 'test')
 
+            with mock.patch.dict(os.environ, {'DWAVE_LEAP_CLIENT_ID': 'test'}):
+                self.assertEqual(load_config(config_file='myfile')['leap_client_id'], 'test')
+
 
 class TestConfigUtils(unittest.TestCase):
 

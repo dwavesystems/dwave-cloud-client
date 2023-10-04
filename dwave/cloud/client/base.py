@@ -236,8 +236,9 @@ class Client(object):
         Added the ``leap_api_endpoint`` parameter and config option (also
         available via environment variable ``DWAVE_LEAP_API_ENDPOINT``).
 
-        Added the ``leap_client_id`` parameter and config option (reserved for
-        testing).
+        Added the ``leap_client_id`` parameter and config option (also available
+        via environment variable ``DWAVE_LEAP_CLIENT_ID``). This option is
+        reserved for testing.
 
     Note:
         Default values of all constructor arguments listed above are kept in
