@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
 import threading
 import unittest
 from functools import partial
@@ -23,6 +24,7 @@ import requests_mock
 
 from dwave.cloud.auth.flows import AuthFlow, LeapAuthFlow
 from dwave.cloud.auth.config import OCEAN_SDK_CLIENT_ID, OCEAN_SDK_SCOPES
+from dwave.cloud.auth.creds import Credentials
 from dwave.cloud.config import ClientConfig
 from dwave.cloud.api.constants import DEFAULT_LEAP_API_ENDPOINT
 
@@ -36,13 +38,17 @@ class TestAuthFlow(unittest.TestCase):
         self.authorization_endpoint = 'https://example.com/authorize'
         self.token_endpoint = 'https://example.com/token'
         self.token = dict(access_token='123', refresh_token='456', id_token='789')
+        self.creds = Credentials(create=False)
+        self.leap_api_endpoint = 'https://example.com/leap/api'
 
         self.test_args = dict(
             client_id=self.client_id,
             scopes=self.scopes,
             redirect_uri=self.redirect_uri_oob,
             authorization_endpoint=self.authorization_endpoint,
-            token_endpoint=self.token_endpoint)
+            token_endpoint=self.token_endpoint,
+            leap_api_endpoint=self.leap_api_endpoint,
+            creds=self.creds)
 
     def test_auth_url(self):
         flow = AuthFlow(**self.test_args)
@@ -86,6 +92,9 @@ class TestAuthFlow(unittest.TestCase):
         m.post(requests_mock.ANY, status_code=404)
         m.post(self.token_endpoint, additional_matcher=post_body_matcher, json=self.token)
 
+        # reset creds
+        self.creds.clear()
+
         # verify token fetch flow
         flow = AuthFlow(**self.test_args)
 
@@ -95,23 +104,36 @@ class TestAuthFlow(unittest.TestCase):
         # verify token proxy to oauth2 session
         self.assertEqual(flow.token, self.token)
 
+        # verify token saved to creds
+        self.assertEqual(flow.creds[flow.leap_api_endpoint], self.token)
+
     def test_token_setter(self):
         flow = AuthFlow(**self.test_args)
 
         self.assertIsNone(flow.session.token)
+
+        self.creds.clear()
 
         flow.token = self.token
 
         self.assertIsNotNone(flow.session.token)
         self.assertEqual(flow.session.token['access_token'], self.token['access_token'])
 
+        # verify token is persisted
+        self.assertEqual(self.creds[self.leap_api_endpoint], self.token)
+
     def test_refresh_token(self):
         flow = AuthFlow(**self.test_args)
+        self.creds.clear()
 
-        with mock.patch.object(flow.session, 'refresh_token') as m:
+        with mock.patch.object(flow.session, 'refresh_token',
+                               return_value=self.token) as m:
             flow.refresh_token()
 
         m.assert_called_once_with(url=flow.token_endpoint)
+
+        # verify token is persisted
+        self.assertEqual(self.creds[self.leap_api_endpoint], self.token)
 
     def test_ensure_active_token(self):
         flow = AuthFlow(**self.test_args)
@@ -146,6 +168,16 @@ class TestAuthFlow(unittest.TestCase):
             flow.update_session(config)
             verify(flow.session, config)
 
+    def test_token_expires_soon(self):
+        flow = AuthFlow(**self.test_args)
+        now = time.time()
+
+        with mock.patch.object(flow.session.token_auth, 'token',
+                               dict(expires_at=now + 59)):
+            self.assertTrue(flow.token_expires_soon())
+            self.assertTrue(flow.token_expires_soon(within=60))
+            self.assertFalse(flow.token_expires_soon(within=0))
+
 
 class TestLeapAuthFlow(unittest.TestCase):
 
@@ -170,10 +202,12 @@ class TestLeapAuthFlow(unittest.TestCase):
         # Leap-specific:
         self.assertTrue(flow.authorization_endpoint.endswith('authorize'))
         self.assertTrue(flow.token_endpoint.endswith('token'))
+        self.assertEqual(flow.leap_api_endpoint, config.leap_api_endpoint)
 
         self.assertEqual(flow.client_id, OCEAN_SDK_CLIENT_ID)
         self.assertEqual(flow.scopes, ' '.join(OCEAN_SDK_SCOPES))
         self.assertEqual(flow.redirect_uri, LeapAuthFlow._OOB_REDIRECT_URI)
+        self.assertIsNotNone(flow.creds)
 
     def test_from_minimal_config_with_overrides(self):
         config = ClientConfig(leap_api_endpoint='https://example.com/leap')
@@ -210,19 +244,19 @@ class TestLeapAuthFlow(unittest.TestCase):
 
 class TestLeapAuthFlowRunners(unittest.TestCase):
 
-    @mock.patch('builtins.print', return_value=None)
+    @mock.patch('click.echo', return_value=None)
     def test_oob(self, m):
         config = ClientConfig(leap_api_endpoint='https://example.com/leap')
         flow = LeapAuthFlow.from_config_model(config)
 
         mock_code = '1234'
 
-        with mock.patch('builtins.input', return_value=mock_code):
+        with mock.patch('click.prompt', return_value=mock_code):
             with mock.patch.object(flow, 'fetch_token') as fetch_token:
                 flow.run_oob_flow()
                 fetch_token.assert_called_once_with(code=mock_code)
 
-    @mock.patch('builtins.print', return_value=None)
+    @mock.patch('click.echo', return_value=None)
     def test_redirect(self, m):
         config = ClientConfig(leap_api_endpoint='https://example.com/leap')
         flow = LeapAuthFlow.from_config_model(config)

@@ -1,0 +1,13 @@
+---
+features:
+  - |
+    Add Leap authorization-related group of CLI commands under ``dwave auth``:
+    ``login``, ``get <token-type>``,  ``refresh``.
+    See `#565 <https://github.com/dwavesystems/dwave-cloud-client/issues/565>`_.
+  - |
+    Add Leap project CLI commands under new ``dwave leap project`` group:
+    ``ls``, ``token``.
+  - |
+    Add ``--auto`` option to ``dwave config create`` to attempt SAPI token
+    fetch from Leap API on configuration file create (if access already
+    authorized with ``dwave auth login``).

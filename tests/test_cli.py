@@ -22,7 +22,9 @@ from parameterized import parameterized
 
 from dwave.cloud.cli import cli
 from dwave.cloud.config import load_config
+from dwave.cloud.config.models import validate_config_v1
 from dwave.cloud.testing import isolated_environ
+from dwave.cloud.api.models import LeapProject
 
 from tests import config, test_config_path, test_config_profile
 from tests.test_mock_solver_loading import solver_object
@@ -427,6 +429,146 @@ class TestCli(unittest.TestCase):
         required = ['python', 'machine', 'system', 'platform']
         for key in required:
             self.assertIn(key, result.output)
+
+
+class TestAuthCli(unittest.TestCase):
+
+    @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
+    def test_login(self, flow_factory):
+        flow = flow_factory.return_value
+
+        with self.subTest('dwave auth login'):
+            flow.reset_mock()
+            runner = CliRunner(mix_stderr=False)
+            with runner.isolated_filesystem():
+                result = runner.invoke(cli, ['auth', 'login'])
+
+            flow.run_redirect_flow.assert_called_once()
+            self.assertEqual(result.exit_code, 0)
+
+        with self.subTest('dwave auth login --oob'):
+            flow.reset_mock()
+            runner = CliRunner(mix_stderr=False)
+            with runner.isolated_filesystem():
+                result = runner.invoke(cli, ['auth', 'login', '--oob'])
+
+            flow.run_oob_flow.assert_called_once()
+            self.assertEqual(result.exit_code, 0)
+
+        with self.subTest('dwave auth login --config-file <file> --profile <profile>'):
+            config_file = 'dwave.conf'
+            profile = 'profile'
+            leap_api_endpoint = 'https://example.com/leap/api'
+            config_lines = [f'[{profile}]', f'leap_api_endpoint = {leap_api_endpoint}']
+
+            flow_factory.reset_mock()
+            runner = CliRunner(mix_stderr=False)
+            with runner.isolated_filesystem():
+                # create config
+                with open(config_file, 'w') as fp:
+                    fp.write('\n'.join(config_lines))
+
+                result = runner.invoke(cli, ['auth', 'login',
+                                             '--config-file', config_file,
+                                             '--profile', profile])
+
+            config = validate_config_v1(dict(leap_api_endpoint=leap_api_endpoint))
+            flow_factory.assert_called_with(config)
+            self.assertEqual(result.exit_code, 0)
+
+    @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
+    def test_get(self, flow_factory):
+        flow = flow_factory.return_value
+
+        with self.subTest('dwave auth get access-token'):
+            flow.reset_mock()
+            runner = CliRunner(mix_stderr=False)
+            with runner.isolated_filesystem():
+                result = runner.invoke(cli, ['auth', 'get', 'access-token'])
+
+            flow.token.get.assert_has_calls(
+                [mock.call('access_token'), mock.call('expires_at')], any_order=True)
+            self.assertIn('Token:', result.output)
+
+            self.assertEqual(result.exit_code, 0)
+
+        with self.subTest('dwave auth get refresh-token'):
+            flow.reset_mock()
+            runner = CliRunner(mix_stderr=False)
+            with runner.isolated_filesystem():
+                result = runner.invoke(cli, ['auth', 'get', 'refresh-token'])
+
+            flow.token.get.assert_called_with('refresh_token')
+            self.assertIn('Token:', result.output)
+
+            self.assertEqual(result.exit_code, 0)
+
+    @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
+    def test_refresh(self, flow_factory):
+        flow = flow_factory.return_value
+        type(flow).token = mock.PropertyMock(return_value=dict(refresh_token='123'))
+
+        with self.subTest('dwave auth refresh'):
+            runner = CliRunner(mix_stderr=False)
+            with runner.isolated_filesystem():
+                result = runner.invoke(cli, ['auth', 'refresh'])
+
+            self.assertEqual(result.exit_code, 0)
+            flow.refresh_token.assert_called_once()
+
+        flow.reset_mock()
+        type(flow).token = mock.PropertyMock(return_value=dict())
+
+        with self.subTest('dwave auth refresh (no token)'):
+            runner = CliRunner(mix_stderr=False)
+            with runner.isolated_filesystem():
+                result = runner.invoke(cli, ['auth', 'refresh'])
+
+            self.assertEqual(result.exit_code, 100)
+
+    @mock.patch('dwave.cloud.api.resources.LeapAccount.from_config')
+    @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
+    def test_leap_project_ls(self, flow_factory, account_factory):
+        flow = flow_factory.return_value
+        account = account_factory.return_value
+
+        type(flow).token = mock.PropertyMock(return_value=dict(access_token='123'))
+        flow.token_expires_soon.return_value = False
+
+        with self.subTest('dwave leap project ls'):
+            runner = CliRunner(mix_stderr=False)
+            with runner.isolated_filesystem():
+                result = runner.invoke(cli, ['leap', 'project', 'ls'])
+
+            self.assertEqual(result.exit_code, 0)
+            account.list_projects.assert_called_once()
+
+    @mock.patch('dwave.cloud.api.resources.LeapAccount.from_config')
+    @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
+    def test_leap_project_token(self, flow_factory, account_factory):
+        flow = flow_factory.return_value
+        account = account_factory.return_value
+
+        type(flow).token = mock.PropertyMock(return_value=dict(access_token='123'))
+        flow.token_expires_soon.return_value = False
+
+        projects = [
+            LeapProject(id=1, name='Project A', code='A'),
+            LeapProject(id=2, name='Project B', code='B'),
+        ]
+        project = 'b'
+
+        account.list_projects.return_value = projects
+
+        with self.subTest('dwave leap project token'):
+            runner = CliRunner(mix_stderr=False)
+            with runner.isolated_filesystem():
+                result = runner.invoke(cli, ['leap', 'project', 'token',
+                                             '--project', project])
+
+            self.assertEqual(result.exit_code, 0)
+            account.list_projects.assert_called_once()
+            account.get_project_token.assert_called_with(project=projects[1])
 
 
 @unittest.skipUnless(config, "No live server configuration available.")

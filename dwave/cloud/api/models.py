@@ -175,7 +175,7 @@ class _LeapProjectsResponse(BaseModel):
 
 # LeapAPI / account / token response
 class _LeapTokenWrapper(BaseModel):
-    token: str
+    token: Optional[str]
 
 class _LeapProjectTokenResponse(BaseModel):
     data: _LeapTokenWrapper
