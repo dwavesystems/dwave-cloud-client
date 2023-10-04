@@ -317,18 +317,21 @@ def _config_create(config_file, profile, ask_full=False, auto_token=False):
         _note = " (select existing or create new)" if config_file_exists else ""
         profile = default_text_input(f"Profile{_note}", default_profile)
 
-    verb = "Updating existing" if profile in config else "Creating new"
+    profile_exists = profile in config
+    verb = "Updating existing" if profile_exists else "Creating new"
     click.echo(f"{verb} profile: {profile}")
 
     if profile != default_section and not config.has_section(profile):
         config.add_section(profile)
 
-    # set using Leap API
-    try:
-        sapi_token = _fetch_sapi_token(config_file, profile) if auto_token else None
-    except Exception as error:
-        click.echo(f"Failed to fetch SAPI token from Leap API ({error!s}).")
-        sapi_token = None
+    # pull token from Leap API
+    sapi_token = None
+    if auto_token:
+        try:
+            sapi_token = _fetch_sapi_token(config_file if config_file_exists else False,
+                                           profile if profile_exists else None)
+        except Exception as error:
+            click.echo(f"Failed to fetch SAPI token from Leap API ({error!s}).")
 
     if sapi_token:
         del prompts['token']
