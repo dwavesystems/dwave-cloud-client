@@ -88,7 +88,7 @@ class TestConfigCreate(unittest.TestCase):
         runner = CliRunner(mix_stderr=False)
         with runner.isolated_filesystem():
             result = runner.invoke(cli, [
-                'config', 'create', '--auto'
+                'config', 'create', '--config-file', 'dwave.conf', '--auto'
             ])
             self.assertEqual(result.exit_code, 0)
 
@@ -445,6 +445,7 @@ class TestCli(unittest.TestCase):
             self.assertIn(key, result.output)
 
 
+@isolated_environ(empty=True)
 class TestAuthCli(unittest.TestCase):
 
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
