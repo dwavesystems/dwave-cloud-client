@@ -1065,7 +1065,7 @@ def leap_project_token(*, config_file, profile, project_hint, json_output, outpu
         project_hint=project_hint, output=output)
 
     output(f"Solver API token for project {project.name} ({project.code}) is {token}.",
-           token=token)
+           token=token, project=project.model_dump())
 
 
 def _get_sapi_token_for_leap_project(
