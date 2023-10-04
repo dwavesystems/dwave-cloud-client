@@ -61,7 +61,7 @@ class TestConfigCreate(unittest.TestCase):
                     self.assertEqual(config.get(var), val)
 
     @parameterized.expand([
-        ("simple", [], dict(config_file=None, token="token")),
+        ("simple", [], dict(token="token")),
         ("full", ["--full"], dict(config_file=None, profile=None, region="na-west-1",
                                   endpoint="endpoint", token="token", client=None, solver=None)),
     ])

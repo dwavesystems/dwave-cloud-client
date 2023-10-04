@@ -314,8 +314,11 @@ def _config_create(config_file, profile, ask_full=False, auto_token=False):
             click.echo(f"Available profiles: {', '.join(existing)}")
         default_profile = next(iter(existing))
 
-        _note = " (select existing or create new)" if config_file_exists else ""
-        profile = default_text_input(f"Profile{_note}", default_profile)
+        if ask_full:
+            _note = " (select existing or create new)" if config_file_exists else ""
+            profile = default_text_input(f"Profile{_note}", default_profile)
+        else:
+            profile = default_profile
 
     profile_exists = profile in config
     verb = "Updating existing" if profile_exists else "Creating new"
