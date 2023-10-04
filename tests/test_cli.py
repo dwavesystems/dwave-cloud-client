@@ -83,7 +83,8 @@ class TestConfigCreate(unittest.TestCase):
                             self.assertEqual(config.get(var), val)
 
     @isolated_environ(empty=True)
-    @mock.patch('dwave.cloud.cli._fetch_sapi_token', return_value='auto-token')
+    @mock.patch('dwave.cloud.cli._get_sapi_token_for_leap_project',
+                return_value=(LeapProject(id=1, name='Project', code='PRJ'), 'auto-token'))
     def test_auto_create(self, mock_fetch_sapi_token):
         runner = CliRunner(mix_stderr=False)
         with runner.isolated_filesystem():
