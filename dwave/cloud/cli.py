@@ -986,8 +986,7 @@ def get(*, config_file, profile, token_type, json_output, output):
     flow = LeapAuthFlow.from_config_model(config)
 
     token_key = token_type.replace('-', '_')
-    token_value = flow.token.get(token_key)
-    if not token_value:
+    if not flow.token or not (token_value := flow.token.get(token_key)):
         raise CLIError('Token not found. Please run "dwave auth login".', code=100)
 
     token_pretty = token_type.replace('-', ' ').capitalize()
