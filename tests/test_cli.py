@@ -82,6 +82,20 @@ class TestConfigCreate(unittest.TestCase):
                         if val:   # skip empty default confirmations
                             self.assertEqual(config.get(var), val)
 
+    @isolated_environ(empty=True)
+    @mock.patch('dwave.cloud.cli._fetch_sapi_token', return_value='auto-token')
+    def test_auto_create(self, mock_fetch_sapi_token):
+        runner = CliRunner(mix_stderr=False)
+        with runner.isolated_filesystem():
+            result = runner.invoke(cli, [
+                'config', 'create', '--auto'
+            ])
+            self.assertEqual(result.exit_code, 0)
+
+            # load and verify config
+            config = load_config()
+            self.assertEqual(config.get('token'), 'auto-token')
+
     @parameterized.expand([
         ("simple", [], dict(token="token")),
         ("full", ["--full"], dict(region="na-west-1", endpoint="endpoint",
