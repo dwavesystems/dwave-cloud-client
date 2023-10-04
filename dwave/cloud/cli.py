@@ -478,8 +478,7 @@ def standardized_output(fn):
 @click.option('--polling-timeout', default=None, type=float,
               help='Problem polling timeout in seconds (time-to-solution timeout)')
 @click.option('--label', default='dwave ping', type=str, help='Problem label')
-@click.option('--json', 'json_output', default=False, is_flag=True,
-              help='JSON output')
+@json_output
 @standardized_output
 def ping(*, config_file, profile, endpoint, region, client_type, solver_def,
          sampling_params, request_timeout, polling_timeout, label, json_output,
@@ -606,8 +605,7 @@ def solvers(config_file, profile, endpoint, region, client_type, solver_def,
               help='Sampling parameters, JSON encoded')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Increase output verbosity')
-@click.option('--json', 'json_output', default=False, is_flag=True,
-              help='JSON output')
+@json_output
 @standardized_output
 def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
            biases, couplings, random_problem, problem_size, num_reads, label,
@@ -982,8 +980,7 @@ def login(*, config_file, profile, oob, output):
 @config_file_options()
 @click.argument('token_type', default='access-token',
                 type=click.Choice(['access-token', 'refresh-token', 'id-token']))
-@click.option('--json', 'json_output', default=False, is_flag=True,
-              help='JSON output')
+@json_output
 @standardized_output
 def get(*, config_file, profile, token_type, json_output, output):
     """Fetch Leap API token."""
