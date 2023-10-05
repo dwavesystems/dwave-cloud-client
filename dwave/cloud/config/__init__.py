@@ -57,6 +57,7 @@ Environment variables:
 *   ``DWAVE_API_TOKEN``: Solver API authorization token.
 *   ``DWAVE_CONFIG_FILE``: Configuration file path.
 *   ``DWAVE_LEAP_API_ENDPOINT``: Leap API endpoint URL.
+*   ``DWAVE_LEAP_CLIENT_ID``: Leap OAuth client ID.
 *   ``DWAVE_METADATA_API_ENDPOINT``: Metadata API endpoint URL.
 *   ``DWAVE_PROFILE``: Name of profile (section).
 

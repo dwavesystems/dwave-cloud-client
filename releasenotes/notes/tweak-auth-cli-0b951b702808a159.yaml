@@ -1,0 +1,10 @@
+---
+features:
+  - |
+    Add ``--project`` option to ``dwave config create``, to be used in conjunction
+    with ``--auto``/``--auto-token``.
+
+    When project is not specified, the configuration file is initialized with
+    a SAPI token for the currently active Leap project.
+
+    Project can be specified via project name, code or ID.

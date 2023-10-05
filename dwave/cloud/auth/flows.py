@@ -324,6 +324,7 @@ class LeapAuthFlow(AuthFlow):
                 webbrowser.open(url)
 
         code = click.prompt(click.style(self._INPUT_CODE_MSG, bold=True))
+        click.echo()
         return self.fetch_token(code=code)
 
     def run_redirect_flow(self, *, open_browser: Union[bool,Callable] = False,
@@ -366,6 +367,7 @@ class LeapAuthFlow(AuthFlow):
         url = self.get_authorization_url()
         click.echo(click.style(self._VISIT_AUTH_MSG, bold=True), nl=False)
         click.echo(click.style(url, underline=True))
+        click.echo()
         if open_browser:
             if callable(open_browser):
                 open_browser(url)

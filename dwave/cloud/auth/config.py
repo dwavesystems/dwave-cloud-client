@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# XXX: update before releasing 0.11.0
-OCEAN_SDK_CLIENT_ID = '968678'
+OCEAN_SDK_CLIENT_ID = '805325'
 
 OCEAN_SDK_SCOPES = (
     'openid',

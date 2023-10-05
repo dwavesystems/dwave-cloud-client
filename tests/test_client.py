@@ -686,6 +686,7 @@ class ClientConfigIntegration(unittest.TestCase):
                     client.get_solvers()
 
 
+@isolated_environ(empty=True)
 class MultiRegionSupport(unittest.TestCase):
 
     def test_region_selection_mocked_end_to_end(self):

@@ -23,7 +23,7 @@ from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps, partial
 from timeit import default_timer as timer
-from typing import Dict, Optional
+from typing import Callable, Dict, Optional, Tuple
 
 import click
 import requests.exceptions
@@ -186,14 +186,16 @@ def inspect(config_file, profile):
 @config_file_options(exists=False)
 @click.option('--full', 'ask_full', is_flag=True,
               help='Configure non-essential options (such as endpoint and solver).')
-@click.option('--auto', 'auto_token', is_flag=True, default=False,
+@click.option('--auto-token', '--auto', 'auto_token', is_flag=True, default=False,
               help='Pull token from Leap API, if "dwave auth login" has been run.')
-def create(*, config_file, profile, ask_full, auto_token):
+@click.option('--project', 'project', default=None,
+              help='Leap project for which token is pulled. Defaults to active project.')
+def create(*, config_file, profile, ask_full, auto_token, project):
     """Create or update cloud client configuration file."""
 
     try:
         _config_create(config_file=config_file, profile=profile,
-                       ask_full=ask_full, auto_token=auto_token)
+                       ask_full=ask_full, auto_token=auto_token, project=project)
     except CLIError as error:
         click.echo(f"Error: {error!s} (code: {error.code})")
         sys.exit(error.code)
@@ -241,26 +243,7 @@ def _write_config(config: ConfigParser, config_file: str):
     except Exception as e:
         raise CLIError(f"Error writing to configuration file: {e!r}", code=2)
 
-def _fetch_sapi_token(config_file: str, profile: str) -> Optional[str]:
-    """Fetch SAPI token from Leap API for a currently active project."""
-
-    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
-    flow = LeapAuthFlow.from_config_model(config)
-
-    if not flow.token or 'access_token' not in flow.token:
-        click.echo('Leap API access token not found.')
-        return
-
-    if flow.token_expires_soon(within=60):
-        click.echo("Refreshing Leap access token since it expired.")
-        flow.refresh_token()
-
-    account = api.LeapAccount.from_config(config=flow.config,
-                                          token=flow.token.get('access_token'))
-    active_project = account.get_active_project()
-    return account.get_project_token(project=active_project)
-
-def _config_create(config_file, profile, ask_full=False, auto_token=False):
+def _config_create(config_file, profile, ask_full=False, auto_token=False, project=None):
     """Full/simplified dwave create flows."""
 
     if ask_full:
@@ -314,26 +297,34 @@ def _config_create(config_file, profile, ask_full=False, auto_token=False):
             click.echo(f"Available profiles: {', '.join(existing)}")
         default_profile = next(iter(existing))
 
-        _note = " (select existing or create new)" if config_file_exists else ""
-        profile = default_text_input(f"Profile{_note}", default_profile)
+        if ask_full:
+            _note = " (select existing or create new)" if config_file_exists else ""
+            profile = default_text_input(f"Profile{_note}", default_profile)
+        else:
+            profile = default_profile
 
-    verb = "Updating existing" if profile in config else "Creating new"
+    profile_exists = profile in config
+    verb = "Updating existing" if profile_exists else "Creating new"
     click.echo(f"{verb} profile: {profile}")
 
     if profile != default_section and not config.has_section(profile):
         config.add_section(profile)
 
-    # set using Leap API
-    try:
-        sapi_token = _fetch_sapi_token(config_file, profile) if auto_token else None
-    except Exception as error:
-        click.echo(f"Failed to fetch SAPI token from Leap API ({error!s}).")
-        sapi_token = None
+    # pull token from Leap API
+    sapi_token = None
+    if auto_token:
+        try:
+            project, sapi_token = _get_sapi_token_for_leap_project(
+                config_file=config_file if config_file_exists else False,
+                profile=profile if profile_exists else None,
+                project_hint=project, output=click.echo)
+            click.echo(f"Fetched SAPI token for project {project.name!r} ({project.code}) from Leap API.")
+        except Exception as error:
+            click.echo(f"Failed to fetch SAPI token from Leap API ({error!s}).")
 
     if sapi_token:
         del prompts['token']
         config.set(profile, 'token', sapi_token)
-        click.echo("Using SAPI token fetched from Leap API.")
 
     _input_config_variables(config, profile, prompts)
 
@@ -472,8 +463,7 @@ def standardized_output(fn):
 @click.option('--polling-timeout', default=None, type=float,
               help='Problem polling timeout in seconds (time-to-solution timeout)')
 @click.option('--label', default='dwave ping', type=str, help='Problem label')
-@click.option('--json', 'json_output', default=False, is_flag=True,
-              help='JSON output')
+@json_output
 @standardized_output
 def ping(*, config_file, profile, endpoint, region, client_type, solver_def,
          sampling_params, request_timeout, polling_timeout, label, json_output,
@@ -600,8 +590,7 @@ def solvers(config_file, profile, endpoint, region, client_type, solver_def,
               help='Sampling parameters, JSON encoded')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Increase output verbosity')
-@click.option('--json', 'json_output', default=False, is_flag=True,
-              help='JSON output')
+@json_output
 @standardized_output
 def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
            biases, couplings, random_problem, problem_size, num_reads, label,
@@ -968,16 +957,15 @@ def login(*, config_file, profile, oob, output):
     else:
         flow.run_redirect_flow(open_browser=True)
 
-    click.echo('\nAuthorization successfully completed. '
-               'You can now use "dwave auth get" to fetch a token.')
+    click.echo('Authorization completed successfully. '
+               'You can now use "dwave auth get" to fetch your token.')
 
 
 @auth.command()
 @config_file_options()
 @click.argument('token_type', default='access-token',
                 type=click.Choice(['access-token', 'refresh-token', 'id-token']))
-@click.option('--json', 'json_output', default=False, is_flag=True,
-              help='JSON output')
+@json_output
 @standardized_output
 def get(*, config_file, profile, token_type, json_output, output):
     """Fetch Leap API token."""
@@ -985,12 +973,12 @@ def get(*, config_file, profile, token_type, json_output, output):
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
     flow = LeapAuthFlow.from_config_model(config)
 
-    token_name = token_type.replace('-', '_')
-    token_value = flow.token.get(token_name)
-    if not token_value:
+    token_key = token_type.replace('-', '_')
+    if not flow.token or not (token_value := flow.token.get(token_key)):
         raise CLIError('Token not found. Please run "dwave auth login".', code=100)
 
-    output("Token: {token}", token=token_value)
+    token_pretty = token_type.replace('-', ' ').capitalize()
+    output(f"{token_pretty}: {{%s}}" % token_key , **{token_key: token_value})
 
     if token_type == 'access-token':
         expires_at = flow.token.get('expires_at')
@@ -1065,18 +1053,31 @@ def list_leap_projects(*, config_file, profile, json_output, output):
 
 @project.command(name='token')
 @config_file_options()
-@click.option('--project', 'project_slug', required=True, type=str,
-              help='Leap project ID, name or code.')
+@click.option('--project', 'project_hint', type=str, default=None,
+              help='Leap project ID, name or code. If unspecified, currently active project is used.')
 @json_output
 @standardized_output
-def leap_project_token(*, config_file, profile, project_slug, json_output, output):
+def leap_project_token(*, config_file, profile, project_hint, json_output, output):
     """Get Solver API token for a selected Leap project."""
+
+    project, token = _get_sapi_token_for_leap_project(
+        config_file=config_file, profile=profile,
+        project_hint=project_hint, output=output)
+
+    output(f"Solver API token for project {project.name} ({project.code}) is {token}.",
+           token=token, project=project.model_dump())
+
+
+def _get_sapi_token_for_leap_project(
+        *, config_file: str, profile: str,
+        project_hint: Optional[str], output: Callable) -> Tuple[api.models.LeapProject, str]:
 
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
     flow = LeapAuthFlow.from_config_model(config)
 
     if not flow.token or 'access_token' not in flow.token:
-        raise CLIError('Leap API access token not found. Please run "dwave auth login".', code=100)
+        raise CLIError('Leap API access token not found. '
+                       'Please run "dwave auth login".', code=100)
 
     if flow.token_expires_soon(within=120):
         output("Access token expired (or expires soon), refreshing it.")
@@ -1084,19 +1085,25 @@ def leap_project_token(*, config_file, profile, project_slug, json_output, outpu
 
     account = api.LeapAccount.from_config(config=flow.config,
                                           token=flow.token.get('access_token'))
-    projects = account.list_projects()
 
-    # find project id
-    needle = str(project_slug).strip().lower()
-    project = [p for p in projects if needle in (str(p.id), p.name.lower(), p.code.lower())]
+    if project_hint is None:
+        # use active project
+        project = account.get_active_project()
 
-    if not project:
-        raise CLIError(f'Project with {project_slug!r} ID, name or code not found. '
-                       'Please run "dwave leap project ls" to list available projects.', code=101)
+    else:
+        # find project using project_hint
+        projects = account.list_projects()
+        needle = str(project_hint).strip().lower()
+        project = [p for p in projects
+                   if needle in (str(p.id), p.name.lower(), p.code.lower())]
+
+        if not project:
+            raise CLIError(f'Project with {project_hint!r} ID, name or code not found. '
+                           'Please run "dwave leap project ls" to list available projects.', code=101)
+
+        project = project[0]
 
     # get token
-    project = project[0]
     token = account.get_project_token(project=project)
 
-    output(f"Solver API token for project {project.name} ({project.code}) is {token}.",
-           token=token)
+    return (project, token)

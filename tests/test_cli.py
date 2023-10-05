@@ -61,7 +61,7 @@ class TestConfigCreate(unittest.TestCase):
                     self.assertEqual(config.get(var), val)
 
     @parameterized.expand([
-        ("simple", [], dict(config_file=None, token="token")),
+        ("simple", [], dict(token="token")),
         ("full", ["--full"], dict(config_file=None, profile=None, region="na-west-1",
                                   endpoint="endpoint", token="token", client=None, solver=None)),
     ])
@@ -81,6 +81,21 @@ class TestConfigCreate(unittest.TestCase):
                     for var, val in inputs.items():
                         if val:   # skip empty default confirmations
                             self.assertEqual(config.get(var), val)
+
+    @isolated_environ(empty=True)
+    @mock.patch('dwave.cloud.cli._get_sapi_token_for_leap_project',
+                return_value=(LeapProject(id=1, name='Project', code='PRJ'), 'auto-token'))
+    def test_auto_create(self, mock_fetch_sapi_token):
+        runner = CliRunner(mix_stderr=False)
+        with runner.isolated_filesystem():
+            result = runner.invoke(cli, [
+                'config', 'create', '--config-file', 'dwave.conf', '--auto'
+            ])
+            self.assertEqual(result.exit_code, 0)
+
+            # load and verify config
+            config = load_config()
+            self.assertEqual(config.get('token'), 'auto-token')
 
     @parameterized.expand([
         ("simple", [], dict(token="token")),
@@ -431,6 +446,7 @@ class TestCli(unittest.TestCase):
             self.assertIn(key, result.output)
 
 
+@isolated_environ(empty=True)
 class TestAuthCli(unittest.TestCase):
 
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
@@ -488,7 +504,7 @@ class TestAuthCli(unittest.TestCase):
 
             flow.token.get.assert_has_calls(
                 [mock.call('access_token'), mock.call('expires_at')], any_order=True)
-            self.assertIn('Token:', result.output)
+            self.assertIn('Access token:', result.output)
 
             self.assertEqual(result.exit_code, 0)
 
@@ -499,7 +515,7 @@ class TestAuthCli(unittest.TestCase):
                 result = runner.invoke(cli, ['auth', 'get', 'refresh-token'])
 
             flow.token.get.assert_called_with('refresh_token')
-            self.assertIn('Token:', result.output)
+            self.assertIn('Refresh token:', result.output)
 
             self.assertEqual(result.exit_code, 0)
 
