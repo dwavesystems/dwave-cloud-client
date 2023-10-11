@@ -26,8 +26,12 @@ jobs:
     steps:
       - checkout
 
+      - run: &save-python-version
+          name: Save full python version in file to be used as part of cache key
+          command: python -V > /tmp/python-V.txt
+
       - restore_cache: &restore-cache-env
-          key: v<< pipeline.parameters.cache-generation >>-pip-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
+          key: &env-cache-key v<< pipeline.parameters.cache-generation >>-python-{{ checksum "/tmp/python-V.txt" }}-pip-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
 
       - run: &create-virtualenv
           name: Create virtual environment
@@ -54,7 +58,7 @@ jobs:
             fi
 
       - save_cache: &save-cache-env
-          key: v<< pipeline.parameters.cache-generation >>-pip-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
+          key: *env-cache-key
           paths:
             - env
 
@@ -89,13 +93,12 @@ jobs:
     steps:
       - checkout
 
+      - restore_cache: &restore-cache-pyenv
+          key: &brew-pyenv-cache-key v<< pipeline.parameters.cache-generation >>-brew-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-<< parameters.xcode >>
+
       - run: &brew-install-pyenv
           name: Install pyenv
           command: brew install pyenv
-
-      - restore_cache: &restore-cache-pyenv
-          keys:
-            - v<< pipeline.parameters.cache-generation >>-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-<< parameters.xcode >>
 
       - run: &pyenv-install-python
           name: Install python
@@ -110,11 +113,15 @@ jobs:
             pyenv global << parameters.python-version >>
 
       - save_cache: &save-cache-pyenv
-          key: v<< pipeline.parameters.cache-generation >>-pyenv-{{ .Environment.CIRCLE_JOB }}-xcode-<< parameters.xcode >>
+          key: *brew-pyenv-cache-key
           paths:
+            - /Users/distiller/Library/Caches/Homebrew
+            - /usr/local/Homebrew
             - ~/.pyenv
 
       # install dependencies and cache them
+      - run: *save-python-version
+
       - restore_cache: *restore-cache-env
 
       - run: *create-virtualenv
@@ -217,13 +224,9 @@ jobs:
     steps:
       - checkout
 
-      - restore_cache: *restore-cache-env
-
       - run: *create-virtualenv
 
       - run: *install-requirements
-
-      - save_cache: *save-cache-env
 
       - run: *build-package
 
