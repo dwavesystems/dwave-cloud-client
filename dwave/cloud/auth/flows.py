@@ -19,7 +19,7 @@ import time
 import webbrowser
 from operator import sub
 from typing import Any, Callable, Dict, Optional, Union, Sequence
-from urllib.parse import urljoin, parse_qsl
+from urllib.parse import urljoin
 
 import click
 from authlib.integrations.requests_client import OAuth2Session, OAuthError
@@ -28,7 +28,7 @@ from authlib.common.security import generate_token
 
 from dwave.cloud.auth.config import OCEAN_SDK_CLIENT_ID, OCEAN_SDK_SCOPES
 from dwave.cloud.auth.creds import Credentials
-from dwave.cloud.auth.server import SingleRequestAppServer, RequestCaptureApp
+from dwave.cloud.auth.server import SingleRequestAppServer, RequestCaptureAndRedirectApp
 from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.regions import resolve_endpoints
 from dwave.cloud.utils import pretty_argvalues
@@ -252,6 +252,14 @@ class LeapAuthFlow(AuthFlow):
     def _infer_token_endpoint(leap_api_endpoint: str) -> str:
         return urljoin(leap_api_endpoint, '/leap/openid/token')
 
+    @staticmethod
+    def _infer_leap_success_uri(leap_api_endpoint: str) -> str:
+        return urljoin(leap_api_endpoint, '/leap/openid/success')
+
+    @staticmethod
+    def _infer_leap_error_uri(leap_api_endpoint: str) -> str:
+        return urljoin(leap_api_endpoint, '/leap/openid/error')
+
     @classmethod
     def from_config_model(cls, config: ClientConfig, **kwargs) -> LeapAuthFlow:
         """Construct a :class:`.LeapAuthModel` initialized with Ocean SDK's
@@ -353,7 +361,14 @@ class LeapAuthFlow(AuthFlow):
             flow.run_redirect_flow(open_browser=True)
 
         """
-        app = RequestCaptureApp(message=self._REDIRECT_DONE_MSG)
+        error_uri = self._infer_leap_error_uri(self.leap_api_endpoint)
+        success_uri = self._infer_leap_success_uri(self.leap_api_endpoint)
+        uri = lambda req: error_uri if 'error' in req.query else success_uri
+
+        app = RequestCaptureAndRedirectApp(
+            message=self._REDIRECT_DONE_MSG,
+            redirect_uri=uri,
+            include_query=True)
         srv = SingleRequestAppServer(
             host=self._REDIRECT_HOST,
             base_port=self._REDIRECT_PORT_RANGE[0],
@@ -380,5 +395,4 @@ class LeapAuthFlow(AuthFlow):
             print(self._AUTH_TIMEOUT_MSG)
             return
 
-        q = dict(parse_qsl(app.query))
-        return self.fetch_token(code=q.get('code'), state=q.get('state'))
+        return self.fetch_token(code=app.query.get('code'), state=app.query.get('state'))
