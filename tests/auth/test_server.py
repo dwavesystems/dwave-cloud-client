@@ -17,13 +17,14 @@ import socket
 import time
 import unittest
 from secrets import token_hex
-from urllib.parse import parse_qsl
+from urllib.parse import urljoin
 
 import requests
 from parameterized import parameterized
 
 from dwave.cloud.auth.server import (
-    iterports, BackgroundAppServer, SingleRequestAppServer, RequestCaptureApp)
+    iterports, BackgroundAppServer, SingleRequestAppServer,
+    RequestCaptureApp, RequestCaptureAndRedirectApp)
 
 
 class TestPortsGenerator(unittest.TestCase):
@@ -233,4 +234,63 @@ class TestRequestCaptureApp(unittest.TestCase):
 
         # test url/query capture
         self.assertTrue(app.uri.startswith(f"{srv.root_url}?"))
-        self.assertEqual(dict(parse_qsl(app.query)), query)
+        self.assertEqual(app.query, query)
+
+
+class TestRequestCaptureAndRedirectApp(unittest.TestCase):
+    base_port = 64070
+
+    def setUp(self):
+        self.success_text = 'success'
+        self.success_app = RequestCaptureApp(message=self.success_text)
+        self.success_srv = SingleRequestAppServer(
+            host='127.0.0.1', base_port=self.base_port, max_port=self.base_port+9,
+            app=self.success_app)
+        self.success_srv.start()
+        self.success_uri = urljoin(self.success_srv.root_url, '/success')
+
+        self.error_text = 'error'
+        self.error_app = RequestCaptureApp(message=self.error_text)
+        self.error_srv = SingleRequestAppServer(
+            host='127.0.0.1', base_port=self.base_port, max_port=self.base_port+9,
+            app=self.error_app)
+        self.error_srv.start()
+        self.error_uri = urljoin(self.error_srv.root_url, '/error')
+
+        def redirect_uri(app):
+            return self.error_uri if 'error' in app.query else self.success_uri
+
+        self.redirect_app = RequestCaptureAndRedirectApp(
+            message='redirecting', redirect_uri=redirect_uri, include_query=True)
+        self.redirect_srv = SingleRequestAppServer(
+            host='127.0.0.1', base_port=self.base_port, max_port=self.base_port+9,
+            app=self.redirect_app)
+        self.redirect_srv.start()
+
+    def test_redirect_on_success(self):
+        query = dict(a=token_hex(8), b=token_hex(16))
+
+        # test response
+        req = requests.get(self.redirect_srv.root_url, params=query)
+        self.assertEqual(req.text, self.success_text)
+
+        # wait for server shutdown to make sure request is done
+        self.redirect_srv.wait_shutdown()
+
+        # test url/query capture
+        self.assertTrue(self.success_app.uri.startswith(self.success_uri))
+        self.assertEqual(self.success_app.query, query)
+
+    def test_redirect_on_error(self):
+        query = dict(error='error-id', error_description='error message')
+
+        # test response
+        req = requests.get(self.redirect_srv.root_url, params=query)
+        self.assertEqual(req.text, self.error_text)
+
+        # wait for server shutdown to make sure request is done
+        self.redirect_srv.wait_shutdown()
+
+        # test url/query capture
+        self.assertTrue(self.error_app.uri.startswith(self.error_uri))
+        self.assertEqual(self.error_app.query, query)
