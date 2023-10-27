@@ -250,10 +250,11 @@ class SingleRequestAppServer(BackgroundAppServer):
         app = kwargs.pop('app')
 
         def single_request_app(*args, **kwargs):
-            ret = app(*args, **kwargs)
-            # we're done after the first successful request
-            self.server.shutdown()
-            return ret
+            try:
+                return app(*args, **kwargs)
+            finally:
+                # we're done after the first request
+                self.server.shutdown()
 
         super().__init__(app=single_request_app, **kwargs)
 
@@ -276,6 +277,13 @@ class RequestCaptureApp:
         self.query = dict(parse_qsl(self.parts.query))
         # in the future, we might also store: method, body data, headers, etc,
         # but we don't need that for now
+
+    def set_exception(self, exc):
+        self._exc = exc
+
+    def exception(self):
+        if hasattr(self, '_exc') and self._exc:
+            raise self._exc
 
     def __call__(self, environ: dict, start_response: Callable):
         self.store_request(environ)
