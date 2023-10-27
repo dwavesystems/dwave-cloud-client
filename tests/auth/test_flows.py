@@ -257,7 +257,7 @@ class TestLeapAuthFlowRunners(unittest.TestCase):
                 fetch_token.assert_called_once_with(code=mock_code)
 
     @mock.patch('click.echo', return_value=None)
-    def test_redirect(self, m):
+    def test_redirect_happy_path(self, m):
         config = ClientConfig(leap_api_endpoint='https://example.com/leap')
         flow = LeapAuthFlow.from_config_model(config)
 
@@ -276,8 +276,12 @@ class TestLeapAuthFlowRunners(unittest.TestCase):
 
             ready.wait()
             response = requests.get(ctx['redirect_uri'],
-                                    params=dict(code=mock_code, state=ctx['state'])).text
-            self.assertEqual(response, flow._REDIRECT_DONE_MSG)
+                                    params=dict(code=mock_code, state=ctx['state']))
+            self.assertEqual(len(response.history), 1)
+            self.assertEqual(response.history[0].status_code, 302)
+            location = response.history[0].headers.get('Location')
+            self.assertTrue(location.startswith(config.leap_api_endpoint))
+            self.assertIn('/success', location)
 
             f.join()
             fetch_token.assert_called_once_with(code=mock_code, state=ctx['state'])

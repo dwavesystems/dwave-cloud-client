@@ -19,7 +19,7 @@ import time
 import webbrowser
 from operator import sub
 from typing import Any, Callable, Dict, Optional, Union, Sequence
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlencode
 
 import click
 from authlib.integrations.requests_client import OAuth2Session, OAuthError
@@ -363,12 +363,34 @@ class LeapAuthFlow(AuthFlow):
         """
         error_uri = self._infer_leap_error_uri(self.leap_api_endpoint)
         success_uri = self._infer_leap_success_uri(self.leap_api_endpoint)
-        uri = lambda req: error_uri if 'error' in req.query else success_uri
+
+        def exchange_code(app):
+            # error responses redirect immediately
+            if 'error' in app.query:
+                app.set_exception(OAuthError(error=app.query['error'],
+                                             description=app.query['error_description']))
+                return urljoin(error_uri, f'?{app.parts.query}')
+
+            # on code responses, try exchanging the code for token
+            try:
+                self.fetch_token(code=app.query.get('code'), state=app.query.get('state'))
+
+            except OAuthError as exc:
+                # store for main thread
+                app.set_exception(exc)
+
+                # redirect to leap error page
+                q = urlencode(query=dict(error=exc.error, error_description=exc.description))
+                return urljoin(error_uri, f"?{q}")
+
+            # redirect to leap success page
+            return urljoin(success_uri, f'?{app.parts.query}')
 
         app = RequestCaptureAndRedirectApp(
             message=self._REDIRECT_DONE_MSG,
-            redirect_uri=uri,
-            include_query=True)
+            redirect_uri=exchange_code,
+            include_query=False)
+
         srv = SingleRequestAppServer(
             host=self._REDIRECT_HOST,
             base_port=self._REDIRECT_PORT_RANGE[0],
@@ -395,4 +417,7 @@ class LeapAuthFlow(AuthFlow):
             print(self._AUTH_TIMEOUT_MSG)
             return
 
-        return self.fetch_token(code=app.query.get('code'), state=app.query.get('state'))
+        # now raise auth exception if set by the app during code exchange
+        app.exception()
+
+        return self.token

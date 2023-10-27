@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Redirect user back to a Leap info page when auth redirect flow successfully
+    completes. Similarly, redirect user to a Leap error page in case of an auth
+    error.
