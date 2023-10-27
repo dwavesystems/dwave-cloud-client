@@ -382,7 +382,8 @@ class LeapAuthFlow(AuthFlow):
                 app.set_exception(exc)
 
                 # redirect to leap error page
-                query = dict(error=exc.error, error_description=exc.description)
+                query = dict(error=exc.error, error_description=exc.description,
+                             state=app.query.get('state'))
                 return add_params_to_uri(error_uri, query)
 
             except Exception as exc:
@@ -390,7 +391,8 @@ class LeapAuthFlow(AuthFlow):
                 app.set_exception(exc)
 
                 # redirect to leap error page
-                query = dict(error=type(exc).__name__, error_description=str(exc))
+                query = dict(error=type(exc).__name__, error_description=str(exc),
+                             state=app.query.get('state'))
                 return add_params_to_uri(error_uri, query)
 
             # redirect to leap success page
