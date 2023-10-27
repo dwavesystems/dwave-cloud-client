@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Prefer QPU solvers in ``dwave ping``, unless overridden by user/config.
+    See `#592 <https://github.com/dwavesystems/dwave-cloud-client/issues/592>`_

@@ -282,11 +282,14 @@ class TestCli(unittest.TestCase):
                                              '--label', label])
 
             # proper arguments passed to Client.from_config?
-            m.from_config.assert_called_with(
+            expected_config = dict(
                 config_file=config_file, profile=profile,
                 endpoint=None, region=None,
                 client=client_type, solver=None,
                 request_timeout=0.5, polling_timeout=30)
+            call = m.from_config.call_args.kwargs
+            self.assertTrue(callable(call.pop('defaults', {}).get('solver', {}).get('order_by')))
+            self.assertEqual(call, expected_config)
 
             # get solver called?
             client.get_solver.assert_called_with()
