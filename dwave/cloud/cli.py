@@ -483,11 +483,18 @@ def ping(*, config_file, profile, endpoint, region, client_type, solver_def,
     if label:
         params.update(label=label)
 
+    # gently prefer the least busy QPU
+    def order_by(solver):
+        category = solver.properties.get('category')
+        avg_load = solver.properties.get('avg_load')
+        return (0 if category == 'qpu' else 1, avg_load)
+
     config = dict(
         config_file=config_file, profile=profile,
         endpoint=endpoint, region=region,
         client=client_type, solver=solver_def,
-        request_timeout=request_timeout, polling_timeout=polling_timeout)
+        request_timeout=request_timeout, polling_timeout=polling_timeout,
+        defaults=dict(solver=dict(order_by=order_by)))
 
     t0 = timer()
     client, solver = _get_client_solver(config, output)
