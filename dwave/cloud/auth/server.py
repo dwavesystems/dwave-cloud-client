@@ -18,8 +18,8 @@ import sys
 import threading
 import traceback
 from socketserver import ThreadingMixIn
-from typing import Optional, Callable, Iterator
-from urllib.parse import urlsplit
+from typing import Callable, Iterator, Optional, Union
+from urllib.parse import urljoin, urlsplit, parse_qsl, SplitResult
 from wsgiref.simple_server import make_server, WSGIRequestHandler, WSGIServer
 from wsgiref.util import request_uri
 
@@ -250,10 +250,11 @@ class SingleRequestAppServer(BackgroundAppServer):
         app = kwargs.pop('app')
 
         def single_request_app(*args, **kwargs):
-            ret = app(*args, **kwargs)
-            # we're done after the first successful request
-            self.server.shutdown()
-            return ret
+            try:
+                return app(*args, **kwargs)
+            finally:
+                # we're done after the first request
+                self.server.shutdown()
 
         super().__init__(app=single_request_app, **kwargs)
 
@@ -265,15 +266,60 @@ class RequestCaptureApp:
 
     def __init__(self, message: str):
         self.message = message
-        self.uri = None
-        self.query = None
+        self.uri: str = None
+        self.parts: SplitResult = None
+        self.query: dict = None
 
-    def __call__(self, environ: dict, start_response: Callable):
+    def store_request(self, environ: dict):
         # store the URI accessed
         self.uri = request_uri(environ, include_query=True)
-        self.query = urlsplit(self.uri).query
+        self.parts = urlsplit(self.uri)
+        self.query = dict(parse_qsl(self.parts.query))
         # in the future, we might also store: method, body data, headers, etc,
         # but we don't need that for now
 
+    def set_exception(self, exc):
+        self._exc = exc
+
+    def exception(self):
+        if hasattr(self, '_exc') and self._exc:
+            raise self._exc
+
+    def __call__(self, environ: dict, start_response: Callable):
+        self.store_request(environ)
+
         start_response("200 OK", [('Content-Type', 'text/plain; charset=utf-8')])
+        return [self.message.encode('utf-8')]
+
+
+class RequestCaptureAndRedirectApp(RequestCaptureApp):
+    """A simple WSGI application that stores request data (currently only URL),
+    and redirects to `redirect_uri`, possibly dynamically generated.
+    """
+
+    def __init__(self, message: str,
+                 redirect_uri: Union[str, Callable],
+                 include_query: bool = True):
+        super().__init__(message)
+
+        self.redirect_uri = redirect_uri
+        self.include_query = include_query
+
+    def __call__(self, environ: dict, start_response: Callable):
+        self.store_request(environ)
+
+        if callable(self.redirect_uri):
+            uri = self.redirect_uri(self)
+        else:
+            uri = self.redirect_uri
+
+        if self.include_query:
+            uri = urljoin(uri, f'?{self.parts.query}')
+
+        start_response('302 Found', [
+            ('Content-Type', 'text/plain; charset=utf-8'),
+            ('Location', uri),
+        ])
+
+        # just in case, include the message in body
         return [self.message.encode('utf-8')]

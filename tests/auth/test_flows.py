@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
 import time
 import threading
 import unittest
@@ -22,7 +23,7 @@ from urllib.parse import urlsplit, parse_qsl, urljoin
 import requests
 import requests_mock
 
-from dwave.cloud.auth.flows import AuthFlow, LeapAuthFlow
+from dwave.cloud.auth.flows import AuthFlow, LeapAuthFlow, OAuthError
 from dwave.cloud.auth.config import OCEAN_SDK_CLIENT_ID, OCEAN_SDK_SCOPES
 from dwave.cloud.auth.creds import Credentials
 from dwave.cloud.config import ClientConfig
@@ -242,7 +243,7 @@ class TestLeapAuthFlow(unittest.TestCase):
         self.assertEqual(flow.client_id, client_id)
 
 
-class TestLeapAuthFlowRunners(unittest.TestCase):
+class TestLeapAuthFlowOOB(unittest.TestCase):
 
     @mock.patch('click.echo', return_value=None)
     def test_oob(self, m):
@@ -256,8 +257,11 @@ class TestLeapAuthFlowRunners(unittest.TestCase):
                 flow.run_oob_flow()
                 fetch_token.assert_called_once_with(code=mock_code)
 
+class TestLeapAuthFlowRedirect(unittest.TestCase):
+
     @mock.patch('click.echo', return_value=None)
-    def test_redirect(self, m):
+    def test_success(self, m):
+        # success case: access authorized, token fetched
         config = ClientConfig(leap_api_endpoint='https://example.com/leap')
         flow = LeapAuthFlow.from_config_model(config)
 
@@ -276,8 +280,173 @@ class TestLeapAuthFlowRunners(unittest.TestCase):
 
             ready.wait()
             response = requests.get(ctx['redirect_uri'],
-                                    params=dict(code=mock_code, state=ctx['state'])).text
-            self.assertEqual(response, flow._REDIRECT_DONE_MSG)
+                                    params=dict(code=mock_code, state=ctx['state']))
+            self.assertEqual(len(response.history), 1)
+            self.assertEqual(response.history[0].status_code, 302)
+            location = response.history[0].headers.get('Location')
+            self.assertTrue(location.startswith(config.leap_api_endpoint))
+            self.assertIn('/success', location)
 
             f.join()
             fetch_token.assert_called_once_with(code=mock_code, state=ctx['state'])
+
+    class FlowRunner(threading.Thread):
+        def __init__(self, *, flow, authorize_response_params, **kwargs):
+            super().__init__(**kwargs)
+
+            self.flow = flow
+
+            # set when authorize url is "opened" in browser
+            self.authorize_query = {}
+            self.authorize_ready = threading.Event()
+            self.authorize_response_params = authorize_response_params
+
+        def open_browser(self, url, *args, **kwargs):
+            self.authorize_query.update(parse_qsl(urlsplit(url).query))
+            self.authorize_ready.set()
+
+        def authorize(self):
+            # fake authorize request from Leap to our redirect_uri
+            # `params` determine if auth was denied or approved
+            self.authorize_ready.wait()
+
+            query = self.authorize_response_params.copy()
+            query.update(state=self.authorize_query['state'])
+            return requests.get(self.authorize_query['redirect_uri'], params=query)
+
+        def run(self):
+            try:
+                self.flow.run_redirect_flow(open_browser=self.open_browser)
+            except:
+                # make exception discoverable from the main thread
+                self._exc_info = sys.exc_info()
+
+        def exception(self):
+            # see: https://stackoverflow.com/a/1854263, published under CC BY-SA 4.0.
+            # to be called from main thread
+            if hasattr(self, '_exc_info') and self._exc_info:
+                raise self._exc_info[1].with_traceback(self._exc_info[2])
+
+    def assert_redirect_to_error_page(self, response, flow):
+        # check that `response` is a 302 redirect with redirect location pointing to leap error page
+        error_uri = flow._infer_leap_error_uri(flow.leap_api_endpoint)
+        self.assertEqual(len(response.history), 1)
+        self.assertEqual(response.history[0].status_code, 302)
+        location = response.history[0].headers.get('Location')
+        self.assertTrue(location.startswith(error_uri))
+
+    def assert_redirect_params(self, response, expected_params):
+        # check that redirect location params match `expected params`
+        location = response.history[0].headers.get('Location')
+        location_params = dict(parse_qsl(urlsplit(location).query))
+        self.assertEqual(location_params, expected_params)
+
+    @mock.patch('click.echo', return_value=None)
+    def test_auth_denied(self, m):
+        # error case: access not authorized (e.g. user clicks "Decline")
+        config = ClientConfig(leap_api_endpoint='https://example.com/leap')
+        flow = LeapAuthFlow.from_config_model(config)
+
+        error = 'access_denied'
+        error_description = 'Authorization request denied'
+
+        with mock.patch.object(flow, 'fetch_token') as fetch_token:
+            authorize_response_params = dict(error=error, error_description=error_description)
+
+            t = self.FlowRunner(flow=flow, authorize_response_params=authorize_response_params)
+            t.start()
+
+            response = t.authorize()
+
+            # check response is a redirect to leap error page
+            self.assert_redirect_to_error_page(response, flow)
+
+            # and all request query params are propagated
+            request = response.history[0].request.url
+            request_params = dict(parse_qsl(urlsplit(request).query))
+            self.assert_redirect_params(response, request_params)
+
+            # token fetch shouldn't even be attempted
+            t.join()
+            fetch_token.assert_not_called()
+
+            # oauth exception raised by the redirect flow runner
+            with self.assertRaisesRegex(OAuthError, error_description):
+                t.exception()
+
+    @mock.patch('click.echo', return_value=None)
+    def test_exchange_fails(self, m):
+        # error case: access authorized, but code exchange fails with oauth error
+        config = ClientConfig(leap_api_endpoint='https://example.com/leap')
+        flow = LeapAuthFlow.from_config_model(config)
+
+        code = '1234'
+
+        # mock `fetch_token` to raise an oauth error (e.g. code expired)
+        error = OAuthError(error='invalid_grant',
+                           description='The provided authorization grant is invalid')
+
+        with mock.patch.object(flow, 'fetch_token', side_effect=error) as fetch_token:
+            authorize_response_params = dict(code=code)     # state appended by FlowRunner.authorize()
+
+            t = self.FlowRunner(flow=flow, authorize_response_params=authorize_response_params)
+            t.start()
+
+            response = t.authorize()
+
+            state = t.authorize_query['state']
+
+            # check response is a redirect to leap error page
+            self.assert_redirect_to_error_page(response, flow)
+
+            # and error page params are constructed properly
+            expected_params = dict(error=error.error,
+                                   error_description=error.description,
+                                   state=state)
+            self.assert_redirect_params(response, expected_params)
+
+            # token fetch is attempted (but it fails with `error`)
+            t.join()
+            fetch_token.assert_called_once_with(code=code, state=state)
+
+            # oauth exception raised by the redirect flow runner
+            with self.assertRaisesRegex(OAuthError, str(error)):
+                t.exception()
+
+    @mock.patch('click.echo', return_value=None)
+    def test_non_auth_failure_during_code_exchange(self, m):
+        # error case: access authorized, but code exchange fails with unexpected non-auth error
+        config = ClientConfig(leap_api_endpoint='https://example.com/leap')
+        flow = LeapAuthFlow.from_config_model(config)
+
+        code = '1234'
+
+        # mock `fetch_token` to raise a non-auth error (e.g. file error)
+        error = OSError("credential store unavailable")
+
+        with mock.patch.object(flow, 'fetch_token', side_effect=error) as fetch_token:
+            authorize_response_params = dict(code=code)     # state appended by FlowRunner.authorize()
+
+            t = self.FlowRunner(flow=flow, authorize_response_params=authorize_response_params)
+            t.start()
+
+            response = t.authorize()
+
+            state = t.authorize_query['state']
+
+            # check response is a redirect to leap error page
+            self.assert_redirect_to_error_page(response, flow)
+
+            # and error page params are constructed properly
+            expected_params = dict(error=type(error).__name__,
+                                   error_description=str(error),
+                                   state=state)
+            self.assert_redirect_params(response, expected_params)
+
+            # token fetch is attempted (but it fails with `error`)
+            t.join()
+            fetch_token.assert_called_once_with(code=code, state=state)
+
+            # oauth exception raised by the redirect flow runner
+            with self.assertRaisesRegex(type(error), str(error)):
+                t.exception()

@@ -951,8 +951,6 @@ def login(*, config_file, profile, oob, output):
     flow = LeapAuthFlow.from_config_model(config)
 
     if oob:
-        # XXX: until the standard OOB URI is supported on Leap
-        flow._OOB_REDIRECT_URI = 'oob'
         flow.run_oob_flow(open_browser=True)
     else:
         flow.run_redirect_flow(open_browser=True)
