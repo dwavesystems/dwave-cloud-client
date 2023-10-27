@@ -19,12 +19,13 @@ import time
 import webbrowser
 from operator import sub
 from typing import Any, Callable, Dict, Optional, Union, Sequence
-from urllib.parse import urljoin, urlencode
+from urllib.parse import urljoin
 
 import click
 from authlib.integrations.requests_client import OAuth2Session, OAuthError
 from authlib.oauth2.rfc6749 import OAuth2Token
 from authlib.common.security import generate_token
+from authlib.common.urls import add_params_to_uri
 
 from dwave.cloud.auth.config import OCEAN_SDK_CLIENT_ID, OCEAN_SDK_SCOPES
 from dwave.cloud.auth.creds import Credentials
@@ -364,14 +365,15 @@ class LeapAuthFlow(AuthFlow):
         error_uri = self._infer_leap_error_uri(self.leap_api_endpoint)
         success_uri = self._infer_leap_success_uri(self.leap_api_endpoint)
 
-        def exchange_code(app):
+        def exchange_code(app: RequestCaptureAndRedirectApp) -> str:
             # error responses redirect immediately
             if 'error' in app.query:
-                app.set_exception(OAuthError(error=app.query['error'],
-                                             description=app.query['error_description']))
-                return urljoin(error_uri, f'?{app.parts.query}')
+                app.set_exception(
+                    OAuthError(error=app.query['error'],
+                               description=app.query.get('error_description')))
+                return add_params_to_uri(error_uri, app.query)
 
-            # on code responses, try exchanging the code for token
+            # when code received, exchange it for token
             try:
                 self.fetch_token(code=app.query.get('code'), state=app.query.get('state'))
 
@@ -380,11 +382,19 @@ class LeapAuthFlow(AuthFlow):
                 app.set_exception(exc)
 
                 # redirect to leap error page
-                q = urlencode(query=dict(error=exc.error, error_description=exc.description))
-                return urljoin(error_uri, f"?{q}")
+                query = dict(error=exc.error, error_description=exc.description)
+                return add_params_to_uri(error_uri, query)
+
+            except Exception as exc:
+                # store for main thread
+                app.set_exception(exc)
+
+                # redirect to leap error page
+                query = dict(error=type(exc).__name__, error_description=str(exc))
+                return add_params_to_uri(error_uri, query)
 
             # redirect to leap success page
-            return urljoin(success_uri, f'?{app.parts.query}')
+            return add_params_to_uri(success_uri, app.query)
 
         app = RequestCaptureAndRedirectApp(
             message=self._REDIRECT_DONE_MSG,
