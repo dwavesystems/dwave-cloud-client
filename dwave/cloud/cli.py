@@ -904,15 +904,26 @@ def _install_contrib_package(name, verbose=0, prompt=True):
 @click.option('--install-all', '--all', '-a', default=False, is_flag=True,
               help='Install all non-open-source packages '\
                    'available and accept licenses without prompting')
+@click.option('--auth', default=False, is_flag=True,
+              help="Authorize Ocean to access Leap API on user's behalf. "
+              "Implies --auto-token during 'dwave config create' and it's "
+              "mutually exclusive with --full.")
+@click.option('--project', 'project', default=None,
+              help='Leap project for which SAPI token is pulled. Defaults to active project.')
+@click.option('--oob', default=False, is_flag=True,
+              help="Same as '--auth', but using OAuth out-of-band flow. "
+              "Use when 'localhost' not available in your browser.")
 @click.option('--full', 'ask_full', default=False, is_flag=True,
-              help='Configure non-essential options (such as endpoint and solver).')
+              help='Configure non-essential options manually (such as endpoint and solver).')
 @click.option('--verbose', '-v', count=True,
               help='Increase output verbosity (additive, up to 4 times)')
-def setup(install_all, ask_full, verbose):
+@standardized_output
+def setup(install_all, auth, project, oob, ask_full, verbose, output):
     """Setup optional Ocean packages and configuration file(s).
 
     Equivalent to running `dwave install [--all]`, followed by
-    `dwave config create [--full]`.
+    an optional `dwave auth login [--oob]` and then by
+    `dwave config create [--full] [--auto-token]`.
     """
 
     contrib = get_contrib_packages()
@@ -937,8 +948,16 @@ def setup(install_all, ask_full, verbose):
         for pkg in packages:
             _install_contrib_package(pkg, verbose=verbose, prompt=not install_all)
 
+    auto_token = False
+    if auth or oob:
+        click.echo("Authorizing Leap access.")
+        _login(config_file=None, profile=None, oob=oob, output=output)
+        auto_token = True
+        ask_full = False
+
     click.echo("Creating the D-Wave configuration file.")
-    return _config_create(config_file=None, profile=None, ask_full=ask_full)
+    return _config_create(config_file=None, profile=None, ask_full=ask_full,
+                          auto_token=auto_token, project=project)
 
 
 @cli.group()
@@ -954,6 +973,9 @@ def auth():
 def login(*, config_file, profile, oob, output):
     """Authorize Ocean to access Leap API on user's behalf."""
 
+    return _login(config_file=config_file, profile=profile, oob=oob, output=output)
+
+def _login(*, config_file, profile, oob, output):
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
     flow = LeapAuthFlow.from_config_model(config)
 
@@ -962,8 +984,8 @@ def login(*, config_file, profile, oob, output):
     else:
         flow.run_redirect_flow(open_browser=True)
 
-    click.echo('Authorization completed successfully. '
-               'You can now use "dwave auth get" to fetch your token.')
+    output('Authorization completed successfully. '
+           'You can now use "dwave auth get" to fetch your token.')
 
 
 @auth.command()
