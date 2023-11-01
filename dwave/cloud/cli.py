@@ -957,7 +957,7 @@ def setup(install_all, auth, project, oob, ask_full, verbose, output):
     auto_token = False
     if auth or oob:
         click.echo("Authorizing Leap access.\n")
-        _login(config_file=None, profile=None, oob=oob, output=output)
+        _login(config_file=None, profile=None, oob=oob, skip_valid=True, output=output)
         click.echo()
         auto_token = True
         ask_full = False
