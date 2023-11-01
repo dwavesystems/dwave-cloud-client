@@ -2,5 +2,5 @@
 features:
   - |
     Add ``--skip-valid`` option to ``dwave auth login`` CLI. When used,
-    authorization flow will be short-circuited if Leap access token is valid, or
+    authorization flow will be skipped if Leap access token is valid or
     if it can be refreshed.

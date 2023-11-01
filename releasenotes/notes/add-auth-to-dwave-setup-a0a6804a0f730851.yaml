@@ -4,6 +4,6 @@ features:
     Add optional Leap authorization step to ``dwave setup`` CLI. During setup,
     we now install optional contributed packages, authorize Ocean to access Leap
     (``--auth`` and ``--oob`` flags), and finally create the configuration file,
-    optionally pulling SAPI token from Leap API (if authorized) for the currently
+    optionally retrieving SAPI token from Leap API (if authorized) for the currently
     active Leap project, or project specified with ``--project`` option.
     See `#591 <https://github.com/dwavesystems/dwave-cloud-client/issues/591>`_.

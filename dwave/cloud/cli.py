@@ -909,12 +909,12 @@ def _install_contrib_package(name, verbose=0, prompt=True):
               "Implies --auto-token during 'dwave config create' and it's "
               "mutually exclusive with --full.")
 @click.option('--project', 'project', default=None,
-              help='Leap project for which SAPI token is pulled. Defaults to active project.')
+              help='Leap project for which SAPI token is retrieved. Defaults to active project.')
 @click.option('--oob', default=False, is_flag=True,
               help="Same as '--auth', but using OAuth out-of-band flow. "
-              "Use when 'localhost' not available in your browser.")
+              "Use when 'localhost' is not available in your browser.")
 @click.option('--full', 'ask_full', default=False, is_flag=True,
-              help='Configure non-essential options manually (such as endpoint and solver).')
+              help='Manually configure non-essential options such as endpoint and solver.')
 @click.option('--verbose', '-v', count=True,
               help='Increase output verbosity (additive, up to 4 times)')
 @standardized_output
