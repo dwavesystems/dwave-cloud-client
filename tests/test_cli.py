@@ -449,8 +449,14 @@ class TestCli(unittest.TestCase):
             self.assertIn(key, result.output)
 
 
-@isolated_environ(empty=True)
 class TestAuthCli(unittest.TestCase):
+
+    def setUp(self):
+        self.env = isolated_environ(empty=True)
+        self.env.start()
+
+    def tearDown(self):
+        self.env.stop()
 
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
     def test_login(self, flow_factory):
@@ -463,6 +469,17 @@ class TestAuthCli(unittest.TestCase):
                 result = runner.invoke(cli, ['auth', 'login'])
 
             flow.run_redirect_flow.assert_called_once()
+            self.assertEqual(result.exit_code, 0)
+
+        with self.subTest('dwave auth login --skip-valid'):
+            flow.reset_mock()
+            flow.ensure_active_token.return_value = True
+            runner = CliRunner(mix_stderr=False)
+            with runner.isolated_filesystem():
+                result = runner.invoke(cli, ['auth', 'login', '--skip-valid'])
+
+            flow.ensure_active_token.assert_called_once()
+            flow.run_redirect_flow.assert_not_called()
             self.assertEqual(result.exit_code, 0)
 
         with self.subTest('dwave auth login --oob'):

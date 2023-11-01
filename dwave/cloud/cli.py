@@ -814,7 +814,7 @@ def _get_dist(dist_spec):
     return pkg_resources.get_distribution(dist_spec)
 
 
-def _contrib_package_maybe_installed(name):
+def _contrib_package_maybe_installed(name: str) -> bool:
     """Check if contrib package `name` is installed (even partially)."""
 
     contrib = get_contrib_packages()
@@ -904,15 +904,26 @@ def _install_contrib_package(name, verbose=0, prompt=True):
 @click.option('--install-all', '--all', '-a', default=False, is_flag=True,
               help='Install all non-open-source packages '\
                    'available and accept licenses without prompting')
+@click.option('--auth', default=False, is_flag=True,
+              help="Authorize Ocean to access Leap API on user's behalf. "
+              "Implies --auto-token during 'dwave config create' and it's "
+              "mutually exclusive with --full.")
+@click.option('--project', 'project', default=None,
+              help='Leap project for which SAPI token is retrieved. Defaults to active project.')
+@click.option('--oob', default=False, is_flag=True,
+              help="Same as '--auth', but using OAuth out-of-band flow. "
+              "Use when 'localhost' is not available in your browser.")
 @click.option('--full', 'ask_full', default=False, is_flag=True,
-              help='Configure non-essential options (such as endpoint and solver).')
+              help='Manually configure non-essential options such as endpoint and solver.')
 @click.option('--verbose', '-v', count=True,
               help='Increase output verbosity (additive, up to 4 times)')
-def setup(install_all, ask_full, verbose):
+@standardized_output
+def setup(install_all, auth, project, oob, ask_full, verbose, output):
     """Setup optional Ocean packages and configuration file(s).
 
     Equivalent to running `dwave install [--all]`, followed by
-    `dwave config create [--full]`.
+    an optional `dwave auth login --skip-valid [--oob]` and then by
+    `dwave config create [--full] [--auto-token]`.
     """
 
     contrib = get_contrib_packages()
@@ -928,17 +939,32 @@ def setup(install_all, ask_full, verbose):
         # and `dwave setup` ran without `--all` flag.
         click.echo("Optionally install non-open-source packages and "
                    "configure your environment.\n")
-        prompt = "Do you want to select non-open-source packages to install (y/n)?"
-        val = default_text_input(prompt, default='y')
-        install = val.lower() == 'y'
+
+        # Skip the prompt if all contrib packages already installed
+        if all(_contrib_package_maybe_installed(name) for name in contrib):
+            click.echo("All optional packages already installed.")
+            install = False
+        else:
+            prompt = "Do you want to select non-open-source packages to install (y/n)?"
+            val = default_text_input(prompt, default='y')
+            install = val.lower() == 'y'
         click.echo()
 
     if install:
         for pkg in packages:
             _install_contrib_package(pkg, verbose=verbose, prompt=not install_all)
 
-    click.echo("Creating the D-Wave configuration file.")
-    return _config_create(config_file=None, profile=None, ask_full=ask_full)
+    auto_token = False
+    if auth or oob:
+        click.echo("Authorizing Leap access.\n")
+        _login(config_file=None, profile=None, oob=oob, skip_valid=True, output=output)
+        click.echo()
+        auto_token = True
+        ask_full = False
+
+    click.echo("Creating the D-Wave configuration file.\n")
+    return _config_create(config_file=None, profile=None, ask_full=ask_full,
+                          auto_token=auto_token, project=project)
 
 
 @cli.group()
@@ -950,20 +976,32 @@ def auth():
 @click.option('--oob', is_flag=True,
               help='Run OAuth 2.0 Authorization Code flow out-of-band, '
                    'without the use of locally hosted redirect URL.')
+@click.option('--skip-valid', is_flag=True,
+              help='Skip authorization if access token is valid, or it '
+                   'can be refreshed.')
 @standardized_output
-def login(*, config_file, profile, oob, output):
+def login(*, config_file, profile, oob, skip_valid, output):
     """Authorize Ocean to access Leap API on user's behalf."""
 
+    return _login(config_file=config_file, profile=profile, oob=oob,
+                  skip_valid=skip_valid, output=output)
+
+def _login(*, config_file, profile, oob, skip_valid, output):
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
     flow = LeapAuthFlow.from_config_model(config)
+
+    if skip_valid:
+        if flow.ensure_active_token():
+            output('Valid token found, skipping authorization.')
+            return
 
     if oob:
         flow.run_oob_flow(open_browser=True)
     else:
         flow.run_redirect_flow(open_browser=True)
 
-    click.echo('Authorization completed successfully. '
-               'You can now use "dwave auth get" to fetch your token.')
+    output('Authorization completed successfully. '
+           'You can now use "dwave auth get" to fetch your token.')
 
 
 @auth.command()
