@@ -922,7 +922,7 @@ def setup(install_all, auth, project, oob, ask_full, verbose, output):
     """Setup optional Ocean packages and configuration file(s).
 
     Equivalent to running `dwave install [--all]`, followed by
-    an optional `dwave auth login [--oob]` and then by
+    an optional `dwave auth login --skip-valid [--oob]` and then by
     `dwave config create [--full] [--auto-token]`.
     """
 
