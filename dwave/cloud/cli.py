@@ -976,15 +976,24 @@ def auth():
 @click.option('--oob', is_flag=True,
               help='Run OAuth 2.0 Authorization Code flow out-of-band, '
                    'without the use of locally hosted redirect URL.')
+@click.option('--skip-valid', is_flag=True,
+              help='Skip authorization if access token is valid, or it '
+                   'can be refreshed.')
 @standardized_output
-def login(*, config_file, profile, oob, output):
+def login(*, config_file, profile, oob, skip_valid, output):
     """Authorize Ocean to access Leap API on user's behalf."""
 
-    return _login(config_file=config_file, profile=profile, oob=oob, output=output)
+    return _login(config_file=config_file, profile=profile, oob=oob,
+                  skip_valid=skip_valid, output=output)
 
-def _login(*, config_file, profile, oob, output):
+def _login(*, config_file, profile, oob, skip_valid, output):
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
     flow = LeapAuthFlow.from_config_model(config)
+
+    if skip_valid:
+        if flow.ensure_active_token():
+            output('Valid token found, skipping authorization.')
+            return
 
     if oob:
         flow.run_oob_flow(open_browser=True)

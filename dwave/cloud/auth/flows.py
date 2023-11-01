@@ -202,7 +202,9 @@ class AuthFlow:
         return token
 
     def ensure_active_token(self):
-        is_active = self.session.ensure_active_token(token=self.session.token)
+        if not self.token:
+            return False
+        is_active = self.session.ensure_active_token(token=self.token)
         self._save_token_to_creds(self.token)
         return is_active
 
