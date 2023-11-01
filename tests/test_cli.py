@@ -449,8 +449,14 @@ class TestCli(unittest.TestCase):
             self.assertIn(key, result.output)
 
 
-@isolated_environ(empty=True)
 class TestAuthCli(unittest.TestCase):
+
+    def setUp(self):
+        self.env = isolated_environ(empty=True)
+        self.env.start()
+
+    def tearDown(self):
+        self.env.stop()
 
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
     def test_login(self, flow_factory):
