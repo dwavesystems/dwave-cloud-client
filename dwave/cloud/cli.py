@@ -814,7 +814,7 @@ def _get_dist(dist_spec):
     return pkg_resources.get_distribution(dist_spec)
 
 
-def _contrib_package_maybe_installed(name):
+def _contrib_package_maybe_installed(name: str) -> bool:
     """Check if contrib package `name` is installed (even partially)."""
 
     contrib = get_contrib_packages()
@@ -939,9 +939,15 @@ def setup(install_all, auth, project, oob, ask_full, verbose, output):
         # and `dwave setup` ran without `--all` flag.
         click.echo("Optionally install non-open-source packages and "
                    "configure your environment.\n")
-        prompt = "Do you want to select non-open-source packages to install (y/n)?"
-        val = default_text_input(prompt, default='y')
-        install = val.lower() == 'y'
+
+        # Skip the prompt if all contrib packages already installed
+        if all(_contrib_package_maybe_installed(name) for name in contrib):
+            click.echo("All optional packages already installed.")
+            install = False
+        else:
+            prompt = "Do you want to select non-open-source packages to install (y/n)?"
+            val = default_text_input(prompt, default='y')
+            install = val.lower() == 'y'
         click.echo()
 
     if install:
@@ -950,12 +956,13 @@ def setup(install_all, auth, project, oob, ask_full, verbose, output):
 
     auto_token = False
     if auth or oob:
-        click.echo("Authorizing Leap access.")
+        click.echo("Authorizing Leap access.\n")
         _login(config_file=None, profile=None, oob=oob, output=output)
+        click.echo()
         auto_token = True
         ask_full = False
 
-    click.echo("Creating the D-Wave configuration file.")
+    click.echo("Creating the D-Wave configuration file.\n")
     return _config_create(config_file=None, profile=None, ask_full=ask_full,
                           auto_token=auto_token, project=project)
 
