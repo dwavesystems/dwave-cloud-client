@@ -17,6 +17,7 @@ install_requires = ['requests[socks]>=2.18', 'pydantic>=2,<3', 'homebase>=1.0',
                     'click>=7.0', 'python-dateutil>=2.7', 'plucky>=0.4.3',
                     'diskcache>=5.2.1', 'packaging>=19', 'werkzeug>=2.2',
                     'typing-extensions>=4.5.0', 'authlib>=1.2,<2',
+                    'importlib_metadata>=5.0.0',    # can be dropped in py312+
                     ]
 
 # Package extras requirements

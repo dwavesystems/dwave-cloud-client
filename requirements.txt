@@ -10,6 +10,9 @@ werkzeug>=2.2
 typing-extensions>=4.5.0
 authlib>=1.2,<2
 
+# bring in py312 semantics of importlib.metadata.entry_points()
+importlib_metadata>=5.0.0
+
 # optional bqm support
 # note: dqm supported in dimod>0.9.6
 # note: cqm supported in dimod>=0.10.0

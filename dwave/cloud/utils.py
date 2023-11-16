@@ -29,7 +29,7 @@ from urllib.parse import urljoin
 from datetime import datetime, timedelta
 from dateutil.tz import UTC
 from functools import partial, wraps
-from importlib.metadata import entry_points
+from importlib_metadata import entry_points
 from secrets import token_hex
 from typing import Any, Optional, Union, List, Dict, Mapping, Sequence
 from unittest import mock
@@ -845,6 +845,9 @@ def pretty_argvalues():
 def get_contrib_config():
     """Return all registered contrib (non-open-source) Ocean packages."""
 
+    # Note: we use `entry_points` from `importlib_metadata` to simplify access
+    # and use py312 semantics. See "compatibility note" in `importlib.metadata`
+    # docs for entry points.
     contrib = [ep.load() for ep in entry_points(group='dwave_contrib')]
     return contrib
 
