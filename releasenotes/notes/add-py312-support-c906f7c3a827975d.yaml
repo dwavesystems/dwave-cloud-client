@@ -2,3 +2,6 @@
 features:
   - |
     Add Python 3.12 support.
+  - |
+    Add ``dwave.cloud.utils.get_distribution`` as a replacement for
+    ``pkg_resources.get_distribution`` unavailable in Python 3.12.
