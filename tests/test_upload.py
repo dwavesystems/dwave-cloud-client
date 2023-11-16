@@ -422,10 +422,11 @@ def choose_reply(key, replies, statuses=None):
         statuses = collections.defaultdict(lambda: iter([200]))
 
     if key in replies:
-        response = mock.Mock(['text', 'json', 'raise_for_status'])
+        response = mock.Mock(['text', 'json', 'raise_for_status', 'headers'])
         response.status_code = next(statuses[key])
         response.text = replies[key]
         response.json.side_effect = lambda: json.loads(replies[key])
+        response.headers = {}
 
         def raise_for_status():
             if not 200 <= response.status_code < 400:

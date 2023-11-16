@@ -1682,8 +1682,8 @@ class Client(object):
                 raise
 
         # parse response
-        logger.trace("[%s] response: (code=%r, body=%r)",
-                     caller, response.status_code, response.text)
+        logger.trace("[%s] response: (code=%r, body=%r, headers=%r)",
+                     caller, response.status_code, response.text, response.headers)
 
         # workaround for charset_normalizer episode in requests>=2.26.0,
         # where decoding of an empty json object '{}' fails.
