@@ -29,7 +29,7 @@ from urllib.parse import urljoin
 from datetime import datetime, timedelta
 from dateutil.tz import UTC
 from functools import partial, wraps
-from pkg_resources import iter_entry_points
+from importlib.metadata import entry_points
 from secrets import token_hex
 from typing import Any, Optional, Union, List, Dict, Mapping, Sequence
 from unittest import mock
@@ -845,7 +845,7 @@ def pretty_argvalues():
 def get_contrib_config():
     """Return all registered contrib (non-open-source) Ocean packages."""
 
-    contrib = [ep.load() for ep in iter_entry_points('dwave_contrib')]
+    contrib = [ep.load() for ep in entry_points(group='dwave_contrib')]
     return contrib
 
 
@@ -867,7 +867,7 @@ def get_contrib_packages():
 def get_platform_tags():
     """Return a list of platform tags generated from registered entry points."""
 
-    fs = [ep.load() for ep in iter_entry_points('dwave.common.platform.tags')]
+    fs = [ep.load() for ep in entry_points(group='dwave.common.platform.tags')]
     tags = list(filter(None, [f() for f in fs]))
     return tags
 
