@@ -29,13 +29,15 @@ from urllib.parse import urljoin
 from datetime import datetime, timedelta
 from dateutil.tz import UTC
 from functools import partial, wraps
-from pkg_resources import iter_entry_points
+from importlib.metadata import Distribution, PackageNotFoundError
 from secrets import token_hex
 from typing import Any, Optional, Union, List, Dict, Mapping, Sequence
 from unittest import mock
 
 import requests
 import diskcache
+from importlib_metadata import entry_points
+from packaging.requirements import Requirement
 
 # Use numpy if available for fast decoding
 try:
@@ -49,6 +51,7 @@ __all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
            'datetime_to_timestamp', 'utcnow', 'epochnow', 'tictoc',
            'hasinstance', 'exception_chain', 'is_caused_by',
            'NumpyEncoder', 'coerce_numpy_to_python',
+           'get_distribution', 'PackageNotFoundError', 'VersionNotFoundError',
            ]
 
 logger = logging.getLogger(__name__)
@@ -845,7 +848,10 @@ def pretty_argvalues():
 def get_contrib_config():
     """Return all registered contrib (non-open-source) Ocean packages."""
 
-    contrib = [ep.load() for ep in iter_entry_points('dwave_contrib')]
+    # Note: we use `entry_points` from `importlib_metadata` to simplify access
+    # and use py312 semantics. See "compatibility note" in `importlib.metadata`
+    # docs for entry points.
+    contrib = [ep.load() for ep in entry_points(group='dwave_contrib')]
     return contrib
 
 
@@ -867,9 +873,50 @@ def get_contrib_packages():
 def get_platform_tags():
     """Return a list of platform tags generated from registered entry points."""
 
-    fs = [ep.load() for ep in iter_entry_points('dwave.common.platform.tags')]
+    fs = [ep.load() for ep in entry_points(group='dwave.common.platform.tags')]
     tags = list(filter(None, [f() for f in fs]))
     return tags
+
+
+class VersionNotFoundError(Exception):
+    """Package version requirement not satisfied."""
+
+
+def get_distribution(requirement: Union[str, Requirement],
+                     prereleases: bool = True) -> Distribution:
+    """Returns :class:`~importlib.metadata.Distribution` for a matching
+    `requirement` specification.
+
+    Note: this function re-implements :func:`pkg_resources.get_distribution`
+    functionality for py38+ (including py312, where setuptools/pkg_resources
+    is not available by default).
+
+    Args:
+        requirement:
+            Package dependency requirement according to PEP-508, given as string,
+            or :class:`~packaging.requirements.Requirement`.
+        prereleases:
+            Boolean flag to control if installed prereleases are allowed.
+
+    Raises:
+        :class:`~importlib.metadata.PackageNotFoundError`:
+            Package by name not found.
+        :class:`~dwave.cloud.utils.VersionNotFoundError`:
+            Version of the package found (distribution) does not match the
+            requirement.
+    """
+
+    if not isinstance(requirement, Requirement):
+        requirement = Requirement(requirement)
+
+    dist = Distribution.from_name(requirement.name)
+
+    if not requirement.specifier.contains(dist.version, prereleases=prereleases):
+        raise VersionNotFoundError(
+            f"Package {dist.name!r} version {dist.version} "
+            f"does not match {requirement.specifier!s}")
+
+    return dist
 
 
 class aliasdict(dict):

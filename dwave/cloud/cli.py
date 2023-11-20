@@ -17,7 +17,6 @@ import sys
 import ast
 import json
 import subprocess
-import pkg_resources
 from collections.abc import Sequence
 from configparser import ConfigParser
 from datetime import datetime
@@ -35,7 +34,8 @@ from dwave.cloud.solver import StructuredSolver, BaseUnstructuredSolver
 from dwave.cloud.utils import (
     default_text_input, generate_random_ising_problem,
     datetime_to_timestamp, utcnow, strtrunc, CLIError, set_loglevel,
-    get_contrib_packages, user_agent, epochnow)
+    get_contrib_packages, user_agent, epochnow,
+    get_distribution, PackageNotFoundError, VersionNotFoundError)
 from dwave.cloud.coders import bqm_as_file
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
@@ -806,14 +806,6 @@ def install(list_all, install_all, update_all, accept_license, verbose, packages
         _install_contrib_package(pkg, verbose=verbose, prompt=not accept_license)
 
 
-def _get_dist(dist_spec):
-    """Returns `pkg_resources.Distribution` object for matching `dist_spec`,
-    which can be given as `pkg_resources.Requirement`, or an unparsed string
-    requirement.
-    """
-    return pkg_resources.get_distribution(dist_spec)
-
-
 def _contrib_package_maybe_installed(name: str) -> bool:
     """Check if contrib package `name` is installed (even partially)."""
 
@@ -823,12 +815,12 @@ def _contrib_package_maybe_installed(name: str) -> bool:
     maybe_installed = False
     for req in pkg['requirements']:
         try:
-            _get_dist(req)
+            get_distribution(req)
             maybe_installed = True
-        except pkg_resources.VersionConflict:
+        except VersionNotFoundError:
             # dependency installed, but wrong version
             maybe_installed = True
-        except pkg_resources.DistributionNotFound:
+        except PackageNotFoundError:
             # dependency not installed
             pass
 
@@ -850,13 +842,13 @@ def _install_contrib_package(name, verbose=0, prompt=True):
     # requirements are installed
     reinstall = False
     try:
-        if all(_get_dist(req) for req in pkg['requirements']):
+        if all(get_distribution(req) for req in pkg['requirements']):
             click.echo("{} installed and up to date.\n".format(title))
             return
-    except pkg_resources.VersionConflict:
+    except VersionNotFoundError:
         click.echo("{} dependency version mismatch.\n".format(title))
         reinstall = True
-    except pkg_resources.DistributionNotFound:
+    except PackageNotFoundError:
         pass    # dependency not installed, proceed with install
 
     action = 'Reinstall' if reinstall else 'Install'

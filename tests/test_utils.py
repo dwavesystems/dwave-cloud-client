@@ -36,7 +36,8 @@ from dwave.cloud.utils import (
     active_qubits, generate_random_ising_problem,
     NumpyEncoder, coerce_numpy_to_python,
     default_text_input, utcnow, cached, retried, deprecated, aliasdict,
-    parse_loglevel, user_agent, hasinstance, exception_chain, is_caused_by)
+    parse_loglevel, user_agent, hasinstance, exception_chain, is_caused_by,
+    get_distribution, PackageNotFoundError, VersionNotFoundError)
 
 
 class TestSimpleUtils(unittest.TestCase):
@@ -947,6 +948,32 @@ class TestFilteredSecretsFormatter(unittest.TestCase):
 
         ctx = 'a{}word'
         self.assertEqual(self._filtered(ctx.format(inp)), ctx.format(inp))
+
+
+class TestDistUtils(unittest.TestCase):
+
+    def test_get_distribution(self):
+        # for simplicity, use a package we know for sure is installed in (test) env
+
+        # baseline
+        dist = get_distribution("pip")
+        self.assertEqual(dist.name, "pip")
+        ver = tuple(map(int, dist.version.split('.')))
+
+        # version matching
+        dist = get_distribution(f"pip~={ver[0]}.0")
+        self.assertEqual(dist.name, "pip")
+
+        with self.assertRaises(VersionNotFoundError):
+            get_distribution(f"pip<{ver[0]}")
+        with self.assertRaises(VersionNotFoundError):
+            get_distribution(f"pip>{ver[0]+1}")
+        with self.assertRaises(VersionNotFoundError):
+            get_distribution(f"pip=={ver[0]-1}")
+
+        # package matching
+        with self.assertRaises(PackageNotFoundError):
+            get_distribution("package-that-is-not-installed")
 
 
 if __name__ == '__main__':
