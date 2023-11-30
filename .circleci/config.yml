@@ -304,16 +304,14 @@ workflows:
   deploy:
     jobs:
       - build-dist:
-          filters:  # required since `pypi-deploy` has tag filters AND requires `build-dist`
+          filters: &on-tag
             tags:
-              only: /.*/
+              only: /^[0-9]+(\.[0-9]+)*((\.dev|rc)([0-9]+)?)?$/
+            branches:
+              ignore: /.*/
 
       - pypi-deploy:
           context: ocean-publish
           requires:
             - build-dist
-          filters:
-            tags:
-              only: /^[0-9]+(\.[0-9]+)*((\.dev|rc)([0-9]+)?)?$/
-            branches:
-              ignore: /.*/
+          filters: *on-tag
