@@ -303,7 +303,11 @@ workflows:
 
   deploy:
     jobs:
-      - build-dist
+      - build-dist:
+          filters:  # required since `pypi-deploy` has tag filters AND requires `build-dist`
+            tags:
+              only: /.*/
+
       - pypi-deploy:
           context: ocean-publish
           requires:
