@@ -214,13 +214,13 @@ def datetime_to_timestamp(dt):
     Note: similar to `datetime.timestamp()` in Python 3.3+.
     """
 
-    epoch = datetime.utcfromtimestamp(0).replace(tzinfo=UTC)
+    epoch = datetime.fromtimestamp(0, tz=UTC)
     return (dt - epoch).total_seconds()
 
 
 def utcnow():
     """Returns tz-aware now in UTC."""
-    return datetime.utcnow().replace(tzinfo=UTC)
+    return datetime.now(tz=UTC)
 
 
 def epochnow() -> float:
