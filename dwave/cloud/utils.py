@@ -220,7 +220,7 @@ def datetime_to_timestamp(dt):
 
 def utcnow():
     """Returns tz-aware now in UTC."""
-    return datetime.utcnow().replace(tzinfo=UTC)
+    return datetime.now(tz=UTC)
 
 
 def epochnow() -> float:
