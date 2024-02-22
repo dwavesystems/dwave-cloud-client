@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Remove circular references in ``dwave.cloud.computation.Future`` to enable
+    easier garbage collection and lower memory footprint.
+    See `#601 <https://github.com/dwavesystems/dwave-cloud-client/issues/601>`_.
