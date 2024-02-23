@@ -46,6 +46,11 @@ jobs:
             pip install -U pip
             pip install -r requirements.txt -r tests/requirements.txt
 
+      - save_cache: &save-cache-env
+          key: *env-cache-key
+          paths:
+            - env
+
       - run:
           name: Install appropriate dimod version
           command: |
@@ -55,11 +60,6 @@ jobs:
             else
               pip uninstall dimod dwave-networkx -y
             fi
-
-      - save_cache: &save-cache-env
-          key: *env-cache-key
-          paths:
-            - env
 
       - run: &install-package
           name: Install package
