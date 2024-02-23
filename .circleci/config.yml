@@ -81,6 +81,7 @@ jobs:
         type: string
       xcode:
         type: string
+        default: "14.2.0"
 
     macos:
       xcode: << parameters.xcode >>
@@ -289,7 +290,6 @@ workflows:
           matrix:
             parameters:
               python-version: *python-versions
-              xcode: ["14.2.0"]
 
       - test-windows:
           name: test-windows-py<< matrix.python-version >>
