@@ -396,6 +396,9 @@ class TestProblemLabel(unittest.TestCase):
                     self.assertIn('problem_label', info)
                     self.assertEqual(info['problem_label'], label)
 
+                # verify sampleset is cached via weakref
+                self.assertIsInstance(fut._sampleset(), dimod.SampleSet)
+
 
 class TestSerialization(unittest.TestCase):
 

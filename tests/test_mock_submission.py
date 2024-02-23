@@ -1043,6 +1043,50 @@ class TestProblemLabel(unittest.TestCase):
                             self.assertEqual(info.get('problem_label'), label)
 
 
+@unittest.skipUnless(dimod, "dimod required for sampleset tests")
+class TestComputationSamplesetCaching(unittest.TestCase):
+
+    def test_sampleset_ref(self):
+        # sampleset is constructed and cached from .wait_sampleset()
+
+        sapi = StructuredSapiMockResponses()
+
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda a, _: choose_reply(a, {
+                'problems/': [sapi.complete_no_answer_reply(id='123')]})
+            session.get = lambda a: choose_reply(a, {
+                'problems/123/': sapi.complete_reply(id='123')})
+            return session
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client(endpoint='endpoint', token='token') as client:
+                solver = Solver(client, sapi.solver.data)
+                response = solver.sample_ising(*sapi.problem)
+
+                # sampleset is initially unset
+                self.assertIsNone(response._sampleset)
+
+                sampleset = response.wait_sampleset()
+
+                # sampleset constructed and available via weakref
+                self.assertIsInstance(response._sampleset(), dimod.SampleSet)
+                self.assertEqual(response._sampleset(), sampleset)
+
+                # sampleset available as property
+                self.assertEqual(response.sampleset, sampleset)
+
+                # other shorthand properties are using sampleset
+                numpy.testing.assert_array_equal(response.energies, sampleset.record.energy)
+                numpy.testing.assert_array_equal(response.num_occurrences, sampleset.record.num_occurrences)
+                numpy.testing.assert_array_equal(response.samples, sampleset.record.sample)
+                numpy.testing.assert_array_equal(response.variables, sampleset.variables)
+
+                # verify gc
+                del sampleset
+                self.assertIsNone(response._sampleset())
+
+
 class TestSerialization(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

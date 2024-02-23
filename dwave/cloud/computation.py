@@ -24,12 +24,12 @@ computation---sampling on a QPU or software solver---executed remotely, monitori
 waiting for and retrieving results, cancelling enqueued jobs, etc.
 
 Some :class:`Future` methods are blocking.
-
 """
 
 import time
 import threading
 import functools
+import weakref
 
 from operator import itemgetter
 from dateutil.parser import parse
@@ -156,6 +156,9 @@ class Future(object):
 
         # XXX: energy offset carried via Future, until implemented in SAPI
         self._offset = 0
+
+        # weakref to resolved (already constructed) sampleset
+        self._sampleset = None
 
     # make Future ordered
 
@@ -631,11 +634,12 @@ class Future(object):
         """
 
         # return energies from sampleset, if already constructed
-        result = self.result()
-        if 'sampleset' in result:
-            return result['sampleset'].record.energy
+        sampleset = self._sampleset() if self._sampleset else None
+        if sampleset is not None:
+            return sampleset.record.energy
 
         # fallback to energies from response
+        result = self.result()
         return result['energies']
 
     @property
@@ -672,24 +676,27 @@ class Future(object):
             (0, 1)
         """
         # return samples from sampleset, if already constructed
-        result = self.result()
-        if 'sampleset' in result:
-            return result['sampleset'].record.sample
+        sampleset = self._sampleset() if self._sampleset else None
+        if sampleset is not None:
+            return sampleset.record.sample
 
         # fallback to samples from response
+        result = self.result()
         return result['solutions']
 
     @property
     def variables(self):
         """List of active variables in response/answer."""
 
-        result = self.result()
+        # return variables from sampleset if available
+        sampleset = self._sampleset() if self._sampleset else None
+        if sampleset is not None:
+            return sampleset.variables
 
+        # fallback to variables from SAPI response
+        result = self.result()
         if 'active_variables' in result:
             return result['active_variables']
-
-        if 'sampleset' in result:
-            return result['sampleset'].variables
 
         raise InvalidAPIResponseError("Active variables not present in the response")
 
@@ -735,12 +742,13 @@ class Future(object):
         """
 
         # return num_occurrences from sampleset, if already constructed
-        result = self.result()
-        if 'sampleset' in result:
-            return result['sampleset'].record.num_occurrences
+        sampleset = self._sampleset() if self._sampleset else None
+        if sampleset is not None:
+            return sampleset.record.num_occurrences
 
         # fallback to num_occurrences from response
         # (but `occurrences` data is not present if `answer_mode` was set to "raw")
+        result = self.result()
         if 'num_occurrences' in result:
             return result['num_occurrences']
         elif self.return_matrix:
@@ -751,18 +759,12 @@ class Future(object):
     def wait_sampleset(self):
         """Blocking sampleset getter."""
 
-        # blocking result get
-        result = self._load_result()
+        # resolve response
+        self._load_result()
 
-        # common problem info: id/label
-        problem_info = dict(problem_id=self.id)
-        if self.label is not None:
-            problem_info.update(problem_label=self.label)
-
-        # sapi returned sampleset directly
-        if 'sampleset' in result:
-            sampleset = result['sampleset']
-            sampleset.info.update(problem_info)
+        # check if sampleset already resolved (e.g. returned in response)
+        sampleset = self._sampleset() if self._sampleset else None
+        if sampleset is not None:
             return sampleset
 
         # construct sampleset from available data
@@ -783,7 +785,8 @@ class Future(object):
 
         # for QPU jobs, info field is blank; add timing info
         info = dict(timing=self.timing)
-        info.update(problem_info)
+        # also extend info with problem metadata like id and label
+        info.update(self._get_problem_info())
 
         sampleset = dimod.SampleSet.from_samples(
             (samples, variables), vartype=vartype,
@@ -794,9 +797,9 @@ class Future(object):
         # the samplesets constructed .from_future, we add the method as well
         sampleset.wait_id = self.wait_id
 
-        # this means that samplesets retrieved BEFORE this function are called
-        # are not the same object as after, but it is a simpler implementation
-        self._result['sampleset'] = self._sampleset = sampleset
+        # cache the constructed sampleset on computation, but don't prevent the
+        # gc from collecting it if unused in parent closure
+        self._sampleset = weakref.ref(sampleset)
 
         return sampleset
 
@@ -809,18 +812,17 @@ class Future(object):
         """
 
         try:
-            return self._sampleset
-        except AttributeError:
-            pass
-
-        try:
             import dimod
         except ImportError:
             raise RuntimeError("Can't construct SampleSet without dimod. "
                                "Re-install the library with 'bqm' support.")
 
-        self._sampleset = sampleset = dimod.SampleSet.from_future(
-            self, lambda f: f.wait_sampleset())
+        # check if sampleset already resolved
+        sampleset = self._sampleset() if self._sampleset else None
+        if sampleset is not None:
+            return sampleset
+
+        sampleset = dimod.SampleSet.from_future(self, lambda f: f.wait_sampleset())
 
         # propagate id to sampleset as well
         # note: this requires dimod>=0.8.21 (before that version SampleSet
@@ -900,7 +902,26 @@ class Future(object):
             self._decode()
             self._alias_result()
 
+            # create a direct reference to sampleset if already available in response
+            # NB: in this case we don't actually need a weakref (strong ref is fine),
+            # but we use it for consistency
+            if 'sampleset' in self._result:
+                # add common problem info
+                sampleset = self._result['sampleset']
+                sampleset.info.update(self._get_problem_info())
+
+                self._sampleset = weakref.ref(sampleset)
+
         return self._result
+
+    def _get_problem_info(self):
+        """Return problem metadata (id, label) to be included in `sampleset.info`."""
+        problem_info = {}
+        if self.id is not None:
+            problem_info.update(problem_id=self.id)
+        if self.label is not None:
+            problem_info.update(problem_label=self.label)
+        return problem_info
 
     def _patch_offset(self):
         # XXX: This is a temporary fix, until SAPI starts returning the offset
