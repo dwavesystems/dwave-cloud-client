@@ -176,7 +176,7 @@ jobs:
 
   test-docs:
     docker:
-      - image: cimg/python:3.9
+      - image: cimg/python:3.11
 
     steps:
       - checkout
@@ -214,7 +214,7 @@ jobs:
 
   build-dist:
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.11
 
     steps:
       - checkout
@@ -240,7 +240,7 @@ jobs:
 
   pypi-deploy:
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.11
 
     steps:
       - attach_workspace:
