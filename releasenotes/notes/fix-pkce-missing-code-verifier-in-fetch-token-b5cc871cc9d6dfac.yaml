@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Fix PKCE support in ``dwave.cloud.auth.flow.AuthFlow`` by properly including
+    ``code_verifier`` in fetch token (code exchange) requests.
+    See `#605 <https://github.com/dwavesystems/dwave-cloud-client/issues/605>`_.
