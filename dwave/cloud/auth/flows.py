@@ -189,6 +189,7 @@ class AuthFlow:
             url=self.token_endpoint,
             grant_type='authorization_code',
             code=code,
+            code_verifier=self.code_verifier,
             **kwargs)
 
         logger.debug(f"{type(self).__name__}.fetch_token() = {token!r}")
