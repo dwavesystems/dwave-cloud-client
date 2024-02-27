@@ -91,14 +91,18 @@ class TestAuthFlow(unittest.TestCase):
 
         m.get(requests_mock.ANY, status_code=404)
         m.post(requests_mock.ANY, status_code=404)
+        m.post(self.token_endpoint, json=dict(error="error", error_description="bad request"))
         m.post(self.token_endpoint, additional_matcher=post_body_matcher, json=self.token)
 
         # reset creds
         self.creds.clear()
 
-        # verify token fetch flow
+        # make auth request to generate all request params (like PKCE's verifier)
         flow = AuthFlow(**self.test_args)
+        _ = flow.get_authorization_url()
+        expected_params.update(code_verifier=flow.code_verifier)
 
+        # verify token fetch flow
         response = flow.fetch_token(code=code)
         self.assertEqual(response, self.token)
 
