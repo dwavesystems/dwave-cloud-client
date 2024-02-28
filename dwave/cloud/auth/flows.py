@@ -378,7 +378,12 @@ class LeapAuthFlow(AuthFlow):
 
             # when code received, exchange it for token
             try:
-                self.fetch_token(code=app.query.get('code'), state=app.query.get('state'))
+                # verify state (Cross-Site Request Forgery protection)
+                state = app.query.get('state')
+                if state != self.state:
+                    raise ValueError('State mismatch')
+
+                self.fetch_token(code=app.query.get('code'), state=state)
 
             except OAuthError as exc:
                 # store for main thread
