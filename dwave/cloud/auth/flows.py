@@ -258,11 +258,11 @@ class LeapAuthFlow(AuthFlow):
 
     @staticmethod
     def _infer_leap_success_uri(leap_api_endpoint: str) -> str:
-        return urljoin(leap_api_endpoint, '/leap/openid/success')
+        return urljoin(leap_api_endpoint, '/leap/openid/success/')
 
     @staticmethod
     def _infer_leap_error_uri(leap_api_endpoint: str) -> str:
-        return urljoin(leap_api_endpoint, '/leap/openid/error')
+        return urljoin(leap_api_endpoint, '/leap/openid/error/')
 
     @classmethod
     def from_config_model(cls, config: ClientConfig, **kwargs) -> LeapAuthFlow:
