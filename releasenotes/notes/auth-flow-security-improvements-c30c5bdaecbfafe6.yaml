@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Use fixed authorization success URL, without any authorization query
+    parameters appended (to minimize exposure), as they are not needed on the
+    authorization server's success page.

@@ -399,7 +399,7 @@ class LeapAuthFlow(AuthFlow):
                 return add_params_to_uri(error_uri, query)
 
             # redirect to leap success page
-            return add_params_to_uri(success_uri, app.query)
+            return success_uri
 
         app = RequestCaptureAndRedirectApp(
             message=self._REDIRECT_DONE_MSG,

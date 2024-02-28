@@ -290,6 +290,7 @@ class TestLeapAuthFlowRedirect(unittest.TestCase):
             location = response.history[0].headers.get('Location')
             self.assertTrue(location.startswith(config.leap_api_endpoint))
             self.assertIn('/success', location)
+            self.assertEqual(urlsplit(location).query, '')
 
             f.join()
             fetch_token.assert_called_once_with(code=mock_code, state=ctx['state'])
