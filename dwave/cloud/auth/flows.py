@@ -258,11 +258,11 @@ class LeapAuthFlow(AuthFlow):
 
     @staticmethod
     def _infer_leap_success_uri(leap_api_endpoint: str) -> str:
-        return urljoin(leap_api_endpoint, '/leap/openid/success')
+        return urljoin(leap_api_endpoint, '/leap/openid/success/')
 
     @staticmethod
     def _infer_leap_error_uri(leap_api_endpoint: str) -> str:
-        return urljoin(leap_api_endpoint, '/leap/openid/error')
+        return urljoin(leap_api_endpoint, '/leap/openid/error/')
 
     @classmethod
     def from_config_model(cls, config: ClientConfig, **kwargs) -> LeapAuthFlow:
@@ -378,7 +378,12 @@ class LeapAuthFlow(AuthFlow):
 
             # when code received, exchange it for token
             try:
-                self.fetch_token(code=app.query.get('code'), state=app.query.get('state'))
+                # verify state (Cross-Site Request Forgery protection)
+                state = app.query.get('state')
+                if state != self.state:
+                    raise ValueError('State mismatch')
+
+                self.fetch_token(code=app.query.get('code'), state=state)
 
             except OAuthError as exc:
                 # store for main thread
@@ -399,7 +404,7 @@ class LeapAuthFlow(AuthFlow):
                 return add_params_to_uri(error_uri, query)
 
             # redirect to leap success page
-            return add_params_to_uri(success_uri, app.query)
+            return success_uri
 
         app = RequestCaptureAndRedirectApp(
             message=self._REDIRECT_DONE_MSG,

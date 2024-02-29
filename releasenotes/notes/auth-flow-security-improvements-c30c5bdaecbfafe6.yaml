@@ -1,0 +1,11 @@
+---
+fixes:
+  - |
+    Use fixed authorization success URL, without any authorization query
+    parameters appended (to minimize exposure), as they are not needed on the
+    authorization server's success page.
+  - |
+    Improve CSRF protection on localhost redirect URI during authorization code
+    exchange. Previously, ``state`` was verified only if supplied. Now it's
+    mandatory. Please note this is an additional CSRF protection on top of the
+    PKCE, just in case PKCE is not supported (or properly implemented) server-side.
