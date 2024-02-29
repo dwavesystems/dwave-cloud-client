@@ -72,7 +72,7 @@ from dwave.cloud.regions import get_regions, resolve_endpoints
 from dwave.cloud.upload import ChunkedData
 from dwave.cloud.events import dispatches_events
 from dwave.cloud.utils import (
-    PretimedHTTPAdapter, BaseUrlSession, user_agent,
+    PretimedHTTPAdapter, BaseUrlSession, default_user_agent,
     datetime_to_timestamp, utcnow, cached, retried, is_caused_by)
 
 __all__ = ['Client']
@@ -536,22 +536,6 @@ class Client(object):
         self._encode_problem_executor = \
             ThreadPoolExecutor(self._ENCODE_PROBLEM_THREAD_COUNT)
 
-    @cached_property
-    def _user_agent(self):
-        """User-Agent string for this client instance, as returned by
-        :meth:`~dwave.cloud.utils.user_agent`, computed on first access and
-        cached for the lifespan of the client.
-
-        Note:
-            The only tags that might change are platform tags, as returned by
-            ``dwave.common.platform.tags`` entry points, and `platform.platform()`
-            (like linux kernel version). Assuming OS/machine won't change during
-            client's lifespan, and typical platform tags defined via entry points
-            depend on process environments (which rarely change), it's pretty safe
-            to always use the per-instance cached user agent.
-        """
-        return user_agent(__packagename__, __version__)
-
     def create_session(self):
         """Create a new requests session based on client's (self) params.
 
@@ -572,7 +556,7 @@ class Client(object):
             timeout=self.config.request_timeout,
             max_retries=self.config.request_retry.to_urllib3_retry()))
 
-        session.headers.update({'User-Agent': self._user_agent})
+        session.headers.update({'User-Agent': default_user_agent()})
         if self.config.headers:
             session.headers.update(self.config.headers)
         if self.config.token:

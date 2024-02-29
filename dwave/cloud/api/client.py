@@ -26,30 +26,12 @@ from werkzeug.http import parse_options_header, dump_options_header
 from dwave.cloud.api import constants, exceptions
 from dwave.cloud.config import load_config, validate_config_v1, update_config
 from dwave.cloud.config.models import ClientConfig
-from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.utils import (
-    PretimedHTTPAdapter, BaseUrlSession, user_agent, is_caused_by)
+    PretimedHTTPAdapter, BaseUrlSession, default_user_agent, is_caused_by)
 
 __all__ = ['DWaveAPIClient', 'SolverAPIClient', 'MetadataAPIClient', 'LeapAPIClient']
 
 logger = logging.getLogger(__name__)
-
-
-class LazyUserAgentClassProperty:
-    # roughly equivalent to ``classmethod(property(cached_user_agent))``, but it
-    # doesn't require chained decorators support available in py39+
-    _user_agent = None
-
-    def __get__(self, obj, objtype=None):
-        # Note: The only tags that might change are platform tags, as returned
-        # by `dwave.common.platform.tags` entry points, and `platform.platform()`
-        # (like linux kernel version). Assuming OS/machine won't change during
-        # client's lifespan, and typical platform tags defined via entry points
-        # depend on process environment variables (which rarely change), it's
-        # pretty safe to cache the user-agent per-class (or even globally).
-        if self._user_agent is None:
-            self._user_agent = user_agent(__packagename__, __version__)
-        return self._user_agent
 
 
 class LoggingSession(BaseUrlSession):
@@ -293,12 +275,6 @@ class DWaveAPIClient:
     # client instance config, populated on init from kwargs overridding DEFAULTS
     config = None
 
-    # User-Agent string used in API requests, as returned by
-    # :meth:`~dwave.cloud.utils.user_agent`, computed on first access and
-    # cached for the lifespan of the class.
-    # TODO: consider exposing "user_agent" config parameter
-    user_agent = LazyUserAgentClassProperty()
-
     def __init__(self, **config):
         self.config = {}
         for opt, default in self.DEFAULTS.items():
@@ -428,7 +404,7 @@ class DWaveAPIClient:
             timeout=timeout, max_retries=cls._retry_config(**retry)))
 
         # configure headers
-        session.headers.update({'User-Agent': cls.user_agent})
+        session.headers.update({'User-Agent': default_user_agent()})
         if config['headers']:
             session.headers.update(config['headers'])
 
