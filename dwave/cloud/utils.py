@@ -417,8 +417,27 @@ def is_caused_by(exception, exception_types):
     return hasinstance(exception_chain(exception), exception_types)
 
 
-def user_agent(name=None, version=None):
-    """Return User-Agent ~ "name/version language/version interpreter/version os/version"."""
+def user_agent(name: Optional[str] = None,
+               version: Optional[str] = None,
+               *,
+               include_platform_tags: bool = True) -> str:
+    """Return User-Agent ~ "name/version language/version interpreter/version os/version".
+
+    Args:
+        name:
+            Package name, primary UA component name.
+        version:
+            Package version, primary UA component version.
+        include_platform_tags:
+            Look for, query and include externally-contributed platform tags
+            (via ``dwave.common.platform.tags`` entrypoint).
+            See :func:`dwave.cloud.utils.get_platform_tags`.
+
+    Return:
+        User-Agent string composed of "key/value" pairs (joined with a space
+        character), for following components: package, language, interpreter,
+        machine, system and platform.
+    """
 
     def _interpreter():
         name = platform.python_implementation()
@@ -445,7 +464,8 @@ def user_agent(name=None, version=None):
     ])
 
     # add platform-specific tags
-    tags.extend(get_platform_tags())
+    if include_platform_tags:
+        tags.extend(get_platform_tags())
 
     return ' '.join("{}/{}".format(name, version) for name, version in tags)
 
