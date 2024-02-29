@@ -39,6 +39,8 @@ import diskcache
 from importlib_metadata import entry_points
 from packaging.requirements import Requirement
 
+from dwave.cloud.package_info import __packagename__, __version__
+
 # Use numpy if available for fast decoding
 try:
     import numpy
@@ -468,6 +470,13 @@ def user_agent(name: Optional[str] = None,
         tags.extend(get_platform_tags())
 
     return ' '.join("{}/{}".format(name, version) for name, version in tags)
+
+
+# defined as a function rather than constant because env might change during runtime
+def default_user_agent() -> str:
+    """Default user agent string to be used consistently across client(s)."""
+    return user_agent(
+        name=__packagename__, version=__version__, include_platform_tags=False)
 
 
 class CLIError(Exception):
