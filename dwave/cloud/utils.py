@@ -423,12 +423,12 @@ def user_agent(name=None, version=None):
     def _interpreter():
         name = platform.python_implementation()
         version = platform.python_version()
-        bitness = platform.architecture()[0]
         if name == 'PyPy':
             version = '.'.join(map(str, sys.pypy_version_info[:3]))
         full_version = [version]
-        if bitness:
-            full_version.append(bitness)
+        is_64bits = sys.maxsize > 2**32
+        if is_64bits:
+            full_version.append('64bit')
         return name, "-".join(full_version)
 
     tags = []
