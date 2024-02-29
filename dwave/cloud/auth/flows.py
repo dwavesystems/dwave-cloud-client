@@ -32,7 +32,7 @@ from dwave.cloud.auth.creds import Credentials
 from dwave.cloud.auth.server import SingleRequestAppServer, RequestCaptureAndRedirectApp
 from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.regions import resolve_endpoints
-from dwave.cloud.utils import pretty_argvalues
+from dwave.cloud.utils import pretty_argvalues, default_user_agent
 
 __all__ = ['AuthFlow', 'LeapAuthFlow', 'OAuthError']
 
@@ -95,6 +95,9 @@ class AuthFlow:
             # metadata set via kwargs
             authorization_endpoint=authorization_endpoint,
             token_endpoint=token_endpoint)
+
+        # set default headers (overwritten by ``session_config['headers']``)
+        self.session.headers.update({'User-Agent': default_user_agent()})
 
         if session_config is not None:
             self.update_session(session_config)

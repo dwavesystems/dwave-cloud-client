@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Use a consistent ``User-Agent`` value for all API and non-API requests made
+    by ``Client``, ``api.Client`` and ``auth.flow`` client.
+  - Speed-up ``User-Agent`` string construction significantly (10ms to 5us).

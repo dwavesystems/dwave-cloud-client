@@ -36,8 +36,8 @@ from dwave.cloud.utils import (
     active_qubits, generate_random_ising_problem,
     NumpyEncoder, coerce_numpy_to_python,
     default_text_input, utcnow, cached, retried, deprecated, aliasdict,
-    parse_loglevel, user_agent, hasinstance, exception_chain, is_caused_by,
-    get_distribution, PackageNotFoundError, VersionNotFoundError)
+    parse_loglevel, user_agent, default_user_agent, hasinstance, exception_chain,
+    is_caused_by, get_distribution, PackageNotFoundError, VersionNotFoundError)
 
 
 class TestSimpleUtils(unittest.TestCase):
@@ -175,6 +175,13 @@ class TestSimpleUtils(unittest.TestCase):
         required = [__packagename__, 'python', 'machine', 'system', 'platform']
         for key in required:
             self.assertIn(key, ua)
+
+    def test_default_user_agent(self):
+        from dwave.cloud.package_info import __packagename__, __version__
+        ua = default_user_agent()
+        ref = user_agent(
+            name=__packagename__, version=__version__, include_platform_tags=False)
+        self.assertEqual(ua, ref)
 
 
 # initially copied from dwave-hybrid/NumpyEncoder tests, but expanded to cover
