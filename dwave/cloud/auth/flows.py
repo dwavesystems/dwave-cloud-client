@@ -22,6 +22,7 @@ from typing import Any, Callable, Dict, Optional, Union, Sequence, Literal
 from urllib.parse import urljoin
 
 import click
+import requests
 from authlib.integrations.requests_client import OAuth2Session, OAuthError
 from authlib.oauth2.rfc6749 import OAuth2Token
 from authlib.common.security import generate_token
@@ -212,11 +213,29 @@ class AuthFlow:
         return token
 
     def revoke_token(self, *,
-                     token_type_hint: Optional[Literal['access_token',
-                                                       'refresh_token']] = None):
-        return self.session.revoke_token(
-            url=self.revocation_endpoint,
+                     token: Optional[str] = None,
+                     token_type_hint: Optional[
+                         Literal['access_token', 'refresh_token']] = None
+                     ) -> bool:
+        """Revoke OAuth 2.0 token.
+
+        Args:
+            token:
+                OAuth 2.0 access or refresh token to be revoked. If refresh token
+                is specified, the authorization server should also revoke the
+                corresponding access tokens. If ``token`` is not specified, then
+                current refresh token is revoked.
+            token_type_hint:
+                Type of the token to be revoked.
+
+        Returns:
+            Token revocation status. True if revocation was successful, or token
+            was invalid already. False in case of an error.
+        """
+        response: requests.Response = self.session.revoke_token(
+            url=self.revocation_endpoint, token=token,
             token_type_hint=token_type_hint)
+        return response.ok
 
     def ensure_active_token(self):
         if not self.token:
