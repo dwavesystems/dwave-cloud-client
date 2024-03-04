@@ -18,7 +18,7 @@ import logging
 import time
 import webbrowser
 from operator import sub
-from typing import Any, Callable, Dict, Optional, Union, Sequence
+from typing import Any, Callable, Dict, Optional, Union, Sequence, Literal
 from urllib.parse import urljoin
 
 import click
@@ -55,6 +55,8 @@ class AuthFlow:
             URL of the authorization server's authorization endpoint.
         token_endpoint:
             URL of the authorization server's token endpoint.
+        revocation_endpoint:
+            URL of the authorization server's OAuth 2.0 revocation endpoint.
         session_config:
             Configuration options for the low-level ``requests.Session`` used
             for all OAuth 2 requests. Supported options are: ``cert``,
@@ -78,6 +80,7 @@ class AuthFlow:
                  redirect_uri: str,
                  authorization_endpoint: str,
                  token_endpoint: str,
+                 revocation_endpoint: str,
                  session_config: Optional[Dict[str, Any]] = None,
                  leap_api_endpoint: Optional[str] = None,
                  creds: Optional[Credentials] = None
@@ -86,8 +89,11 @@ class AuthFlow:
         self.scopes = ' '.join(scopes)
         self.authorization_endpoint = authorization_endpoint
         self.token_endpoint = token_endpoint
+        self.revocation_endpoint = revocation_endpoint
         self.leap_api_endpoint = leap_api_endpoint
         self.creds = creds
+
+        # TODO: verify authorization/token/revocation endpoints are https
 
         self.session = OAuth2Session(
             client_id=client_id, scope=scopes, redirect_uri=redirect_uri,
@@ -205,6 +211,13 @@ class AuthFlow:
         self._save_token_to_creds(token)
         return token
 
+    def revoke_token(self, *,
+                     token_type_hint: Optional[Literal['access_token',
+                                                       'refresh_token']] = None):
+        return self.session.revoke_token(
+            url=self.revocation_endpoint,
+            token_type_hint=token_type_hint)
+
     def ensure_active_token(self):
         if not self.token:
             return False
@@ -260,6 +273,10 @@ class LeapAuthFlow(AuthFlow):
         return urljoin(leap_api_endpoint, '/leap/openid/token')
 
     @staticmethod
+    def _infer_revocation_endpoint(leap_api_endpoint: str) -> str:
+        return urljoin(leap_api_endpoint, '/leap/openid/revoke_token/')
+
+    @staticmethod
     def _infer_leap_success_uri(leap_api_endpoint: str) -> str:
         return urljoin(leap_api_endpoint, '/leap/openid/success/')
 
@@ -290,6 +307,7 @@ class LeapAuthFlow(AuthFlow):
 
         authorization_endpoint = cls._infer_auth_endpoint(config.leap_api_endpoint)
         token_endpoint = cls._infer_token_endpoint(config.leap_api_endpoint)
+        revocation_endpoint = cls._infer_revocation_endpoint(config.leap_api_endpoint)
 
         # note: possible to de-dup via `DWaveAPIClient.from_config_model`, but
         # currently not worth the extra complexity (indirection layer).
@@ -306,6 +324,7 @@ class LeapAuthFlow(AuthFlow):
             redirect_uri=kwargs.pop('redirect_uri', cls._OOB_REDIRECT_URI),
             authorization_endpoint=authorization_endpoint,
             token_endpoint=token_endpoint,
+            revocation_endpoint=revocation_endpoint,
             session_config=session_config,
             leap_api_endpoint=config.leap_api_endpoint,
             creds=creds)

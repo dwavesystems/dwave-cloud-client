@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Add ``revoke_token`` method to ``dwave.cloud.auth.flow.AuthFlow`` to enable
+    revocation of OAuth 2.0 refresh/access tokens.
+    See `#600 <https://github.com/dwavesystems/dwave-cloud-client/issues/600>`_.
