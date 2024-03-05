@@ -81,7 +81,7 @@ class AuthFlow:
                  redirect_uri: str,
                  authorization_endpoint: str,
                  token_endpoint: str,
-                 revocation_endpoint: str,
+                 revocation_endpoint: Optional[str] = None,
                  session_config: Optional[Dict[str, Any]] = None,
                  leap_api_endpoint: Optional[str] = None,
                  creds: Optional[Credentials] = None
@@ -231,10 +231,18 @@ class AuthFlow:
         Returns:
             Token revocation status. True if revocation was successful, or token
             was invalid already. False in case of an error.
+
+        Note:
+            Precondition for token revocation is defining a ``revocation_endpoint``
+            during :class:`~dwave.cloud.auth.flows.AuthFlow` construction.
         """
+        if self.revocation_endpoint is None:
+            raise TypeError("Revocation endpoint undefined.")
+
         response: requests.Response = self.session.revoke_token(
             url=self.revocation_endpoint, token=token,
             token_type_hint=token_type_hint)
+
         return response.ok
 
     def ensure_active_token(self):

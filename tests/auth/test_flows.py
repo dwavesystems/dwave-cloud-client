@@ -38,6 +38,7 @@ class TestAuthFlow(unittest.TestCase):
         self.redirect_uri_oob = 'oob'
         self.authorization_endpoint = 'https://example.com/authorize'
         self.token_endpoint = 'https://example.com/token'
+        self.revocation_endpoint = 'https://example.com/revoke'
         self.token = dict(access_token='123', refresh_token='456', id_token='789')
         self.creds = Credentials(create=False)
         self.leap_api_endpoint = 'https://example.com/leap/api'
@@ -48,6 +49,7 @@ class TestAuthFlow(unittest.TestCase):
             redirect_uri=self.redirect_uri_oob,
             authorization_endpoint=self.authorization_endpoint,
             token_endpoint=self.token_endpoint,
+            revocation_endpoint=self.revocation_endpoint,
             leap_api_endpoint=self.leap_api_endpoint,
             creds=self.creds)
 
@@ -148,6 +150,20 @@ class TestAuthFlow(unittest.TestCase):
             flow.ensure_active_token()
 
         m.assert_called_once_with(token=self.token)
+
+    def test_revoke_token(self):
+        flow = AuthFlow(**self.test_args)
+
+        ok = requests.Response()
+        ok.status_code = 200
+
+        with mock.patch.object(flow.session, 'revoke_token',
+                               return_value=ok) as m:
+            status = flow.revoke_token()
+            self.assertTrue(status)
+
+        m.assert_called_once_with(url=flow.revocation_endpoint, token=None,
+                                  token_type_hint=None)
 
     def test_session_config(self):
         config = dict(
