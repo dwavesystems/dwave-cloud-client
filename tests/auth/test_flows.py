@@ -165,6 +165,63 @@ class TestAuthFlow(unittest.TestCase):
         m.assert_called_once_with(url=flow.revocation_endpoint, token=None,
                                   token_type_hint=None)
 
+    @requests_mock.Mocker()
+    def test_revoke_token_request_formation(self, m):
+        # when we want to revoke a specific token, outgoing request conforms to RFC 7009
+
+        # mock the revocation_endpoint
+        expected_params = dict(
+            token=self.token['access_token'],
+            token_type_hint='access_token')
+
+        def post_body_matcher(request):
+            params = dict(parse_qsl(request.text))
+            return params == expected_params
+
+        m.get(requests_mock.ANY, status_code=404)
+        m.post(requests_mock.ANY, status_code=404)
+        m.post(self.revocation_endpoint, json=dict(error="error", error_description="bad request"))
+        m.post(self.revocation_endpoint, additional_matcher=post_body_matcher, status_code=200)
+
+        # reset creds
+        self.creds.clear()
+
+        # initialize flow with token
+        flow = AuthFlow(**self.test_args)
+        flow.token = self.token
+
+        # verify revoke token flow
+        status = flow.revoke_token(token=self.token['access_token'],
+                                   token_type_hint='access_token')
+        self.assertTrue(status)
+
+    @requests_mock.Mocker()
+    def test_revoke_token_default_request_formation(self, m):
+        # when token is unspecified, refresh token should be revoked
+
+        # mock the revocation_endpoint:
+        expected_params = dict(token=self.token['refresh_token'])
+
+        def post_body_matcher(request):
+            params = dict(parse_qsl(request.text))
+            return params == expected_params
+
+        m.get(requests_mock.ANY, status_code=404)
+        m.post(requests_mock.ANY, status_code=404)
+        m.post(self.revocation_endpoint, json=dict(error="error", error_description="bad request"))
+        m.post(self.revocation_endpoint, additional_matcher=post_body_matcher, status_code=200)
+
+        # reset creds
+        self.creds.clear()
+
+        # initialize flow with token
+        flow = AuthFlow(**self.test_args)
+        flow.token = self.token
+
+        # verify revoke token flow
+        status = flow.revoke_token()
+        self.assertTrue(status)
+
     def test_session_config(self):
         config = dict(
             cert='/path/to/cert',
