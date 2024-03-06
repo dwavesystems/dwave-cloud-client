@@ -1071,7 +1071,10 @@ def revoke(*, config_file, profile, token_type, json_output, output):
     # revoke
     revoked = flow.revoke_token(token=token_value, token_type_hint=token_key)
 
-    output(f'{token_pretty} {"successfully revoked" if revoked else "revocation failed"}.')
+    if not revoked:
+        raise CLIError(f'{token_pretty} revocation failed.', code=102)
+
+    output(f'{token_pretty} successfully revoked.')
 
 
 @cli.group()

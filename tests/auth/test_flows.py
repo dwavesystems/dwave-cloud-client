@@ -165,6 +165,18 @@ class TestAuthFlow(unittest.TestCase):
         m.assert_called_once_with(url=flow.revocation_endpoint, token=None,
                                   token_type_hint=None)
 
+    def test_revoke_token_is_conditionally_available(self):
+        # when: `revocation_endpoint` is undefined
+        args = self.test_args.copy()
+        del args['revocation_endpoint']
+
+        # then: init works
+        flow = AuthFlow(**args)
+
+        # but: revoke_token() is unavailable
+        with self.assertRaisesRegex(TypeError, 'endpoint undefined'):
+            flow.revoke_token()
+
     @requests_mock.Mocker()
     def test_revoke_token_request_formation(self, m):
         # when we want to revoke a specific token, outgoing request conforms to RFC 7009
