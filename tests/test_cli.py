@@ -515,6 +515,8 @@ class TestAuthCli(unittest.TestCase):
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
     def test_get(self, flow_factory):
         flow = flow_factory.return_value
+        token = dict(access_token='123', refresh_token='456')
+        type(flow).token = mock.PropertyMock(return_value=token)
 
         with self.subTest('dwave auth get access-token'):
             flow.reset_mock()
@@ -522,11 +524,8 @@ class TestAuthCli(unittest.TestCase):
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['auth', 'get', 'access-token'])
 
-            flow.token.get.assert_has_calls(
-                [mock.call('access_token'), mock.call('expires_at')], any_order=True)
-            self.assertIn('Access token:', result.output)
-
             self.assertEqual(result.exit_code, 0)
+            self.assertIn(token['access_token'], result.output)
 
         with self.subTest('dwave auth get refresh-token'):
             flow.reset_mock()
@@ -534,10 +533,8 @@ class TestAuthCli(unittest.TestCase):
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['auth', 'get', 'refresh-token'])
 
-            flow.token.get.assert_called_with('refresh_token')
-            self.assertIn('Refresh token:', result.output)
-
             self.assertEqual(result.exit_code, 0)
+            self.assertIn(token['refresh_token'], result.output)
 
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
     def test_refresh(self, flow_factory):
@@ -561,6 +558,62 @@ class TestAuthCli(unittest.TestCase):
                 result = runner.invoke(cli, ['auth', 'refresh'])
 
             self.assertEqual(result.exit_code, 100)
+
+    @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
+    def test_revoke(self, flow_factory):
+        flow = flow_factory.return_value
+        token = dict(access_token='123', refresh_token='456')
+        type(flow).token = mock.PropertyMock(return_value=token)
+
+        with self.subTest('dwave auth revoke (default: access-token)'):
+            runner = CliRunner(mix_stderr=False)
+            with runner.isolated_filesystem():
+                result = runner.invoke(cli, ['auth', 'revoke'])
+
+            self.assertEqual(result.exit_code, 0)
+            flow.revoke_token.assert_called_with(
+                token=token['access_token'], token_type_hint='access_token')
+
+        with self.subTest('dwave auth revoke access-token'):
+            runner = CliRunner(mix_stderr=False)
+            with runner.isolated_filesystem():
+                result = runner.invoke(cli, ['auth', 'revoke', 'access-token'])
+
+            self.assertEqual(result.exit_code, 0)
+            flow.revoke_token.assert_called_with(
+                token=token['access_token'], token_type_hint='access_token')
+
+        with self.subTest('dwave auth revoke refresh-token'):
+            runner = CliRunner(mix_stderr=False)
+            with runner.isolated_filesystem():
+                result = runner.invoke(cli, ['auth', 'revoke', 'refresh-token'])
+
+            self.assertEqual(result.exit_code, 0)
+            flow.revoke_token.assert_called_with(
+                token=token['refresh_token'], token_type_hint='refresh_token')
+
+    @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
+    def test_revoke_failure_modes(self, flow_factory):
+        flow = flow_factory.return_value
+        type(flow).token = mock.PropertyMock(return_value={})
+
+        with self.subTest('dwave auth revoke: token missing'):
+            runner = CliRunner(mix_stderr=False)
+            with runner.isolated_filesystem():
+                result = runner.invoke(cli, ['auth', 'revoke'])
+
+            self.assertEqual(result.exit_code, 100)
+
+        flow.reset_mock()
+        flow.revoke_token.return_value = False
+        type(flow).token = mock.PropertyMock(return_value=dict(access_token='123'))
+
+        with self.subTest('dwave auth revoke: server-side failure'):
+            runner = CliRunner(mix_stderr=False)
+            with runner.isolated_filesystem():
+                result = runner.invoke(cli, ['auth', 'revoke', 'access-token'])
+
+            self.assertEqual(result.exit_code, 102)
 
     @mock.patch('dwave.cloud.api.resources.LeapAccount.from_config')
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')

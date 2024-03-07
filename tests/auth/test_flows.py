@@ -38,6 +38,7 @@ class TestAuthFlow(unittest.TestCase):
         self.redirect_uri_oob = 'oob'
         self.authorization_endpoint = 'https://example.com/authorize'
         self.token_endpoint = 'https://example.com/token'
+        self.revocation_endpoint = 'https://example.com/revoke'
         self.token = dict(access_token='123', refresh_token='456', id_token='789')
         self.creds = Credentials(create=False)
         self.leap_api_endpoint = 'https://example.com/leap/api'
@@ -48,6 +49,7 @@ class TestAuthFlow(unittest.TestCase):
             redirect_uri=self.redirect_uri_oob,
             authorization_endpoint=self.authorization_endpoint,
             token_endpoint=self.token_endpoint,
+            revocation_endpoint=self.revocation_endpoint,
             leap_api_endpoint=self.leap_api_endpoint,
             creds=self.creds)
 
@@ -148,6 +150,89 @@ class TestAuthFlow(unittest.TestCase):
             flow.ensure_active_token()
 
         m.assert_called_once_with(token=self.token)
+
+    def test_revoke_token(self):
+        flow = AuthFlow(**self.test_args)
+
+        ok = requests.Response()
+        ok.status_code = 200
+
+        with mock.patch.object(flow.session, 'revoke_token',
+                               return_value=ok) as m:
+            status = flow.revoke_token()
+            self.assertTrue(status)
+
+        m.assert_called_once_with(url=flow.revocation_endpoint, token=None,
+                                  token_type_hint=None)
+
+    def test_revoke_token_is_conditionally_available(self):
+        # when: `revocation_endpoint` is undefined
+        args = self.test_args.copy()
+        del args['revocation_endpoint']
+
+        # then: init works
+        flow = AuthFlow(**args)
+
+        # but: revoke_token() is unavailable
+        with self.assertRaisesRegex(TypeError, 'endpoint undefined'):
+            flow.revoke_token()
+
+    @requests_mock.Mocker()
+    def test_revoke_token_request_formation(self, m):
+        # when we want to revoke a specific token, outgoing request conforms to RFC 7009
+
+        # mock the revocation_endpoint
+        expected_params = dict(
+            token=self.token['access_token'],
+            token_type_hint='access_token')
+
+        def post_body_matcher(request):
+            params = dict(parse_qsl(request.text))
+            return params == expected_params
+
+        m.get(requests_mock.ANY, status_code=404)
+        m.post(requests_mock.ANY, status_code=404)
+        m.post(self.revocation_endpoint, json=dict(error="error", error_description="bad request"))
+        m.post(self.revocation_endpoint, additional_matcher=post_body_matcher, status_code=200)
+
+        # reset creds
+        self.creds.clear()
+
+        # initialize flow with token
+        flow = AuthFlow(**self.test_args)
+        flow.token = self.token
+
+        # verify revoke token flow
+        status = flow.revoke_token(token=self.token['access_token'],
+                                   token_type_hint='access_token')
+        self.assertTrue(status)
+
+    @requests_mock.Mocker()
+    def test_revoke_token_default_request_formation(self, m):
+        # when token is unspecified, refresh token should be revoked
+
+        # mock the revocation_endpoint:
+        expected_params = dict(token=self.token['refresh_token'])
+
+        def post_body_matcher(request):
+            params = dict(parse_qsl(request.text))
+            return params == expected_params
+
+        m.get(requests_mock.ANY, status_code=404)
+        m.post(requests_mock.ANY, status_code=404)
+        m.post(self.revocation_endpoint, json=dict(error="error", error_description="bad request"))
+        m.post(self.revocation_endpoint, additional_matcher=post_body_matcher, status_code=200)
+
+        # reset creds
+        self.creds.clear()
+
+        # initialize flow with token
+        flow = AuthFlow(**self.test_args)
+        flow.token = self.token
+
+        # verify revoke token flow
+        status = flow.revoke_token()
+        self.assertTrue(status)
 
     def test_session_config(self):
         config = dict(

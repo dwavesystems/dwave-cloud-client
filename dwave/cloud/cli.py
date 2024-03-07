@@ -1009,11 +1009,11 @@ def get(*, config_file, profile, token_type, json_output, output):
     flow = LeapAuthFlow.from_config_model(config)
 
     token_key = token_type.replace('-', '_')
-    if not flow.token or not (token_value := flow.token.get(token_key)):
+    if not flow.token or not token_key in flow.token:
         raise CLIError('Token not found. Please run "dwave auth login".', code=100)
 
     token_pretty = token_type.replace('-', ' ').capitalize()
-    output(f"{token_pretty}: {{%s}}" % token_key , **{token_key: token_value})
+    output(f"{token_pretty}: {{%s}}" % token_key, **{token_key: flow.token[token_key]})
 
     if token_type == 'access-token':
         expires_at = flow.token.get('expires_at')
@@ -1049,6 +1049,32 @@ def refresh(*, config_file, profile, output):
 
     output('Access and refresh tokens successfully refreshed. '
            'You can now use "dwave auth get" to view them.')
+
+
+@auth.command()
+@config_file_options()
+@click.argument('token_type', default='access-token',
+                type=click.Choice(['access-token', 'refresh-token']))
+@json_output
+@standardized_output
+def revoke(*, config_file, profile, token_type, json_output, output):
+    """Revoke access and/or refresh token(s) for Leap API."""
+
+    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
+    flow = LeapAuthFlow.from_config_model(config)
+
+    token_key = token_type.replace('-', '_')
+    token_pretty = token_type.replace('-', ' ').capitalize()
+    if not flow.token or not token_key in flow.token:
+        raise CLIError('Token not found. Please run "dwave auth login".', code=100)
+
+    # revoke
+    revoked = flow.revoke_token(token=flow.token[token_key], token_type_hint=token_key)
+
+    if not revoked:
+        raise CLIError(f'{token_pretty} revocation failed.', code=102)
+
+    output(f'{token_pretty} successfully revoked.')
 
 
 @cli.group()
