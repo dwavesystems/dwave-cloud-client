@@ -515,6 +515,8 @@ class TestAuthCli(unittest.TestCase):
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
     def test_get(self, flow_factory):
         flow = flow_factory.return_value
+        token = dict(access_token='123', refresh_token='456')
+        type(flow).token = mock.PropertyMock(return_value=token)
 
         with self.subTest('dwave auth get access-token'):
             flow.reset_mock()
@@ -522,11 +524,8 @@ class TestAuthCli(unittest.TestCase):
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['auth', 'get', 'access-token'])
 
-            flow.token.get.assert_has_calls(
-                [mock.call('access_token'), mock.call('expires_at')], any_order=True)
-            self.assertIn('Access token:', result.output)
-
             self.assertEqual(result.exit_code, 0)
+            self.assertIn(token['access_token'], result.output)
 
         with self.subTest('dwave auth get refresh-token'):
             flow.reset_mock()
@@ -534,10 +533,8 @@ class TestAuthCli(unittest.TestCase):
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['auth', 'get', 'refresh-token'])
 
-            flow.token.get.assert_called_with('refresh_token')
-            self.assertIn('Refresh token:', result.output)
-
             self.assertEqual(result.exit_code, 0)
+            self.assertIn(token['refresh_token'], result.output)
 
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
     def test_refresh(self, flow_factory):
