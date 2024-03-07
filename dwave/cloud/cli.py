@@ -1058,7 +1058,7 @@ def refresh(*, config_file, profile, output):
 @json_output
 @standardized_output
 def revoke(*, config_file, profile, token_type, json_output, output):
-    """Revoke Leap API access and/or refresh token(s)."""
+    """Revoke access and/or refresh token(s) for Leap API."""
 
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
     flow = LeapAuthFlow.from_config_model(config)

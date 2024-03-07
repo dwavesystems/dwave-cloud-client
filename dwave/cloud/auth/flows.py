@@ -233,8 +233,8 @@ class AuthFlow:
             was invalid already. False in case of an error.
 
         Note:
-            Precondition for token revocation is defining a ``revocation_endpoint``
-            during :class:`~dwave.cloud.auth.flows.AuthFlow` construction.
+            Token revocation requires that a ``revocation_endpoint`` is defined
+            in :class:`~dwave.cloud.auth.flows.AuthFlow` construction.
         """
         if self.revocation_endpoint is None:
             raise TypeError("Revocation endpoint undefined.")
