@@ -1,0 +1,4 @@
+---
+fixes:
+  - |
+    Log failing request/response details in the low-level API client.
