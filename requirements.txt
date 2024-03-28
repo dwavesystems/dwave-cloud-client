@@ -1,4 +1,5 @@
-requests[socks]>=2.18
+requests[socks]>=2.25
+urllib3>=1.26.0
 pydantic>=2,<3
 homebase>=1.0.0
 python-dateutil>=2.7
