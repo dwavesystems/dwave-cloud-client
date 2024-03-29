@@ -1,14 +1,14 @@
-requests[socks]>=2.25
-urllib3>=1.26.0
+requests[socks]>=2.25,<3
+urllib3>=1.26.0,<3
 pydantic>=2,<3
-homebase>=1.0.0
-python-dateutil>=2.7
-click>=7
-plucky>=0.4.3
-diskcache>=5.2.1
+homebase>=1.0.0,<2
+python-dateutil>=2.7,<3
+click>=7,<9
+plucky>=0.4.3,<0.5
+diskcache>=5.2.1,<6
 packaging>=19
-werkzeug>=2.2
-typing-extensions>=4.5.0
+werkzeug>=2.2,<3
+typing-extensions>=4.5.0,<5
 authlib>=1.2,<2
 
 # bring in py312 semantics of importlib.metadata.entry_points()
@@ -24,4 +24,4 @@ numpy>=1.17.3
 dwave-networkx>=0.8.9
 
 # dev requirements
-reno==3.4.0
+reno~=4.0
