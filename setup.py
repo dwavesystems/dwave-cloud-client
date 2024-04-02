@@ -13,10 +13,11 @@ with open(package_info_path, encoding='utf-8') as f:
 python_requires = '>=3.8'
 
 # Package requirements, minimal pinning
-install_requires = ['requests[socks]>=2.18', 'pydantic>=2,<3', 'homebase>=1.0',
-                    'click>=7.0', 'python-dateutil>=2.7', 'plucky>=0.4.3',
-                    'diskcache>=5.2.1', 'packaging>=19', 'werkzeug>=2.2',
-                    'typing-extensions>=4.5.0', 'authlib>=1.2,<2',
+install_requires = ['requests[socks]>=2.25,<3', 'urllib3>=1.26,<3',
+                    'pydantic>=2,<3', 'homebase>=1.0,<2',
+                    'click>=7.0,<9', 'python-dateutil>=2.7,<3', 'plucky>=0.4.3,<0.5',
+                    'diskcache>=5.2.1,<6', 'packaging>=19', 'werkzeug>=2.2,<4',
+                    'typing-extensions>=4.5.0,<5', 'authlib>=1.2,<2',
                     'importlib_metadata>=5.0.0',    # can be dropped in py312+
                     ]
 
