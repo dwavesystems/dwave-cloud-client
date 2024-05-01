@@ -103,6 +103,20 @@ class AuthFlow:
             authorization_endpoint=authorization_endpoint,
             token_endpoint=token_endpoint)
 
+        # setup response logging
+        def log_response(response, **kwargs):
+            callee = type(self.session).__name__
+
+            req = getattr(response, 'request', None)
+            if req is not None:
+                logger.trace("[%s] request=%r", callee,
+                             dict(method=req.method, url=req.url,
+                                  headers=req.headers, body=req.body))
+
+            logger.trace("[%s] request(...) = (code=%r, body=%r, headers=%r, %r)",
+                         callee, response.status_code, response.text, response.headers, kwargs)
+        self.session.hooks["response"].append(log_response)
+
         # set default headers (overwritten by ``session_config['headers']``)
         self.session.headers.update({'User-Agent': default_user_agent()})
 

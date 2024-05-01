@@ -66,7 +66,7 @@ class LoggingSession(BaseUrlSession):
     RequestRecord = namedtuple('RequestRecord',
                                ('request', 'response', 'exception'))
 
-    def send(self, request: requests.PreparedRequest, **kwargs):
+    def send(self, request: requests.PreparedRequest, **kwargs) -> requests.Response:
         callee = type(self).__name__
         if logger.getEffectiveLevel() >= logging.DEBUG:
             logger.debug(f"[{callee!s}] send(method={request.method!r}, url={request.url!r}, ...)")
