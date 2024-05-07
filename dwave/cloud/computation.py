@@ -152,6 +152,9 @@ class Future(object):
         self._results_ready_event = threading.Event()
         self._other_events = []
 
+        # set when answer data is downloaded
+        self._answer_data_ready_event = threading.Event()
+
         # current poll back-off interval, in seconds
         self._poll_backoff = None
 
@@ -909,6 +912,10 @@ class Future(object):
             # Prepare results from the response
             self._decode()
             self._alias_result()
+
+            # signal answer data downloaded
+            if 'answer' in self._result:
+                self._answer_data_ready_event.set()
 
             # create a direct reference to sampleset if already available in response
             # NB: in this case we don't actually need a weakref (strong ref is fine),
