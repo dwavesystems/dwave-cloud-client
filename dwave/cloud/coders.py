@@ -21,7 +21,7 @@ from dwave.cloud.utils import uniform_get, active_qubits
 __all__ = [
     'encode_problem_as_qp', 'decode_qp', 'decode_qp_numpy',
     'encode_problem_as_bq', 'decode_bq',
-    'encode_problem_as_ref',
+    'encode_problem_as_ref', 'decode_binary_ref',
     'bqm_as_file',
 ]
 

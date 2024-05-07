@@ -34,6 +34,7 @@ Examples:
 
 """
 
+import io
 import re
 import time
 import copy
@@ -53,7 +54,7 @@ from itertools import chain, zip_longest
 from functools import partial, wraps
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict
+from typing import Dict, Optional, Union
 
 import requests
 import urllib3
@@ -1612,7 +1613,8 @@ class Client(object):
         finally:
             session.close()
 
-    def _download_answer_binary_ref(self, *, auth_method: str, url: str) -> concurrent.futures.Future:
+    def _download_answer_binary_ref(self, *, auth_method: str, url: str,
+                                    output: Optional[io.IOBase] = None) -> concurrent.futures.Future:
         """Initiate binary-ref answer download, returning the binary data in
         :class:`~concurrent.futures.Future`.
 
@@ -1624,13 +1626,14 @@ class Client(object):
                 Answer binary data.
 
         Returns:
-            :class:`concurrent.futures.Future`[bytes]:
+            :class:`concurrent.futures.Future`[bytes | io.IOBase]:
                 Answer data in a Future.
         """
         return self._download_answer_executor.submit(
-            self._download_answer_worker, auth_method=auth_method, url=url)
+            self._download_answer_worker, auth_method=auth_method, url=url, output=output)
 
-    def _download_answer_worker(self, *, auth_method: str, url: str) -> bytes:
+    def _download_answer_worker(self, *, auth_method: str, url: str,
+                                output: Optional[io.IOBase] = None) -> Union[bytes, io.IOBase]:
         if auth_method != 'sapi-token':
             raise ValueError(f"Authentication method {auth_method!r} not supported.")
 
@@ -1639,9 +1642,18 @@ class Client(object):
 
         with self.create_session() as session:
             # TODO: this is temporary, the url will be absolute, but it's not fixed yet sapi-side
-            answer = session.get(url.strip('/')).content
+            url = url.strip('/')
 
-        logger.debug("Answer data downloaded from %r, size = %r", url, len(answer))
+            if output is not None:
+                for chunk in session.get(url, stream=True).iter_content(chunk_size=8192):
+                    output.write(chunk)
+                output.seek(0)
+                answer = output
+
+            else:
+                answer = session.get(url).content
+
+        logger.debug("Answer data downloaded from %r", url)
 
         return answer
 
