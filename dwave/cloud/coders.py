@@ -14,6 +14,7 @@
 
 import struct
 import base64
+from typing import Callable
 
 from dwave.cloud.utils import uniform_get, active_qubits
 
@@ -345,7 +346,10 @@ def decode_bq(msg):
                            "Re-install the library with 'bqm' support.")
 
     answer = msg['answer']
-    assert answer['format'] == 'bq'
+    if answer['format'] != 'bq':
+        raise ValueError(f"Unsupported answer format: {answer['format']}")
+    if 'data' not in answer:
+        raise ValueError("Incomplete answer")
 
     result = {}
 
@@ -355,6 +359,24 @@ def decode_bq(msg):
     # include problem type
     result['problem_type'] = msg['type']
 
+    return result
+
+
+def decode_binary_ref(msg: dict, ref_resolver: Callable) -> dict:
+    """Decode binary-ref answer."""
+
+    answer = msg['answer']
+    if answer['format'] != 'binary-ref':
+        raise ValueError(f"Unsupported answer format: {answer['format']}")
+    if 'auth-method' not in answer or 'url' not in answer:
+        raise ValueError("Incomplete binary-ref answer")
+
+    result = {
+        'problem_type': msg['type'],
+        'timing': answer.get('timing', {}),
+        'shape': answer.get('shape', {}),
+        'answer': ref_resolver(auth_method=answer['auth-method'], url=answer['url'])
+    }
     return result
 
 
