@@ -43,7 +43,7 @@ def unstructured_solver_data(problem_type='bqm'):
         "description": "A test unstructured solver"
     }
 
-def complete_reply(sampleset, id_="problem-id", type_='bqm', label=None):
+def complete_reply_bq(sampleset, id_="problem-id", type_='bqm', label=None):
     """Reply with the sampleset as a solution."""
 
     return json.dumps([{
@@ -59,6 +59,30 @@ def complete_reply(sampleset, id_="problem-id", type_='bqm', label=None):
         "id": id_,
         "label": label
     }])
+
+def complete_reply_binary_ref(answer_data_uri, id_="problem-id", type_='cqm', label=None):
+    """Reply with `answer_data_uri` in binary-ref."""
+
+    return json.dumps([{
+        "status": "COMPLETED",
+        "solver": "solver-name",
+        "solved_on": "2019-07-31T12:34:56Z",
+        "submitted_on": "2019-07-31T12:34:56Z",
+        "answer": {
+            "format": "binary-ref",
+            "auth-method": "sapi-token",
+            "url": answer_data_uri,
+            "timing": {
+                "qpu_access_time": 1
+            }
+        },
+        "type": type_,
+        "id": id_,
+        "label": label
+    }])
+
+def answer_data_reply(data):
+    return data
 
 def choose_reply(path, replies):
     """Choose the right response based on the path and make a mock response."""
@@ -102,7 +126,7 @@ class TestUnstructuredSolver(unittest.TestCase):
                 ss = dimod.ExactSolver().sample(bqm)
                 ss.info.update(problem_id=mock_problem_id)
                 session.post = lambda path, _: choose_reply(
-                    path, {'problems/': complete_reply(ss, id_=mock_problem_id)})
+                    path, {'problems/': complete_reply_bq(ss, id_=mock_problem_id)})
 
                 fut = solver.sample_bqm(bqm)
                 numpy.testing.assert_array_equal(fut.sampleset, ss)
@@ -122,7 +146,7 @@ class TestUnstructuredSolver(unittest.TestCase):
                 ss = dimod.ExactSolver().sample_ising(lin, quad)
                 ss.info.update(problem_id=mock_problem_id)
                 session.post = lambda path, _: choose_reply(
-                    path, {'problems/': complete_reply(ss, id_=mock_problem_id)})
+                    path, {'problems/': complete_reply_bq(ss, id_=mock_problem_id)})
 
                 fut = solver.sample_ising(lin, quad)
                 numpy.testing.assert_array_equal(fut.sampleset, ss)
@@ -135,7 +159,7 @@ class TestUnstructuredSolver(unittest.TestCase):
                 ss = dimod.ExactSolver().sample_qubo(qubo)
                 ss.info.update(problem_id=mock_problem_id)
                 session.post = lambda path, _: choose_reply(
-                    path, {'problems/': complete_reply(ss, id_=mock_problem_id)})
+                    path, {'problems/': complete_reply_bq(ss, id_=mock_problem_id)})
 
                 fut = solver.sample_qubo(qubo)
                 numpy.testing.assert_array_equal(fut.sampleset, ss)
@@ -182,7 +206,7 @@ class TestUnstructuredSolver(unittest.TestCase):
                 ss = dimod.ExactSolver().sample(dimod.BQM.empty('SPIN'))
                 ss.info.update(problem_id=mock_problem_id)
                 session.post = lambda path, _: choose_reply(
-                    path, {'problems/': complete_reply(ss, id_=mock_problem_id, type_=problem_type)})
+                    path, {'problems/': complete_reply_bq(ss, id_=mock_problem_id, type_=problem_type)})
 
                 # verify decoding works
                 fut = solver.sample_cqm(cqm)
@@ -225,7 +249,7 @@ class TestUnstructuredSolver(unittest.TestCase):
                 ss = dimod.ExactSolver().sample(dimod.BQM.empty('SPIN'))
                 ss.info.update(problem_id=mock_problem_id)
                 session.post = lambda path, _: choose_reply(
-                    path, {'problems/': complete_reply(ss, id_=mock_problem_id, type_=problem_type)})
+                    path, {'problems/': complete_reply_bq(ss, id_=mock_problem_id, type_=problem_type)})
 
                 # verify decoding works
                 fut = solver.sample_dqm(dqm)
@@ -255,7 +279,7 @@ class TestUnstructuredSolver(unittest.TestCase):
                     # direct bqm sampling
                     ss = dimod.ExactSolver().sample(bqm)
                     session.post = lambda path, _: choose_reply(
-                        path, {'problems/': complete_reply(ss)})
+                        path, {'problems/': complete_reply_bq(ss)})
 
                     fut = solver.sample_bqm(bqm)
 
@@ -386,7 +410,7 @@ class TestProblemLabel(unittest.TestCase):
                 # construct mock response
                 ss = dimod.ExactSolver().sample(bqm)
                 session.post = lambda path, _: choose_reply(
-                    path, {'problems/': complete_reply(ss, id_=mock_problem_id, label=label)})
+                    path, {'problems/': complete_reply_bq(ss, id_=mock_problem_id, label=label)})
 
                 # sample and verify label
                 fut = solver.sample_bqm(bqm, label=label)
@@ -398,6 +422,55 @@ class TestProblemLabel(unittest.TestCase):
 
                 # verify sampleset is cached via weakref
                 self.assertIsInstance(fut._sampleset(), dimod.SampleSet)
+
+
+class TestAnswerDownloadFromBinaryRef(unittest.TestCase):
+
+    def test_binary_ref_answer_download(self):
+        # mock problem
+        cqm = mock.Mock()
+        cqm.to_file.return_value = io.BytesIO(b'123')
+
+        mock_answer_data = b'abc'
+
+        problem_type = 'cqm'
+
+        # use a global mocked session, so we can modify it on the fly
+        session = mock.Mock()
+        setattr(session, '__enter__', mock.Mock())
+        setattr(session, '__exit__', mock.Mock())
+        session.__enter__.return_value = session
+        session.__exit__.return_value = None
+        session.get.return_value.iter_content.return_value = iter([mock_answer_data])
+
+        # upload is now part of submit, so we need to mock it
+        mock_problem_id = 'mock-problem-id'
+        def mock_upload(self, cqm_file):
+            cqm_file.close()
+            return Present(result=mock_problem_id)
+
+        # construct a functional solver by mocking client and api response data
+        with mock.patch.multiple(Client, create_session=lambda _: session,
+                                 upload_problem_encoded=mock_upload):
+            with Client(endpoint='endpoint', token='token') as client:
+                solver = CQMSolver(client, unstructured_solver_data(problem_type=problem_type))
+
+                # solver has to support binary-ref
+                solver._handled_encoding_formats.add('binary-ref')
+
+                # use mock answer data
+                answer_url = f'/problems/{mock_problem_id}/answer/data/'
+                session.post = lambda path, _: choose_reply(
+                    path, {
+                        'problems/': complete_reply_binary_ref(answer_url, id_=mock_problem_id, type_=problem_type),
+                        answer_url: answer_data_reply(mock_answer_data),
+                    })
+
+                # verify decoding works
+                fut = solver.sample_cqm(cqm)
+                self.assertIsInstance(fut.answer_data, io.IOBase)
+                self.assertEqual(fut.answer_data.read(), mock_answer_data)
+                self.assertEqual(fut.problem_type, problem_type)
 
 
 class TestSerialization(unittest.TestCase):

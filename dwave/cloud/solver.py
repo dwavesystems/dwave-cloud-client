@@ -195,7 +195,7 @@ class BaseSolver(object):
 
         fmt = msg.get('answer', {}).get('format')
         if fmt not in self._handled_encoding_formats:
-            raise ValueError('Unhandled answer encoding format received.')
+            raise ValueError(f'Unhandled answer encoding format received: {fmt!r}.')
 
         if fmt == 'qp':
             return self._decode_qp(msg)
