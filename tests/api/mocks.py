@@ -243,3 +243,24 @@ class UnstructuredSapiMockResponses(SapiMockResponses):
 
         # unstructured problem specific
         self.problem_data_id = str(uuid.uuid4())    # mock `self.problem` uploaded
+
+
+class UnstructuredSapiMockResponsesWithBinaryRefAnswer(UnstructuredSapiMockResponses):
+
+    def _problem_answer(self, answer_data_uri, **kwargs) -> dict:
+        answer = {
+            "format": "binary-ref",
+            "auth-method": "sapi-token",
+            "url": answer_data_uri,
+            "timing": {
+                "qpu_access_time": 100,
+                "run_time": 1000
+            },
+            "shape": {}
+        }
+        answer.update(**kwargs)
+        return answer
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault('answer', self._problem_answer("http://127.0.0.1/answer/data"))
+        super().__init__(**kwargs)

@@ -33,12 +33,14 @@ except ImportError:
 from dwave.cloud.client.base import Client
 from dwave.cloud.coders import (
     encode_problem_as_qp, decode_qp,
-    encode_problem_as_ref, decode_bq)
+    encode_problem_as_ref, decode_bq, decode_binary_ref)
 from dwave.cloud.api.resources import Problems
 from dwave.cloud.api import exceptions, models, constants
 
 from tests import config
-from tests.api.mocks import StructuredSapiMockResponses, UnstructuredSapiMockResponses
+from tests.api.mocks import (
+    StructuredSapiMockResponses, UnstructuredSapiMockResponses,
+    UnstructuredSapiMockResponsesWithBinaryRefAnswer)
 
 
 class AssertionSatisfied(Exception):
@@ -352,10 +354,21 @@ class StructuredProblemTestsMixin:
 class UnstructuredProblemTestsMixin:
 
     def verify_problem_answer(self, answer: models.ProblemAnswer):
-        ans = decode_bq(msg=dict(answer=answer.model_dump(), type=self.problem_type.value))
-        ss = ans['sampleset']
-        self.assertEqual(ss.variables, self.bqm.variables)
-        dimod.testing.assert_sampleset_energies(ss, self.bqm)
+        if answer.format is constants.AnswerEncodingFormat.BQ:
+            ans = decode_bq(
+                msg=dict(answer=answer.model_dump(), type=self.problem_type.value))
+            ss = ans['sampleset']
+            self.assertEqual(ss.variables, self.bqm.variables)
+            dimod.testing.assert_sampleset_energies(ss, self.bqm)
+        elif answer.format is constants.AnswerEncodingFormat.BINARY_REF:
+            mock_answer_data = b'123456'
+            ans = decode_binary_ref(
+                msg=dict(answer=answer.model_dump(by_alias=True), type=self.problem_type.value),
+                ref_resolver=lambda **kw: mock_answer_data)
+            answer_data = ans['answer']
+            self.assertEqual(answer_data, mock_answer_data)
+        else:
+            raise ValueError(f"Unsupported answer encoding format: {answer.format!r}")
 
 
 class ProblemResourcesMockerMixin:
@@ -598,7 +611,7 @@ class TestMockProblemsUnstructured(UnstructuredProblemTestsMixin,
                                    ProblemResourcesBaseTests,
                                    unittest.TestCase):
     """Verify `dwave.cloud.api.resources.Problems` handle unstructured problems
-    using mocked SAPI responses.
+    with answers in the `bq` format, using mocked SAPI responses.
     """
 
     @classmethod
@@ -608,6 +621,30 @@ class TestMockProblemsUnstructured(UnstructuredProblemTestsMixin,
         cls.p1 = UnstructuredSapiMockResponses()
         cls.p2 = UnstructuredSapiMockResponses()
         cls.p3 = UnstructuredSapiMockResponses()
+
+        cls.bqm = cls.p1.problem
+        cls.problem_data = models.ProblemData.model_validate(cls.p1.problem_data())
+        cls.problem_type = constants.ProblemType(cls.p1.problem_type)
+        cls.problem_id = cls.p1.problem_id
+        cls.problem_label = cls.p1.problem_label
+
+        cls.params = dict(time_limit=3)
+        cls.solver_id = cls.p1.solver.id
+
+
+@unittest.skipUnless(dimod, "dimod not installed")
+class TestMockProblemsUnstructuredWithBinaryRefAsnwer(TestMockProblemsUnstructured):
+    """Verify `dwave.cloud.api.resources.Problems` handle unstructured problems
+    with answers in the `binary-ref` format, using mocked SAPI responses.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        """Configure attributes required (used) by ProblemResourcesBaseTests."""
+
+        cls.p1 = UnstructuredSapiMockResponsesWithBinaryRefAnswer()
+        cls.p2 = UnstructuredSapiMockResponsesWithBinaryRefAnswer()
+        cls.p3 = UnstructuredSapiMockResponsesWithBinaryRefAnswer()
 
         cls.bqm = cls.p1.problem
         cls.problem_data = models.ProblemData.model_validate(cls.p1.problem_data())
