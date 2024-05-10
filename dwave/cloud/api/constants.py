@@ -58,6 +58,7 @@ class ProblemEncodingFormat(str, enum.Enum):
 class AnswerEncodingFormat(str, enum.Enum):
     QP = "qp"
     BQ = "bq"   # dimod (de-)serialization-based
+    BINARY_REF = "binary-ref"
 
 
 class ProblemType(str, enum.Enum):

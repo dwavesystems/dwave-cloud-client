@@ -16,7 +16,7 @@ from datetime import datetime
 from typing import List, Union, Optional, Dict, Any
 from typing_extensions import Annotated     # backport for py37, py38
 
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel, RootModel, Field
 from pydantic.functional_validators import AfterValidator
 
 from dwave.cloud.api import constants
@@ -63,8 +63,18 @@ class UnstructuredProblemAnswer(BaseModel):
     data: dict
 
 
+class UnstructuredProblemAnswerBinaryRef(BaseModel):
+    format: constants.AnswerEncodingFormat = constants.AnswerEncodingFormat.BINARY_REF
+    auth_method: str = Field(alias='auth-method')
+    url: str
+    timing: dict
+    shape: dict
+
+
 class ProblemAnswer(RootModel):
-    root: Union[StructuredProblemAnswer, UnstructuredProblemAnswer]
+    root: Union[StructuredProblemAnswer,
+                UnstructuredProblemAnswer,
+                UnstructuredProblemAnswerBinaryRef]
 
     def __getattr__(self, item):
         return getattr(self.root, item)
