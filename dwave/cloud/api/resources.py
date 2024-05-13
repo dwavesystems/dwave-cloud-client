@@ -60,7 +60,7 @@ class ResourceBase:
     client_class: DWaveAPIClient = DWaveAPIClient
 
     # endpoint path prefix (base path) specific to all methods on the resource
-    resource_path: str = None
+    resource_path: Optional[str] = None
 
     def __init__(self, client: Optional[DWaveAPIClient] = None, **config):
         if isinstance(client, DWaveAPIClient):

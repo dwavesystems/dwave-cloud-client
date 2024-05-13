@@ -439,15 +439,9 @@ class DWaveAPIClient:
         # failure. However, that is currently not the case. We need to work
         # around this until it's fixed.
 
-        # no error -> body is json
+        # no error -> content type verified by `VersionedAPISession ` @accepts
         # error -> body can be json or plain text error message
-        if response.ok:
-            try:
-                response.json()
-            except:
-                raise exceptions.ResourceBadResponseError("JSON response expected")
-
-        else:
+        if not response.ok:
             try:
                 msg = response.json()
                 error_msg = msg['error_msg']
