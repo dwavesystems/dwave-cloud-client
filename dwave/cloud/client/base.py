@@ -1633,7 +1633,7 @@ class Client(object):
             self._download_answer_worker, auth_method=auth_method, url=url, output=output)
 
     def _download_answer_worker(self, *, auth_method: str, url: str,
-                                output: Optional[io.IOBase] = None) -> Union[bytes, io.IOBase]:
+                                output: Optional[io.IOBase] = None) -> io.IOBase:
         if auth_method != 'sapi-token':
             raise ValueError(f"Authentication method {auth_method!r} not supported.")
 
@@ -1644,18 +1644,18 @@ class Client(object):
             # TODO: this is temporary, the url will be absolute, but it's not fixed yet sapi-side
             url = url.strip('/')
 
-            if output is not None:
-                for chunk in session.get(url, stream=True).iter_content(chunk_size=8192):
-                    output.write(chunk)
-                output.seek(0)
-                answer = output
+            if output is None:
+                output = io.BytesIO()
 
-            else:
-                answer = session.get(url).content
+            size = 0
+            for chunk in session.get(url, stream=True).iter_content(chunk_size=8192):
+                size += output.write(chunk)
 
-        logger.debug("Answer data downloaded from %r", url)
+            output.seek(0)
 
-        return answer
+        logger.debug("Answer data downloaded from %r. Written %r bytes.", url, size)
+
+        return output
 
     def upload_problem_encoded(self, problem, problem_id=None):
         """Initiate multipart problem upload, returning the Problem ID in a
