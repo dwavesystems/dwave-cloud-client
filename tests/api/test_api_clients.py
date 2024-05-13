@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import uuid
 import unittest
 
@@ -251,15 +252,28 @@ class TestNonStrictVersionValidation(TestVersionValidation):
 class TestResponseParsing(unittest.TestCase):
 
     @requests_mock.Mocker()
-    def test_non_json(self, m):
-        """Non-JSON OK response is unexpected."""
+    def test_json(self, m):
+        """Non-JSON response is OK if consistent with media type."""
 
-        m.get(requests_mock.ANY, text='text', status_code=200)
+        mock_response = {"a": 1}
+
+        m.get(requests_mock.ANY, content=json.dumps(mock_response).encode('ascii'),
+              status_code=200, headers={'Content-Type': 'application/octet-stream'})
 
         with DWaveAPIClient(endpoint='https://mock') as client:
 
-            with self.assertRaises(exceptions.ResourceBadResponseError) as exc:
-                client.session.get('test')
+            with self.subTest("binary response when expecting json"):
+                client.session.set_accept(media_type="application/json")
+                with self.assertRaises(exceptions.ResourceBadResponseError):
+                    client.session.get('')
+
+            with self.subTest("response matches the expected media type"):
+                client.session.set_accept(media_type="application/octet-stream", media_type_params={"case": 2})
+                self.assertEqual(client.session.get('').json(), mock_response)
+
+            with self.subTest("everything goes when there's no expectation on media type"):
+                client.session.unset_accept()
+                self.assertTrue(len(client.session.get('').content))
 
     @requests_mock.Mocker()
     def test_structured_error_response(self, m):
