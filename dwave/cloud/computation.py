@@ -26,14 +26,15 @@ waiting for and retrieving results, cancelling enqueued jobs, etc.
 Some :class:`Future` methods are blocking.
 """
 
+import io
 import time
 import threading
 import functools
 import weakref
 
-from operator import itemgetter
-from dateutil.parser import parse
 from concurrent.futures import TimeoutError
+from dateutil.parser import parse
+from operator import itemgetter
 
 from dwave.cloud.utils import (
     utcnow, datetime_to_timestamp, aliasdict, deprecated)
@@ -151,6 +152,9 @@ class Future(object):
         self._results_ready_event = threading.Event()
         self._other_events = []
 
+        # set when answer data is downloaded
+        self._answer_data_ready_event = threading.Event()
+
         # current poll back-off interval, in seconds
         self._poll_backoff = None
 
@@ -159,6 +163,9 @@ class Future(object):
 
         # weakref to resolved (already constructed) sampleset
         self._sampleset = None
+
+        # file buffer for binary-ref answer data
+        self._answer_data = io.BytesIO()
 
     # make Future ordered
 
@@ -873,6 +880,10 @@ class Future(object):
         """
         return self.result()['problem_type']
 
+    @property
+    def answer_data(self):
+        return self.result().get('answer')
+
     def __getitem__(self, key):
         """Provide a simple results item getter. Blocks if future is unresolved.
 
@@ -901,6 +912,10 @@ class Future(object):
             # Prepare results from the response
             self._decode()
             self._alias_result()
+
+            # signal answer data downloaded
+            if 'answer' in self._result:
+                self._answer_data_ready_event.set()
 
             # create a direct reference to sampleset if already available in response
             # NB: in this case we don't actually need a weakref (strong ref is fine),
@@ -938,7 +953,7 @@ class Future(object):
         """Decode answer data from the response."""
         start = time.time()
         self._patch_offset()
-        self._result = self.solver.decode_response(self._message)
+        self._result = self.solver.decode_response(self._message, answer_data=self._answer_data)
         self.parse_time = time.time() - start
         return self._result
 

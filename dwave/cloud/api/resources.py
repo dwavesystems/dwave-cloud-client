@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import json
 from typing import List, Union, Optional, Callable, get_type_hints
 from functools import wraps
@@ -216,6 +217,23 @@ class Problems(ResourceBase):
         response = self.session.get(path)
         answer = response.json()['answer']
         return models.ProblemAnswer.model_validate(answer)
+
+    @accepts(media_type='application/octet-stream')
+    def get_answer_data(self, answer: models.UnstructuredProblemAnswerBinaryRef,
+                        output: Optional[io.IOBase] = None) -> io.IOBase:
+        """Retrieve binary-ref answer data."""
+        if answer.auth_method != constants.BinaryRefAuthMethod.SAPI_TOKEN:
+            raise ValueError(f"Authentication method {answer.auth_method!r} not supported.")
+
+        if output is None:
+            output = io.BytesIO()
+
+        for chunk in self.session.get(answer.url, stream=True).iter_content(chunk_size=8192):
+            output.write(chunk)
+
+        output.seek(0)
+
+        return output
 
     @accepts(media_type='application/vnd.dwave.sapi.problem-message+json', version='>=2.1,<3')
     def get_problem_messages(self, problem_id: str) -> List[dict]:

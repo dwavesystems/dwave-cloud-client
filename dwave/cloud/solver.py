@@ -28,17 +28,19 @@ You can list all solvers available to a :class:`~dwave.cloud.client.Client` with
 
 """
 
+import io
 import copy
 import json
 import logging
 import typing
 from collections.abc import Mapping
+from functools import partial
 
 from dwave.cloud.exceptions import (
     InvalidAPIResponseError, SolverPropertyMissingError,
     UnsupportedSolverError, ProblemStructureError)
 from dwave.cloud.coders import (
-    encode_problem_as_qp, encode_problem_as_ref,
+    encode_problem_as_qp, encode_problem_as_ref, decode_binary_ref,
     decode_qp_numpy, decode_qp, decode_bq, bqm_as_file)
 from dwave.cloud.utils import reformat_qubo_as_ising, NumpyEncoder
 from dwave.cloud.computation import Future
@@ -182,18 +184,26 @@ class BaseSolver(object):
         else:
             return decode_qp(msg)
 
-    def decode_response(self, msg):
+    def _download_binary_ref(self, *, auth_method: str, url: str,
+                             output: typing.Optional[io.IOBase] = None) -> typing.Union[bytes, io.IOBase]:
+        return self.client._download_answer_binary_ref(
+            auth_method=auth_method, url=url, output=output).result()
+
+    def decode_response(self, msg, answer_data: typing.Optional[io.IOBase] = None):
         if msg['type'] not in self._handled_problem_types:
             raise ValueError('Unknown problem type received.')
 
         fmt = msg.get('answer', {}).get('format')
         if fmt not in self._handled_encoding_formats:
-            raise ValueError('Unhandled answer encoding format received.')
+            raise ValueError(f'Unhandled answer encoding format received: {fmt!r}.')
 
         if fmt == 'qp':
             return self._decode_qp(msg)
         elif fmt == 'bq':
             return decode_bq(msg)
+        elif fmt == 'binary-ref':
+            ref_resolver = partial(self._download_binary_ref, output=answer_data)
+            return decode_binary_ref(msg, ref_resolver=ref_resolver)
         else:
             raise ValueError("Don't know how to decode %r answer format" % fmt)
 

@@ -58,6 +58,11 @@ class ProblemEncodingFormat(str, enum.Enum):
 class AnswerEncodingFormat(str, enum.Enum):
     QP = "qp"
     BQ = "bq"   # dimod (de-)serialization-based
+    BINARY_REF = "binary-ref"
+
+
+class BinaryRefAuthMethod(str, enum.Enum):
+    SAPI_TOKEN = "sapi-token"
 
 
 class ProblemType(str, enum.Enum):

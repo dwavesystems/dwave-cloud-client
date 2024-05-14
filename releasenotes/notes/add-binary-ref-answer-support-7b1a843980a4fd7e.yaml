@@ -1,0 +1,15 @@
+---
+features:
+  - |
+    Add support for ``binary-ref`` answer encoding format, where answer data
+    is not immediately present in the answer, but on an URI referenced in the
+    answer response.
+  - |
+    Add ``dwave.cloud.computation.Future.answer_data`` property to hold the
+    answer data of a resolved future. A call to ``.answer_data`` will block
+    until computation future is resolved.
+  - |
+    Add ``dwave.cloud.api.models.UnstructuredProblemAnswerBinaryRef`` model, a
+    subclass of ``ProblemAnswer`` for ``binary-ref`` answers, and a method
+    for downloading answer data (resolving binary-ref),
+    ``dwave.cloud.api.resources.Problems.get_answer_data``.

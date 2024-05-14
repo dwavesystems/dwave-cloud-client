@@ -34,6 +34,7 @@ Examples:
 
 """
 
+import io
 import re
 import time
 import copy
@@ -50,10 +51,10 @@ import codecs
 import concurrent.futures
 
 from itertools import chain, zip_longest
-from functools import partial, wraps, cached_property
+from functools import partial, wraps
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict
+from typing import Dict, Optional, Union
 
 import requests
 import urllib3
@@ -350,6 +351,9 @@ class Client(object):
     _UPLOAD_REQUEST_RETRIES = 2
     _UPLOAD_RETRIES_BACKOFF = lambda retry: 2 ** retry
 
+    # Binary-ref answer download parameters
+    _DOWNLOAD_ANSWER_THREAD_COUNT = 2
+
     @staticmethod
     def _legacy_config_property_proxy(self, legacy_property, config_path):
         warnings.warn(
@@ -536,6 +540,10 @@ class Client(object):
         self._encode_problem_executor = \
             ThreadPoolExecutor(self._ENCODE_PROBLEM_THREAD_COUNT)
 
+        # Setup binary-ref answer download executors
+        self._download_answer_executor = \
+            ThreadPoolExecutor(self._DOWNLOAD_ANSWER_THREAD_COUNT)
+
     def create_session(self):
         """Create a new requests session based on client's (self) params.
 
@@ -612,6 +620,9 @@ class Client(object):
         self._upload_part_executor.shutdown()
         logger.debug("Shutting down problem encoder executor")
         self._encode_problem_executor.shutdown()
+
+        logger.debug("Shutting down answer download executor")
+        self._download_answer_executor.shutdown()
 
         # Send kill-task to all worker threads
         # Note: threads can't be 'killed' in Python, they have to die by
@@ -1601,6 +1612,45 @@ class Client(object):
 
         finally:
             session.close()
+
+    def _download_answer_binary_ref(self, *, auth_method: str, url: str,
+                                    output: Optional[io.IOBase] = None) -> concurrent.futures.Future:
+        """Initiate binary-ref answer download, returning the binary data in
+        :class:`~concurrent.futures.Future`.
+
+        Args:
+            auth_method:
+                Authentication method used to access data at ``url``.
+
+            url:
+                Answer binary data.
+
+        Returns:
+            :class:`concurrent.futures.Future`[bytes | io.IOBase]:
+                Answer data in a Future.
+        """
+        return self._download_answer_executor.submit(
+            self._download_answer_worker, auth_method=auth_method, url=url, output=output)
+
+    def _download_answer_worker(self, *, auth_method: str, url: str,
+                                output: Optional[io.IOBase] = None) -> io.IOBase:
+        if auth_method != api.constants.BinaryRefAuthMethod.SAPI_TOKEN:
+            raise ValueError(f"Authentication method {auth_method!r} not supported.")
+        if output is None:
+            output = io.BytesIO()
+
+        logger.debug("Downloading binary-ref answer from %r using %r method.",
+                     url, auth_method)
+
+        with self.create_session() as session:
+            size = 0
+            for chunk in session.get(url, stream=True).iter_content(chunk_size=8192):
+                size += output.write(chunk)
+            output.seek(0)
+
+        logger.debug("Answer data downloaded from %r. Written %r bytes.", url, size)
+
+        return output
 
     def upload_problem_encoded(self, problem, problem_id=None):
         """Initiate multipart problem upload, returning the Problem ID in a
