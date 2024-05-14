@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import abc
+import io
 import json
 import uuid
 import unittest
@@ -210,6 +211,19 @@ class ProblemResourcesBaseTests(abc.ABC):
         self.assertIsInstance(answer, models.ProblemAnswer)
         self.verify_problem_answer(answer)
 
+    def test_get_problem_answer_data(self):
+        """Problem answer data retrieved from a binary-ref."""
+
+        answer = self.api.get_problem_answer(problem_id=self.problem_id)
+
+        if answer.format != constants.AnswerEncodingFormat.BINARY_REF:
+            self.skipTest("no binary-ref answer data to download")
+
+        data = self.api.get_answer_data(answer)
+
+        self.assertIsInstance(data, io.IOBase)
+        self.assertEqual(data.read(), self.p1.problem_answer_data().read())
+
     def test_get_problem_messages(self):
         """Problem messages retrieved by problem id."""
 
@@ -396,6 +410,8 @@ class ProblemResourcesMockerMixin:
         p1_params = self.params
         p1_metadata = self.p1.problem_metadata(submitted_by=self.token)
         p1_answer = self.p1.problem_answer()
+        p1_answer_data = self.p1.problem_answer_data()
+        p1_answer_data_uri = self.p1.problem_answer_data_uri()
         p1_messages = self.p1.problem_messages()
         p1_info = self.p1.problem_info(params=p1_params, metadata=p1_metadata)
 
@@ -438,6 +454,10 @@ class ProblemResourcesMockerMixin:
         self.mocker.get(
             url(f'problems/{p1_id}/answer'),
             json=p1_answer,
+            request_headers=headers)
+        self.mocker.get(
+            p1_answer_data_uri,
+            body=p1_answer_data,
             request_headers=headers)
         self.mocker.get(
             url(f'problems/{p1_id}/messages'),

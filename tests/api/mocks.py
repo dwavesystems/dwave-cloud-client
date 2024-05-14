@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import uuid
-from typing import Union, Tuple
+from typing import Any, Optional, Tuple, Union
 
 from dwave.cloud.coders import encode_problem_as_qp, encode_problem_as_ref
 from dwave.cloud.utils import utcrel, generate_const_ising_problem
@@ -73,6 +74,12 @@ class SapiMockResponses:
         return {
             "answer": self.answer.copy()
         }
+
+    def problem_answer_data(self, problem: Optional[Any] = None) -> Optional[io.IOBase]:
+        return None
+
+    def problem_answer_data_uri(self, problem: Optional[Any] = None) -> Optional[str]:
+        return None
 
     def problem_info(self, **kwargs) -> dict:
         response = {
@@ -238,7 +245,7 @@ class UnstructuredSapiMockResponses(SapiMockResponses):
         kwargs.setdefault('solver', solver)
         kwargs.setdefault('problem', bqm)
         kwargs.setdefault('problem_type', 'bqm')
-        kwargs.setdefault('answer', self._problem_answer(sampleset))
+        kwargs.setdefault('answer', self._problem_answer(sampleset=sampleset))
         super().__init__(**kwargs)
 
         # unstructured problem specific
@@ -247,11 +254,11 @@ class UnstructuredSapiMockResponses(SapiMockResponses):
 
 class UnstructuredSapiMockResponsesWithBinaryRefAnswer(UnstructuredSapiMockResponses):
 
-    def _problem_answer(self, answer_data_uri, **kwargs) -> dict:
+    def _problem_answer(self, **kwargs) -> dict:
         answer = {
             "format": "binary-ref",
             "auth-method": "sapi-token",
-            "url": answer_data_uri,
+            "url": self.problem_answer_data_uri(kwargs.get('problem')),
             "timing": {
                 "qpu_access_time": 100,
                 "run_time": 1000
@@ -261,6 +268,12 @@ class UnstructuredSapiMockResponsesWithBinaryRefAnswer(UnstructuredSapiMockRespo
         answer.update(**kwargs)
         return answer
 
+    def problem_answer_data(self, problem: Optional[Any] = None) -> Optional[io.IOBase]:
+        return io.BytesIO(b'123')
+
+    def problem_answer_data_uri(self, problem: Optional[Any] = None) -> str:
+        return "http://127.0.0.1/answer/data"
+
     def __init__(self, **kwargs):
-        kwargs.setdefault('answer', self._problem_answer("http://127.0.0.1/answer/data"))
+        kwargs.setdefault('answer', self._problem_answer(**kwargs))
         super().__init__(**kwargs)
