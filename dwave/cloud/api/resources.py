@@ -222,7 +222,7 @@ class Problems(ResourceBase):
     def get_answer_data(self, answer: models.UnstructuredProblemAnswerBinaryRef,
                         output: Optional[io.IOBase] = None) -> io.IOBase:
         """Retrieve binary-ref answer data."""
-        if answer.auth_method != 'sapi-token':
+        if answer.auth_method != constants.BinaryRefAuthMethod.SAPI_TOKEN:
             raise ValueError(f"Authentication method {answer.auth_method!r} not supported.")
 
         # TODO: this is temporary, the url will be absolute, but it's not fixed yet sapi-side

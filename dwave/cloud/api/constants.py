@@ -61,6 +61,10 @@ class AnswerEncodingFormat(str, enum.Enum):
     BINARY_REF = "binary-ref"
 
 
+class BinaryRefAuthMethod(str, enum.Enum):
+    SAPI_TOKEN = "sapi-token"
+
+
 class ProblemType(str, enum.Enum):
     ISING = "ising"
     QUBO = "qubo"

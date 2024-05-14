@@ -1634,7 +1634,7 @@ class Client(object):
 
     def _download_answer_worker(self, *, auth_method: str, url: str,
                                 output: Optional[io.IOBase] = None) -> io.IOBase:
-        if auth_method != 'sapi-token':
+        if auth_method != api.constants.BinaryRefAuthMethod.SAPI_TOKEN:
             raise ValueError(f"Authentication method {auth_method!r} not supported.")
 
         logger.debug("Downloading binary-ref answer from %r using %r method.",

@@ -65,7 +65,8 @@ class UnstructuredProblemAnswer(BaseModel):
 
 class UnstructuredProblemAnswerBinaryRef(BaseModel):
     format: constants.AnswerEncodingFormat = constants.AnswerEncodingFormat.BINARY_REF
-    auth_method: str = Field(default='sapi-token', alias='auth-method')
+    auth_method: constants.BinaryRefAuthMethod = Field(
+        default=constants.BinaryRefAuthMethod.SAPI_TOKEN, alias='auth-method')
     url: str
     timing: dict
     shape: dict
