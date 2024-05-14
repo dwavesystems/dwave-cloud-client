@@ -1636,21 +1636,16 @@ class Client(object):
                                 output: Optional[io.IOBase] = None) -> io.IOBase:
         if auth_method != api.constants.BinaryRefAuthMethod.SAPI_TOKEN:
             raise ValueError(f"Authentication method {auth_method!r} not supported.")
+        if output is None:
+            output = io.BytesIO()
 
         logger.debug("Downloading binary-ref answer from %r using %r method.",
                      url, auth_method)
 
         with self.create_session() as session:
-            # TODO: this is temporary, the url will be absolute, but it's not fixed yet sapi-side
-            url = url.strip('/')
-
-            if output is None:
-                output = io.BytesIO()
-
             size = 0
             for chunk in session.get(url, stream=True).iter_content(chunk_size=8192):
                 size += output.write(chunk)
-
             output.seek(0)
 
         logger.debug("Answer data downloaded from %r. Written %r bytes.", url, size)

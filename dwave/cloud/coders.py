@@ -368,14 +368,14 @@ def decode_binary_ref(msg: dict, ref_resolver: Callable) -> dict:
     answer = msg['answer']
     if answer['format'] != 'binary-ref':
         raise ValueError(f"Unsupported answer format: {answer['format']}")
-    if 'auth-method' not in answer or 'url' not in answer:
+    if 'auth_method' not in answer or 'url' not in answer:
         raise ValueError("Incomplete binary-ref answer")
 
     result = {
         'problem_type': msg['type'],
         'timing': answer.get('timing', {}),
         'shape': answer.get('shape', {}),
-        'answer': ref_resolver(auth_method=answer['auth-method'], url=answer['url'])
+        'answer': ref_resolver(auth_method=answer['auth_method'], url=answer['url'])
     }
     return result
 

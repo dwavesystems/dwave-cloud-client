@@ -225,15 +225,10 @@ class Problems(ResourceBase):
         if answer.auth_method != constants.BinaryRefAuthMethod.SAPI_TOKEN:
             raise ValueError(f"Authentication method {answer.auth_method!r} not supported.")
 
-        # TODO: this is temporary, the url will be absolute, but it's not fixed yet sapi-side
-        url = answer.url.strip('/')
-        if url.startswith(self.resource_path):
-            url = url[len(self.resource_path):]
-
         if output is None:
             output = io.BytesIO()
 
-        for chunk in self.session.get(url, stream=True).iter_content(chunk_size=8192):
+        for chunk in self.session.get(answer.url, stream=True).iter_content(chunk_size=8192):
             output.write(chunk)
 
         output.seek(0)

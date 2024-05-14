@@ -257,7 +257,7 @@ class UnstructuredSapiMockResponsesWithBinaryRefAnswer(UnstructuredSapiMockRespo
     def _problem_answer(self, **kwargs) -> dict:
         answer = {
             "format": "binary-ref",
-            "auth-method": "sapi-token",
+            "auth_method": "sapi-token",
             "url": self.problem_answer_data_uri(kwargs.get('problem')),
             "timing": {
                 "qpu_access_time": 100,

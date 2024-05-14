@@ -70,7 +70,7 @@ def complete_reply_binary_ref(answer_data_uri, id_="problem-id", type_='cqm', la
         "submitted_on": "2019-07-31T12:34:56Z",
         "answer": {
             "format": "binary-ref",
-            "auth-method": "sapi-token",
+            "auth_method": "sapi-token",
             "url": answer_data_uri,
             "timing": {
                 "qpu_access_time": 1
