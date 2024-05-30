@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import os
 import re
 import sys
 import logging
 import importlib
+import typing
 
 from dwave.cloud.client import Client
 from dwave.cloud.solver import Solver
@@ -24,6 +26,20 @@ from dwave.cloud.computation import Future
 from dwave.cloud.utils import set_loglevel
 
 __all__ = ['Client', 'Solver', 'Future']
+
+
+# prevent log output (from library) when logging not configured by user/app
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
+# add TRACE log level and Logger.trace() method
+logging.TRACE = 5
+logging.addLevelName(logging.TRACE, "TRACE")
+
+def _trace(logger, message, *args, **kwargs):
+    logger.log(logging.TRACE, message, *args, **kwargs)
+
+logging.Logger.trace = _trace
 
 
 class FilteredSecretsFormatter(logging.Formatter):
@@ -50,33 +66,42 @@ class FilteredSecretsFormatter(logging.Formatter):
         output = re.sub(self._UUID_TOKEN_PATTERN, r'\1...\3', output)
         return output
 
-# configure logger `dwave.cloud` root logger, inherited in submodules
-# (write level warning+ to stderr, include timestamp/module/level)
-_formatter = FilteredSecretsFormatter('%(asctime)s %(name)s %(levelname)s %(threadName)s %(message)s')
-_handler = logging.StreamHandler()
-_handler.setFormatter(_formatter)
 
-# expose the root logger to simplify access; for example:
-# `dwave.cloud.logger.setLevel(logging.DEBUG)`
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
-logger.addHandler(_handler)
+def configure_logging(*,
+                      logger: typing.Optional[logging.Logger] = None,
+                      level: int = logging.WARNING,
+                      filter_secrets: bool = True,
+                      output_stream: io.IOBase = sys.stderr,
+                      ) -> logging.Logger:
+    """Configure cloud-client's `dwave.cloud` base logger.
+
+    Logging output from the cloud-client is suppressed by default. This utility
+    function can be used from user's (app) code to quickly setup basic logging
+    from the library.
+
+    .. versionadded:: 0.12.0
+       Explicit optional logging configuration. Previously, logger was minimally
+       configured by default.
+    """
+    if logger is None:
+        logger = logging.getLogger(__name__)
+
+    fmt = '%(asctime)s %(name)s %(levelname)s %(threadName)s %(message)s'
+    _formatter = FilteredSecretsFormatter(fmt) if filter_secrets else logging.Formatter(fmt)
+    _handler = logging.StreamHandler(stream=output_stream)
+    _handler.setFormatter(_formatter)
+
+    logger.setLevel(level)
+    logger.addHandler(_handler)
+
+    return logger
 
 
-# add TRACE log level and Logger.trace() method
-logging.TRACE = 5
-logging.addLevelName(logging.TRACE, "TRACE")
-
-def _trace(logger, message, *args, **kwargs):
-    if logger.isEnabledFor(logging.TRACE):
-        logger._log(logging.TRACE, message, args, **kwargs)
-
-logging.Logger.trace = _trace
-
-
-# apply DWAVE_LOG_LEVEL
+# configure logger if DWAVE_LOG_LEVEL present in environment
 def _apply_loglevel_from_env(logger):
-    set_loglevel(logger, os.getenv('DWAVE_LOG_LEVEL'))
+    if level := os.getenv('DWAVE_LOG_LEVEL'):
+        configure_logging(logger=logger)
+        set_loglevel(logger, level)
 
 _apply_loglevel_from_env(logger)
 

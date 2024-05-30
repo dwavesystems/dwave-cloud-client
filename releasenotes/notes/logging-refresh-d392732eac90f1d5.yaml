@@ -5,3 +5,6 @@ features:
 fixes:
   - |
     Log failing request/response details in the low-level API client.
+  - |
+    Suppress logging output from the cloud-client by default (as recommended
+    for libraries).
