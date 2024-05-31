@@ -17,6 +17,7 @@ import os
 import re
 import sys
 import logging
+import datetime
 import importlib
 import typing
 
@@ -42,6 +43,18 @@ def _trace(logger, message, *args, **kwargs):
 logging.Logger.trace = _trace
 
 
+class ISOFormatter(logging.Formatter):
+    # target timezone, e.g. `datetime.timezone.utc`, or `None` for naive timestamp
+    as_tz: typing.Optional[datetime.timezone] = None
+
+    def __init__(self, *args, as_tz: typing.Optional[datetime.timezone] = None, **kwargs):
+        self.as_tz = as_tz
+        super().__init__(*args, **kwargs)
+
+    def formatTime(self, record: logging.LogRecord, datefmt: typing.Optional[str] = None) -> str:
+        return datetime.datetime.fromtimestamp(record.created, tz=self.as_tz).isoformat()
+
+
 class FilteredSecretsFormatter(logging.Formatter):
     """Logging formatter that filters out secrets (like Solver API tokens).
 
@@ -59,7 +72,7 @@ class FilteredSecretsFormatter(logging.Formatter):
     _UUID_TOKEN_PATTERN = re.compile(
         r'\b([0-9A-Fa-f]{3})([0-9A-Fa-f]{5}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{9})([0-9A-Fa-f]{3})\b')
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         output = super().format(record)
         output = re.sub(self._SAPI_TOKEN_PATTERN, r'\1...\3', output)
         output = re.sub(self._HEX_TOKEN_PATTERN, r'\1...\3', output)
@@ -67,11 +80,12 @@ class FilteredSecretsFormatter(logging.Formatter):
         return output
 
 
-def configure_logging(*,
-                      logger: typing.Optional[logging.Logger] = None,
+def configure_logging(logger: typing.Optional[logging.Logger] = None,
+                      *,
                       level: int = logging.WARNING,
                       filter_secrets: bool = True,
                       output_stream: io.IOBase = sys.stderr,
+                      in_utc: bool = False,
                       ) -> logging.Logger:
     """Configure cloud-client's `dwave.cloud` base logger.
 
@@ -86,8 +100,11 @@ def configure_logging(*,
     if logger is None:
         logger = logging.getLogger(__name__)
 
-    fmt = '%(asctime)s %(name)s %(levelname)s %(threadName)s %(message)s'
-    _formatter = FilteredSecretsFormatter(fmt) if filter_secrets else logging.Formatter(fmt)
+    format = dict(
+        fmt='%(asctime)s %(name)s %(levelname)s %(threadName)s %(message)s',
+        as_tz=datetime.timezone.utc if in_utc else None,
+    )
+    _formatter = FilteredSecretsFormatter(**format) if filter_secrets else ISOFormatter(**format)
     _handler = logging.StreamHandler(stream=output_stream)
     _handler.setFormatter(_formatter)
 
@@ -100,7 +117,7 @@ def configure_logging(*,
 # configure logger if DWAVE_LOG_LEVEL present in environment
 def _apply_loglevel_from_env(logger):
     if level := os.getenv('DWAVE_LOG_LEVEL'):
-        configure_logging(logger=logger)
+        configure_logging(logger)
         set_loglevel(logger, level)
 
 _apply_loglevel_from_env(logger)
