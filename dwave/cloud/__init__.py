@@ -25,7 +25,7 @@ import typing
 from dwave.cloud.client import Client
 from dwave.cloud.solver import Solver
 from dwave.cloud.computation import Future
-from dwave.cloud.utils import set_loglevel
+from dwave.cloud.utils import parse_loglevel
 
 __all__ = ['Client', 'Solver', 'Future']
 
@@ -140,9 +140,11 @@ def configure_logging(logger: typing.Optional[logging.Logger] = None,
 
 # configure logger if DWAVE_LOG_LEVEL present in environment
 def _apply_loglevel_from_env(logger):
-    if level := os.getenv('DWAVE_LOG_LEVEL'):
-        configure_logging(logger)
-        set_loglevel(logger, level)
+    if log_level := os.getenv('DWAVE_LOG_LEVEL', os.getenv('dwave_log_level')):
+        level = parse_loglevel(log_level)
+        log_format = os.getenv('DWAVE_LOG_FORMAT', os.getenv('dwave_log_format', ''))
+        structured = log_format.strip().lower() == 'json'
+        configure_logging(logger, level=level, structured_output=structured)
 
 _apply_loglevel_from_env(logger)
 
