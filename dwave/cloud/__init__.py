@@ -16,6 +16,7 @@ import io
 import os
 import re
 import sys
+import json
 import logging
 import datetime
 import importlib
@@ -80,12 +81,23 @@ class FilteredSecretsFormatter(logging.Formatter):
         return output
 
 
+class JSONFormatter(ISOFormatter):
+    def format(self, record: logging.LogRecord) -> str:
+        super().format(record)
+        # filter out message template and potentially unserializable args
+        rec = record.__dict__.copy()
+        del rec['args']
+        del rec['msg']
+        return json.dumps(rec)
+
+
 def configure_logging(logger: typing.Optional[logging.Logger] = None,
                       *,
                       level: int = logging.WARNING,
                       filter_secrets: bool = True,
                       output_stream: io.IOBase = sys.stderr,
                       in_utc: bool = False,
+                      structured_output: bool = False,
                       ) -> logging.Logger:
     """Configure cloud-client's `dwave.cloud` base logger.
 
@@ -101,15 +113,27 @@ def configure_logging(logger: typing.Optional[logging.Logger] = None,
         logger = logging.getLogger(__name__)
 
     format = dict(
-        fmt='%(asctime)s %(name)s %(levelname)s %(threadName)s %(message)s',
+        fmt='%(asctime)s %(name)s %(levelname)s %(threadName)s [%(funcName)s] %(message)s',
         as_tz=datetime.timezone.utc if in_utc else None,
     )
-    _formatter = FilteredSecretsFormatter(**format) if filter_secrets else ISOFormatter(**format)
-    _handler = logging.StreamHandler(stream=output_stream)
-    _handler.setFormatter(_formatter)
+
+    if structured_output:
+        formatter_base = JSONFormatter
+    else:
+        formatter_base = ISOFormatter
+
+    if filter_secrets:
+        class Formatter(FilteredSecretsFormatter, formatter_base):
+            pass
+    else:
+        Formatter = formatter_base
+
+    formatter = Formatter(**format)
+    handler = logging.StreamHandler(stream=output_stream)
+    handler.setFormatter(formatter)
 
     logger.setLevel(level)
-    logger.addHandler(_handler)
+    logger.addHandler(handler)
 
     return logger
 
