@@ -15,6 +15,7 @@
 import os
 import json
 import unittest
+import subprocess
 from unittest import mock
 
 from click.testing import CliRunner
@@ -714,6 +715,29 @@ class TestCliLive(unittest.TestCase):
                                      '--solver', solver,
                                      '--sampling-params', params])
         self.assertEqual(result.exit_code, 0)
+
+
+class TestLogging(unittest.TestCase):
+
+    def test_json_logs(self):
+        env = {
+            'DWAVE_CONFIG_FILE': test_config_path,
+            'DWAVE_LOG_LEVEL': 'debug',
+            'DWAVE_LOG_FORMAT': 'json',
+        }
+
+        with isolated_environ(add=env):
+            ret = subprocess.run('dwave ping', capture_output=True, shell=True)
+
+        # ping will fail because API token is undefined
+        self.assertEqual(ret.returncode, 1)
+
+        # but stderr should still contain one json log record per line
+        for line in ret.stderr.splitlines():
+            rec = json.loads(line)
+            self.assertIsInstance(rec, dict)
+            self.assertIn('message', rec)
+            self.assertIn('created', rec)
 
 
 if __name__ == '__main__':

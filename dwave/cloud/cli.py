@@ -545,6 +545,7 @@ def solvers(config_file, profile, endpoint, region, client_type, solver_def,
         client_type = 'base'
         solver_def = '{}'
 
+    # TODO: handle exceptions like in `_get_client_solver` and `standardized_output`
     with Client.from_config(
             config_file=config_file, profile=profile,
             endpoint=endpoint, region=region,
