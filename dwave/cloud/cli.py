@@ -28,7 +28,7 @@ import click
 import requests.exceptions
 
 import dwave.cloud
-from dwave.cloud import Client
+from dwave.cloud import Client, configure_logging
 from dwave.cloud import api
 from dwave.cloud.solver import StructuredSolver, BaseUnstructuredSolver
 from dwave.cloud.utils import (
@@ -55,10 +55,12 @@ click.option = partial(click.option, show_default=True)
 
 def enable_logging(ctx, param, value):
     if value and not ctx.resilient_parsing:
+        configure_logging()
         set_loglevel(dwave.cloud.logger, param.name)
 
 def enable_loglevel(ctx, param, value):
     if value and not ctx.resilient_parsing:
+        configure_logging()
         set_loglevel(dwave.cloud.logger, value)
 
 def show_platform(ctx, param, value):
@@ -543,6 +545,7 @@ def solvers(config_file, profile, endpoint, region, client_type, solver_def,
         client_type = 'base'
         solver_def = '{}'
 
+    # TODO: handle exceptions like in `_get_client_solver` and `standardized_output`
     with Client.from_config(
             config_file=config_file, profile=profile,
             endpoint=endpoint, region=region,

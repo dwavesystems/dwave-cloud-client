@@ -869,6 +869,7 @@ def set_loglevel(logger, level_name):
     logger.setLevel(level)
     logger.info("Log level for %r namespace set to %r", logger.name, level)
 
+
 def pretty_argvalues():
     """Pretty-formatted function call arguments, from the caller's frame."""
     return inspect.formatargvalues(*inspect.getargvalues(inspect.currentframe().f_back))

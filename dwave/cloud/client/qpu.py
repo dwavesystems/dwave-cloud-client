@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
+r"""
 An implementation of the REST client for D-Wave Solver API (SAPI) service.
 
 SAPI servers provide authentication, queuing, and scheduling services,

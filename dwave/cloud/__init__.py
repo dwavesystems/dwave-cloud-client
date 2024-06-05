@@ -12,18 +12,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import os
 import re
 import sys
+import json
 import logging
+import datetime
 import importlib
+import typing
 
 from dwave.cloud.client import Client
 from dwave.cloud.solver import Solver
 from dwave.cloud.computation import Future
-from dwave.cloud.utils import set_loglevel
+from dwave.cloud.utils import parse_loglevel
 
 __all__ = ['Client', 'Solver', 'Future']
+
+
+# prevent log output (from library) when logging not configured by user/app
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
+# add TRACE log level and Logger.trace() method
+logging.TRACE = 5
+logging.addLevelName(logging.TRACE, "TRACE")
+
+def _trace(logger, message, *args, **kwargs):
+    logger.log(logging.TRACE, message, *args, **kwargs)
+
+logging.Logger.trace = _trace
+
+
+class ISOFormatter(logging.Formatter):
+    # target timezone, e.g. `datetime.timezone.utc`, or `None` for naive timestamp
+    as_tz: typing.Optional[datetime.timezone] = None
+
+    def __init__(self, *args, as_tz: typing.Optional[datetime.timezone] = None, **kwargs):
+        self.as_tz = as_tz
+        super().__init__(*args, **kwargs)
+
+    def formatTime(self, record: logging.LogRecord, datefmt: typing.Optional[str] = None) -> str:
+        return datetime.datetime.fromtimestamp(record.created, tz=self.as_tz).isoformat()
 
 
 class FilteredSecretsFormatter(logging.Formatter):
@@ -43,40 +73,78 @@ class FilteredSecretsFormatter(logging.Formatter):
     _UUID_TOKEN_PATTERN = re.compile(
         r'\b([0-9A-Fa-f]{3})([0-9A-Fa-f]{5}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{9})([0-9A-Fa-f]{3})\b')
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         output = super().format(record)
         output = re.sub(self._SAPI_TOKEN_PATTERN, r'\1...\3', output)
         output = re.sub(self._HEX_TOKEN_PATTERN, r'\1...\3', output)
         output = re.sub(self._UUID_TOKEN_PATTERN, r'\1...\3', output)
         return output
 
-# configure logger `dwave.cloud` root logger, inherited in submodules
-# (write level warning+ to stderr, include timestamp/module/level)
-_formatter = FilteredSecretsFormatter('%(asctime)s %(name)s %(levelname)s %(threadName)s %(message)s')
-_handler = logging.StreamHandler()
-_handler.setFormatter(_formatter)
 
-# expose the root logger to simplify access; for example:
-# `dwave.cloud.logger.setLevel(logging.DEBUG)`
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
-logger.addHandler(_handler)
+class JSONFormatter(ISOFormatter):
+    def format(self, record: logging.LogRecord) -> str:
+        super().format(record)
+        # filter out message template and potentially unserializable args
+        rec = record.__dict__.copy()
+        del rec['args']
+        del rec['msg']
+        return json.dumps(rec)
 
 
-# add TRACE log level and Logger.trace() method
-logging.TRACE = 5
-logging.addLevelName(logging.TRACE, "TRACE")
+def configure_logging(logger: typing.Optional[logging.Logger] = None,
+                      *,
+                      level: int = logging.WARNING,
+                      filter_secrets: bool = True,
+                      output_stream: io.IOBase = sys.stderr,
+                      in_utc: bool = False,
+                      structured_output: bool = False,
+                      ) -> logging.Logger:
+    """Configure cloud-client's `dwave.cloud` base logger.
 
-def _trace(logger, message, *args, **kwargs):
-    if logger.isEnabledFor(logging.TRACE):
-        logger._log(logging.TRACE, message, args, **kwargs)
+    Logging output from the cloud-client is suppressed by default. This utility
+    function can be used from user's (app) code to quickly setup basic logging
+    from the library.
 
-logging.Logger.trace = _trace
+    .. versionadded:: 0.12.0
+       Explicit optional logging configuration. Previously, logger was minimally
+       configured by default.
+    """
+    if logger is None:
+        logger = logging.getLogger(__name__)
+
+    format = dict(
+        fmt='%(asctime)s %(name)s %(levelname)s %(threadName)s [%(funcName)s] %(message)s',
+        as_tz=datetime.timezone.utc if in_utc else None,
+    )
+
+    if structured_output:
+        formatter_base = JSONFormatter
+    else:
+        formatter_base = ISOFormatter
+
+    if filter_secrets:
+        class Formatter(FilteredSecretsFormatter, formatter_base):
+            pass
+    else:
+        Formatter = formatter_base
+
+    formatter = Formatter(**format)
+    handler = logging.StreamHandler(stream=output_stream)
+    handler.setFormatter(formatter)
+
+    logger.setLevel(level)
+    logger.addHandler(handler)
+
+    return logger
 
 
-# apply DWAVE_LOG_LEVEL
+# configure logger if DWAVE_LOG_LEVEL present in environment
 def _apply_loglevel_from_env(logger):
-    set_loglevel(logger, os.getenv('DWAVE_LOG_LEVEL'))
+    if log_level := os.getenv('DWAVE_LOG_LEVEL', os.getenv('dwave_log_level')):
+        level = parse_loglevel(log_level)
+        log_format = os.getenv('DWAVE_LOG_FORMAT', os.getenv('dwave_log_format', ''))
+        structured = log_format.strip().lower() == 'json'
+        configure_logging(logger, level=level, structured_output=structured)
 
 _apply_loglevel_from_env(logger)
 

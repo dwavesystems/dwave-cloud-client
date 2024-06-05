@@ -66,7 +66,7 @@ class LoggingSession(BaseUrlSession):
     RequestRecord = namedtuple('RequestRecord',
                                ('request', 'response', 'exception'))
 
-    def send(self, request: requests.PreparedRequest, **kwargs):
+    def send(self, request: requests.PreparedRequest, **kwargs) -> requests.Response:
         callee = type(self).__name__
         if logger.getEffectiveLevel() >= logging.DEBUG:
             logger.debug(f"[{callee!s}] send(method={request.method!r}, url={request.url!r}, ...)")
@@ -95,13 +95,13 @@ class LoggingSession(BaseUrlSession):
             logger.debug("[%s] request failed with %r", callee, exc)
 
             req = getattr(exc, 'request', None)
-            if req:
+            if req is not None:
                 logger.trace("[%s] failing request=%r", callee,
                              dict(method=req.method, url=req.url,
                                   headers=req.headers, body=req.body))
 
             res = getattr(exc, 'response', None)
-            if res:
+            if res is not None:
                 logger.trace("[%s] failing response=%r", callee,
                              dict(status_code=res.status_code,
                                   headers=res.headers, text=res.text))

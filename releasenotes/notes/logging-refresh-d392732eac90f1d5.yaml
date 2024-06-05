@@ -1,0 +1,17 @@
+---
+features:
+  - |
+    Add request/response logging to ``AuthFlow``/``OAuth2Session``.
+  - |
+    Add basic support for structured logs (JSON output).
+  - |
+    Enable log format control with ``DWAVE_LOG_FORMAT`` env variable (set to
+    ``"json"`` for structured output.
+fixes:
+  - |
+    Log failing request/response details in the low-level API client.
+  - |
+    Suppress logging output from the cloud-client by default (as recommended
+    for libraries).
+  - |
+    Format log record date/time according to ISO 8601.
