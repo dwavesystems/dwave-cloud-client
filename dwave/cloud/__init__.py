@@ -98,6 +98,7 @@ def configure_logging(logger: typing.Optional[logging.Logger] = None,
                       output_stream: io.IOBase = sys.stderr,
                       in_utc: bool = False,
                       structured_output: bool = False,
+                      additive: bool = False,
                       ) -> logging.Logger:
     """Configure cloud-client's `dwave.cloud` base logger.
 
@@ -127,6 +128,11 @@ def configure_logging(logger: typing.Optional[logging.Logger] = None,
             pass
     else:
         Formatter = formatter_base
+
+    if not additive:
+        # make sure handlers are not accumulated
+        while len(logger.handlers):
+            logger.removeHandler(logger.handlers[-1])
 
     formatter = Formatter(**format)
     handler = logging.StreamHandler(stream=output_stream)
