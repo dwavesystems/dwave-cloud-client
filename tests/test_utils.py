@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import copy
 import json
 import uuid
@@ -24,13 +25,13 @@ from unittest import mock
 from collections import OrderedDict
 from itertools import count
 from datetime import datetime
-from functools import partial
+from functools import partial, wraps
 from typing import Tuple, Union
 
 import numpy
 from parameterized import parameterized
 
-from dwave.cloud import FilteredSecretsFormatter
+from dwave.cloud import FilteredSecretsFormatter, configure_logging
 from dwave.cloud.utils import (
     uniform_iterator, uniform_get, strip_head, strip_tail,
     active_qubits, generate_random_ising_problem,
@@ -38,6 +39,8 @@ from dwave.cloud.utils import (
     default_text_input, utcnow, cached, retried, deprecated, aliasdict,
     parse_loglevel, user_agent, default_user_agent, hasinstance, exception_chain,
     is_caused_by, get_distribution, PackageNotFoundError, VersionNotFoundError)
+
+logger = logging.getLogger(__name__)
 
 
 class TestSimpleUtils(unittest.TestCase):
@@ -981,6 +984,66 @@ class TestDistUtils(unittest.TestCase):
         # package matching
         with self.assertRaises(PackageNotFoundError):
             get_distribution("package-that-is-not-installed")
+
+
+def capture_stderr(fn):
+    """Decorator that captures stderr and provides access via `output` argument."""
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        with contextlib.redirect_stderr(io.StringIO()) as output:
+            return fn(*args, output=output, **kwargs)
+    return wrapper
+
+
+class TestLogging(unittest.TestCase):
+
+    @capture_stderr
+    def test_default_configure(self, output):
+        configure_logging(logger)
+
+        logger.info('test')
+        logger.warning('secret: beefcafe-aaaa-bbbb-cccc-0123456789ab')
+
+        # level is warning+, and secrets are filtered
+        lines = output.getvalue().splitlines()
+        self.assertEqual(len(lines), 1)
+        self.assertIn('bee...9ab', lines[0])
+
+    @capture_stderr
+    def test_structured_logging(self, output):
+        configure_logging(logger, level=logging.INFO, structured_output=True)
+
+        logger.info('test', extra=dict(key='value'))
+
+        # level is info+, json output contains the extra dict
+        lines = output.getvalue().splitlines()
+        self.assertEqual(len(lines), 1)
+        record = json.loads(lines[0])
+        self.assertEqual(record.get('message'), 'test')
+        self.assertEqual(record.get('key'), 'value')
+
+    @capture_stderr
+    def test_multiple_handlers(self, output):
+        structured_stream = io.StringIO()
+
+        configure_logging(
+            logger, handler_level=logging.ERROR)
+        configure_logging(
+            logger, level=logging.DEBUG, additive=True,
+            output_stream=structured_stream, structured_output=True)
+
+        logger.debug('debug')
+        logger.error('error')
+
+        # structured_stream has all as json, stderr only errors in text
+        error = output.getvalue().splitlines()
+        self.assertEqual(len(error), 1)
+        self.assertIn('error', error[0])
+
+        debug = list(map(json.loads, structured_stream.getvalue().splitlines()))
+        self.assertEqual(len(debug), 2)
+        self.assertEqual(debug[0].get('message'), 'debug')
+        self.assertEqual(debug[1].get('message'), 'error')
 
 
 if __name__ == '__main__':

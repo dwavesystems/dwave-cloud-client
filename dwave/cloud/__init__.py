@@ -95,22 +95,31 @@ def configure_logging(logger: typing.Optional[logging.Logger] = None,
                       *,
                       level: int = logging.WARNING,
                       filter_secrets: bool = True,
-                      output_stream: io.IOBase = sys.stderr,
+                      output_stream: typing.Optional[io.IOBase] = None,
                       in_utc: bool = False,
                       structured_output: bool = False,
+                      handler_level: typing.Optional[int] = None,
+                      additive: bool = False,
                       ) -> logging.Logger:
     """Configure cloud-client's `dwave.cloud` base logger.
 
     Logging output from the cloud-client is suppressed by default. This utility
-    function can be used from user's (app) code to quickly setup basic logging
-    from the library.
+    function can be used to quickly setup basic logging from the library.
+
+    .. note::
+       This function is currently intended for internal/private use only.
 
     .. versionadded:: 0.12.0
        Explicit optional logging configuration. Previously, logger was minimally
        configured by default.
     """
+
     if logger is None:
         logger = logging.getLogger(__name__)
+    if output_stream is None:
+        output_stream = sys.stderr
+    if handler_level is None:
+        handler_level = level
 
     format = dict(
         fmt='%(asctime)s %(name)s %(levelname)s %(threadName)s [%(funcName)s] %(message)s',
@@ -128,12 +137,18 @@ def configure_logging(logger: typing.Optional[logging.Logger] = None,
     else:
         Formatter = formatter_base
 
+    if not additive:
+        # make sure handlers are not accumulated
+        while len(logger.handlers):
+            logger.removeHandler(logger.handlers[-1])
+
     formatter = Formatter(**format)
     handler = logging.StreamHandler(stream=output_stream)
     handler.setFormatter(formatter)
+    handler.setLevel(handler_level)
 
-    logger.setLevel(level)
     logger.addHandler(handler)
+    logger.setLevel(level)
 
     return logger
 
