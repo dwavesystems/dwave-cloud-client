@@ -379,7 +379,7 @@ class BaseUnstructuredSolver(BaseSolver):
         """
         raise NotImplementedError
 
-    def upload_problem(self, problem):
+    def upload_problem(self, problem, **kwargs):
         """Encode and upload the problem.
 
         Args:
@@ -388,15 +388,19 @@ class BaseUnstructuredSolver(BaseSolver):
                 for example :class:`~dimod.BQM`, :class:`~dimod.CQM` or
                 :class:`~dwave.optimization.Model`.
 
+            **kwargs:
+                Optional problem encoding and upload parameters.
+
         Returns:
             :class:`concurrent.futures.Future`[str]:
                 Problem ID in a Future. Problem ID can be used to submit
                 problems by reference.
         """
-        data = self._encode_problem_for_upload(problem)
-        return self.client.upload_problem_encoded(data)
+        data = self._encode_problem_for_upload(problem, **kwargs)
+        return self.client.upload_problem_encoded(data, **kwargs)
 
-    def _encode_problem_for_submission(self, problem, problem_type, params,
+    def _encode_problem_for_submission(self, *, problem, problem_type,
+                                       upload_params=None, sample_params=None,
                                        label=None):
         """Encode `problem` for submitting in `ref` format. Upload the
         problem if it's not already uploaded.
@@ -408,8 +412,11 @@ class BaseUnstructuredSolver(BaseSolver):
             problem_type (str):
                 Problem type, one of the handled problem types by the solver.
 
-            params (dict):
-                Parameters for the sampling method, solver-specific.
+            upload_params (dict):
+                Upload parameters, solver-specific.
+
+            sample_params (dict):
+                Sampling parameters, solver-specific.
 
             label (str, optional):
                 Problem label.
@@ -419,18 +426,23 @@ class BaseUnstructuredSolver(BaseSolver):
                 JSON-encoded problem submit body
         """
 
+        if upload_params is None:
+            upload_params = {}
+        if sample_params is None:
+            sample_params = {}
+
         if isinstance(problem, str):
             problem_id = problem
         else:
             logger.debug("To encode the problem for submit in the 'ref' format, "
                          "we need to upload it first.")
-            problem_id = self.upload_problem(problem).result()
+            problem_id = self.upload_problem(problem, **upload_params).result()
 
         body = {
             'solver': self.id,
             'data': encode_problem_as_ref(problem_id),
             'type': problem_type,
-            'params': params
+            'params': sample_params
         }
         if label is not None:
             body['label'] = label
@@ -440,7 +452,8 @@ class BaseUnstructuredSolver(BaseSolver):
         return body_data
 
     @dispatches_events('sample')
-    def sample_problem(self, problem, problem_type=None, label=None, **params):
+    def sample_problem(self, problem, problem_type=None, label=None,
+                       upload_params=None, **sample_params):
         """Sample from the specified problem.
 
         Args:
@@ -457,8 +470,11 @@ class BaseUnstructuredSolver(BaseSolver):
                 Problem label you can optionally tag submissions with for ease
                 of identification.
 
-            **params:
-                Parameters for the sampling method, solver-specific.
+            upload_params (dict):
+                Optional upload/encode parameters, solver specific.
+
+            **sample_params:
+                Sampling parameters, solver-specific.
 
         Returns:
             :class:`~dwave.cloud.computation.Future`
@@ -471,8 +487,8 @@ class BaseUnstructuredSolver(BaseSolver):
         # encode the request (body as future)
         body = self.client._encode_problem_executor.submit(
             self._encode_problem_for_submission,
-            problem=problem, problem_type=problem_type, params=params,
-            label=label)
+            problem=problem, problem_type=problem_type, label=label,
+            upload_params=upload_params, sample_params=sample_params)
 
         # computation future holds a reference to the remote job
         computation = Future(
@@ -750,32 +766,30 @@ class NLSolver(BaseUnstructuredSolver):
     _handled_problem_types = {"nl"}
     _handled_encoding_formats = {"binary-ref"}
 
-    def upload_problem(self, problem, **kwargs):
-        # TODO: move this to `BaseUnstructuredSolver` once we go public
-        data = self._encode_problem_for_upload(problem, **kwargs)
-        return self.client.upload_problem_encoded(data)
-
     def _encode_problem_for_upload(self,
                                    model: typing.Union['dwave.optimization.Model', io.IOBase],
                                    **kwargs
                                    ) -> io.IOBase:
+        encode_params = {k: v for k, v in kwargs.items()
+                         if k in {'max_num_states', 'only_decision'}}
         try:
-            data = model.to_file(**kwargs)
+            data = model.to_file(**encode_params)
         except Exception as e:
             logger.debug("NL model serialization failed with %r, "
                          "assuming data already encoded.", e)
             # assume `model` given as file, ready for upload
             data = model
+        else:
+            logger.debug("Problem (model) encoded with encode_params=%r for upload in %r",
+                        encode_params, data)
 
-        logger.debug("Problem (model) encoded for upload: %r", data)
         return data
 
-    # TODO: add max_num_states before we go public -- we need to support
-    # `upload_params` and `sample_params`
     def sample_nlm(self,
                    model: typing.Union['dwave.optimization.Model', io.IOBase, str],
                    label: typing.Optional[str] = None,
-                   **params
+                   upload_params: typing.Optional[dict] = None,
+                   **sample_params
                    ) -> Future:
         """Sample from the specified :term:`NL model`.
 
@@ -788,8 +802,13 @@ class NLSolver(BaseUnstructuredSolver):
                 Problem label you can optionally tag submissions with for ease
                 of identification.
 
-            **params:
-                Parameters for the sampling method, solver-specific.
+            upload_params (dict):
+                Model encoding and upload parameters, for example parameters
+                passed down to ``:meth:~dwave.optimization.model.Model.to_file``,
+                like ``max_num_states``.
+
+            **sample_params:
+                Sampling parameters, solver-specific.
 
         Returns:
             :class:`~dwave.cloud.computation.Future`
@@ -803,7 +822,8 @@ class NLSolver(BaseUnstructuredSolver):
             raise RuntimeError("Can't sample from nonlinear model without dwave-optimization. "
                                "Re-install the library with 'nlm' support.")
 
-        return self.sample_problem(model, label=label, **params)
+        return self.sample_problem(
+            model, label=label, upload_params=upload_params, **sample_params)
 
     def sample_problem(self, *args, **kwargs):
         sf = SpooledTemporaryFile(max_size=1e8, mode='w+b')
@@ -821,7 +841,7 @@ class NLSolver(BaseUnstructuredSolver):
 
     def upload_nlm(self,
                    model: typing.Union['dwave.optimization.Model', io.IOBase, bytes],
-                   **kwargs,
+                   **upload_params,
                    ) -> concurrent.futures.Future:
         """Upload the specified :term:`NL model` to SAPI, returning a Problem ID
         that can be used to submit the NL model to this solver (i.e. call the
@@ -834,9 +854,10 @@ class NLSolver(BaseUnstructuredSolver):
                 (encoded serialized model) in either a file-like or a bytes-like
                 object.
 
-            max_num_states (int):
-                Maximum number of states to upload along with the model.
-                The number of states uploaded is ``min(len(model.states), max_num_states)``.
+            **upload_params:
+                Model encoding and upload parameters, for example parameters
+                passed down to ``:meth:~dwave.optimization.model.Model.to_file``,
+                like ``max_num_states``.
 
         Returns:
             :class:`concurrent.futures.Future`[str]:
@@ -846,7 +867,7 @@ class NLSolver(BaseUnstructuredSolver):
         Note:
             To use this method, dwave-optimization package has to be installed.
         """
-        return self.upload_problem(model, **kwargs)
+        return self.upload_problem(model, **upload_params)
 
 
 class StructuredSolver(BaseSolver):

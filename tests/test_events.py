@@ -155,21 +155,25 @@ class TestEventDispatch(unittest.TestCase):
         lin = {0: 1}
         quad = {(0, 1): 1}
         offset = 2
-        params = dict(num_reads=100)
-        future = solver.sample_ising(lin, quad, offset, **params)
+        sample_params = dict(num_reads=100)
+        upload_params = dict(encoding='good')
 
         # test entry values
-        before = memo['before_sample']
         if solver.qpu:
+            future = solver.sample_ising(lin, quad, offset, **sample_params)
             args = dict(type_='ising', linear=lin, quadratic=quad,
-                        offset=offset, params=params,
+                        offset=offset, params=sample_params,
                         undirected_biases=False, label=None)
         elif solver.hybrid:
             if not dimod:
                 self.skipTest("dimod not installed")
+            future = solver.sample_ising(lin, quad, offset,
+                                         upload_params=upload_params, **sample_params)
             bqm = dimod.BQM.from_ising(lin, quad, offset)
-            args = dict(problem=bqm, problem_type=None, label=None, params=params)
+            args = dict(problem=bqm, problem_type=None, label=None,
+                        sample_params=sample_params, upload_params=upload_params)
 
+        before = memo['before_sample']
         self.assertEqual(before['obj'], solver)
         self.assertDictEqual(before['args'], args)
 
