@@ -785,6 +785,28 @@ class NLSolver(BaseUnstructuredSolver):
 
         return data
 
+    def sample_bqm(self, bqm, label=None, **params):
+        """Use just for testing."""
+        try:
+            import dimod
+        except ImportError: # pragma: no cover
+            raise RuntimeError("Can't sample from 'bqm' without dimod. "
+                               "Re-install the library with 'bqm' support.")
+        try:
+            from dwave.optimization.generators import _from_constrained_quadratic_model
+        except ImportError: # pragma: no cover
+            raise RuntimeError("Can't sample from nonlinear model without dwave-optimization. "
+                               "Re-install the library with 'nlm' support.")
+
+        # cqm to model generator requires binary bqm
+        bqm.change_vartype(dimod.BINARY, inplace=True)
+
+        # TODO: simplify when a public BQM -> Model generator is added to dwave-optimization
+        cqm = dimod.CQM.from_bqm(bqm)
+        nlm = _from_constrained_quadratic_model(cqm)
+
+        return self.sample_nlm(nlm, label=label, **params)
+
     def sample_nlm(self,
                    model: typing.Union['dwave.optimization.Model', io.IOBase, str],
                    label: typing.Optional[str] = None,
