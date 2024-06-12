@@ -383,9 +383,10 @@ class BaseUnstructuredSolver(BaseSolver):
         """Encode and upload the problem.
 
         Args:
-            problem (dimod-model-like):
-                Quadratic model handled by the solver, for example
-                :class:`dimod.BQM`, :class:`dimod.CQM` or :class:`dimod.DQM`.
+            problem (model-like):
+                A quadratic model or a nonlinear model handled by the solver,
+                for example :class:`~dimod.BQM`, :class:`~dimod.CQM` or
+                :class:`~dwave.optimization.Model`.
 
         Returns:
             :class:`concurrent.futures.Future`[str]:
@@ -443,10 +444,10 @@ class BaseUnstructuredSolver(BaseSolver):
         """Sample from the specified problem.
 
         Args:
-            problem (dimod-model-like/str):
-                A quadratic model (e.g. :class:`dimod.BQM`/:class:`dimod.CQM`/:class:`dimod.DQM`),
-                or a reference to one (Problem ID returned by
-                :meth:`.upload_problem` method).
+            problem (model-like/str):
+                A quadratic model (e.g. :class:`~dimod.BQM`, :class:`~dimod.CQM`,
+                :class:`~dimod.DQM`), a nonlinear model (:class:`~dwave.optimization.Model`)
+                or a reference to one (Problem ID returned by :meth:`.upload_problem` method).
 
             problem_type (str, optional):
                 Problem type, one of the handled problem types by the solver.
@@ -496,9 +497,6 @@ class BQMSolver(BaseUnstructuredSolver):
 
         data (`dict`):
             Data from the server describing this solver.
-
-    Note:
-        Events are not yet dispatched from unstructured solvers.
     """
 
     _handled_problem_types = {"bqm"}
@@ -574,9 +572,6 @@ class DQMSolver(BaseUnstructuredSolver):
 
         data (`dict`):
             Data from the server describing this solver.
-
-    Note:
-        Events are not yet dispatched from unstructured solvers.
     """
 
     _handled_problem_types = {"dqm"}
@@ -662,9 +657,6 @@ class CQMSolver(BaseUnstructuredSolver):
 
         data (`dict`):
             Data from the server describing this solver.
-
-    Note:
-        Events are not yet dispatched from unstructured solvers.
     """
 
     _handled_problem_types = {"cqm"}
@@ -870,7 +862,6 @@ class StructuredSolver(BaseSolver):
 
         data (`dict`):
             Data from the server describing this solver.
-
     """
 
     _handled_problem_types = {"ising", "qubo"}
