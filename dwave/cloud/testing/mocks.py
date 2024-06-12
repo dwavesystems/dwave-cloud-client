@@ -22,6 +22,7 @@ __all__ = [
     'structured_solver_data', 'qpu_clique_solver_data',
     'qpu_chimera_solver_data', 'qpu_pegasus_solver_data', 'qpu_problem_timing_data',
     'unstructured_solver_data', 'hybrid_bqm_solver_data', 'hybrid_dqm_solver_data',
+    'hybrid_nl_solver_data'
 ]
 
 
@@ -293,7 +294,8 @@ def unstructured_solver_data(id: str = None,
             "quota_conversion_rate": 20,
             "parameters": {
                 "time_limit": "Hybrid solver execution time limit."
-            }
+            },
+            "version": "1.0",
         }
 
     if supported_problem_types is None:
@@ -327,6 +329,17 @@ def hybrid_dqm_solver_data(**kwargs) -> dict:
         id="hybrid_dqm_solver",
         description="Hybrid unstructured DQM mock solver",
         supported_problem_types=["dqm"]
+    )
+    params.update(**kwargs)
+    return unstructured_solver_data(**params)
+
+
+def hybrid_nl_solver_data(**kwargs) -> dict:
+    params = dict(
+        id="hybrid_nl_solver",
+        description="Hybrid unstructured NL mock solver",
+        supported_problem_types=["nl"],
+        maximum_number_of_states=1
     )
     params.update(**kwargs)
     return unstructured_solver_data(**params)
