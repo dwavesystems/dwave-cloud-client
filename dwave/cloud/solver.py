@@ -29,12 +29,14 @@ You can list all solvers available to a :class:`~dwave.cloud.client.Client` with
 """
 
 import io
+import concurrent.futures
 import copy
 import json
 import logging
 import typing
 from collections.abc import Mapping
 from functools import partial
+from tempfile import SpooledTemporaryFile
 
 from dwave.cloud.exceptions import (
     InvalidAPIResponseError, SolverPropertyMissingError,
@@ -62,7 +64,7 @@ except ImportError:
 __all__ = [
     'BaseSolver', 'StructuredSolver',
     'BaseUnstructuredSolver', 'UnstructuredSolver',
-    'Solver', 'BQMSolver', 'CQMSolver', 'DQMSolver',
+    'Solver', 'BQMSolver', 'CQMSolver', 'DQMSolver', 'NLSolver',
 ]
 
 logger = logging.getLogger(__name__)
@@ -377,23 +379,28 @@ class BaseUnstructuredSolver(BaseSolver):
         """
         raise NotImplementedError
 
-    def upload_problem(self, problem):
+    def upload_problem(self, problem, **kwargs):
         """Encode and upload the problem.
 
         Args:
-            problem (dimod-model-like):
-                Quadratic model handled by the solver, for example
-                :class:`dimod.BQM`, :class:`dimod.CQM` or :class:`dimod.DQM`.
+            problem (model-like):
+                A quadratic model or a nonlinear model handled by the solver,
+                for example :class:`~dimod.BQM`, :class:`~dimod.CQM` or
+                :class:`~dwave.optimization.Model`.
+
+            **kwargs:
+                Optional problem encoding and upload parameters.
 
         Returns:
             :class:`concurrent.futures.Future`[str]:
                 Problem ID in a Future. Problem ID can be used to submit
                 problems by reference.
         """
-        data = self._encode_problem_for_upload(problem)
-        return self.client.upload_problem_encoded(data)
+        data = self._encode_problem_for_upload(problem, **kwargs)
+        return self.client.upload_problem_encoded(data, **kwargs)
 
-    def _encode_problem_for_submission(self, problem, problem_type, params,
+    def _encode_problem_for_submission(self, *, problem, problem_type,
+                                       upload_params=None, sample_params=None,
                                        label=None):
         """Encode `problem` for submitting in `ref` format. Upload the
         problem if it's not already uploaded.
@@ -405,8 +412,11 @@ class BaseUnstructuredSolver(BaseSolver):
             problem_type (str):
                 Problem type, one of the handled problem types by the solver.
 
-            params (dict):
-                Parameters for the sampling method, solver-specific.
+            upload_params (dict):
+                Upload parameters, solver-specific.
+
+            sample_params (dict):
+                Sampling parameters, solver-specific.
 
             label (str, optional):
                 Problem label.
@@ -416,18 +426,23 @@ class BaseUnstructuredSolver(BaseSolver):
                 JSON-encoded problem submit body
         """
 
+        if upload_params is None:
+            upload_params = {}
+        if sample_params is None:
+            sample_params = {}
+
         if isinstance(problem, str):
             problem_id = problem
         else:
             logger.debug("To encode the problem for submit in the 'ref' format, "
                          "we need to upload it first.")
-            problem_id = self.upload_problem(problem).result()
+            problem_id = self.upload_problem(problem, **upload_params).result()
 
         body = {
             'solver': self.id,
             'data': encode_problem_as_ref(problem_id),
             'type': problem_type,
-            'params': params
+            'params': sample_params
         }
         if label is not None:
             body['label'] = label
@@ -437,14 +452,15 @@ class BaseUnstructuredSolver(BaseSolver):
         return body_data
 
     @dispatches_events('sample')
-    def sample_problem(self, problem, problem_type=None, label=None, **params):
+    def sample_problem(self, problem, problem_type=None, label=None,
+                       upload_params=None, **sample_params):
         """Sample from the specified problem.
 
         Args:
-            problem (dimod-model-like/str):
-                A quadratic model (e.g. :class:`dimod.BQM`/:class:`dimod.CQM`/:class:`dimod.DQM`),
-                or a reference to one (Problem ID returned by
-                :meth:`.upload_problem` method).
+            problem (model-like/str):
+                A quadratic model (e.g. :class:`~dimod.BQM`, :class:`~dimod.CQM`,
+                :class:`~dimod.DQM`), a nonlinear model (:class:`~dwave.optimization.Model`)
+                or a reference to one (Problem ID returned by :meth:`.upload_problem` method).
 
             problem_type (str, optional):
                 Problem type, one of the handled problem types by the solver.
@@ -454,8 +470,11 @@ class BaseUnstructuredSolver(BaseSolver):
                 Problem label you can optionally tag submissions with for ease
                 of identification.
 
-            **params:
-                Parameters for the sampling method, solver-specific.
+            upload_params (dict):
+                Optional upload/encode parameters, solver specific.
+
+            **sample_params:
+                Sampling parameters, solver-specific.
 
         Returns:
             :class:`~dwave.cloud.computation.Future`
@@ -468,8 +487,8 @@ class BaseUnstructuredSolver(BaseSolver):
         # encode the request (body as future)
         body = self.client._encode_problem_executor.submit(
             self._encode_problem_for_submission,
-            problem=problem, problem_type=problem_type, params=params,
-            label=label)
+            problem=problem, problem_type=problem_type, label=label,
+            upload_params=upload_params, sample_params=sample_params)
 
         # computation future holds a reference to the remote job
         computation = Future(
@@ -494,9 +513,6 @@ class BQMSolver(BaseUnstructuredSolver):
 
         data (`dict`):
             Data from the server describing this solver.
-
-    Note:
-        Events are not yet dispatched from unstructured solvers.
     """
 
     _handled_problem_types = {"bqm"}
@@ -572,9 +588,6 @@ class DQMSolver(BaseUnstructuredSolver):
 
         data (`dict`):
             Data from the server describing this solver.
-
-    Note:
-        Events are not yet dispatched from unstructured solvers.
     """
 
     _handled_problem_types = {"dqm"}
@@ -660,9 +673,6 @@ class CQMSolver(BaseUnstructuredSolver):
 
         data (`dict`):
             Data from the server describing this solver.
-
-    Note:
-        Events are not yet dispatched from unstructured solvers.
     """
 
     _handled_problem_types = {"cqm"}
@@ -739,6 +749,152 @@ class CQMSolver(BaseUnstructuredSolver):
         return self.upload_problem(cqm)
 
 
+class NLSolver(BaseUnstructuredSolver):
+    """NL solver interface.
+
+    This class provides an :term:`NL model` sampling method and encapsulates
+    the solver description returned from the D-Wave cloud API.
+
+    Args:
+        client (:class:`~dwave.cloud.client.Client`):
+            Client that manages access to this solver.
+
+        data (`dict`):
+            Data from the server describing this solver.
+    """
+
+    _handled_problem_types = {"nl"}
+    _handled_encoding_formats = {"binary-ref"}
+
+    def _encode_problem_for_upload(self,
+                                   model: typing.Union['dwave.optimization.Model', io.IOBase],
+                                   **kwargs
+                                   ) -> io.IOBase:
+        encode_params = {k: v for k, v in kwargs.items()
+                         if k in {'max_num_states', 'only_decision'}}
+        try:
+            data = model.to_file(**encode_params)
+        except Exception as e:
+            logger.debug("NL model serialization failed with %r, "
+                         "assuming data already encoded.", e)
+            # assume `model` given as file, ready for upload
+            data = model
+        else:
+            logger.debug("Problem (model) encoded with encode_params=%r for upload in %r",
+                        encode_params, data)
+
+        return data
+
+    def sample_bqm(self,
+                   bqm: 'dimod.BQM',
+                   label: typing.Optional[str] = None,
+                   **params) -> Future:
+        """Use just for testing."""
+        try:
+            import dimod
+        except ImportError: # pragma: no cover
+            raise RuntimeError("Can't sample from 'bqm' without dimod. "
+                               "Re-install the library with 'bqm' support.")
+        try:
+            from dwave.optimization.generators import _from_constrained_quadratic_model
+        except ImportError: # pragma: no cover
+            raise RuntimeError("Can't sample from nonlinear model without dwave-optimization. "
+                               "Re-install the library with 'nlm' support.")
+
+        # cqm to model generator requires binary bqm
+        bqm.change_vartype(dimod.BINARY, inplace=True)
+
+        # TODO: simplify when a public BQM -> Model generator is added to dwave-optimization
+        cqm = dimod.CQM.from_bqm(bqm)
+        nlm = _from_constrained_quadratic_model(cqm)
+
+        return self.sample_nlm(nlm, label=label, **params)
+
+    def sample_nlm(self,
+                   model: typing.Union['dwave.optimization.Model', io.IOBase, str],
+                   label: typing.Optional[str] = None,
+                   upload_params: typing.Optional[dict] = None,
+                   **sample_params
+                   ) -> Future:
+        """Sample from the specified :term:`NL model`.
+
+        Args:
+            model (:class:`~dwave.optimization.Model`/bytes/str):
+                A nonlinear model, serialized model, or a reference to uploaded
+                model (Problem ID returned by `.upload_nlm` method).
+
+            label (str, optional):
+                Problem label you can optionally tag submissions with for ease
+                of identification.
+
+            upload_params (dict):
+                Model encoding and upload parameters, for example parameters
+                passed down to ``:meth:~dwave.optimization.model.Model.to_file``,
+                like ``max_num_states``.
+
+            **sample_params:
+                Sampling parameters, solver-specific.
+
+        Returns:
+            :class:`~dwave.cloud.computation.Future`
+
+        Note:
+            To use this method, dwave-optimization package has to be installed.
+        """
+        try:
+            import dwave.optimization
+        except ImportError: # pragma: no cover
+            raise RuntimeError("Can't sample from nonlinear model without dwave-optimization. "
+                               "Re-install the library with 'nlm' support.")
+
+        return self.sample_problem(
+            model, label=label, upload_params=upload_params, **sample_params)
+
+    def sample_problem(self, *args, **kwargs):
+        sf = SpooledTemporaryFile(max_size=1e8, mode='w+b')
+        # backport a fix for bpo-26175, https://github.com/python/cpython/pull/29560.
+        # to make sure `zipfile` works with `SpooledTemporaryFile` in Python < 3.11
+        if not hasattr(sf, 'seekable'):
+            # of all the methods fixed in the above PR, only seekable is actually
+            # ever used in `zipfile`.
+            sf.seekable = lambda: sf._file.seekable()
+
+        future = super().sample_problem(*args, **kwargs)
+        future._answer_data = sf
+
+        return future
+
+    def upload_nlm(self,
+                   model: typing.Union['dwave.optimization.Model', io.IOBase, bytes],
+                   **upload_params,
+                   ) -> concurrent.futures.Future:
+        """Upload the specified :term:`NL model` to SAPI, returning a Problem ID
+        that can be used to submit the NL model to this solver (i.e. call the
+        :meth:`.sample_nlm` method).
+
+        Args:
+            model (:class:`~dwave.optimization.Model`/bytes-like/file-like):
+                A nonlinear model given either as an in-memory
+                :class:`~dwave.optimization.Model` object, or as raw data
+                (encoded serialized model) in either a file-like or a bytes-like
+                object.
+
+            **upload_params:
+                Model encoding and upload parameters, for example parameters
+                passed down to ``:meth:~dwave.optimization.model.Model.to_file``,
+                like ``max_num_states``.
+
+        Returns:
+            :class:`concurrent.futures.Future`[str]:
+                Problem ID in a Future. Problem ID can be used to submit
+                problems by reference.
+
+        Note:
+            To use this method, dwave-optimization package has to be installed.
+        """
+        return self.upload_problem(model, **upload_params)
+
+
 class StructuredSolver(BaseSolver):
     """Class for D-Wave structured solvers.
 
@@ -752,7 +908,6 @@ class StructuredSolver(BaseSolver):
 
         data (`dict`):
             Data from the server describing this solver.
-
     """
 
     _handled_problem_types = {"ising", "qubo"}
@@ -1380,4 +1535,4 @@ UnstructuredSolver = BQMSolver
 
 # list of all available solvers, ordered according to loading attempt priority
 # (more specific first)
-available_solvers = [StructuredSolver, BQMSolver, CQMSolver, DQMSolver]
+available_solvers = [StructuredSolver, BQMSolver, CQMSolver, DQMSolver, NLSolver]

@@ -71,3 +71,4 @@ class ProblemType(str, enum.Enum):
     BQM = "bqm"
     CQM = "cqm"
     DQM = "dqm"
+    NL = "nl"

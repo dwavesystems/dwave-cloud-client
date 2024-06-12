@@ -1652,7 +1652,7 @@ class Client(object):
 
         return output
 
-    def upload_problem_encoded(self, problem, problem_id=None):
+    def upload_problem_encoded(self, problem, problem_id=None, **kwargs):
         """Initiate multipart problem upload, returning the Problem ID in a
         :class:`~concurrent.futures.Future`.
 
