@@ -785,7 +785,10 @@ class NLSolver(BaseUnstructuredSolver):
 
         return data
 
-    def sample_bqm(self, bqm, label=None, **params):
+    def sample_bqm(self,
+                   bqm: 'dimod.BQM',
+                   label: typing.Optional[str] = None,
+                   **params) -> Future:
         """Use just for testing."""
         try:
             import dimod
