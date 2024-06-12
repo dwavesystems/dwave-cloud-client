@@ -1,0 +1,7 @@
+---
+fixes:
+  - |
+    Fix a possible race condition when multiple threads try to resolve
+    remote computation results. A special case of this occurs on binary answer
+    download from a reference link.
+    See `#624 <https://github.com/dwavesystems/dwave-cloud-client/issues/624>`_.
