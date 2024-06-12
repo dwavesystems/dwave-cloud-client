@@ -18,19 +18,26 @@ import io
 import json
 import unittest
 from unittest import mock
-from parameterized import parameterized
 
 import numpy
+from parameterized import parameterized
 
 from dwave.cloud.client import Client
 from dwave.cloud.solver import (
-    BaseUnstructuredSolver, UnstructuredSolver, BQMSolver, CQMSolver, DQMSolver)
+    StructuredSolver, BaseUnstructuredSolver, UnstructuredSolver,
+    BQMSolver, CQMSolver, DQMSolver, NLSolver)
 from dwave.cloud.concurrency import Present
+from dwave.cloud.testing.mocks import qpu_pegasus_solver_data, hybrid_nl_solver_data
 
 try:
     import dimod
 except ImportError:
     raise unittest.SkipTest("dimod required for unstructured solver tests")
+
+try:
+    from dwave.optimization import Model as NLModel
+except ImportError:
+    NLModel = None
 
 
 def unstructured_solver_data(problem_type='bqm'):
@@ -60,8 +67,11 @@ def complete_reply_bq(sampleset, id_="problem-id", type_='bqm', label=None):
         "label": label
     }])
 
-def complete_reply_binary_ref(answer_data_uri, id_="problem-id", type_='cqm', label=None):
+def complete_reply_binary_ref(answer_data_uri, id_="problem-id", type_='cqm', label=None, timing=None):
     """Reply with `answer_data_uri` in binary-ref."""
+
+    if timing is None:
+        timing = {"qpu_access_time": 1}
 
     return json.dumps([{
         "status": "COMPLETED",
@@ -72,9 +82,7 @@ def complete_reply_binary_ref(answer_data_uri, id_="problem-id", type_='cqm', la
             "format": "binary-ref",
             "auth_method": "sapi-token",
             "url": answer_data_uri,
-            "timing": {
-                "qpu_access_time": 1
-            }
+            "timing": timing
         },
         "type": type_,
         "id": id_,
@@ -311,6 +319,92 @@ class TestUnstructuredSolver(unittest.TestCase):
                     for fut in futs:
                         with self.assertRaises(type(mock_upload_exc)):
                             fut.result()
+
+
+class TestNLSolver(unittest.TestCase):
+
+    def setUp(self):
+        self.mock_nl_solver = NLSolver(client=None, data=hybrid_nl_solver_data())
+        self.mock_qpu_solver = StructuredSolver(client=None, data=qpu_pegasus_solver_data(2))
+        self.solvers = [self.mock_qpu_solver, self.mock_nl_solver]
+        self.client = Client(endpoint='endpoint', token='token')
+        self.client._fetch_solvers = lambda **kw: self.solvers
+
+    def shutDown(self):
+        self.client.close()
+
+    def assertSolvers(self, container, members):
+        self.assertEqual(set(container), set(members))
+
+    def test_get_solvers(self):
+        self.assertSolvers(self.client.get_solvers(), self.solvers)
+
+    def test_nl_solver_selection(self):
+        solvers = self.client.get_solvers(supported_problem_types__issubset={'nl'})
+        self.assertSolvers(solvers, [self.mock_nl_solver])
+
+    @unittest.skipUnless(NLModel, "dwave.optimization not installed")
+    def test_sample_nl_smoke_test(self):
+        # create nonlinear model
+        model = NLModel()
+        x = model.list(10)
+        model.minimize(x.sum())
+        num_states = 5
+        model.states.resize(num_states)
+
+        # save states
+        self.assertEqual(model.states.size(), num_states)
+        states_file = io.BytesIO()
+        model.states.into_file(states_file)
+        states_file.seek(0)
+
+        mock_answer_data = states_file.read()
+        states_file.seek(0)
+
+        # reset states
+        model.states.resize(0)
+        self.assertEqual(model.states.size(), 0)
+
+        problem_type = 'nl'
+        upload_params = dict(max_num_states=1)
+        timing_info = {'qpu_access_time': 1, 'run_time': 2}
+
+        # use a global mocked session, so we can modify it on the fly
+        session = mock.Mock()
+        setattr(session, '__enter__', mock.Mock())
+        setattr(session, '__exit__', mock.Mock())
+        session.__enter__.return_value = session
+        session.__exit__.return_value = None
+        session.get.return_value.iter_content.return_value = iter([mock_answer_data])
+
+        # mock the upload worker on client only, still testing the solver upload path
+        mock_problem_id = 'mock-problem-id'
+        def mock_upload(_, file, **kwargs):
+            file.close()
+            self.assertEqual(kwargs, upload_params)
+            return Present(result=mock_problem_id)
+
+        # construct a functional solver by mocking client and api response data
+        with mock.patch.multiple(Client, create_session=lambda self: session,
+                                 upload_problem_encoded=mock_upload):
+            with Client(endpoint='endpoint', token='token') as client:
+                solver = NLSolver(client, hybrid_nl_solver_data())
+
+                # use mock answer data
+                answer_url = f'/problems/{mock_problem_id}/answer/data/'
+                session.post = lambda path, _: choose_reply(
+                    path, {
+                        'problems/': complete_reply_binary_ref(
+                            answer_url, id_=mock_problem_id, type_=problem_type,
+                            timing=timing_info),
+                        answer_url: mock_answer_data,
+                    })
+
+                # verify decoding works
+                fut = solver.sample_nlm(model, upload_params=upload_params)
+                self.assertEqual(fut.problem_type, problem_type)
+                self.assertEqual(fut.timing, timing_info)
+                self.assertEqual(fut.answer_data.read(), mock_answer_data)
 
 
 class TestProblemLabel(unittest.TestCase):
