@@ -29,12 +29,14 @@ You can list all solvers available to a :class:`~dwave.cloud.client.Client` with
 """
 
 import io
+import concurrent.futures
 import copy
 import json
 import logging
 import typing
 from collections.abc import Mapping
 from functools import partial
+from tempfile import SpooledTemporaryFile
 
 from dwave.cloud.exceptions import (
     InvalidAPIResponseError, SolverPropertyMissingError,
@@ -62,7 +64,7 @@ except ImportError:
 __all__ = [
     'BaseSolver', 'StructuredSolver',
     'BaseUnstructuredSolver', 'UnstructuredSolver',
-    'Solver', 'BQMSolver', 'CQMSolver', 'DQMSolver',
+    'Solver', 'BQMSolver', 'CQMSolver', 'DQMSolver', 'NLSolver',
 ]
 
 logger = logging.getLogger(__name__)
@@ -739,6 +741,122 @@ class CQMSolver(BaseUnstructuredSolver):
         return self.upload_problem(cqm)
 
 
+class NLSolver(BaseUnstructuredSolver):
+    """NL solver interface.
+
+    This class provides an :term:`NL model` sampling method and encapsulates
+    the solver description returned from the D-Wave cloud API.
+
+    Args:
+        client (:class:`~dwave.cloud.client.Client`):
+            Client that manages access to this solver.
+
+        data (`dict`):
+            Data from the server describing this solver.
+    """
+
+    _handled_problem_types = {"nl"}
+    _handled_encoding_formats = {"binary-ref"}
+
+    def upload_problem(self, problem, **kwargs):
+        # TODO: move this to `BaseUnstructuredSolver` once we go public
+        data = self._encode_problem_for_upload(problem, **kwargs)
+        return self.client.upload_problem_encoded(data)
+
+    def _encode_problem_for_upload(self,
+                                   model: typing.Union['dwave.optimization.Model', io.IOBase],
+                                   **kwargs
+                                   ) -> io.IOBase:
+        try:
+            data = model.to_file(**kwargs)
+        except Exception as e:
+            logger.debug("NL model serialization failed with %r, "
+                         "assuming data already encoded.", e)
+            # assume `model` given as file, ready for upload
+            data = model
+
+        logger.debug("Problem (model) encoded for upload: %r", data)
+        return data
+
+    # TODO: add max_num_states before we go public -- we need to support
+    # `upload_params` and `sample_params`
+    def sample_nlm(self,
+                   model: typing.Union['dwave.optimization.Model', io.IOBase, str],
+                   label: typing.Optional[str] = None,
+                   **params
+                   ) -> Future:
+        """Sample from the specified :term:`NL model`.
+
+        Args:
+            model (:class:`~dwave.optimization.Model`/bytes/str):
+                A nonlinear model, serialized model, or a reference to uploaded
+                model (Problem ID returned by `.upload_nlm` method).
+
+            label (str, optional):
+                Problem label you can optionally tag submissions with for ease
+                of identification.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
+
+        Returns:
+            :class:`~dwave.cloud.computation.Future`
+
+        Note:
+            To use this method, dwave-optimization package has to be installed.
+        """
+        try:
+            import dwave.optimization
+        except ImportError: # pragma: no cover
+            raise RuntimeError("Can't sample from nonlinear model without dwave-optimization. "
+                               "Re-install the library with 'nlm' support.")
+
+        return self.sample_problem(model, label=label, **params)
+
+    def sample_problem(self, *args, **kwargs):
+        sf = SpooledTemporaryFile(max_size=1e8, mode='w+b')
+        # backport a fix for bpo-26175, https://github.com/python/cpython/pull/29560.
+        # to make sure `zipfile` works with `SpooledTemporaryFile` in Python < 3.11
+        if not hasattr(sf, 'seekable'):
+            # of all the methods fixed in the above PR, only seekable is actually
+            # ever used in `zipfile`.
+            sf.seekable = lambda: sf._file.seekable()
+
+        future = super().sample_problem(*args, **kwargs)
+        future._answer_data = sf
+
+        return future
+
+    def upload_nlm(self,
+                   model: typing.Union['dwave.optimization.Model', io.IOBase, bytes],
+                   **kwargs,
+                   ) -> concurrent.futures.Future:
+        """Upload the specified :term:`NL model` to SAPI, returning a Problem ID
+        that can be used to submit the NL model to this solver (i.e. call the
+        :meth:`.sample_nlm` method).
+
+        Args:
+            model (:class:`~dwave.optimization.Model`/bytes-like/file-like):
+                A nonlinear model given either as an in-memory
+                :class:`~dwave.optimization.Model` object, or as raw data
+                (encoded serialized model) in either a file-like or a bytes-like
+                object.
+
+            max_num_states (int):
+                Maximum number of states to upload along with the model.
+                The number of states uploaded is ``min(len(model.states), max_num_states)``.
+
+        Returns:
+            :class:`concurrent.futures.Future`[str]:
+                Problem ID in a Future. Problem ID can be used to submit
+                problems by reference.
+
+        Note:
+            To use this method, dwave-optimization package has to be installed.
+        """
+        return self.upload_problem(model, **kwargs)
+
+
 class StructuredSolver(BaseSolver):
     """Class for D-Wave structured solvers.
 
@@ -1380,4 +1498,4 @@ UnstructuredSolver = BQMSolver
 
 # list of all available solvers, ordered according to loading attempt priority
 # (more specific first)
-available_solvers = [StructuredSolver, BQMSolver, CQMSolver, DQMSolver]
+available_solvers = [StructuredSolver, BQMSolver, CQMSolver, DQMSolver, NLSolver]

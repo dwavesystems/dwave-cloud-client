@@ -36,6 +36,9 @@ extras_require = {
     # cqm support
     'cqm': ['dimod>=0.10.5,<0.13,!=0.11.4', 'numpy>=1.17.3'],
 
+    # nlm support
+    'nlm': ['dwave-optimization>=0.1.0,<0.3', 'numpy>=1.20.0'],
+
     # testing mocks
     'mocks': ['dwave-networkx>=0.8.9'],
 }

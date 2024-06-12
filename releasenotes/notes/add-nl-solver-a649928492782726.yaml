@@ -1,0 +1,4 @@
+---
+features:
+  - |
+    Add support for nonlinear unstructured solvers with ``dwave.cloud.solver.NLSolver``.
