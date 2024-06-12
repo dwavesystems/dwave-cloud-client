@@ -14,18 +14,18 @@
 
 """Test problem submission against hard-coded replies with unittest.mock."""
 
-import json
-import unittest
-import threading
 import collections
-
+import json
+import threading
+import time
+import unittest
+from concurrent.futures import TimeoutError, ThreadPoolExecutor
 from unittest import mock
-from requests.structures import CaseInsensitiveDict
-from requests.exceptions import HTTPError
-from concurrent.futures import TimeoutError
-from parameterized import parameterized
 
 import numpy
+from parameterized import parameterized
+from requests.exceptions import HTTPError
+from requests.structures import CaseInsensitiveDict
 
 try:
     import dimod
@@ -1085,6 +1085,50 @@ class TestComputationSamplesetCaching(unittest.TestCase):
                 # verify gc
                 del sampleset
                 self.assertIsNone(response._sampleset())
+
+
+class TestThreadSafety(unittest.TestCase):
+
+    def test_result_loading(self):
+        sapi = StructuredSapiMockResponses()
+        executor = ThreadPoolExecutor(max_workers=2)
+        gate = threading.Event()
+        limit = threading.BoundedSemaphore(value=1)
+
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda a, _: choose_reply(a, {
+                'problems/': [sapi.complete_no_answer_reply(id='123')]})
+            session.get = lambda a: choose_reply(a, {
+                'problems/123/': sapi.complete_reply(id='123')})
+            return session
+
+        def gated_decoder(self, msg, **kwargs):
+            gate.wait()
+            with limit:
+                time.sleep(0.1)
+                return self._decode_qp(msg)
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with mock.patch.object(Solver, 'decode_response', gated_decoder):
+                with Client(endpoint='endpoint', token='token') as client:
+                    solver = Solver(client, sapi.solver.data)
+                    response = solver.sample_ising(*sapi.problem)
+
+                    # run `response.result()` in parallel:
+                    timing = executor.submit(lambda: response.timing)
+                    problem_type = executor.submit(lambda: response.problem_type)
+
+                    gate.set()
+
+                    try:
+                        timing.result()
+                        problem_type.result()
+                    except:
+                        # might fail with `ValueError` raised by the `BoundedSemaphore`,
+                        # or some other decoder-specific error due to repeated decoding
+                        # of a mutated structure (message)
+                        self.fail('parallel resolve failed')
 
 
 class TestSerialization(unittest.TestCase):

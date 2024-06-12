@@ -148,6 +148,9 @@ class Future(object):
         self._result = None
         self._exception = None
 
+        # make writes to self._result thread-safe
+        self._result_write_lock = threading.Lock()
+
         # Event(s) to signal when the results are ready
         self._results_ready_event = threading.Event()
         self._other_events = []
@@ -905,13 +908,15 @@ class Future(object):
             if self._exception is not None:
                 raise self._exception
 
-            # If someone else took care of this while we were waiting
-            if self._result is not None:
-                return self._result
+            with self._result_write_lock:
+                # If someone else took care of decoding while we were waiting
+                if self._result is not None:
+                    return self._result
 
-            # Prepare results from the response
-            self._decode()
-            self._alias_result()
+                # extract results from the response
+                # note: decoding might mutate `self._message`, so it should be only called once
+                self._decode()
+                self._alias_result()
 
             # signal answer data downloaded
             if 'answer' in self._result:
