@@ -1,4 +1,4 @@
-# Copyright 2017 D-Wave Systems Inc.
+# Copyright 2024 D-Wave Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,23 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import inspect
+"""Exception handling utilities for private and Ocean-internal use.
 
+.. versionchanged:: 0.12.0
+   These functions previously lived under ``dwave.cloud.utils``.
+"""
+
+from typing import Any, Iterable, Tuple, Union
 
 __all__ = ['hasinstance', 'exception_chain', 'is_caused_by']
 
 
-
-
-def hasinstance(iterable, class_or_tuple):
+def hasinstance(objs: Iterable[Any], class_or_tuple: Union[Any, Tuple[Any]]):
     """Extension of ``isinstance`` to iterables/sequences. Returns True iff the
     sequence contains at least one object which is instance of ``class_or_tuple``.
     """
 
-    return any(isinstance(e, class_or_tuple) for e in iterable)
+    return any(isinstance(e, class_or_tuple) for e in objs)
 
 
-def exception_chain(exception):
+def exception_chain(exception: Exception):
     """Traverse the chain of embedded exceptions, yielding one at the time.
 
     Args:
@@ -67,7 +70,9 @@ def exception_chain(exception):
             return
 
 
-def is_caused_by(exception, exception_types):
+def is_caused_by(exception: Exception,
+                 exception_types: Union[Exception, Tuple[Exception]]
+                 ) -> bool:
     """Check if any of ``exception_types`` is causing the ``exception``.
     Equivalently, check if any of ``exception_types`` is contained in the
     exception chain rooted at ``exception``.
@@ -86,34 +91,3 @@ def is_caused_by(exception, exception_types):
     """
 
     return hasinstance(exception_chain(exception), exception_types)
-
-
-
-def pretty_argvalues():
-    """Pretty-formatted function call arguments, from the caller's frame."""
-    return inspect.formatargvalues(*inspect.getargvalues(inspect.currentframe().f_back))
-
-
-
-def bqm_to_dqm(bqm):
-    """Represent a :class:`dimod.BQM` as a :class:`dimod.DQM`."""
-    try:
-        from dimod import DiscreteQuadraticModel
-    except ImportError: # pragma: no cover
-        raise RuntimeError(
-            "dimod package with support for DiscreteQuadraticModel required."
-            "Re-install the library with 'dqm' support.")
-
-    dqm = DiscreteQuadraticModel()
-
-    ising = bqm.spin
-
-    for v, bias in ising.linear.items():
-        dqm.add_variable(2, label=v)
-        dqm.set_linear(v, [-bias, bias])
-
-    for (u, v), bias in ising.quadratic.items():
-        biases = numpy.array([[bias, -bias], [-bias, bias]], dtype=numpy.float64)
-        dqm.set_quadratic(u, v, biases)
-
-    return dqm

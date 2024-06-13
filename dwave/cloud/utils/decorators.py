@@ -1,4 +1,4 @@
-# Copyright 2024 D-Wave Systems Inc.
+# Copyright 2024 D-Wave Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ class aliasdict(dict):
 
     Example:
         >>> from operator import itemgetter
-        >>> from dwave.cloud.utils import aliasdict
+        >>> from dwave.cloud.utils.decorators import aliasdict
 
         >>> d = aliasdict(a=1, b=2)
         >>> d.alias(c=itemgetter('a'))

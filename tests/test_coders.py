@@ -30,7 +30,7 @@ from dwave.cloud.coders import (
     encode_problem_as_qp, decode_qp, decode_qp_numpy,
     encode_problem_as_bq, decode_bq, encode_problem_as_ref)
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
-from dwave.cloud.utils import generate_const_ising_problem
+from dwave.cloud.utils.qubo import generate_const_ising_problem
 
 # parse string version as tuple
 if dimod:

@@ -1,4 +1,4 @@
-# Copyright 2024 D-Wave Systems Inc.
+# Copyright 2024 D-Wave Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 """Utilities for private and Ocean-internal use."""
 
 # imports for backward-compat
-from dwave.cloud.utils.logging import set_loglevel
+from dwave.cloud.utils.logging import set_loglevel, configure_logging
 
 from dwave.cloud.utils.qubo import (
     uniform_get, reformat_qubo_as_ising, active_qubits,
@@ -23,4 +23,4 @@ from dwave.cloud.utils.qubo import (
 
 from dwave.cloud.utils.time import utcnow
 
-from dwave.cloud.utils.decorators import retried
+from dwave.cloud.utils.decorators import cached, retried

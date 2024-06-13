@@ -70,7 +70,7 @@ class TestConfigCreate(unittest.TestCase):
         runner = CliRunner(mix_stderr=False)
         with runner.isolated_filesystem():
             with mock.patch("dwave.cloud.config.loaders.get_configfile_paths", lambda: ['dwave.conf']):
-                with mock.patch("dwave.cloud.utils.input", side_effect=inputs):
+                with mock.patch("dwave.cloud.utils.cli.input", side_effect=inputs):
                     result = runner.invoke(cli, [
                         'config', 'create'
                     ] + extra_opts, input='\n'.join('' if v is None else v for v in inputs.values()))

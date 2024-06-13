@@ -1,4 +1,4 @@
-# Copyright 2024 D-Wave Systems Inc.
+# Copyright 2024 D-Wave Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,10 +18,9 @@
    These functions previously lived under ``dwave.cloud.utils``.
 """
 
-from collections import OrderedDict
 from importlib.metadata import (
     entry_points, EntryPoint, Distribution, PackageNotFoundError)
-from typing import Dict, List, Union
+from typing import Dict, List, OrderedDict, Union
 
 from packaging.requirements import Requirement
 
@@ -38,7 +37,7 @@ def get_contrib_config() -> List[EntryPoint]:
     return contrib
 
 
-def get_contrib_packages() -> Dict[str, Distribution]:
+def get_contrib_packages() -> OrderedDict[str, dict]:
     """Combine all contrib packages in an ordered dict. Assumes package names
     are unique.
     """
@@ -76,7 +75,7 @@ def get_distribution(requirement: Union[str, Requirement],
     Raises:
         :class:`~importlib.metadata.PackageNotFoundError`:
             Package by name not found.
-        :class:`~dwave.cloud.utils.VersionNotFoundError`:
+        :class:`~dwave.cloud.utils.dist.VersionNotFoundError`:
             Version of the package found (distribution) does not match the
             requirement.
     """

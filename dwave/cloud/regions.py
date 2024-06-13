@@ -25,7 +25,7 @@ from dwave.cloud.api.constants import (
     DEFAULT_REGION, DEFAULT_SOLVER_API_ENDPOINT, DEFAULT_LEAP_API_ENDPOINT,
     DEFAULT_METADATA_API_ENDPOINT)
 from dwave.cloud.config.models import ClientConfig, validate_config_v1
-from dwave.cloud.utils import cached
+from dwave.cloud.utils.decorators import cached
 
 __all__ = ['get_regions']
 

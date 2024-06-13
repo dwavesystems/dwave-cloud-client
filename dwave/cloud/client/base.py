@@ -74,7 +74,8 @@ from dwave.cloud.upload import ChunkedData
 from dwave.cloud.events import dispatches_events
 from dwave.cloud.utils.http import PretimedHTTPAdapter, BaseUrlSession, default_user_agent
 from dwave.cloud.utils.time import datetime_to_timestamp, utcnow
-from dwave.cloud.utils import cached, retried, is_caused_by
+from dwave.cloud.utils.decorators import cached, retried
+from dwave.cloud.utils.exception import is_caused_by
 
 __all__ = ['Client']
 

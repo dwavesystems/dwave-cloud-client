@@ -1,4 +1,4 @@
-# Copyright 2024 D-Wave Systems Inc.
+# Copyright 2024 D-Wave Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,10 @@
 
 import json
 
-import numpy
+try:
+    import numpy
+except ImportError: # pragma: no cover
+    pass    # numpy not required for all cloud-client functionality
 
 __all__ = ['NumpyEncoder', 'coerce_numpy_to_python']
 

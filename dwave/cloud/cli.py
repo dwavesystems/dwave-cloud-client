@@ -31,13 +31,13 @@ import dwave.cloud
 from dwave.cloud import Client
 from dwave.cloud import api
 from dwave.cloud.solver import StructuredSolver, BaseUnstructuredSolver
-from dwave.cloud.utils.logging import configure_logging
-from dwave.cloud.utils.qubo import generate_random_ising_problem
-from dwave.cloud.utils.http import user_agent
-from dwave.cloud.utils.time import datetime_to_timestamp, utcnow, epochnow
 from dwave.cloud.utils.cli import default_text_input, strtrunc, CLIError
 from dwave.cloud.utils.dist import (
     get_contrib_packages, get_distribution, PackageNotFoundError, VersionNotFoundError)
+from dwave.cloud.utils.http import user_agent
+from dwave.cloud.utils.logging import configure_logging
+from dwave.cloud.utils.qubo import generate_random_ising_problem
+from dwave.cloud.utils.time import datetime_to_timestamp, utcnow, epochnow
 from dwave.cloud.coders import bqm_as_file
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (

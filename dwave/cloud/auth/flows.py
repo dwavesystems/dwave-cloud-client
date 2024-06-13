@@ -34,7 +34,7 @@ from dwave.cloud.auth.server import SingleRequestAppServer, RequestCaptureAndRed
 from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.regions import resolve_endpoints
 from dwave.cloud.utils.http import default_user_agent
-from dwave.cloud.utils import pretty_argvalues
+from dwave.cloud.utils.logging import pretty_argvalues
 
 __all__ = ['AuthFlow', 'LeapAuthFlow', 'OAuthError']
 

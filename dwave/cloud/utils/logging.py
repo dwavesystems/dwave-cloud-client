@@ -1,4 +1,4 @@
-# Copyright 2024 D-Wave Systems Inc.
+# Copyright 2024 D-Wave Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 """Logging utilities for private and Ocean-internal use."""
 
 import datetime
+import inspect
 import io
 import json
 import logging
@@ -208,3 +209,8 @@ def configure_logging_from_env(logger: logging.Logger) -> bool:
                       structured_output=(log_format.strip().lower() == 'json'))
 
     return True
+
+
+def pretty_argvalues():
+    """Pretty-formatted function call arguments, from the caller's frame."""
+    return inspect.formatargvalues(*inspect.getargvalues(inspect.currentframe().f_back))

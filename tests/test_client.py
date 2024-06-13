@@ -21,9 +21,9 @@ test_mock_solver_loading.py duplicates some of these tests against a mock server
 import json
 import time
 import unittest
-from unittest import mock
-from contextlib import contextmanager
 from collections import defaultdict
+from contextlib import contextmanager
+from unittest import mock
 
 import requests
 from parameterized import parameterized
@@ -32,11 +32,11 @@ from plucky import merge
 from dwave.cloud.api import constants, models, Regions
 from dwave.cloud.client import Client
 from dwave.cloud.config.models import dump_config_v1
-from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
-from dwave.cloud.utils import cached
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, SolverError, SolverNotFoundError)
+from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
 from dwave.cloud.testing import iterable_mock_open, isolated_environ
+from dwave.cloud.utils.decorators import cached
 import dwave.cloud
 
 from tests import config

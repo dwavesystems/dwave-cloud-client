@@ -17,7 +17,8 @@ import uuid
 from typing import Any, Optional, Tuple, Union
 
 from dwave.cloud.coders import encode_problem_as_qp, encode_problem_as_ref
-from dwave.cloud.utils import utcrel, generate_const_ising_problem
+from dwave.cloud.utils.qubo import generate_const_ising_problem
+from dwave.cloud.utils.time import utcrel
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
 from dwave.cloud.testing.mocks import qpu_clique_solver_data, hybrid_bqm_solver_data
 
