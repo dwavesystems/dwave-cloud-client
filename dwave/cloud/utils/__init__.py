@@ -22,3 +22,5 @@ from dwave.cloud.utils.qubo import (
 )
 
 from dwave.cloud.utils.time import utcnow
+
+from dwave.cloud.utils.decorators import retried

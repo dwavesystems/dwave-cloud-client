@@ -37,7 +37,7 @@ from dateutil.parser import parse
 from operator import itemgetter
 
 from dwave.cloud.utils.time import utcnow, datetime_to_timestamp
-from dwave.cloud.utils import aliasdict, deprecated
+from dwave.cloud.utils.decorators import aliasdict, deprecated
 from dwave.cloud.exceptions import InvalidAPIResponseError
 
 # Use numpy if available for fast decoding
