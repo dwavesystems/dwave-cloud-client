@@ -16,7 +16,7 @@ import struct
 import base64
 from typing import Callable
 
-from dwave.cloud.utils import uniform_get, active_qubits
+from dwave.cloud.utils.qubo import uniform_get, active_qubits
 
 __all__ = [
     'encode_problem_as_qp', 'decode_qp', 'decode_qp_numpy',

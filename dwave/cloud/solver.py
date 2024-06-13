@@ -44,14 +44,15 @@ from dwave.cloud.exceptions import (
 from dwave.cloud.coders import (
     encode_problem_as_qp, encode_problem_as_ref, decode_binary_ref,
     decode_qp_numpy, decode_qp, decode_bq, bqm_as_file)
-from dwave.cloud.utils import reformat_qubo_as_ising, NumpyEncoder
 from dwave.cloud.computation import Future
 from dwave.cloud.concurrency import Present
 from dwave.cloud.events import dispatches_events
+from dwave.cloud.utils.coders import NumpyEncoder
+from dwave.cloud.utils.qubo import reformat_qubo_as_ising
 
 # Use numpy if available for fast encoding/decoding
 try:
-    import numpy as np
+    import numpy
     _numpy = True
 except ImportError:
     _numpy = False
@@ -593,6 +594,30 @@ class DQMSolver(BaseUnstructuredSolver):
     _handled_problem_types = {"dqm"}
     _handled_encoding_formats = {"bq"}
 
+    @staticmethod
+    def _bqm_to_dqm(bqm):
+        """Represent a :class:`dimod.BQM` as a :class:`dimod.DQM`."""
+        try:
+            from dimod import DiscreteQuadraticModel
+        except ImportError: # pragma: no cover
+            raise RuntimeError(
+                "dimod package with support for DiscreteQuadraticModel required."
+                "Re-install the library with 'dqm' support.")
+
+        dqm = DiscreteQuadraticModel()
+
+        ising = bqm.spin
+
+        for v, bias in ising.linear.items():
+            dqm.add_variable(2, label=v)
+            dqm.set_linear(v, [-bias, bias])
+
+        for (u, v), bias in ising.quadratic.items():
+            biases = numpy.array([[bias, -bias], [-bias, bias]], dtype=numpy.float64)
+            dqm.set_quadratic(u, v, biases)
+
+        return dqm
+
     def _encode_problem_for_upload(self, dqm):
         try:
             data = dqm.to_file()
@@ -607,10 +632,9 @@ class DQMSolver(BaseUnstructuredSolver):
 
     def sample_bqm(self, bqm, label=None, **params):
         """Use for testing."""
-        from dwave.cloud.utils import bqm_to_dqm
 
         # to sample BQM problems, we need to convert them to DQM
-        dqm = bqm_to_dqm(bqm)
+        dqm = self.bqm_to_dqm(bqm)
 
         # TODO: convert sampleset back
         return self.sample_dqm(dqm, label=label, **params)
@@ -1502,9 +1526,9 @@ class StructuredSolver(BaseSolver):
         q = readout_time_model_parameters[:n//2]
         t = readout_time_model_parameters[n//2:]
         if readout_time_model == 'pwl_log_log':
-            readout_time = pow(10, np.interp(np.emath.log10(num_qubits), q, t))
+            readout_time = pow(10, numpy.interp(numpy.emath.log10(num_qubits), q, t))
         elif readout_time_model == 'pwl_linear':
-            readout_time = np.interp(num_qubits, q, t)
+            readout_time = numpy.interp(num_qubits, q, t)
         else:
             raise ValueError("``estimate_qpu_access_time`` does not support "
                              f"``readout_time_model`` value {readout_time_model} "

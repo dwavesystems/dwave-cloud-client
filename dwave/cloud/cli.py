@@ -28,14 +28,16 @@ import click
 import requests.exceptions
 
 import dwave.cloud
-from dwave.cloud import Client, configure_logging
+from dwave.cloud import Client
 from dwave.cloud import api
 from dwave.cloud.solver import StructuredSolver, BaseUnstructuredSolver
-from dwave.cloud.utils import (
-    default_text_input, generate_random_ising_problem,
-    datetime_to_timestamp, utcnow, strtrunc, CLIError, set_loglevel,
-    get_contrib_packages, user_agent, epochnow,
-    get_distribution, PackageNotFoundError, VersionNotFoundError)
+from dwave.cloud.utils.cli import default_text_input, strtrunc, CLIError
+from dwave.cloud.utils.dist import (
+    get_contrib_packages, get_distribution, PackageNotFoundError, VersionNotFoundError)
+from dwave.cloud.utils.http import user_agent
+from dwave.cloud.utils.logging import configure_logging
+from dwave.cloud.utils.qubo import generate_random_ising_problem
+from dwave.cloud.utils.time import datetime_to_timestamp, utcnow, epochnow
 from dwave.cloud.coders import bqm_as_file
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
@@ -55,13 +57,11 @@ click.option = partial(click.option, show_default=True)
 
 def enable_logging(ctx, param, value):
     if value and not ctx.resilient_parsing:
-        configure_logging()
-        set_loglevel(dwave.cloud.logger, param.name)
+        configure_logging(level=param.name)
 
 def enable_loglevel(ctx, param, value):
     if value and not ctx.resilient_parsing:
-        configure_logging()
-        set_loglevel(dwave.cloud.logger, value)
+        configure_logging(level=value)
 
 def show_platform(ctx, param, value):
     if value and not ctx.resilient_parsing:

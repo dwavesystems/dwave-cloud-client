@@ -31,14 +31,18 @@ from typing import Tuple, Union
 import numpy
 from parameterized import parameterized
 
-from dwave.cloud import FilteredSecretsFormatter, configure_logging
-from dwave.cloud.utils import (
-    uniform_iterator, uniform_get, strip_head, strip_tail,
-    active_qubits, generate_random_ising_problem,
-    NumpyEncoder, coerce_numpy_to_python,
-    default_text_input, utcnow, cached, retried, deprecated, aliasdict,
-    parse_loglevel, user_agent, default_user_agent, hasinstance, exception_chain,
-    is_caused_by, get_distribution, PackageNotFoundError, VersionNotFoundError)
+from dwave.cloud.utils.coders import NumpyEncoder, coerce_numpy_to_python
+from dwave.cloud.utils.cli import default_text_input
+from dwave.cloud.utils.decorators import aliasdict, cached, deprecated, retried
+from dwave.cloud.utils.dist import get_distribution, PackageNotFoundError, VersionNotFoundError
+from dwave.cloud.utils.exception import hasinstance, exception_chain, is_caused_by
+from dwave.cloud.utils.http import user_agent, default_user_agent
+from dwave.cloud.utils.logging import (
+    FilteredSecretsFormatter, configure_logging, parse_loglevel)
+from dwave.cloud.utils.qubo import (
+    uniform_iterator, uniform_get,
+    active_qubits, generate_random_ising_problem)
+from dwave.cloud.utils.time import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -59,18 +63,6 @@ class TestSimpleUtils(unittest.TestCase):
         self.assertEqual(uniform_get(l, 0), 0)
         self.assertEqual(uniform_get(l, 2), None)
         self.assertEqual(uniform_get(l, 2, default=0), 0)
-
-    def test_strip_head(self):
-        self.assertEqual(strip_head([0, 0, 1, 2], [0]), [1, 2])
-        self.assertEqual(strip_head([1], [0]), [1])
-        self.assertEqual(strip_head([1], []), [1])
-        self.assertEqual(strip_head([0, 0, 1, 2], [0, 1, 2]), [])
-
-    def test_strip_tail(self):
-        self.assertEqual(strip_tail([1, 2, 0, 0], [0]), [1, 2])
-        self.assertEqual(strip_tail([1], [0]), [1])
-        self.assertEqual(strip_tail([1], []), [1])
-        self.assertEqual(strip_tail([0, 0, 1, 2], [0, 1, 2]), [])
 
     def test_active_qubits_dict(self):
         self.assertEqual(active_qubits({}, {}), set())
@@ -322,19 +314,19 @@ class TestCachedCommon(unittest.TestCase):
             return next(counter)
 
         # populate
-        with mock.patch('dwave.cloud.utils.epochnow', lambda: 0):
+        with mock.patch('dwave.cloud.utils.decorators.epochnow', lambda: 0):
             self.assertEqual(f(), 0)
             self.assertEqual(f(1), 1)
             self.assertEqual(f(a=1, b=2), 2)
 
         # cache miss, expired
-        with mock.patch('dwave.cloud.utils.epochnow', lambda: 15):
+        with mock.patch('dwave.cloud.utils.decorators.epochnow', lambda: 15):
             self.assertEqual(f(), 3)
             self.assertEqual(f(1), 4)
             self.assertEqual(f(a=1, b=2), 5)
 
         # cache hit, still hot
-        with mock.patch('dwave.cloud.utils.epochnow', lambda: 5):
+        with mock.patch('dwave.cloud.utils.decorators.epochnow', lambda: 5):
             self.assertEqual(f(), 3)
             self.assertEqual(f(1), 4)
             self.assertEqual(f(a=1, b=2), 5)
@@ -347,17 +339,17 @@ class TestCachedCommon(unittest.TestCase):
             return next(counter)
 
         # populate
-        with mock.patch('dwave.cloud.utils.epochnow', lambda: 0):
+        with mock.patch('dwave.cloud.utils.decorators.epochnow', lambda: 0):
             self.assertEqual(f(), 0)
 
         # expired for default maxage
-        with mock.patch('dwave.cloud.utils.epochnow', lambda: 15):
+        with mock.patch('dwave.cloud.utils.decorators.epochnow', lambda: 15):
             self.assertEqual(f(maxage_=20), 0)
             self.assertEqual(f(maxage_=15.01), 0)
             self.assertEqual(f(maxage_=15), 1)
 
         # cache hot for default maxage
-        with mock.patch('dwave.cloud.utils.epochnow', lambda: 25):
+        with mock.patch('dwave.cloud.utils.decorators.epochnow', lambda: 25):
             self.assertEqual(f(maxage_=11), 1)
             self.assertEqual(f(), 2)
             self.assertEqual(f(maxage_=1), 2)

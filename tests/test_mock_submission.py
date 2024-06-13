@@ -33,12 +33,13 @@ except ImportError:
     dimod = None
 
 from dwave.cloud.client import Client
-from dwave.cloud.solver import Solver
 from dwave.cloud.computation import Future
-from dwave.cloud.utils import evaluate_ising, utcrel
 from dwave.cloud.exceptions import (
     SolverFailureError, CanceledFutureError, SolverError,
     InvalidAPIResponseError)
+from dwave.cloud.solver import Solver
+from dwave.cloud.utils.qubo import evaluate_ising
+from dwave.cloud.utils.time import utcrel
 
 from tests.api.mocks import StructuredSapiMockResponses
 

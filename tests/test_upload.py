@@ -12,24 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
-import os
-import time
-import json
-import unittest
-import tempfile
 import collections
-from unittest import mock
+import io
+import json
+import os
+import tempfile
+import time
+import unittest
 from concurrent.futures import ThreadPoolExecutor, wait
+from unittest import mock
 
-from requests.exceptions import HTTPError
 from parameterized import parameterized
+from requests.exceptions import HTTPError
 
-from dwave.cloud.utils import tictoc
 from dwave.cloud.client import Client
 from dwave.cloud.exceptions import SAPIError, ProblemUploadError
 from dwave.cloud.upload import (
     Gettable, GettableFile, GettableMemory, FileView, ChunkedData)
+from dwave.cloud.utils.time import tictoc
 
 from tests import config
 

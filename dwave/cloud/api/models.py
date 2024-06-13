@@ -20,7 +20,7 @@ from pydantic import BaseModel, RootModel, Field
 from pydantic.functional_validators import AfterValidator
 
 from dwave.cloud.api import constants
-from dwave.cloud.utils import coerce_numpy_to_python
+from dwave.cloud.utils.coders import coerce_numpy_to_python
 
 
 # coerce common numpy types to python types on validation (parsing)

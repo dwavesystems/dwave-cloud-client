@@ -1,0 +1,17 @@
+---
+upgrade:
+  - |
+    ``dwave.cloud.utils`` module has been split into the following submodules:
+    ``dwave.cloud.utils.cli``, ``dwave.cloud.utils.coders``,
+    ``dwave.cloud.utils.decorators``, ``dwave.cloud.utils.dist``,
+    ``dwave.cloud.utils.exception``, ``dwave.cloud.utils.http``,
+    ``dwave.cloud.utils.logging``, ``dwave.cloud.utils.qubo``, and
+    ``dwave.cloud.utils.time``.
+
+    First reason for doing this was code clean-up (including adding type annotations),
+    but a more important reason is that this will enable import time optimization
+    in the future. And that's why we break backwards compatibility by not importing
+    everything back into the top-level utils namespace.
+
+    The utils module is considered Ocean-internal as is, so this move shouldn't
+    affect user's code.

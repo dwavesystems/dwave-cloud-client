@@ -19,8 +19,8 @@ Note:
     These are all aggregate tests, not really testing single units.
 """
 
-import unittest
 import random
+import unittest
 import warnings
 from datetime import datetime
 
@@ -31,11 +31,11 @@ try:
 except ImportError:
     dimod = None
 
-from dwave.cloud.utils import evaluate_ising, generate_random_ising_problem
+import dwave.cloud.computation
 from dwave.cloud.client import Client
 from dwave.cloud.exceptions import (
     CanceledFutureError, SolverFailureError, InvalidProblemError)
-import dwave.cloud.computation
+from dwave.cloud.utils.qubo import evaluate_ising, generate_random_ising_problem
 
 
 from tests import config

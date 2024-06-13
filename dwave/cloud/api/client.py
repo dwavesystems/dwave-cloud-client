@@ -24,10 +24,10 @@ from packaging.specifiers import SpecifierSet
 from werkzeug.http import parse_options_header, dump_options_header
 
 from dwave.cloud.api import constants, exceptions
-from dwave.cloud.config import load_config, validate_config_v1, update_config
+from dwave.cloud.config import load_config, validate_config_v1
 from dwave.cloud.config.models import ClientConfig
-from dwave.cloud.utils import (
-    PretimedHTTPAdapter, BaseUrlSession, default_user_agent, is_caused_by)
+from dwave.cloud.utils.exception import is_caused_by
+from dwave.cloud.utils.http import PretimedHTTPAdapter, BaseUrlSession, default_user_agent
 
 __all__ = ['DWaveAPIClient', 'SolverAPIClient', 'MetadataAPIClient', 'LeapAPIClient']
 
