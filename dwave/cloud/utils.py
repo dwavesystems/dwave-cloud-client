@@ -21,8 +21,6 @@ import inspect
 import numbers
 
 from collections import OrderedDict
-from datetime import datetime, timedelta
-from dateutil.tz import UTC
 from functools import partial, wraps
 from importlib.metadata import Distribution, PackageNotFoundError
 from secrets import token_hex
@@ -39,8 +37,7 @@ try:
 except ImportError:  # pragma: no cover
     pass
 
-__all__ = ['default_text_input', 'datetime_to_timestamp',
-           'datetime_to_timestamp', 'utcnow', 'epochnow', 'tictoc',
+__all__ = ['default_text_input',
            'hasinstance', 'exception_chain', 'is_caused_by',
            'NumpyEncoder', 'coerce_numpy_to_python',
            'get_distribution', 'PackageNotFoundError', 'VersionNotFoundError',
@@ -80,40 +77,6 @@ def default_text_input(prompt: str, default: Optional[Any] = None, *,
     return value
 
 
-def datetime_to_timestamp(dt):
-    """Convert timezone-aware `datetime` to POSIX timestamp and
-    return seconds since UNIX epoch.
-
-    Note: similar to `datetime.timestamp()` in Python 3.3+.
-    """
-
-    epoch = datetime.fromtimestamp(0, tz=UTC)
-    return (dt - epoch).total_seconds()
-
-
-def utcnow():
-    """Returns tz-aware now in UTC."""
-    return datetime.now(tz=UTC)
-
-
-def epochnow() -> float:
-    """Returns now as UNIX timestamp.
-
-    Invariant:
-        epochnow() ~= datetime_to_timestamp(utcnow())
-
-    """
-    return time.time()
-
-
-def utcrel(offset):
-    """Return a timezone-aware `datetime` relative to now (UTC), shifted by
-    `offset` seconds in to the future.
-
-    Example:
-        a_minute_from_now = utcrel(60)
-    """
-    return utcnow() + timedelta(seconds=offset)
 
 
 def strtrunc(s, maxlen=60):
@@ -517,15 +480,6 @@ class retried(object):
         return wrapped
 
 
-class tictoc(object):
-    """Timer as a context manager."""
-
-    def __enter__(self):
-        self.tick = time.perf_counter()
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.dt = time.perf_counter() - self.tick
 
 
 class deprecated(object):

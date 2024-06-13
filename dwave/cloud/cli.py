@@ -34,10 +34,11 @@ from dwave.cloud.solver import StructuredSolver, BaseUnstructuredSolver
 from dwave.cloud.utils.logging import configure_logging
 from dwave.cloud.utils.qubo import generate_random_ising_problem
 from dwave.cloud.utils.http import user_agent
+from dwave.cloud.utils.time import datetime_to_timestamp, utcnow, epochnow
 from dwave.cloud.utils import (
     default_text_input,
-    datetime_to_timestamp, utcnow, strtrunc, CLIError,
-    get_contrib_packages, epochnow,
+    strtrunc, CLIError,
+    get_contrib_packages,
     get_distribution, PackageNotFoundError, VersionNotFoundError)
 from dwave.cloud.coders import bqm_as_file
 from dwave.cloud.package_info import __title__, __version__

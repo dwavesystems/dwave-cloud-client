@@ -20,3 +20,5 @@ from dwave.cloud.utils.logging import set_loglevel
 from dwave.cloud.utils.qubo import (
     uniform_get, reformat_qubo_as_ising, active_qubits,
 )
+
+from dwave.cloud.utils.time import utcnow
