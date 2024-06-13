@@ -38,9 +38,10 @@ from dwave.cloud.utils.qubo import (
     uniform_iterator, uniform_get,
     active_qubits, generate_random_ising_problem)
 from dwave.cloud.utils.time import utcnow
+from dwave.cloud.utils.cli import default_text_input
 from dwave.cloud.utils import (
     NumpyEncoder, coerce_numpy_to_python,
-    default_text_input, cached, retried, deprecated, aliasdict,
+    cached, retried, deprecated, aliasdict,
     hasinstance, exception_chain,
     is_caused_by, get_distribution, PackageNotFoundError, VersionNotFoundError)
 

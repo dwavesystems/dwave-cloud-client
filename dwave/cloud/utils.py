@@ -21,7 +21,7 @@ import inspect
 import numbers
 
 from collections import OrderedDict
-from functools import partial, wraps
+from functools import wraps
 from importlib.metadata import Distribution, PackageNotFoundError
 from secrets import token_hex
 from typing import Any, Optional, Union, List, Dict, Mapping, Sequence
@@ -37,51 +37,12 @@ try:
 except ImportError:  # pragma: no cover
     pass
 
-__all__ = ['default_text_input',
-           'hasinstance', 'exception_chain', 'is_caused_by',
+__all__ = ['hasinstance', 'exception_chain', 'is_caused_by',
            'NumpyEncoder', 'coerce_numpy_to_python',
            'get_distribution', 'PackageNotFoundError', 'VersionNotFoundError',
            ]
 
 logger = logging.getLogger(__name__)
-
-
-def default_text_input(prompt: str, default: Optional[Any] = None, *,
-                       optional: bool = True,
-                       choices: Optional[Sequence[Any]] = None) -> Union[str, None]:
-    # CLI util; defer click import until actually needed (see #473)
-    import click
-    _skip = 'skip'
-    kwargs = dict(text=prompt)
-    if default:
-        kwargs.update(default=default)
-    else:
-        # make click print [skip] next to prompt
-        if optional:
-            kwargs.update(default=_skip)
-    if choices:
-        _type = click.Choice(choices)
-        kwargs.update(type=_type)
-        # a special case to skip user input instead of forcing input
-        if optional:
-            def allow_skip(value):
-                if value == _skip:
-                    return value
-                return click.types.convert_type(_type)(value)
-
-            kwargs.update(value_proc=allow_skip)
-
-    value = click.prompt(**kwargs)
-    if optional and value == _skip:
-        value = None
-    return value
-
-
-
-
-def strtrunc(s, maxlen=60):
-    s = str(s)
-    return s[:(maxlen-3)]+'...' if len(s) > maxlen else s
 
 
 def coerce_numpy_to_python(obj):
@@ -124,8 +85,6 @@ class NumpyEncoder(json.JSONEncoder):
             return obj.tolist()
 
         return super().default(obj)
-
-
 
 
 def hasinstance(iterable, class_or_tuple):
@@ -194,15 +153,6 @@ def is_caused_by(exception, exception_types):
     """
 
     return hasinstance(exception_chain(exception), exception_types)
-
-
-class CLIError(Exception):
-    """CLI command error that includes the error code in addition to the
-    standard error message."""
-
-    def __init__(self, message, code):
-        super().__init__(message)
-        self.code = code
 
 
 class cached:
@@ -480,8 +430,6 @@ class retried(object):
         return wrapped
 
 
-
-
 class deprecated(object):
     """Decorator that issues a deprecation message on each call of the
     decorated function.
@@ -507,40 +455,6 @@ class deprecated(object):
 
         return wrapped
 
-
-def deprecated_option(msg=None, update=None):
-    """Generate a Click callback function that will print a deprecation notice
-    to stderr with a customized message and copy option value to new option.
-
-    Note: if you provide the ``update`` option name, make sure that option is
-    processed before the deprecated one (set ``is_eager``).
-
-    Example::
-
-        @click.option('--config-file', '-f', default=None, is_eager=True)
-        @click.option(
-            '-c', default=None, expose_value=False,
-            help="[Deprecated in favor of '-f']",
-            callback=deprecated_option(DEPRECATION_MSG, update='config_file'))
-        ...
-        def ping(config_file, ...):
-            pass
-
-    """
-    # CLI util; defer click import until actually needed (see #473)
-    import click
-
-    def _print_deprecation(ctx, param, value, msg=None, update=None):
-        if msg is None:
-            msg = "DeprecationWarning: The following options are deprecated: {opts!r}."
-        if value and not ctx.resilient_parsing:
-            click.echo(click.style(msg.format(opts=param.opts), fg="red"), err=True)
-            if update:
-                ctx.params[update] = value
-
-    # click seems to strip closure variables in calls to `callback`,
-    # so we pass `msg` and `update` via partial application
-    return partial(_print_deprecation, msg=msg, update=update)
 
 
 def pretty_argvalues():
