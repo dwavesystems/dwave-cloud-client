@@ -23,7 +23,7 @@ from dwave.cloud.api.client import (
     DWaveAPIClient, SolverAPIClient, MetadataAPIClient, LeapAPIClient)
 from dwave.cloud.api import constants, models
 from dwave.cloud.config.models import ClientConfig
-from dwave.cloud.utils import NumpyEncoder
+from dwave.cloud.utils.coders import NumpyEncoder
 
 __all__ = ['Solvers', 'Problems', 'Regions']
 

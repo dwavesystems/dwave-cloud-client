@@ -12,64 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-import logging
 import inspect
 
 
-# Use numpy if available for fast decoding
-try:
-    import numpy
-except ImportError:  # pragma: no cover
-    pass
-
-__all__ = ['hasinstance', 'exception_chain', 'is_caused_by',
-           'NumpyEncoder', 'coerce_numpy_to_python',
-           ]
-
-logger = logging.getLogger(__name__)
+__all__ = ['hasinstance', 'exception_chain', 'is_caused_by']
 
 
-def coerce_numpy_to_python(obj):
-    """Numpy object serializer with support for basic scalar types and ndarrays."""
-
-    if isinstance(obj, numpy.integer):
-        return int(obj)
-    elif isinstance(obj, numpy.floating):
-        return float(obj)
-    elif isinstance(obj, numpy.bool_):
-        return bool(obj)
-    elif isinstance(obj, numpy.ndarray):
-        return [coerce_numpy_to_python(v) for v in obj.tolist()]
-    elif isinstance(obj, (list, tuple)):    # be explicit to avoid recursing over string et al
-        return type(obj)(coerce_numpy_to_python(v) for v in obj)
-    elif isinstance(obj, dict):
-        return {coerce_numpy_to_python(k): coerce_numpy_to_python(v) for k, v in obj.items()}
-    return obj
-
-
-# copied from dwave-hybrid utils
-# (https://github.com/dwavesystems/dwave-hybrid/blob/b9025b5bb3d88dce98ec70e28cfdb25400a10e4a/hybrid/utils.py#L43-L61)
-# TODO: switch to `dwave.common` if and when we create it
-class NumpyEncoder(json.JSONEncoder):
-    """JSON encoder for numpy types.
-
-    Supported types:
-     - basic numeric types: booleans, integers, floats
-     - arrays: ndarray, recarray
-    """
-
-    def default(self, obj):
-        if isinstance(obj, numpy.integer):
-            return int(obj)
-        elif isinstance(obj, numpy.floating):
-            return float(obj)
-        elif isinstance(obj, numpy.bool_):
-            return bool(obj)
-        elif isinstance(obj, numpy.ndarray):
-            return obj.tolist()
-
-        return super().default(obj)
 
 
 def hasinstance(iterable, class_or_tuple):

@@ -37,13 +37,12 @@ from dwave.cloud.utils.logging import (
 from dwave.cloud.utils.qubo import (
     uniform_iterator, uniform_get,
     active_qubits, generate_random_ising_problem)
-from dwave.cloud.utils.time import utcnow
+from dwave.cloud.utils.coders import NumpyEncoder, coerce_numpy_to_python
 from dwave.cloud.utils.cli import default_text_input
 from dwave.cloud.utils.decorators import aliasdict, cached, deprecated, retried
 from dwave.cloud.utils.dist import get_distribution, PackageNotFoundError, VersionNotFoundError
-from dwave.cloud.utils import (
-    NumpyEncoder, coerce_numpy_to_python,
-    hasinstance, exception_chain, is_caused_by)
+from dwave.cloud.utils.time import utcnow
+from dwave.cloud.utils import hasinstance, exception_chain, is_caused_by
 
 logger = logging.getLogger(__name__)
 
