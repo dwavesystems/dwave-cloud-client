@@ -16,12 +16,6 @@ import json
 import logging
 import inspect
 
-from collections import OrderedDict
-from importlib.metadata import Distribution, PackageNotFoundError
-from typing import Any, Optional, Union, List, Dict, Mapping, Sequence
-
-from importlib_metadata import entry_points
-from packaging.requirements import Requirement
 
 # Use numpy if available for fast decoding
 try:
@@ -31,7 +25,6 @@ except ImportError:  # pragma: no cover
 
 __all__ = ['hasinstance', 'exception_chain', 'is_caused_by',
            'NumpyEncoder', 'coerce_numpy_to_python',
-           'get_distribution', 'PackageNotFoundError', 'VersionNotFoundError',
            ]
 
 logger = logging.getLogger(__name__)
@@ -152,71 +145,6 @@ def pretty_argvalues():
     """Pretty-formatted function call arguments, from the caller's frame."""
     return inspect.formatargvalues(*inspect.getargvalues(inspect.currentframe().f_back))
 
-
-def get_contrib_config():
-    """Return all registered contrib (non-open-source) Ocean packages."""
-
-    # Note: we use `entry_points` from `importlib_metadata` to simplify access
-    # and use py312 semantics. See "compatibility note" in `importlib.metadata`
-    # docs for entry points.
-    contrib = [ep.load() for ep in entry_points(group='dwave_contrib')]
-    return contrib
-
-
-def get_contrib_packages():
-    """Combine all contrib packages in an ordered dict. Assumes package names
-    are unique.
-    """
-
-    contrib = get_contrib_config()
-
-    packages = OrderedDict()
-    for dist in contrib:
-        for pkg in dist:
-            packages[pkg['name']] = pkg
-
-    return packages
-
-
-class VersionNotFoundError(Exception):
-    """Package version requirement not satisfied."""
-
-
-def get_distribution(requirement: Union[str, Requirement],
-                     prereleases: bool = True) -> Distribution:
-    """Returns :class:`~importlib.metadata.Distribution` for a matching
-    `requirement` specification.
-
-    Note: this function re-implements :func:`pkg_resources.get_distribution`
-    functionality for py38+ (including py312, where setuptools/pkg_resources
-    is not available by default).
-
-    Args:
-        requirement:
-            Package dependency requirement according to PEP-508, given as string,
-            or :class:`~packaging.requirements.Requirement`.
-        prereleases:
-            Boolean flag to control if installed prereleases are allowed.
-
-    Raises:
-        :class:`~importlib.metadata.PackageNotFoundError`:
-            Package by name not found.
-        :class:`~dwave.cloud.utils.VersionNotFoundError`:
-            Version of the package found (distribution) does not match the
-            requirement.
-    """
-
-    if not isinstance(requirement, Requirement):
-        requirement = Requirement(requirement)
-
-    dist = Distribution.from_name(requirement.name)
-
-    if not requirement.specifier.contains(dist.version, prereleases=prereleases):
-        raise VersionNotFoundError(
-            f"Package {dist.name!r} version {dist.version} "
-            f"does not match {requirement.specifier!s}")
-
-    return dist
 
 
 def bqm_to_dqm(bqm):
