@@ -134,7 +134,8 @@ def configure_logging(logger: typing.Optional[logging.Logger] = None,
     return logger
 
 
-def parse_loglevel(level_name, default=logging.NOTSET):
+def parse_loglevel(level_name: typing.Union[str, int],
+                   default: int = logging.NOTSET) -> int:
     """Resolve numeric and symbolic log level names to numeric levels."""
 
     try:
@@ -166,7 +167,7 @@ def parse_loglevel(level_name, default=logging.NOTSET):
     return level
 
 
-def set_loglevel(logger, level_name):
+def set_loglevel(logger: logging.Logger, level_name: typing.Union[str, int]) -> None:
     level = parse_loglevel(level_name)
     logger.setLevel(level)
     logger.info("Log level for %r namespace set to %r", logger.name, level)
