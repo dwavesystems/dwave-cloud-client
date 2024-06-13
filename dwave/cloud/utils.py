@@ -16,7 +16,6 @@ import sys
 import json
 import math
 import time
-import random
 import logging
 import platform
 import itertools
@@ -44,12 +43,10 @@ from dwave.cloud.package_info import __packagename__, __version__
 # Use numpy if available for fast decoding
 try:
     import numpy
-    _numpy = True
 except ImportError:  # pragma: no cover
-    _numpy = False
+    pass
 
-__all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
-           'default_text_input', 'datetime_to_timestamp',
+__all__ = ['default_text_input', 'datetime_to_timestamp',
            'datetime_to_timestamp', 'utcnow', 'epochnow', 'tictoc',
            'hasinstance', 'exception_chain', 'is_caused_by',
            'NumpyEncoder', 'coerce_numpy_to_python',
@@ -59,112 +56,6 @@ __all__ = ['evaluate_ising', 'uniform_iterator', 'uniform_get',
 logger = logging.getLogger(__name__)
 
 
-def evaluate_ising(linear, quad, state, offset=0):
-    """Calculate the energy of a state given the Hamiltonian.
-
-    Args:
-        linear: Linear Hamiltonian terms.
-        quad: Quadratic Hamiltonian terms.
-        offset: Energy offset.
-        state: Vector of spins describing the system state.
-
-    Returns:
-        Energy of the state evaluated by the given energy function.
-    """
-
-    # If we were given a numpy array cast to list
-    if _numpy and isinstance(state, numpy.ndarray):
-        return evaluate_ising(linear, quad, state.tolist(), offset=offset)
-
-    # Accumulate the linear and quadratic values
-    energy = offset
-    for index, value in uniform_iterator(linear):
-        energy += state[index] * value
-    for (index_a, index_b), value in quad.items():
-        energy += value * state[index_a] * state[index_b]
-    return energy
-
-
-def active_qubits(linear, quadratic):
-    """Calculate a set of all active qubits. Qubit is "active" if it has
-    bias or coupling attached.
-
-    Args:
-        linear (dict[variable, bias]/list[variable, bias]):
-            Linear terms of the model.
-
-        quadratic (dict[(variable, variable), bias]):
-            Quadratic terms of the model.
-
-    Returns:
-        set:
-            Active qubits' indices.
-    """
-
-    active = {idx for idx,bias in uniform_iterator(linear)}
-    for edge, _ in quadratic.items():
-        active.update(edge)
-    return active
-
-
-def generate_random_ising_problem(solver, h_range=None, j_range=None):
-    """Generates an Ising problem formulation valid for a particular solver,
-    using all qubits and all couplings and linear/quadratic biases sampled
-    uniformly from `h_range`/`j_range`.
-    """
-
-    if h_range is None:
-        h_range = solver.properties.get('h_range', [-1, 1])
-    if j_range is None:
-        j_range = solver.properties.get('j_range', [-1, 1])
-
-    lin = {qubit: random.uniform(*h_range) for qubit in solver.nodes}
-    quad = {edge: random.uniform(*j_range) for edge in solver.undirected_edges}
-
-    return lin, quad
-
-
-def generate_const_ising_problem(solver, h=1, j=-1):
-    return generate_random_ising_problem(solver, h_range=[h, h], j_range=[j, j])
-
-
-def uniform_iterator(sequence):
-    """Uniform (key, value) iteration on a `dict`,
-    or (idx, value) on a `list`."""
-
-    if isinstance(sequence, Mapping):
-        return sequence.items()
-    else:
-        return enumerate(sequence)
-
-
-def uniform_get(sequence, index, default=None):
-    """Uniform `dict`/`list` item getter, where `index` is interpreted as a key
-    for maps and as numeric index for lists."""
-
-    if isinstance(sequence, Mapping):
-        return sequence.get(index, default)
-    else:
-        return sequence[index] if index < len(sequence) else default
-
-
-def reformat_qubo_as_ising(qubo):
-    """Split QUBO coefficients into linear and quadratic terms (the Ising form).
-
-    Args:
-        qubo (dict[(int, int), float]):
-            Coefficients of a quadratic unconstrained binary optimization
-            (QUBO) model.
-
-    Returns:
-        (dict[int, float], dict[(int, int), float])
-
-    """
-
-    lin = {u: bias for (u, v), bias in qubo.items() if u == v}
-    quad = {(u, v): bias for (u, v), bias in qubo.items() if u != v}
-
-    return lin, quad
 
 
 def strip_head(sequence, values):

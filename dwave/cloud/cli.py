@@ -32,8 +32,9 @@ from dwave.cloud import Client
 from dwave.cloud import api
 from dwave.cloud.solver import StructuredSolver, BaseUnstructuredSolver
 from dwave.cloud.utils.logging import configure_logging
+from dwave.cloud.utils.qubo import generate_random_ising_problem
 from dwave.cloud.utils import (
-    default_text_input, generate_random_ising_problem,
+    default_text_input,
     datetime_to_timestamp, utcnow, strtrunc, CLIError,
     get_contrib_packages, user_agent, epochnow,
     get_distribution, PackageNotFoundError, VersionNotFoundError)

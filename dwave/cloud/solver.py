@@ -44,7 +44,8 @@ from dwave.cloud.exceptions import (
 from dwave.cloud.coders import (
     encode_problem_as_qp, encode_problem_as_ref, decode_binary_ref,
     decode_qp_numpy, decode_qp, decode_bq, bqm_as_file)
-from dwave.cloud.utils import reformat_qubo_as_ising, NumpyEncoder
+from dwave.cloud.utils import NumpyEncoder
+from dwave.cloud.utils.qubo import reformat_qubo_as_ising
 from dwave.cloud.computation import Future
 from dwave.cloud.concurrency import Present
 from dwave.cloud.events import dispatches_events
