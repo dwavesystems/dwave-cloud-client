@@ -142,10 +142,9 @@ def parse_loglevel(level_name, default=logging.NOTSET):
     except:
         return default
 
-    # note: make sure `TRACE` level is added to `logging` before calling this
+    # note: in py 3.11+ we can use `logging.getLevelNamesMapping()` instead
     known_levels = {
         'notset': logging.NOTSET,
-        'trace': logging.TRACE,
         'debug': logging.DEBUG,
         'info': logging.INFO,
         'warning': logging.WARNING,
@@ -154,6 +153,10 @@ def parse_loglevel(level_name, default=logging.NOTSET):
         'critical': logging.CRITICAL,
         'fatal': logging.CRITICAL
     }
+
+    # support TRACE level, but make sure this function works without it
+    if hasattr(logging, 'TRACE'):
+        known_levels.update(trace=logging.TRACE)
 
     try:
         level = int(level_name)
@@ -167,3 +170,19 @@ def set_loglevel(logger, level_name):
     level = parse_loglevel(level_name)
     logger.setLevel(level)
     logger.info("Log level for %r namespace set to %r", logger.name, level)
+
+
+def add_loglevel(name: str, value: int) -> None:
+    """Create a new globally available logging loglevel and a logging method
+    on the base ``logging.Logger`` class.
+    """
+
+    name = name.upper()
+
+    setattr(logging, name, value)
+    logging.addLevelName(value, name)
+
+    def log_method(logger, message, *args, **kwargs):
+        logger.log(value, message, *args, **kwargs)
+
+    setattr(logging.Logger, name.lower(), log_method)

@@ -20,7 +20,7 @@ import importlib
 from dwave.cloud.client import Client
 from dwave.cloud.solver import Solver
 from dwave.cloud.computation import Future
-from dwave.cloud.utils.logging import parse_loglevel, configure_logging
+from dwave.cloud.utils.logging import add_loglevel, parse_loglevel, configure_logging
 
 __all__ = ['Client', 'Solver', 'Future']
 
@@ -29,14 +29,7 @@ __all__ = ['Client', 'Solver', 'Future']
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
-# add TRACE log level and Logger.trace() method
-logging.TRACE = 5
-logging.addLevelName(logging.TRACE, "TRACE")
-
-def _trace(logger, message, *args, **kwargs):
-    logger.log(logging.TRACE, message, *args, **kwargs)
-
-logging.Logger.trace = _trace
+add_loglevel('TRACE', 5)
 
 
 # configure logger if DWAVE_LOG_LEVEL present in environment
