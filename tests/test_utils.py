@@ -31,14 +31,16 @@ from typing import Tuple, Union
 import numpy
 from parameterized import parameterized
 
-from dwave.cloud.utils.logging import FilteredSecretsFormatter, configure_logging
+from dwave.cloud.utils.http import user_agent, default_user_agent
+from dwave.cloud.utils.logging import (
+    FilteredSecretsFormatter, configure_logging, parse_loglevel)
 from dwave.cloud.utils.qubo import (
     uniform_iterator, uniform_get,
     active_qubits, generate_random_ising_problem)
 from dwave.cloud.utils import (
     NumpyEncoder, coerce_numpy_to_python,
     default_text_input, utcnow, cached, retried, deprecated, aliasdict,
-    parse_loglevel, user_agent, default_user_agent, hasinstance, exception_chain,
+    hasinstance, exception_chain,
     is_caused_by, get_distribution, PackageNotFoundError, VersionNotFoundError)
 
 logger = logging.getLogger(__name__)
