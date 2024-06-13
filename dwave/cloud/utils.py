@@ -56,19 +56,6 @@ __all__ = ['default_text_input', 'datetime_to_timestamp',
 logger = logging.getLogger(__name__)
 
 
-
-
-def strip_head(sequence, values):
-    """Strips elements of `values` from the beginning of `sequence`."""
-    values = set(values)
-    return list(itertools.dropwhile(lambda x: x in values, sequence))
-
-
-def strip_tail(sequence, values):
-    """Strip `values` from the end of `sequence`."""
-    return list(reversed(list(strip_head(reversed(sequence), values))))
-
-
 def default_text_input(prompt: str, default: Optional[Any] = None, *,
                        optional: bool = True,
                        choices: Optional[Sequence[Any]] = None) -> Union[str, None]:
