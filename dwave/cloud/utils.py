@@ -835,41 +835,6 @@ def deprecated_option(msg=None, update=None):
     return partial(_print_deprecation, msg=msg, update=update)
 
 
-def parse_loglevel(level_name, default=logging.NOTSET):
-    """Resolve numeric and symbolic log level names to numeric levels."""
-
-    try:
-        level_name = str(level_name or '').strip().lower()
-    except:
-        return default
-
-    # note: make sure `TRACE` level is added to `logging` before calling this
-    known_levels = {
-        'notset': logging.NOTSET,
-        'trace': logging.TRACE,
-        'debug': logging.DEBUG,
-        'info': logging.INFO,
-        'warning': logging.WARNING,
-        'warn': logging.WARNING,
-        'error': logging.ERROR,
-        'critical': logging.CRITICAL,
-        'fatal': logging.CRITICAL
-    }
-
-    try:
-        level = int(level_name)
-    except ValueError:
-        level = known_levels.get(level_name, default)
-
-    return level
-
-
-def set_loglevel(logger, level_name):
-    level = parse_loglevel(level_name)
-    logger.setLevel(level)
-    logger.info("Log level for %r namespace set to %r", logger.name, level)
-
-
 def pretty_argvalues():
     """Pretty-formatted function call arguments, from the caller's frame."""
     return inspect.formatargvalues(*inspect.getargvalues(inspect.currentframe().f_back))
