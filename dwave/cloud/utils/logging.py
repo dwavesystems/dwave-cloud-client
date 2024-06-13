@@ -73,9 +73,64 @@ class JSONFormatter(ISOFormatter):
         return json.dumps(rec)
 
 
+def parse_loglevel(level_name: typing.Union[str, int],
+                   default: int = logging.NOTSET) -> int:
+    """Resolve numeric and symbolic log level names to numeric levels."""
+
+    try:
+        level_name = str(level_name or '').strip().lower()
+    except:
+        return default
+
+    # note: in py 3.11+ we can use `logging.getLevelNamesMapping()` instead
+    known_levels = {
+        'notset': logging.NOTSET,
+        'debug': logging.DEBUG,
+        'info': logging.INFO,
+        'warning': logging.WARNING,
+        'warn': logging.WARNING,
+        'error': logging.ERROR,
+        'critical': logging.CRITICAL,
+        'fatal': logging.CRITICAL
+    }
+
+    # support TRACE level, but make sure this function works without it
+    if hasattr(logging, 'TRACE'):
+        known_levels.update(trace=logging.TRACE)
+
+    try:
+        level = int(level_name)
+    except ValueError:
+        level = known_levels.get(level_name, default)
+
+    return level
+
+
+def set_loglevel(logger: logging.Logger, level: typing.Union[str, int]) -> None:
+    level = parse_loglevel(level)
+    logger.setLevel(level)
+    logger.info("Log level for %r namespace set to %r", logger.name, level)
+
+
+def add_loglevel(name: str, value: int) -> None:
+    """Create a new globally available logging loglevel and a logging method
+    on the base ``logging.Logger`` class.
+    """
+
+    name = name.upper()
+
+    setattr(logging, name, value)
+    logging.addLevelName(value, name)
+
+    def log_method(logger, message, *args, **kwargs):
+        logger.log(value, message, *args, **kwargs)
+
+    setattr(logging.Logger, name.lower(), log_method)
+
+
 def configure_logging(logger: typing.Optional[logging.Logger] = None,
                       *,
-                      level: int = logging.WARNING,
+                      level: typing.Union[str, int] = logging.WARNING,
                       filter_secrets: bool = True,
                       output_stream: typing.Optional[io.IOBase] = None,
                       in_utc: bool = False,
@@ -95,6 +150,8 @@ def configure_logging(logger: typing.Optional[logging.Logger] = None,
        Explicit optional logging configuration. Previously, logger was minimally
        configured by default.
     """
+
+    level = parse_loglevel(level)
 
     if logger is None:
         logger = logging.getLogger('dwave.cloud')
@@ -133,61 +190,6 @@ def configure_logging(logger: typing.Optional[logging.Logger] = None,
     logger.setLevel(level)
 
     return logger
-
-
-def parse_loglevel(level_name: typing.Union[str, int],
-                   default: int = logging.NOTSET) -> int:
-    """Resolve numeric and symbolic log level names to numeric levels."""
-
-    try:
-        level_name = str(level_name or '').strip().lower()
-    except:
-        return default
-
-    # note: in py 3.11+ we can use `logging.getLevelNamesMapping()` instead
-    known_levels = {
-        'notset': logging.NOTSET,
-        'debug': logging.DEBUG,
-        'info': logging.INFO,
-        'warning': logging.WARNING,
-        'warn': logging.WARNING,
-        'error': logging.ERROR,
-        'critical': logging.CRITICAL,
-        'fatal': logging.CRITICAL
-    }
-
-    # support TRACE level, but make sure this function works without it
-    if hasattr(logging, 'TRACE'):
-        known_levels.update(trace=logging.TRACE)
-
-    try:
-        level = int(level_name)
-    except ValueError:
-        level = known_levels.get(level_name, default)
-
-    return level
-
-
-def set_loglevel(logger: logging.Logger, level_name: typing.Union[str, int]) -> None:
-    level = parse_loglevel(level_name)
-    logger.setLevel(level)
-    logger.info("Log level for %r namespace set to %r", logger.name, level)
-
-
-def add_loglevel(name: str, value: int) -> None:
-    """Create a new globally available logging loglevel and a logging method
-    on the base ``logging.Logger`` class.
-    """
-
-    name = name.upper()
-
-    setattr(logging, name, value)
-    logging.addLevelName(value, name)
-
-    def log_method(logger, message, *args, **kwargs):
-        logger.log(value, message, *args, **kwargs)
-
-    setattr(logging.Logger, name.lower(), log_method)
 
 
 def configure_logging_from_env(logger: logging.Logger) -> bool:
