@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import sys
 import logging
 import importlib
@@ -20,7 +19,7 @@ import importlib
 from dwave.cloud.client import Client
 from dwave.cloud.solver import Solver
 from dwave.cloud.computation import Future
-from dwave.cloud.utils.logging import add_loglevel, parse_loglevel, configure_logging
+from dwave.cloud.utils.logging import add_loglevel, configure_logging_from_env
 
 __all__ = ['Client', 'Solver', 'Future']
 
@@ -29,18 +28,11 @@ __all__ = ['Client', 'Solver', 'Future']
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
+# make sure TRACE level is available
 add_loglevel('TRACE', 5)
 
-
 # configure logger if DWAVE_LOG_LEVEL present in environment
-def _apply_loglevel_from_env(logger):
-    if log_level := os.getenv('DWAVE_LOG_LEVEL', os.getenv('dwave_log_level')):
-        level = parse_loglevel(log_level)
-        log_format = os.getenv('DWAVE_LOG_FORMAT', os.getenv('dwave_log_format', ''))
-        structured = log_format.strip().lower() == 'json'
-        configure_logging(logger, level=level, structured_output=structured)
-
-_apply_loglevel_from_env(logger)
+configure_logging_from_env(logger)
 
 
 # alias dwave.cloud.client.{qpu,sw,hybrid} as dwave.cloud.*

@@ -18,6 +18,7 @@ import datetime
 import io
 import json
 import logging
+import os
 import re
 import sys
 import typing
@@ -187,3 +188,21 @@ def add_loglevel(name: str, value: int) -> None:
         logger.log(value, message, *args, **kwargs)
 
     setattr(logging.Logger, name.lower(), log_method)
+
+
+def configure_logging_from_env(logger: logging.Logger) -> bool:
+    """Use ``DWAVE_LOG_LEVEL`` (name or value) and ``DWAVE_LOG_FORMAT`` ("json"
+    for structured output) environment variables to configure logging.
+    """
+
+    log_level = os.getenv('DWAVE_LOG_LEVEL', os.getenv('dwave_log_level'))
+    log_format = os.getenv('DWAVE_LOG_FORMAT', os.getenv('dwave_log_format', ''))
+
+    if not log_level:
+        return False
+
+    configure_logging(logger, additive=False,
+                      level=parse_loglevel(log_level),
+                      structured_output=(log_format.strip().lower() == 'json'))
+
+    return True
