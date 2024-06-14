@@ -1,0 +1,5 @@
+---
+upgrade:
+  - |
+    Positional arguments in ``dwave.cloud.Client`` constructor, deprecated in 0.10.0,
+    are removed in 0.12.0. Use keyword arguments instead.

@@ -248,14 +248,14 @@ class Client(object):
 
         Instance-level defaults can be specified via ``defaults`` argument.
 
-    .. deprecated:: 0.10.0
-        Positional arguments in :class:`.Client` constructor are deprecated and
-        will be removed in 0.12.0.
-
     .. deprecated:: 0.11.0
         Config attributes on :class:`.Client` are deprecated in favor of config
         model attributes available on ``Client.config`` and will be removed
         in 0.13.0.
+
+    .. versionremoved:: 0.12.0
+        Positional arguments in :class:`.Client` constructor, deprecated in 0.10.0,
+        are removed in 0.12.0. Use keyword arguments instead.
 
     Examples:
         This example directly initializes a :class:`.Client`.
@@ -435,27 +435,7 @@ class Client(object):
         return _clients[_client](**config)
 
     @dispatches_events('client_init')
-    def __init__(self, *args, **kwargs):
-        # for (reasonable) backwards compatibility, accept only the first few
-        # positional args.
-        if len(args) > 3:
-            raise TypeError(
-                "Client constructor takes up to 3 positional "
-                f"arguments, but {len(args)} were given")
-
-        if len(args) > 0:
-            warnings.warn(
-                "Positional arguments in Client constructor are deprecated "
-                "since dwave-cloud-client 0.10.0, and will be removed in 0.12.0. "
-                "Use keyword arguments instead.",
-                DeprecationWarning, stacklevel=3)
-
-            argsdict = dict(zip(('endpoint', 'token', 'solver'), args))
-            intersection = argsdict.keys() & kwargs
-            if intersection:
-                raise TypeError(f"Client() got multiple values for {intersection}")
-            kwargs.update(argsdict)
-
+    def __init__(self, **kwargs):
         logger.debug("Client init called with: %r", kwargs)
 
         # insert deprecated config properties that proxy values from the new `Client.config`
