@@ -255,7 +255,7 @@ class Client(object):
     .. deprecated:: 0.11.0
         Config attributes on :class:`.Client` are deprecated in favor of config
         model attributes available on ``Client.config`` and will be removed
-        in 0.12.0.
+        in 0.13.0.
 
     Examples:
         This example directly initializes a :class:`.Client`.
@@ -359,7 +359,7 @@ class Client(object):
     def _legacy_config_property_proxy(self, legacy_property, config_path):
         warnings.warn(
             f"`Client.{legacy_property}` property is deprecated since "
-            f"dwave-cloud-client 0.11.0, and will be removed in 0.12.0. "
+            f"dwave-cloud-client 0.11.0, and will be removed in 0.13.0. "
             f"Use `Client.config.{config_path}` instead.",
             DeprecationWarning, stacklevel=2)
         return pluck(self.config, config_path)
