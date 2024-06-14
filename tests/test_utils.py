@@ -12,21 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
-import copy
-import json
-import uuid
-import logging
-import unittest
-import warnings
-import tempfile
 import contextlib
-from unittest import mock
+import copy
+import io
+import json
+import logging
+import tempfile
+import time
+import unittest
+import uuid
+import warnings
 from collections import OrderedDict
-from itertools import count
 from datetime import datetime
+from dateutil.tz import UTC
 from functools import partial, wraps
+from itertools import count
 from typing import Tuple, Union
+from unittest import mock
 
 import numpy
 from parameterized import parameterized
@@ -139,10 +141,10 @@ class TestSimpleUtils(unittest.TestCase):
 
     def test_utcnow(self):
         t = utcnow()
-        now = datetime.utcnow()
+        now = datetime.fromtimestamp(time.time(), tz=UTC)
         self.assertEqual(t.utcoffset().total_seconds(), 0.0)
-        unaware = t.replace(tzinfo=None)
-        self.assertLess((now - unaware).total_seconds(), 1.0)
+        self.assertEqual(now.utcoffset().total_seconds(), 0.0)
+        self.assertLess((now - t).total_seconds(), 1.0)
 
     def test_parse_loglevel_invalid(self):
         """Parsing invalid log levels returns NOTSET."""

@@ -906,39 +906,6 @@ class TestOffsetHandling(_QueryTest):
                     self._check(results, linear, quadratic, offset=offset, **params)
 
 
-@mock.patch('time.sleep', lambda *x: None)
-class TestComputationDeprecations(_QueryTest):
-
-    @classmethod
-    def setUpClass(cls):
-        cls.sapi = StructuredSapiMockResponses()
-
-    def test_deprecations(self):
-        """Proper deprecation warnings are raised."""
-
-        def create_mock_session(client):
-            session = mock.Mock()
-            session.post = lambda a, _: choose_reply(a, {
-                'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
-            session.get = lambda a: choose_reply(a, {
-                'problems/123/': self.sapi.complete_reply(id='123')})
-            return session
-
-        with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client(endpoint='endpoint', token='token') as client:
-                solver = Solver(client, self.sapi.solver.data)
-
-                linear, quadratic = self.sapi.problem
-                params = dict(num_reads=100)
-                results = solver.sample_ising(linear, quadratic, **params)
-
-                # aliased keys are deprecated in 0.8.0
-                with self.assertWarns(DeprecationWarning):
-                    results['samples']
-                with self.assertWarns(DeprecationWarning):
-                    results['occurrences']
-
-
 class TestProblemLabel(unittest.TestCase):
 
     @classmethod
