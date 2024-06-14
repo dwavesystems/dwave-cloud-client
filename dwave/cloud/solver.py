@@ -634,7 +634,7 @@ class DQMSolver(BaseUnstructuredSolver):
         """Use for testing."""
 
         # to sample BQM problems, we need to convert them to DQM
-        dqm = self.bqm_to_dqm(bqm)
+        dqm = self._bqm_to_dqm(bqm)
 
         # TODO: convert sampleset back
         return self.sample_dqm(dqm, label=label, **params)

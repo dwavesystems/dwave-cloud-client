@@ -719,6 +719,7 @@ class TestCliLive(unittest.TestCase):
 
 class TestLogging(unittest.TestCase):
 
+    @isolated_environ(remove_dwave=True)
     def test_json_logs(self):
         env = {
             'DWAVE_CONFIG_FILE': test_config_path,
