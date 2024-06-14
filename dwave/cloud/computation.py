@@ -566,20 +566,20 @@ class Future(object):
             `'num_occurrences'`. Better yet, use :meth:`Future.samples` and
             :meth:`Future.num_occurrences` instead.
 
-        .. deprecated:: 0.8.0
-
-            Alias keys ``samples`` and ``occurrences`` in the result dict are
-            deprecated and will be removed in 0.12.0. We'll try to keep the
-            result dict as close to raw data returned by SAPI as possible.
-            Postprocessed data is available via
-            :class:`~dwave.cloud.computation.Future` properties.
-
         .. versionchanged:: 0.8.0
 
             Instead of adding copies of ``solutions`` and ``num_occurrences``
             keys (as ``samples`` and ``occurrences``), we alias them using
             :class:`~dwave.cloud.utils.decorators.aliasdict`. Values are available under
             alias keys, but the keys themselves are not stored or visible.
+
+        .. versionremoved:: 0.12.0
+
+            Alias keys ``samples`` and ``occurrences`` in the result dict,
+            deprecated in 0.8.0, are removed in 0.12.0. We'll try to keep the
+            result dict as close to raw data returned by SAPI as possible.
+            Postprocessed data is available via
+            :class:`~dwave.cloud.computation.Future` properties.
 
         Examples:
             This example creates a solver using the local system's default
@@ -916,7 +916,6 @@ class Future(object):
                 # extract results from the response
                 # note: decoding might mutate `self._message`, so it should be only called once
                 self._decode()
-                self._alias_result()
 
             # signal answer data downloaded
             if 'answer' in self._result:
@@ -960,27 +959,4 @@ class Future(object):
         self._patch_offset()
         self._result = self.solver.decode_response(self._message, answer_data=self._answer_data)
         self.parse_time = time.time() - start
-        return self._result
-
-    def _alias_result(self):
-        """Alias `solutions` and `num_occurrences`.
-
-        Deprecated in version 0.8.0.
-
-        Scheduled for removal in 0.12.0.
-        """
-        if not self._result:
-            return
-
-        msg = "'{}' alias has been deprecated in favor of '{}'"
-        samples_msg = msg.format('samples', 'solutions')
-        occurrences_msg = msg.format('occurrences', 'num_occurrences')
-
-        aliases = dict(
-            samples=deprecated(samples_msg)(itemgetter('solutions')),
-            occurrences=deprecated(occurrences_msg)(itemgetter('num_occurrences')))
-
-        self._result = aliasdict(self._result)
-        self._result.alias(aliases)
-
         return self._result

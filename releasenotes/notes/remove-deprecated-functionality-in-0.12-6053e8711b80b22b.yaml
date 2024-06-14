@@ -3,3 +3,9 @@ upgrade:
   - |
     Positional arguments in ``dwave.cloud.Client`` constructor, deprecated in 0.10.0,
     are removed in 0.12.0. Use keyword arguments instead.
+  - |
+    Alias keys ``samples`` and ``occurrences`` (for ``solutions`` and ``num_occurrences``)
+    in the results dict of ``dwave.cloud.computation.Future.result()``, deprecated in
+    0.8.0, are now finally removed in 0.12.0. We'll try to keep the result dict as close
+    to raw data returned by SAPI as possible. Postprocessed data is instead available
+    via ``dwave.cloud.computation.Future`` properties.
