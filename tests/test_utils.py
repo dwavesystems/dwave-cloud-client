@@ -36,9 +36,10 @@ from parameterized import parameterized
 from dwave.cloud.utils.coders import NumpyEncoder, coerce_numpy_to_python
 from dwave.cloud.utils.cli import default_text_input
 from dwave.cloud.utils.decorators import aliasdict, cached, deprecated, retried
-from dwave.cloud.utils.dist import get_distribution, PackageNotFoundError, VersionNotFoundError
+from dwave.cloud.utils.dist import (
+    get_contrib_packages, get_distribution, PackageNotFoundError, VersionNotFoundError)
 from dwave.cloud.utils.exception import hasinstance, exception_chain, is_caused_by
-from dwave.cloud.utils.http import user_agent, default_user_agent
+from dwave.cloud.utils.http import user_agent, default_user_agent, platform_tags
 from dwave.cloud.utils.logging import (
     FilteredSecretsFormatter, configure_logging, parse_loglevel)
 from dwave.cloud.utils.qubo import (
@@ -172,6 +173,13 @@ class TestSimpleUtils(unittest.TestCase):
         required = [__packagename__, 'python', 'machine', 'system', 'platform']
         for key in required:
             self.assertIn(key, ua)
+
+    def test_platform_tags_smoke(self):
+        pt = platform_tags()
+        if pt:
+            self.assertNotEqual(
+                user_agent(include_platform_tags=False),
+                user_agent(include_platform_tags=True))
 
     def test_default_user_agent(self):
         from dwave.cloud.package_info import __packagename__, __version__
@@ -978,6 +986,14 @@ class TestDistUtils(unittest.TestCase):
         # package matching
         with self.assertRaises(PackageNotFoundError):
             get_distribution("package-that-is-not-installed")
+
+    def test_contrib_packages_smoke(self):
+        # requires installed contrib packages, or the entry_points patcher we
+        # plan to port from dwave-inspector
+        try:
+            get_contrib_packages()
+        except:
+            self.fail("can't enumerate dwave contrib packages")
 
 
 def capture_stderr(fn):

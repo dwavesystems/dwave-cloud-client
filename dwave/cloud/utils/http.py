@@ -137,7 +137,7 @@ def user_agent(name: typing.Optional[str] = None,
 
     # add platform-specific tags
     if include_platform_tags:
-        tags.extend(get_platform_tags())
+        tags.extend(platform_tags())
 
     return ' '.join("{}/{}".format(name, version) for name, version in tags)
 
@@ -149,7 +149,7 @@ def default_user_agent() -> str:
         name=__packagename__, version=__version__, include_platform_tags=False)
 
 
-def get_platform_tags() -> typing.List[str]:
+def platform_tags() -> typing.List[str]:
     """Return a list of platform tags generated from registered entry points."""
 
     # import only when needed, as it's pretty slow! (~10ms)
