@@ -19,9 +19,10 @@
 """
 
 from importlib.metadata import (
-    entry_points, EntryPoint, Distribution, PackageNotFoundError)
-from typing import Dict, List, OrderedDict, Union
+    EntryPoint, Distribution, PackageNotFoundError)
+from typing import List, OrderedDict, Union
 
+from importlib_metadata import entry_points
 from packaging.requirements import Requirement
 
 __all__ = ['get_distribution', 'PackageNotFoundError', 'VersionNotFoundError']
@@ -30,7 +31,7 @@ __all__ = ['get_distribution', 'PackageNotFoundError', 'VersionNotFoundError']
 def get_contrib_config() -> List[EntryPoint]:
     """Return all registered contrib (non-open-source) Ocean packages."""
 
-    # Note: we use `entry_points` from `importlib_metadata` to simplify access
+    # Note: we use `entry_points` from `importlib_metadata>=5` to simplify access
     # and use py312 semantics. See "compatibility note" in `importlib.metadata`
     # docs for entry points.
     contrib = [ep.load() for ep in entry_points(group='dwave_contrib')]

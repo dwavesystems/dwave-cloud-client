@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Fix a regression bug introduced during utils module refactor and keep using
+    ``importlib_metadata`` for ``entry_points()`` access.
+    See `#631 <https://github.com/dwavesystems/dwave-cloud-client/issues/631>`_.
