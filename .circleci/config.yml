@@ -213,6 +213,42 @@ jobs:
             . env/bin/activate
             make -C docs/ linkcheck
 
+  test-cli:
+    parameters:
+      python-version:
+        type: string
+
+    docker:
+      - image: cimg/python:<< parameters.python-version >>
+
+    steps:
+      - checkout
+
+      - run:
+          name: Install
+          command: |
+            python -m venv env
+            . env/bin/activate
+            pip install .
+            pip install dwave-inspector
+
+      - run:
+          name: Test contrib install
+          command: |
+            . env/bin/activate
+
+            # listing works
+            dwave install --list -v | grep -F 'Package: inspector'
+
+            # assert inspector not installed
+            ! pip show dwave-inspectorapp
+
+            # install works
+            dwave install inspector --yes
+
+            # assert inspector installed
+            pip show dwave-inspectorapp
+
   build-dist:
     docker:
       - image: cimg/python:3.11
@@ -294,6 +330,12 @@ workflows:
       - test-windows:
           name: test-windows-py<< matrix.python-version >>
           context: *ctx-build
+          matrix:
+            parameters:
+              python-version: *python-versions
+
+      - test-cli:
+          name: test-cli-linux-py<< matrix.python-version >>
           matrix:
             parameters:
               python-version: *python-versions
