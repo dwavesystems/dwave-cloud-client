@@ -556,7 +556,7 @@ class BQMSolver(BaseUnstructuredSolver):
     def upload_bqm(self, bqm):
         r"""Upload the specified :term:`BQM` to SAPI, returning a Problem ID
         that can be used to submit the BQM to this solver (i.e. call the
-        :meth:`.sample_bqm` method).
+        :meth:`~BQMSolver.sample_bqm` method).
 
         Args:
             bqm (:class:`~dimod.binary.BinaryQuadraticModel`\ /bytes-like/file-like):
