@@ -58,7 +58,6 @@ Methods
    Client.get_regions
    Client.get_solver
    Client.get_solvers
-   Client.solvers
    Client.is_solver_handled
    Client.retrieve_answer
    Client.close
