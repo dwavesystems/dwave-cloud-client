@@ -393,7 +393,7 @@ class BaseUnstructuredSolver(BaseSolver):
                 Optional problem encoding and upload parameters.
 
         Returns:
-            :class:`concurrent.futures.Future`[str]:
+            :class:`concurrent.futures.Future`\ [str]:
                 Problem ID in a Future. Problem ID can be used to submit
                 problems by reference.
         """
@@ -554,19 +554,19 @@ class BQMSolver(BaseUnstructuredSolver):
         return self.sample_problem(bqm, label=label, **params)
 
     def upload_bqm(self, bqm):
-        """Upload the specified :term:`BQM` to SAPI, returning a Problem ID
+        r"""Upload the specified :term:`BQM` to SAPI, returning a Problem ID
         that can be used to submit the BQM to this solver (i.e. call the
-        `.sample_bqm` method).
+        :meth:`~BQMSolver.sample_bqm` method).
 
         Args:
-            bqm (:class:`~dimod.BinaryQuadraticModel`/bytes-like/file-like):
+            bqm (:class:`~dimod.binary.BinaryQuadraticModel`\ /bytes-like/file-like):
                 A binary quadratic model given either as an in-memory
-                :class:`~dimod.BinaryQuadraticModel` object, or as raw data
+                :class:`~dimod.binary.BinaryQuadraticModel` object, or as raw data
                 (encoded serialized model) in either a file-like or a bytes-like
                 object.
 
         Returns:
-            :class:`concurrent.futures.Future`[str]:
+            :class:`concurrent.futures.Future`\ [str]:
                 Problem ID in a Future. Problem ID can be used to submit
                 problems by reference.
 
@@ -675,7 +675,7 @@ class DQMSolver(BaseUnstructuredSolver):
                 object.
 
         Returns:
-            :class:`concurrent.futures.Future`[str]:
+            :class:`concurrent.futures.Future`\ [str]:
                 Problem ID in a Future. Problem ID can be used to submit
                 problems by reference.
 
@@ -763,7 +763,7 @@ class CQMSolver(BaseUnstructuredSolver):
                 object.
 
         Returns:
-            :class:`concurrent.futures.Future`[str]:
+            :class:`concurrent.futures.Future`\ [str]:
                 Problem ID in a Future. Problem ID can be used to submit
                 problems by reference.
 
@@ -909,7 +909,7 @@ class NLSolver(BaseUnstructuredSolver):
                 like ``max_num_states``.
 
         Returns:
-            :class:`concurrent.futures.Future`[str]:
+            :class:`concurrent.futures.Future`\ [str]:
                 Problem ID in a Future. Problem ID can be used to submit
                 problems by reference.
 
