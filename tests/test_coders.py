@@ -15,6 +15,7 @@
 import re
 import copy
 import base64
+import random
 import struct
 import unittest
 
@@ -24,13 +25,15 @@ except ImportError:
     dimod = None
 
 import numpy as np
+from parameterized import parameterized
 from plucky import pluck
 
 from dwave.cloud.coders import (
-    encode_problem_as_qp, decode_qp, decode_qp_numpy,
+    encode_problem_as_qp, decode_qp, decode_qp_numpy, decode_qp_problem,
     encode_problem_as_bq, decode_bq, encode_problem_as_ref)
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
-from dwave.cloud.utils.qubo import generate_const_ising_problem
+from dwave.cloud.testing import mocks
+from dwave.cloud.utils.qubo import generate_const_ising_problem, generate_random_ising_problem
 
 # parse string version as tuple
 if dimod:
@@ -189,6 +192,24 @@ class TestQPCoders(CodersTestBase):
         self.assertEqual(request['lin'],  self.encode_doubles([0, self.nan, self.nan, 0]))
         # [-1]
         self.assertEqual(request['quad'], self.encode_doubles([-1]))
+
+    @parameterized.expand([
+        ("K2", mocks.qpu_clique_solver_data(2)),
+        ("C4", mocks.qpu_chimera_solver_data(4)),
+        ("P16", mocks.qpu_pegasus_solver_data(16))
+    ])
+    def test_qp_problem_decode(self, name, solver_data):
+        solver = StructuredSolver(client=None, data=solver_data)
+
+        linear, quadratic = generate_random_ising_problem(solver)
+        offset = random.random()
+
+        encoded_qp = encode_problem_as_qp(solver, linear, quadratic, offset)
+        qp = decode_qp_problem(solver, encoded_qp)
+
+        self.assertEqual(qp['linear'], linear)
+        self.assertEqual(qp['quadratic'], quadratic)
+        self.assertEqual(qp['offset'], offset)
 
 
 class TestQPDecoders(CodersTestBase):

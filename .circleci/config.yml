@@ -58,7 +58,7 @@ jobs:
             if [[ "<< parameters.dimod-numpy-version >>" ]]; then
               pip install << parameters.dimod-numpy-version >>
             else
-              pip uninstall dimod dwave-networkx -y
+              pip uninstall dimod -y
             fi
 
       - run: &install-package
