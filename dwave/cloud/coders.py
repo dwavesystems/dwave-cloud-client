@@ -14,7 +14,13 @@
 
 import struct
 import base64
-from typing import Callable, Dict, List, NotRequired, Tuple, TypedDict, Union
+from typing import Callable, Dict, List, Tuple, Union
+
+try:
+    # note: TypedDict is available in py38+, but NotRequired only in py311+
+    from typing import NotRequired, TypedDict
+except ImportError:
+    from typing_extensions import NotRequired, TypedDict
 
 from dwave.cloud.utils.qubo import uniform_get, active_qubits
 
