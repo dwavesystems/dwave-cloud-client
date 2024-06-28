@@ -15,14 +15,14 @@
 import uuid
 import itertools
 import random
-from typing import List, Tuple, Optional
+from typing import List, Optional
 
 __all__ = [
     'solver_configuration_data',
     'structured_solver_data', 'qpu_clique_solver_data',
-    'qpu_chimera_solver_data', 'qpu_pegasus_solver_data', 'qpu_problem_timing_data',
+    'qpu_chimera_solver_data', 'qpu_pegasus_solver_data', 'qpu_zephyr_solver_data',
     'unstructured_solver_data', 'hybrid_bqm_solver_data', 'hybrid_dqm_solver_data',
-    'hybrid_nl_solver_data'
+    'hybrid_nl_solver_data', 'qpu_problem_timing_data',
 ]
 
 
@@ -165,8 +165,8 @@ def qpu_chimera_solver_data(m: int,
     m = graph.graph['rows']
     n = graph.graph['columns']
     t = graph.graph['tile']
-    qubits = list(graph.nodes)
-    couplers = list(graph.edges)
+    qubits = sorted(list(graph.nodes))
+    couplers = sorted(map(sorted, graph.edges))
     num_qubits = len(qubits)
 
     params = dict(
@@ -207,8 +207,8 @@ def qpu_pegasus_solver_data(m: int,
                            "Install with 'dwave-cloud-client[mocks]'.")
 
     graph = dnx.pegasus_graph(m, fabric_only=fabric_only)
-    qubits = list(graph.nodes)
-    couplers = list(graph.edges)
+    qubits = sorted(list(graph.nodes))
+    couplers = sorted(map(sorted, graph.edges))
     num_qubits = 24 * m * (m-1)     # includes non-fabric qubits
 
     params = dict(
@@ -222,6 +222,44 @@ def qpu_pegasus_solver_data(m: int,
     params.update(**kwargs)
 
     return structured_solver_data(**params)
+
+
+def qpu_zephyr_solver_data(m: int,
+                           t: int = 4,
+                           **kwargs) -> dict:
+    """Mock QPU solver data with a custom-sized Zephyr topology.
+
+    Args:
+        m:
+            Grid parameter for the Zephyr lattice.
+        t:
+            Tile parameter for the Zephyr lattice.
+        **kwargs:
+            Solver properties passed down to :meth:`.structured_solver_data`.
+    """
+    try:
+        import dwave_networkx as dnx
+    except ImportError:     # pragma: no cover
+        raise RuntimeError("Can't generate Zephyr graph without dwave-networkx. "
+                           "Install with 'dwave-cloud-client[mocks]'.")
+
+    graph = dnx.zephyr_graph(m, t)
+    qubits = sorted(list(graph.nodes))
+    couplers = sorted(map(sorted, graph.edges))
+    num_qubits = len(qubits)
+
+    params = dict(
+        id=f"zephyr_{num_qubits}q_mock",
+        description=f"A {num_qubits}-qubit mock QPU solver with zephyr topology",
+        qubits=qubits,
+        couplers=couplers,
+        topology={"type": "zephyr", "shape": [m, t]},
+        num_qubits=num_qubits,
+    )
+    params.update(**kwargs)
+
+    return structured_solver_data(**params)
+
 
 def qpu_problem_timing_data(qpu: str = 'advantage') -> dict:
     """Mock QPU solver proprty problem_timing_data.
@@ -272,6 +310,7 @@ def qpu_problem_timing_data(qpu: str = 'advantage') -> dict:
                  '2000q': timing_data_2000q6_2022_8}
 
     return name_dict[qpu]
+
 
 def unstructured_solver_data(id: str = None,
                              status: str = None,

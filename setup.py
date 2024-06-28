@@ -40,7 +40,7 @@ extras_require = {
     'nlm': ['dwave-optimization>=0.1.0,<0.3', 'numpy>=1.20.0'],
 
     # testing mocks
-    'mocks': ['dwave-networkx>=0.8.9'],
+    'mocks': ['dwave-networkx>=0.8.10'],
 }
 
 # Packages provided. Only include packages under the 'dwave' namespace.

@@ -24,6 +24,11 @@ try:
 except ImportError:
     dimod = None
 
+try:
+    import dwave_networkx as dnx
+except ImportError:
+    dnx = None
+
 from dwave.cloud.testing import isolated_environ, iterable_mock_open, mocks
 
 
@@ -196,26 +201,57 @@ class TestSolverDataMocks(unittest.TestCase):
         # 2 x 2 chimera tiles of 1-1 bipartite graphs, overall forming a cycle over 8 qubits
         m, n, t = 2, 2, 1
         num_qubits = m * n * 2 * t
+
         data = mocks.qpu_chimera_solver_data(m, n, t)
         nodes = data['properties']['qubits']
         edges = data['properties']['couplers']
+
         self.assertEqual(data['id'], f'chimera_{num_qubits}q_mock')
         self.assertEqual(data['properties']['num_qubits'], num_qubits)
         self.assertEqual(set(nodes), set(range(num_qubits)))
         self.assertEqual(len(nx.find_cycle(nx.Graph(edges))), num_qubits)
+
+        # verify qubits and couplers are ordered (like on SAPI)
+        self.assertEqual(nodes, sorted(nodes))
+        self.assertTrue(all(i < j for (i, j) in edges))
 
     @unittest.skipUnless(dimod, "dimod not installed")
     def test_qpu_pegasus_solver_data(self):
         m = 2
         num_qubits = 24 * m * (m-1)     # includes non-fabric qubits
         num_edges = 12 * (15 * (m-1)^2 + m - 3)
+
         data = mocks.qpu_pegasus_solver_data(m)
         nodes = data['properties']['qubits']
         edges = data['properties']['couplers']
+
         self.assertEqual(data['id'], f'pegasus_{num_qubits}q_mock')
         self.assertEqual(data['properties']['num_qubits'], num_qubits)
         self.assertLessEqual(len(nodes), num_qubits)
         self.assertLessEqual(len(edges), num_edges)
+
+        # verify qubits and couplers are ordered (like on SAPI)
+        self.assertEqual(nodes, sorted(nodes))
+        self.assertTrue(all(i < j for (i, j) in edges))
+
+    @unittest.skipUnless(dimod and dnx, "dimod/dwave-networkx not installed")
+    def test_qpu_zephyr_solver_data(self):
+        m, t = 2, 2
+        num_qubits = 4 * t * m * (2 * m + 1)
+        num_edges = len(dnx.zephyr_graph(m, t).edges)
+
+        data = mocks.qpu_zephyr_solver_data(m, t)
+        nodes = data['properties']['qubits']
+        edges = data['properties']['couplers']
+
+        self.assertEqual(data['id'], f'zephyr_{num_qubits}q_mock')
+        self.assertEqual(data['properties']['num_qubits'], num_qubits)
+        self.assertLessEqual(len(nodes), num_qubits)
+        self.assertLessEqual(len(edges), num_edges)
+
+        # verify qubits and couplers are ordered (like on SAPI)
+        self.assertEqual(nodes, sorted(nodes))
+        self.assertTrue(all(i < j for (i, j) in edges))
 
     def test_unstructured_solver_data(self):
         data = mocks.unstructured_solver_data()
