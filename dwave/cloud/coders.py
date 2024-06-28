@@ -14,20 +14,37 @@
 
 import struct
 import base64
-from typing import Callable
+from typing import Callable, Dict, List, NotRequired, Tuple, TypedDict, Union
 
 from dwave.cloud.utils.qubo import uniform_get, active_qubits
 
 __all__ = [
-    'encode_problem_as_qp', 'decode_qp', 'decode_qp_numpy',
+    'encode_problem_as_qp', 'decode_qp', 'decode_qp_numpy', 'decode_qp_problem',
     'encode_problem_as_bq', 'decode_bq',
     'encode_problem_as_ref', 'decode_binary_ref',
     'bqm_as_file',
 ]
 
 
-def encode_problem_as_qp(solver, linear, quadratic, offset=0,
-                         undirected_biases=False):
+# a plain dict version of `dwave.cloud.api.models.StructuredProblemData`
+class EncodedQP(TypedDict):
+    format: str
+    lin: str
+    quad: str
+    offset: NotRequired[float]
+
+class QuadraticProblem(TypedDict):
+    linear: Dict[int, float]
+    quadratic: Dict[Tuple[int, int], float]
+    offset: NotRequired[float]
+
+
+def encode_problem_as_qp(solver: 'dwave.cloud.solver.StructuredSolver',
+                         linear: Union[List[float], Dict[int, float]],
+                         quadratic: Dict[Tuple[int, int], float],
+                         offset: float = 0,
+                         undirected_biases: bool = False
+                         ) -> EncodedQP:
     """Encode the binary quadratic problem for submission to a given solver,
     using the `qp` format for data.
 
@@ -88,6 +105,34 @@ def encode_problem_as_qp(solver, linear, quadratic, offset=0,
         'quad': quad.decode('utf-8'),
         'offset': offset
     }
+
+
+def decode_qp_problem(solver: 'dwave.cloud.solver.StructuredSolver',
+                      qp: EncodedQP,
+                      undirected_edges: bool = True
+                      ) -> QuadraticProblem:
+    """Decode quadratic unconstrained binary problem encoded using SAPI's
+    ``qp`` format."""
+
+    encoding_qubits = solver._encoding_qubits
+    encoding_couplers = solver._encoding_couplers
+
+    lin = base64.decodebytes(qp['lin'].encode('ascii'))
+    lin = struct.unpack('<' + ('d' * int(len(lin)/8)), lin)
+    linear = {qubit: lin[idx] for idx, qubit in enumerate(encoding_qubits)}
+
+    quad = base64.decodebytes(qp['quad'].encode('ascii'))
+    quad = struct.unpack('<' + ('d' * int(len(quad)/8)), quad)
+    quadratic = {(q1,q2): quad[idx] for idx, (q1,q2) in enumerate(encoding_couplers)}
+
+    # return quadratic as upper triangular (regardless of encoding couplers)
+    if undirected_edges:
+        quadratic = {(q1,q2): quadratic.get((q1,q2), 0) + quadratic.get((q2,q1), 0)
+                     for (q1,q2) in solver.undirected_edges}
+
+    offset = qp.get('offset', 0.0)
+
+    return QuadraticProblem(linear=linear, quadratic=quadratic, offset=offset)
 
 
 def decode_qp(msg):
