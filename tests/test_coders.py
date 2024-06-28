@@ -194,12 +194,13 @@ class TestQPCoders(CodersTestBase):
         self.assertEqual(request['quad'], self.encode_doubles([-1]))
 
     @parameterized.expand([
-        ("K2", mocks.qpu_clique_solver_data(2)),
-        ("C4", mocks.qpu_chimera_solver_data(4)),
-        ("P16", mocks.qpu_pegasus_solver_data(16))
+        ("K2", lambda: mocks.qpu_clique_solver_data(2)),
+        ("C4", lambda: mocks.qpu_chimera_solver_data(4)),
+        ("P16", lambda: mocks.qpu_pegasus_solver_data(16))
     ])
-    def test_qp_problem_decode(self, name, solver_data):
-        solver = StructuredSolver(client=None, data=solver_data)
+    @unittest.skipUnless(dimod, "dimod required for mock solver generators")
+    def test_qp_problem_decode(self, name, get_solver_data):
+        solver = StructuredSolver(client=None, data=get_solver_data())
 
         linear, quadratic = generate_random_ising_problem(solver)
         offset = random.random()
