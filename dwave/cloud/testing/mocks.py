@@ -165,8 +165,8 @@ def qpu_chimera_solver_data(m: int,
     m = graph.graph['rows']
     n = graph.graph['columns']
     t = graph.graph['tile']
-    qubits = list(graph.nodes)
-    couplers = list(graph.edges)
+    qubits = sorted(list(graph.nodes))
+    couplers = sorted(map(sorted, graph.edges))
     num_qubits = len(qubits)
 
     params = dict(
@@ -207,8 +207,8 @@ def qpu_pegasus_solver_data(m: int,
                            "Install with 'dwave-cloud-client[mocks]'.")
 
     graph = dnx.pegasus_graph(m, fabric_only=fabric_only)
-    qubits = list(graph.nodes)
-    couplers = list(graph.edges)
+    qubits = sorted(list(graph.nodes))
+    couplers = sorted(map(sorted, graph.edges))
     num_qubits = 24 * m * (m-1)     # includes non-fabric qubits
 
     params = dict(
@@ -244,8 +244,8 @@ def qpu_zephyr_solver_data(m: int,
                            "Install with 'dwave-cloud-client[mocks]'.")
 
     graph = dnx.zephyr_graph(m, t)
-    qubits = list(graph.nodes)
-    couplers = list(graph.edges)
+    qubits = sorted(list(graph.nodes))
+    couplers = sorted(map(sorted, graph.edges))
     num_qubits = len(qubits)
 
     params = dict(
