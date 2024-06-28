@@ -24,6 +24,11 @@ try:
 except ImportError:
     dimod = None
 
+try:
+    import dwave_networkx as dnx
+except ImportError:
+    dnx = None
+
 from dwave.cloud.testing import isolated_environ, iterable_mock_open, mocks
 
 
@@ -213,6 +218,19 @@ class TestSolverDataMocks(unittest.TestCase):
         nodes = data['properties']['qubits']
         edges = data['properties']['couplers']
         self.assertEqual(data['id'], f'pegasus_{num_qubits}q_mock')
+        self.assertEqual(data['properties']['num_qubits'], num_qubits)
+        self.assertLessEqual(len(nodes), num_qubits)
+        self.assertLessEqual(len(edges), num_edges)
+
+    @unittest.skipUnless(dimod and dnx, "dimod/dwave-networkx not installed")
+    def test_qpu_zephyr_solver_data(self):
+        m, t = 2, 2
+        num_qubits = 4 * t * m * (2 * m + 1)
+        num_edges = len(dnx.zephyr_graph(m, t).edges)
+        data = mocks.qpu_zephyr_solver_data(m, t)
+        nodes = data['properties']['qubits']
+        edges = data['properties']['couplers']
+        self.assertEqual(data['id'], f'zephyr_{num_qubits}q_mock')
         self.assertEqual(data['properties']['num_qubits'], num_qubits)
         self.assertLessEqual(len(nodes), num_qubits)
         self.assertLessEqual(len(edges), num_edges)

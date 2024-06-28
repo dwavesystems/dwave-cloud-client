@@ -1,0 +1,4 @@
+---
+features:
+  - |
+    Add ``qpu_zephyr_solver_data`` generator for mock QPU solvers with Zephyr topology.
