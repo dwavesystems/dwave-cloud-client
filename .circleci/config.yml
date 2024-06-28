@@ -3,7 +3,7 @@ version: 2.1
 parameters:
   cache-generation:
     type: integer
-    default: 3
+    default: 4
 
 orbs:
   win: circleci/windows@5.0
@@ -58,7 +58,7 @@ jobs:
             if [[ "<< parameters.dimod-numpy-version >>" ]]; then
               pip install << parameters.dimod-numpy-version >>
             else
-              pip uninstall dimod dwave-networkx -y
+              pip uninstall dimod -y
             fi
 
       - run: &install-package
@@ -94,7 +94,9 @@ jobs:
 
       - run: &brew-install-pyenv
           name: Install pyenv
-          command: brew install pyenv
+          command: |
+            brew update
+            brew install pyenv
 
       - run: &pyenv-install-python
           name: Install python
