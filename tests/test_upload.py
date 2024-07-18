@@ -363,16 +363,15 @@ class TestChunkedData(unittest.TestCase):
 
         # serialize a BQM via .to_file
         bqm = bqm_cls.from_ising({'a': 1}, {})
-        bqm_file = bqm.to_file()     # returns dimod's FileView
+        with bqm.to_file() as bqm_file:     # returns dimod's FileView
+            chunk_size = 10
+            cd = ChunkedData(bqm_file, chunk_size=chunk_size)
 
-        chunk_size = 10
-        cd = ChunkedData(bqm_file, chunk_size=chunk_size)
-
-        # verify chunks
-        bqm_file.seek(0)
-        raw = bqm_file.read()
-        chunks_expected = [raw[i:i+chunk_size] for i in range(0, len(raw), chunk_size)]
-        self.verify_chunking(cd, chunks_expected)
+            # verify chunks
+            bqm_file.seek(0)
+            raw = bqm_file.read()
+            chunks_expected = [raw[i:i+chunk_size] for i in range(0, len(raw), chunk_size)]
+            self.verify_chunking(cd, chunks_expected)
 
     def test_chunks_from_dqm(self):
         try:
@@ -383,16 +382,15 @@ class TestChunkedData(unittest.TestCase):
         # serialize a DQM via .to_file
         dqm = DQM()
         dqm.add_variable(1)
-        dqm_file = dqm.to_file()    # returns SpooledTemporaryFile subclass
+        with dqm.to_file() as dqm_file:    # returns SpooledTemporaryFile subclass
+            chunk_size = 100
+            cd = ChunkedData(dqm_file, chunk_size=chunk_size)
 
-        chunk_size = 100
-        cd = ChunkedData(dqm_file, chunk_size=chunk_size)
-
-        # verify chunks
-        dqm_file.seek(0)
-        raw = dqm_file.read()
-        chunks_expected = [raw[i:i+chunk_size] for i in range(0, len(raw), chunk_size)]
-        self.verify_chunking(cd, chunks_expected)
+            # verify chunks
+            dqm_file.seek(0)
+            raw = dqm_file.read()
+            chunks_expected = [raw[i:i+chunk_size] for i in range(0, len(raw), chunk_size)]
+            self.verify_chunking(cd, chunks_expected)
 
     def test_chunk_size_edges(self):
         with self.assertRaises(ValueError):
