@@ -34,10 +34,8 @@ import weakref
 
 from concurrent.futures import TimeoutError
 from dateutil.parser import parse
-from operator import itemgetter
 
 from dwave.cloud.exceptions import InvalidAPIResponseError
-from dwave.cloud.utils.decorators import aliasdict, deprecated
 from dwave.cloud.utils.time import utcnow, datetime_to_timestamp
 
 # Use numpy if available for fast decoding
@@ -960,3 +958,11 @@ class Future(object):
         self._result = self.solver.decode_response(self._message, answer_data=self._answer_data)
         self.parse_time = time.time() - start
         return self._result
+
+    def __del__(self):
+        # note: here we close the answer buffer (typically a file on disk)
+        # even though it's closed by a file destructor anyway just for explicitness sake.
+        # TODO: consider lazy answer data download, so that the buffer/file can be released
+        # immediately after use.
+        if self._answer_data is not None:
+            self._answer_data.close()
