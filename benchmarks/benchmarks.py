@@ -158,7 +158,7 @@ class SolverMetadataJSONDecode:
     version = "1"
 
     def setup(self):
-        self.data = Path(__file__, 'fixtures/solvers.json').read_bytes()
+        self.data = (Path(__file__).parent / 'fixtures/solvers.json').read_bytes()
 
     def time_json_loads(self):
         # match the decoder used by requests (Response.json())
@@ -170,8 +170,32 @@ class SolverSelection:
 
     def setup(self):
         self.client = Client(token='mock')
-        solvers_data = json.loads(Path(__file__, 'fixtures/solvers.json').read_bytes())
-        self.client._sapi_request = lambda session, url: solvers_data
+        solvers_data = json.loads((Path(__file__).parent / 'fixtures/solvers.json').read_bytes())
+        self._original_sapi_request = Client._sapi_request
+        Client._sapi_request = lambda session, url: solvers_data
+
+    def teardown(self):
+        Client._sapi_request = self._original_sapi_request
 
     def time_get_solvers(self):
         self.client.get_solvers()
+
+    def time_get_solver(self):
+        self.client.get_solver()
+
+    def time_get_solver_nl(self):
+        self.client.get_solver(
+            supported_problem_types__contains='nl',
+            order_by='-properties.version')
+
+    def time_get_solver_pegasus(self):
+        self.client.get_solver(
+            topology__type='pegasus',
+            num_qubits__within=(5000, 6000),
+            order_by='-num_active_qubits')
+
+    def time_get_solver_zephyr_small(self):
+        self.client.get_solver(
+            topology__type='zephyr',
+            num_qubits__within=(1000, 2000),
+            order_by='-num_active_qubits')
