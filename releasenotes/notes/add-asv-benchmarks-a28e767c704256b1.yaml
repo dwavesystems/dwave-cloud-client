@@ -1,9 +1,9 @@
 ---
 features:
   - |
-    Add ``dwave.could.testing.mocks.hybrid_cqm_solver_data()``, a mock metadata
+    Add ``dwave.cloud.testing.mocks.hybrid_cqm_solver_data()``, a mock metadata
     generator for the CQM hybrid solver.
 fixes:
   - |
-    Update ``dwave.could.testing.mocks.hybrid_*_solver_data()`` generators to
+    Update ``dwave.cloud.testing.mocks.hybrid_*_solver_data()`` generators to
     include the full list of solver properties (albeit with mock/dummy values).
