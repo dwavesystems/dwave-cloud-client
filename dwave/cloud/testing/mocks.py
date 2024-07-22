@@ -22,7 +22,7 @@ __all__ = [
     'structured_solver_data', 'qpu_clique_solver_data',
     'qpu_chimera_solver_data', 'qpu_pegasus_solver_data', 'qpu_zephyr_solver_data',
     'unstructured_solver_data', 'hybrid_bqm_solver_data', 'hybrid_dqm_solver_data',
-    'hybrid_nl_solver_data', 'qpu_problem_timing_data',
+    'hybrid_cqm_solver_data', 'hybrid_nl_solver_data', 'qpu_problem_timing_data',
 ]
 
 
@@ -325,11 +325,6 @@ def unstructured_solver_data(id: str = None,
     if properties is None:
         properties = {
             "category": "hybrid",
-            "maximum_number_of_variables": 65536,
-            "maximum_time_limit_hrs": 2.0,
-            "minimum_time_limit": [
-                [1, 1.0], [1024, 2.0], [4096, 4.0], [8192, 16.0]
-            ],
             "quota_conversion_rate": 20,
             "parameters": {
                 "time_limit": "Hybrid solver execution time limit."
@@ -357,7 +352,34 @@ def hybrid_bqm_solver_data(**kwargs) -> dict:
     params = dict(
         id="hybrid_bqm_solver",
         description="Hybrid unstructured BQM mock solver",
-        supported_problem_types=["bqm"]
+        supported_problem_types=["bqm"],
+        # solver-specific properties (mock values)
+        maximum_number_of_biases=2**20,
+        maximum_number_of_variables=2**16,
+        maximum_time_limit_hrs=1.0,
+        minimum_time_limit=[[1, 1.0], [1024, 2.0], [4096, 4.0], [8192, 16.0]],
+    )
+    params.update(**kwargs)
+    return unstructured_solver_data(**params)
+
+
+def hybrid_cqm_solver_data(**kwargs) -> dict:
+    params = dict(
+        id="hybrid_cqm_solver",
+        description="Hybrid unstructured CQM mock solver",
+        supported_problem_types=["cqm"],
+        # solver-specific properties (mock values)
+        maximum_number_of_biases=2**20,
+        maximum_number_of_constraints=2**10,
+        maximum_number_of_linear_biases_real=2**20,
+        maximum_number_of_quadratic_variables=2**20,
+        maximum_number_of_quadratic_variables_real=0,
+        maximum_number_of_variables=2**16,
+        maximum_time_limit_hrs=1.0,
+        minimum_time_limit_s=1,
+        num_biases_multiplier=1e-06,
+        num_constraints_multiplier=1e-09,
+        num_variables_multiplier=1e-4,
     )
     params.update(**kwargs)
     return unstructured_solver_data(**params)
@@ -367,7 +389,13 @@ def hybrid_dqm_solver_data(**kwargs) -> dict:
     params = dict(
         id="hybrid_dqm_solver",
         description="Hybrid unstructured DQM mock solver",
-        supported_problem_types=["dqm"]
+        supported_problem_types=["dqm"],
+        # solver-specific properties (mock values)
+        maximum_number_of_biases=2**20,
+        maximum_number_of_cases=2**12,
+        maximum_number_of_variables=2**10,
+        maximum_time_limit_hrs=1.0,
+        minimum_time_limit=[[1, 1.0], [1024, 2.0], [4096, 4.0], [8192, 16.0]],
     )
     params.update(**kwargs)
     return unstructured_solver_data(**params)
@@ -378,7 +406,16 @@ def hybrid_nl_solver_data(**kwargs) -> dict:
         id="hybrid_nl_solver",
         description="Hybrid unstructured NL mock solver",
         supported_problem_types=["nl"],
-        maximum_number_of_states=1
+        # solver-specific properties (mock values)
+        maximum_decision_state_size=2**20,
+        maximum_number_of_nodes=2**16,
+        maximum_number_of_states=1,
+        maximum_state_size=2**20,
+        maximum_time_limit_hrs=1.0,
+        num_nodes_multiplier=1e-05,
+        num_nodes_state_size_multiplier=1e-12,
+        state_size_multiplier=1e-10,
+        time_constant=1e-02,
     )
     params.update(**kwargs)
     return unstructured_solver_data(**params)
