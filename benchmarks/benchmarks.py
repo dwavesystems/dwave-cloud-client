@@ -12,15 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import subprocess
 
 from functools import partial
+from pathlib import Path
 
 from dwave.cloud import Client
 from dwave.cloud.coders import encode_problem_as_qp
 from dwave.cloud.config import ClientConfig
 from dwave.cloud.solver import StructuredSolver, BQMSolver, CQMSolver, DQMSolver, NLSolver
-from dwave.cloud.regions import resolve_endpoints
+from dwave.cloud.regions import resolve_endpoints, get_regions
 from dwave.cloud.testing import isolated_environ, mocks
 from dwave.cloud.utils.qubo import generate_random_ising_problem
 
@@ -138,3 +140,38 @@ class ProblemEncoding:
 
     def time_encode_qp(self, key):
         encode_problem_as_qp(self.solver, *self.problem)
+
+
+# requires internet access
+class RegionsMetadata:
+    version = "1"
+
+    def setup(self):
+        # force region metadata cache refresh
+        get_regions(refresh=True, maxage=0)
+
+    def time_get_region_from_cache(self):
+        get_regions()
+
+
+class SolverMetadataJSONDecode:
+    version = "1"
+
+    def setup(self):
+        self.data = Path(__file__, 'fixtures/solvers.json').read_bytes()
+
+    def time_json_loads(self):
+        # match the decoder used by requests (Response.json())
+        json.loads(self.data)
+
+
+class SolverSelection:
+    version = "1"
+
+    def setup(self):
+        self.client = Client(token='mock')
+        solvers_data = json.loads(Path(__file__, 'fixtures/solvers.json').read_bytes())
+        self.client._sapi_request = lambda session, url: solvers_data
+
+    def time_get_solvers(self):
+        self.client.get_solvers()
