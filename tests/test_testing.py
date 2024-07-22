@@ -256,14 +256,26 @@ class TestSolverDataMocks(unittest.TestCase):
     def test_unstructured_solver_data(self):
         data = mocks.unstructured_solver_data()
         self.assertEqual(data['properties']['category'], 'hybrid')
-        self.assertIn('minimum_time_limit', data['properties'])
         self.assertListEqual(data['properties']['supported_problem_types'], ['bqm'])
 
         data = mocks.hybrid_bqm_solver_data()
         self.assertListEqual(data['properties']['supported_problem_types'], ['bqm'])
+        self.assertIn('maximum_number_of_variables', data['properties'])
+
+        data = mocks.hybrid_cqm_solver_data()
+        self.assertListEqual(data['properties']['supported_problem_types'], ['cqm'])
+        self.assertIn('maximum_number_of_variables', data['properties'])
+        self.assertIn('maximum_number_of_constraints', data['properties'])
 
         data = mocks.hybrid_dqm_solver_data()
         self.assertListEqual(data['properties']['supported_problem_types'], ['dqm'])
+        self.assertIn('maximum_number_of_variables', data['properties'])
+        self.assertIn('maximum_number_of_cases', data['properties'])
+
+        data = mocks.hybrid_nl_solver_data()
+        self.assertListEqual(data['properties']['supported_problem_types'], ['nl'])
+        self.assertIn('maximum_number_of_nodes', data['properties'])
+        self.assertIn('maximum_number_of_states', data['properties'])
 
 
 if __name__ == '__main__':
