@@ -251,6 +251,22 @@ jobs:
             # assert inspector installed
             pip show dwave-inspectorapp
 
+  test-asv:
+    docker:
+      - image: cimg/python:3.11
+
+    steps:
+      - checkout
+
+      - run:
+          name: Verify benchmarks run
+          command: |
+            python -m venv env
+            . env/bin/activate
+            pip install -r benchmarks/requirements.txt
+            asv machine --yes
+            asv run -q
+
   build-dist:
     docker:
       - image: cimg/python:3.11
@@ -343,6 +359,7 @@ workflows:
               python-version: *python-versions
 
       - test-docs
+      - test-asv
       - build-dist
 
   deploy:
