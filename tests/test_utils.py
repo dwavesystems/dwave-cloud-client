@@ -548,6 +548,30 @@ class TestCachedForking(unittest.TestCase):
         self.assertEqual(run.stdout.strip(), b'')
         self.assertEqual(run.stderr.strip(), b'')
 
+    def test_import_only_survives_forking(self):
+        # note: this convoluted subprocess call approach seems to be simpler
+        # than trying to kill the forked unittest suite after a forking test case.
+        program = textwrap.dedent("""
+            import os
+            from dwave.cloud.utils.decorators import cached
+
+            @cached.ondisk()
+            def f():
+                return 42
+
+            os.fork()
+
+            # make sure cache works in both parent and child
+            if f() != 42:
+                print("FAIL")
+        """)
+
+        run = subprocess.run(f"echo '{program}' | python", shell=True, capture_output=True)
+
+        self.assertEqual(run.returncode, 0)
+        self.assertEqual(run.stdout.strip(), b'')
+        self.assertEqual(run.stderr.strip(), b'')
+
 
 class TestRetriedDecorator(unittest.TestCase):
 
