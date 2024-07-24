@@ -27,9 +27,10 @@ import warnings
 
 from functools import wraps
 from secrets import token_hex
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Union
 from unittest import mock
 
+from dwave.cloud.config import get_cache_dir
 from dwave.cloud.utils.time import epochnow
 
 __all__ = ['aliasdict', 'cached', 'deprecated', 'retried']
@@ -224,7 +225,7 @@ class cached:
 
     def __init__(self, *,
                  maxage: Optional[float] = None,
-                 store: Optional[Mapping] = None,
+                 store: Union[Mapping, Callable[[], Mapping], None] = None,
                  key: Optional[str] = None,
                  bucket: Optional[str] = None):
 
@@ -232,6 +233,8 @@ class cached:
 
         if store is None:
             store = {}
+        if callable(store):
+            store = store()
         self.store = store
 
         self.key = key
@@ -282,15 +285,18 @@ class cached:
     def ondisk(cls, **kwargs):
         """@cached backed by an on-disk sqlite3-based cache."""
 
-        # lazy import for performance
-        import diskcache
-        from dwave.cloud.config import get_cache_dir
-
         directory = kwargs.pop('directory', get_cache_dir())
         compression_level = kwargs.pop('compression_level', 6)
-        cache = diskcache.Cache(disk=diskcache.JSONDisk, directory=directory,
-                                disk_compress_level=compression_level)
-        return cls(store=cache, **kwargs)
+
+        # defer diskcache construction (sqlite db access!) until actually needed.
+        # also, by postponing sqlite3 connect we enable easier post-fork re-init
+        # (see https://www.sqlite.org/faq.html#q6)
+        def store_initializer():
+            import diskcache
+            return diskcache.Cache(disk=diskcache.JSONDisk, directory=directory,
+                                   disk_compress_level=compression_level)
+
+        return cls(store=store_initializer, **kwargs)
 
     class disabled:
         """Context manager and decorator that disables the cache within the

@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Defer SQLite connect in ``@cached.ondisk()`` until actually needed. Also,
+    verify cache thread/process-safety and forking support.
