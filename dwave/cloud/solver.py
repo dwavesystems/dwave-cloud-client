@@ -381,7 +381,7 @@ class BaseUnstructuredSolver(BaseSolver):
         raise NotImplementedError
 
     def upload_problem(self, problem, **kwargs):
-        """Encode and upload the problem.
+        r"""Encode and upload the problem.
 
         Args:
             problem (model-like):
@@ -663,7 +663,7 @@ class DQMSolver(BaseUnstructuredSolver):
         return self.sample_problem(dqm, label=label, **params)
 
     def upload_dqm(self, dqm):
-        """Upload the specified :term:`DQM` to SAPI, returning a Problem ID
+        r"""Upload the specified :term:`DQM` to SAPI, returning a Problem ID
         that can be used to submit the DQM to this solver (i.e. call the
         `.sample_dqm` method).
 
@@ -751,7 +751,7 @@ class CQMSolver(BaseUnstructuredSolver):
         return self.sample_problem(cqm, label=label, **params)
 
     def upload_cqm(self, cqm):
-        """Upload the specified :term:`CQM` to SAPI, returning a Problem ID
+        r"""Upload the specified :term:`CQM` to SAPI, returning a Problem ID
         that can be used to submit the CQM to this solver (i.e. call the
         `.sample_cqm` method).
 
@@ -892,7 +892,7 @@ class NLSolver(BaseUnstructuredSolver):
                    model: typing.Union['dwave.optimization.Model', io.IOBase, bytes],
                    **upload_params,
                    ) -> concurrent.futures.Future:
-        """Upload the specified :term:`NL model` to SAPI, returning a Problem ID
+        r"""Upload the specified :term:`NL model` to SAPI, returning a Problem ID
         that can be used to submit the NL model to this solver (i.e. call the
         :meth:`.sample_nlm` method).
 
