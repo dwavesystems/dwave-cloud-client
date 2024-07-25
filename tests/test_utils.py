@@ -553,9 +553,11 @@ class TestCachedForking(unittest.TestCase):
         # than trying to kill the forked unittest suite after a forking test case.
         program = textwrap.dedent("""
             import os
+            import tempfile
             from dwave.cloud.utils.decorators import cached
 
-            @cached.ondisk()
+            # isolate cache to avoid https://github.com/grantjenks/python-diskcache/issues/325
+            @cached.ondisk(directory=tempfile.mkdtemp())
             def f():
                 return 42
 
