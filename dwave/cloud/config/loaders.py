@@ -238,13 +238,19 @@ def get_default_configfile_path(**kwargs) -> str:
     return get_configfile_paths(**kwargs)[0]
 
 
-def get_cache_dir() -> str:
+def get_cache_dir(create: bool = False) -> str:
     """Return a directory path convenient for storing user-local,
     package-local and version-specific cache data.
     """
-    return homebase.user_cache_dir(
+    path = homebase.user_cache_dir(
         app_name=__packagename__, app_author=CONF_AUTHOR,
-        version=__version__, use_virtualenv=False, create=True)
+        version=__version__, use_virtualenv=False, create=False)
+
+    # avoid possible race condition on create (https://github.com/dwavesystems/homebase/issues/37)
+    if create:
+        os.makedirs(path, exist_ok=True)
+
+    return path
 
 
 def load_config_from_files(filenames=None):

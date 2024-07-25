@@ -3,3 +3,10 @@ fixes:
   - |
     Defer SQLite connect in ``@cached.ondisk()`` until actually needed. Also,
     verify cache thread/process-safety and forking support.
+  - |
+    Fix ``get_cache_dir()`` to not create the cache directory by default. Creation
+    is now optional and controlled with ``create`` argument. This makes it consistent
+    with other config path functions.
+  - |
+    Fix possible race condition during cache directory create.
+    See `homebase#37 <https://github.com/dwavesystems/homebase/issues/37>`_.
