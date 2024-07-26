@@ -17,7 +17,11 @@ import copy
 import io
 import json
 import logging
+import os
+import sqlite3
+import subprocess
 import tempfile
+import textwrap
 import time
 import unittest
 import uuid
@@ -510,6 +514,65 @@ class TestCachedOnDiskDecorator(TestCachedCommon):
 
         f2 = self.cached(bucket='fixed')(f)
         self.assertEqual(f2(), 0)
+
+
+@unittest.skipUnless(hasattr(os, 'fork'), "os.fork() not available on this platform")
+class TestCachedForking(unittest.TestCase):
+
+    @unittest.skipUnless(sqlite3.threadsafety == 3,
+                         "sqlite3 is not compiled with serialized threading mode support")
+    def test_cache_connection_safety_post_forking(self):
+        # note: this convoluted subprocess call approach seems to be simpler
+        # than trying to kill the forked unittest suite after a forking test case.
+        program = textwrap.dedent("""
+            import os
+            from dwave.cloud.utils.decorators import cached
+
+            @cached.ondisk()
+            def f():
+                return 42
+
+            # make sure db connection is opened
+            f()
+
+            os.fork()
+
+            # make sure cache works in both parent and child
+            if f() != 42:
+                print("FAIL")
+        """)
+
+        run = subprocess.run(f"echo '{program}' | python", shell=True, capture_output=True)
+
+        self.assertEqual(run.returncode, 0)
+        self.assertEqual(run.stdout.strip(), b'')
+        self.assertEqual(run.stderr.strip(), b'')
+
+    def test_import_only_survives_forking(self):
+        # note: this convoluted subprocess call approach seems to be simpler
+        # than trying to kill the forked unittest suite after a forking test case.
+        program = textwrap.dedent("""
+            import os
+            import tempfile
+            from dwave.cloud.utils.decorators import cached
+
+            # isolate cache to avoid https://github.com/grantjenks/python-diskcache/issues/325
+            @cached.ondisk(directory=tempfile.mkdtemp())
+            def f():
+                return 42
+
+            os.fork()
+
+            # make sure cache works in both parent and child
+            if f() != 42:
+                print("FAIL")
+        """)
+
+        run = subprocess.run(f"echo '{program}' | python", shell=True, capture_output=True)
+
+        self.assertEqual(run.returncode, 0)
+        self.assertEqual(run.stdout.strip(), b'')
+        self.assertEqual(run.stderr.strip(), b'')
 
 
 class TestRetriedDecorator(unittest.TestCase):

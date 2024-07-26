@@ -459,7 +459,7 @@ class TestConfigUtils(unittest.TestCase):
             parse_boolean('x')
 
     def test_cache_dir(self):
-        path = get_cache_dir()
+        path = get_cache_dir(create=True)
         self.assertTrue(os.path.isdir(path))
         self.assertIn(__packagename__, path)
         self.assertIn(__version__, path)
