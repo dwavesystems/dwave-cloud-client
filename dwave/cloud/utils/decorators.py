@@ -30,7 +30,6 @@ from secrets import token_hex
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Union
 from unittest import mock
 
-from dwave.cloud.config import get_cache_dir
 from dwave.cloud.utils.time import epochnow
 
 __all__ = ['aliasdict', 'cached', 'deprecated', 'retried']
@@ -284,6 +283,9 @@ class cached:
     @classmethod
     def ondisk(cls, **kwargs):
         """@cached backed by an on-disk sqlite3-based cache."""
+
+        # defer to break circular imports
+        from dwave.cloud.config import get_cache_dir
 
         directory = kwargs.pop('directory', get_cache_dir())
         compression_level = kwargs.pop('compression_level', 6)
