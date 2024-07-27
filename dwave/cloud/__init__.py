@@ -15,10 +15,8 @@
 import sys
 import logging
 import importlib
+import types
 
-from dwave.cloud.client import Client
-from dwave.cloud.solver import Solver
-from dwave.cloud.computation import Future
 from dwave.cloud.utils.logging import add_loglevel, configure_logging_from_env
 
 __all__ = ['Client', 'Solver', 'Future']
@@ -35,11 +33,29 @@ add_loglevel('TRACE', 5)
 configure_logging_from_env(logger)
 
 
-# alias dwave.cloud.client.{qpu,sw,hybrid} as dwave.cloud.*
+# lazily import Client/Solver/Future -- only when actually asked for
+def __getattr__(cls):
+    modname = {'Client': 'client', 'Solver': 'solver', 'Future': 'computation'}
+    if cls in modname:
+        mod = importlib.import_module(f'dwave.cloud.{modname[cls]}')
+        return getattr(mod, cls)
+
+    raise AttributeError(f"module '{__name__}' has no attribute '{cls}'")
+
+
+# lazily alias dwave.cloud.client.{qpu,sw,hybrid} as dwave.cloud.*
+# (i.e. don't preemptively import Client from submodules)
 def _alias_old_client_submodules():
+    class _submod(types.ModuleType):
+        def __getattr__(self, name):
+            modname = self.__name__
+            if name == 'Client':
+                mod = importlib.import_module('dwave.cloud.client.{}'.format(modname))
+                return getattr(mod, 'Client')
+
+            raise AttributeError(f"module '{self.__name__}' has no attribute '{name}'")
+
     for name in ('qpu', 'sw', 'hybrid'):
-        # note: create both module and local attribute
-        globals()[name] = sys.modules['dwave.cloud.{}'.format(name)] = \
-            importlib.import_module('dwave.cloud.client.{}'.format(name))
+        globals()[name] = sys.modules[f'dwave.cloud.{name}'] = _submod(name)
 
 _alias_old_client_submodules()

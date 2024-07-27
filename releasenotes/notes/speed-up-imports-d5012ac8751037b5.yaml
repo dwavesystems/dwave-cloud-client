@@ -1,0 +1,14 @@
+---
+features:
+  - |
+    Lazily import ``Client``/``Solver``/``Future`` in the top-level namespace,
+    ``dwave.cloud``. Direct imports are preferred, e.g.
+    ``from dwave.cloud.client import Client``, but the widely-used way
+    (``from dwave.cloud import Client``) is still supported for backwards
+    compatibility.
+
+    Similarly we now lazily import old namespaces with client type as submodule,
+    e.g. ``dwave.cloud.qpu``.
+
+    The main benefit of such lazy imports is import performance, as "heavy"
+    symbols are only imported when explicitly needed/asked for.
