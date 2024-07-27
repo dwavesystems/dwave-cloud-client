@@ -27,9 +27,8 @@ from typing import Callable, Dict, Optional, Tuple
 import click
 import requests.exceptions
 
-import dwave.cloud
-from dwave.cloud import Client
 from dwave.cloud import api
+from dwave.cloud.client import Client
 from dwave.cloud.solver import StructuredSolver, BaseUnstructuredSolver
 from dwave.cloud.utils.cli import default_text_input, strtrunc, CLIError
 from dwave.cloud.utils.dist import (

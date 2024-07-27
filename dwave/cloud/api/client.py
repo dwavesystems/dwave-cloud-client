@@ -16,18 +16,20 @@ from __future__ import annotations
 
 import logging
 from collections import deque, namedtuple
-from typing import Optional, Union
+from typing import Optional, Union, TYPE_CHECKING
 
 import requests
 import urllib3
 from packaging.specifiers import SpecifierSet
 from werkzeug.http import parse_options_header, dump_options_header
 
+import dwave.cloud.config   # don't use `from` to break circular import (config <> api.constants)
 from dwave.cloud.api import constants, exceptions
-from dwave.cloud.config import load_config, validate_config_v1
-from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.utils.exception import is_caused_by
 from dwave.cloud.utils.http import PretimedHTTPAdapter, BaseUrlSession, default_user_agent
+
+if TYPE_CHECKING:
+    from dwave.cloud.config.models import ClientConfig
 
 __all__ = ['DWaveAPIClient', 'SolverAPIClient', 'MetadataAPIClient', 'LeapAPIClient']
 
@@ -326,8 +328,8 @@ class DWaveAPIClient:
         logger.trace(f"{cls.__name__}.from_config_file("
                      f"config_file={config_file!r}, profile={profile!r}, **{kwargs!r})")
 
-        options = load_config(config_file=config_file, profile=profile, **kwargs)
-        config = validate_config_v1(options)
+        options = dwave.cloud.config.load_config(config_file=config_file, profile=profile, **kwargs)
+        config = dwave.cloud.config.validate_config_v1(options)
         return cls.from_config_model(config)
 
     @classmethod
@@ -346,7 +348,7 @@ class DWaveAPIClient:
         """
         logger.trace(f"{cls.__name__}.from_config(config={config!r}, **{kwargs!r}")
 
-        if isinstance(config, ClientConfig):
+        if isinstance(config, dwave.cloud.config.ClientConfig):
             return cls.from_config_model(config, **kwargs)
 
         kwargs['config_file'] = config

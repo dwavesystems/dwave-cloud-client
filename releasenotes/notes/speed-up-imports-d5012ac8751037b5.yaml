@@ -12,6 +12,8 @@ features:
 
     The main benefit of such lazy imports is import performance, as "heavy"
     symbols are only imported when explicitly needed/asked for.
+  - |
+    Speed-up imports by slightly decoupling submodules.
 deprecations:
   - |
     Shorthand import paths for specialized Clients (for ``qpu``, ``sw`` and

@@ -18,7 +18,7 @@ import logging
 import time
 import webbrowser
 from operator import sub
-from typing import Any, Callable, Dict, Optional, Union, Sequence, Literal
+from typing import Any, Callable, Dict, Optional, Union, Sequence, Literal, TYPE_CHECKING
 from urllib.parse import urljoin
 
 import click
@@ -31,10 +31,12 @@ from authlib.common.urls import add_params_to_uri
 from dwave.cloud.auth.config import OCEAN_SDK_CLIENT_ID, OCEAN_SDK_SCOPES
 from dwave.cloud.auth.creds import Credentials
 from dwave.cloud.auth.server import SingleRequestAppServer, RequestCaptureAndRedirectApp
-from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.regions import resolve_endpoints
 from dwave.cloud.utils.http import default_user_agent
 from dwave.cloud.utils.logging import pretty_argvalues
+
+if TYPE_CHECKING:
+    from dwave.cloud.config.models import ClientConfig
 
 __all__ = ['AuthFlow', 'LeapAuthFlow', 'OAuthError']
 
