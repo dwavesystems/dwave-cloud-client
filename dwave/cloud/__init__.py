@@ -16,6 +16,7 @@ import sys
 import logging
 import importlib
 import types
+import warnings
 
 from dwave.cloud.utils.logging import add_loglevel, configure_logging_from_env
 
@@ -50,7 +51,13 @@ def _alias_old_client_submodules():
         def __getattr__(self, name):
             modname = self.__name__
             if name == 'Client':
-                mod = importlib.import_module('dwave.cloud.client.{}'.format(modname))
+                warnings.warn(
+                    f"Importing 'Client' from 'dwave.cloud.{modname}' has been "
+                    f"deprecated and will be removed in dwave-cloud-client 0.14. "
+                    f"Import 'Client' directly from 'dwave.cloud.client.{modname}'.",
+                    DeprecationWarning, stacklevel=2)
+
+                mod = importlib.import_module(f'dwave.cloud.client.{modname}')
                 return getattr(mod, 'Client')
 
             raise AttributeError(f"module '{self.__name__}' has no attribute '{name}'")
@@ -58,4 +65,5 @@ def _alias_old_client_submodules():
     for name in ('qpu', 'sw', 'hybrid'):
         globals()[name] = sys.modules[f'dwave.cloud.{name}'] = _submod(name)
 
+# TODO: remove in 0.14.0
 _alias_old_client_submodules()

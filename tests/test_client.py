@@ -630,6 +630,12 @@ class VerifyLazyClientImport(unittest.TestCase):
 
         self.assertEqual(dwave.cloud.client.Client, dwave.cloud.Client)
 
+    @parameterized.expand([("qpu", ), ("sw", ), ("hybrid", )])
+    def test_deprecation(self, name):
+        with self.assertWarns(DeprecationWarning):
+            mod = importlib.import_module(f'dwave.cloud.{name}')
+            self.assertTrue(issubclass(getattr(mod, 'Client'), Client))
+
 
 @mock.patch("dwave.cloud.regions.get_regions", get_default_regions)
 class ClientConfigIntegration(unittest.TestCase):

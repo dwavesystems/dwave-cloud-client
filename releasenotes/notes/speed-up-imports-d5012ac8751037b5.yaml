@@ -12,3 +12,10 @@ features:
 
     The main benefit of such lazy imports is import performance, as "heavy"
     symbols are only imported when explicitly needed/asked for.
+deprecations:
+  - |
+    Shorthand import paths for specialized Clients (for ``qpu``, ``sw`` and
+    ``hybrid``) are deprecated in ``dwave-cloud-client==0.12.2`` and will be
+    removed in ``dwave-cloud-client==0.14.0``. Instead, use the full import
+    path, e.g. ``from dwave.cloud.client.qpu import Client``, instead of
+    ``from dwave.cloud.qpu import Client``.
