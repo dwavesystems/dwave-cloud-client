@@ -265,7 +265,7 @@ jobs:
             . env/bin/activate
             pip install -r benchmarks/requirements.txt
             asv machine --yes
-            asv run -q
+            asv run -q HEAD^!
 
   build-dist:
     docker:
