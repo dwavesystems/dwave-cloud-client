@@ -16,7 +16,7 @@ from datetime import datetime
 from typing import List, Union, Optional, Dict, Any
 from typing_extensions import Annotated     # backport for py37, py38
 
-from pydantic import BaseModel, RootModel, Field
+from pydantic import BaseModel, RootModel, ConfigDict
 from pydantic.functional_validators import AfterValidator
 
 from dwave.cloud.api import constants
@@ -27,12 +27,24 @@ from dwave.cloud.utils.coders import coerce_numpy_to_python
 AnyIncludingNumpy = Annotated[Any, AfterValidator(coerce_numpy_to_python)]
 
 
-class SolverConfiguration(BaseModel):
+class SolverCompleteConfiguration(BaseModel):
     id: str
     status: str
     description: str
     properties: dict
     avg_load: float
+
+
+class SolverFilteredConfiguration(BaseModel):
+    # no required fields, and no ignored fields
+    model_config = ConfigDict(extra='allow')
+
+
+class SolverConfiguration(RootModel):
+    root: Union[SolverCompleteConfiguration, SolverFilteredConfiguration]
+
+    def __getattr__(self, item):
+        return getattr(self.root, item)
 
 
 class ProblemInitialStatus(BaseModel):
