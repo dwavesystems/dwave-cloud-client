@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import io
 import json
-from typing import List, Union, Optional, Callable, get_type_hints
+from typing import List, Union, Optional, Callable, get_type_hints, TYPE_CHECKING
 from functools import wraps
 
 from pydantic import TypeAdapter
@@ -22,8 +24,10 @@ from pydantic import TypeAdapter
 from dwave.cloud.api.client import (
     DWaveAPIClient, SolverAPIClient, MetadataAPIClient, LeapAPIClient)
 from dwave.cloud.api import constants, models
-from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.utils.coders import NumpyEncoder
+
+if TYPE_CHECKING:
+    from dwave.cloud.config.models import ClientConfig
 
 __all__ = ['Solvers', 'Problems', 'Regions']
 

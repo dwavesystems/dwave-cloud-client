@@ -18,6 +18,7 @@ Tests the ability to connect to the SAPI server with the `dwave.cloud.qpu.Client
 test_mock_solver_loading.py duplicates some of these tests against a mock server.
 """
 
+import importlib
 import json
 import time
 import unittest
@@ -619,6 +620,21 @@ class ClientConstruction(unittest.TestCase):
             with dwave.cloud.Client.from_config(**retry_kwargs) as client:
                 retry = client.session.get_adapter('https://').max_retries
                 self._verify_retry_config(retry, retry_kwargs)
+
+
+class VerifyLazyClientImport(unittest.TestCase):
+
+    def test_client_available(self):
+        import dwave.cloud
+        import dwave.cloud.client
+
+        self.assertEqual(dwave.cloud.client.Client, dwave.cloud.Client)
+
+    @parameterized.expand([("qpu", ), ("sw", ), ("hybrid", )])
+    def test_deprecation(self, name):
+        with self.assertWarns(DeprecationWarning):
+            mod = importlib.import_module(f'dwave.cloud.{name}')
+            self.assertTrue(issubclass(getattr(mod, 'Client'), Client))
 
 
 @mock.patch("dwave.cloud.regions.get_regions", get_default_regions)

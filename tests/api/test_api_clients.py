@@ -112,7 +112,7 @@ class TestConfig(unittest.TestCase):
         # `load_config` is already tested thoroughly in `tests.test_config`,
         # so it's ok to just mock it here
         config = dict(endpoint='https://test.com/path/')
-        with unittest.mock.patch("dwave.cloud.api.client.load_config",
+        with unittest.mock.patch("dwave.cloud.config.load_config",
                                  lambda *a, **kw: config):
             with DWaveAPIClient.from_config_file() as client:
                 self.assertEqual(client.session.base_url, config['endpoint'])

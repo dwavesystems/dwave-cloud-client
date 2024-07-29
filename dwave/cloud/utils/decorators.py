@@ -28,7 +28,6 @@ import warnings
 from functools import wraps
 from secrets import token_hex
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Union
-from unittest import mock
 
 from dwave.cloud.utils.time import epochnow
 
@@ -330,6 +329,10 @@ class cached:
         """
 
         def start(self):
+            # lazy import: cached.disabled is rarely used, yet mock import
+            # adds 50ms to root package import
+            from unittest import mock
+
             self.patcher = mock.patch.object(cached, '_disabled', True)
             self.patcher.start()
 
