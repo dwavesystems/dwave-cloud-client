@@ -43,6 +43,11 @@ def __getattr__(cls):
 
     raise AttributeError(f"module '{__name__}' has no attribute '{cls}'")
 
+def __dir__():
+    # dev note: make sure __all__ is limited to symbols we import lazily
+    yield from __all__
+    yield from globals()
+
 
 # lazily alias dwave.cloud.client.{qpu,sw,hybrid} as dwave.cloud.*
 # (i.e. don't preemptively import Client from submodules)
@@ -61,6 +66,10 @@ def _alias_old_client_submodules():
                 return getattr(mod, 'Client')
 
             raise AttributeError(f"module '{self.__name__}' has no attribute '{name}'")
+
+        def __dir__(self):
+            self.__getattr__('Client')      # force submodule import
+            yield from dir(sys.modules[f'dwave.cloud.client.{self.__name__}'])
 
     for name in ('qpu', 'sw', 'hybrid'):
         globals()[name] = sys.modules[f'dwave.cloud.{name}'] = _submod(name)
