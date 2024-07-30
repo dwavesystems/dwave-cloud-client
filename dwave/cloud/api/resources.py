@@ -126,16 +126,18 @@ class Solvers(ResourceBase):
     client_class = SolverAPIClient
 
     @accepts(media_type='application/vnd.dwave.sapi.solver-definition-list+json', version='~=2.0')
-    def list_solvers(self) -> List[models.SolverConfiguration]:
+    def list_solvers(self, filter: Optional[str] = None) -> List[models.SolverConfiguration]:
         path = 'remote/'
-        response = self.session.get(path)
+        params = {'filter': filter} if filter is not None else None
+        response = self.session.get(path, params=params)
         solvers = response.json()
         return TypeAdapter(List[models.SolverConfiguration]).validate_python(solvers)
 
     @accepts(media_type='application/vnd.dwave.sapi.solver-definition+json', version='~=2.0')
-    def get_solver(self, solver_id: str) -> models.SolverConfiguration:
+    def get_solver(self, solver_id: str, filter: Optional[str] = None) -> models.SolverConfiguration:
         path = 'remote/{}'.format(solver_id)
-        response = self.session.get(path)
+        params = {'filter': filter} if filter is not None else None
+        response = self.session.get(path, params=params)
         solver = response.json()
         return models.SolverConfiguration.model_validate(solver)
 

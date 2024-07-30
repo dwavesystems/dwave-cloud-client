@@ -12,10 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import uuid
 import unittest
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse, parse_qsl
 
+import json
+import requests
 import requests_mock
 
 from dwave.cloud.api.resources import Solvers
@@ -101,8 +104,102 @@ class TestMockSolvers(unittest.TestCase):
             api.list_solvers()
 
 
+class FilteringTestsMixin:
+    additive_filter = 'none,+id'
+    subtractive_filter = 'all,-properties.couplers'
+
+    # assume self.api is initialized
+
+    def test_solver_collection_property_filtering(self):
+        with self.subTest('SAPI additive filtering'):
+            solvers = self.api.list_solvers(filter=self.additive_filter)
+            for item in solvers:
+                self.assertIsInstance(item.root, models.SolverFilteredConfiguration)
+                self.assertEqual(item.model_dump().keys(), {'id'})
+
+        with self.subTest('SAPI subtractive filtering'):
+            solvers = self.api.list_solvers(filter=self.subtractive_filter)
+            for item in solvers:
+                self.assertIsInstance(item.root, models.SolverCompleteConfiguration)
+                self.assertNotIn('couplers', item.properties)
+                if item.properties.get('category') == 'qpu':
+                    self.assertIn('qubits', item.properties)
+
+    def test_solver_property_filtering(self):
+        # find a QPU solver to query
+        qpu = [solver.id for solver in self.api.list_solvers()
+               if solver.properties.get('category') == 'qpu']
+        solver_id = qpu.pop()
+
+        with self.subTest('SAPI additive filtering'):
+            solver = self.api.get_solver(solver_id=solver_id, filter=self.additive_filter)
+            self.assertIsInstance(solver.root, models.SolverFilteredConfiguration)
+            self.assertEqual(solver.model_dump().keys(), {'id'})
+
+        with self.subTest('SAPI subtractive filtering'):
+            solver = self.api.get_solver(solver_id=solver_id, filter=self.subtractive_filter)
+            self.assertIsInstance(solver.root, models.SolverCompleteConfiguration)
+            self.assertNotIn('couplers', solver.properties)
+            self.assertIn('qubits', solver.properties)
+
+
+class TestFiltering(FilteringTestsMixin, unittest.TestCase):
+
+    token = str(uuid.uuid4())
+    endpoint = 'http://test.com/path/'
+
+    def setUp(self):
+        self.mocker = requests_mock.Mocker()
+
+        self.solver_data = qpu_clique_solver_data(3)
+        self.solver_id = self.solver_data['id']
+
+        self.solver_uri = urljoin(self.endpoint, 'solvers/remote/{}'.format(self.solver_id))
+        self.list_uri = urljoin(self.endpoint, 'solvers/remote/')
+
+        self.additive_filter_data = {"id": self.solver_id}
+
+        self.subtractive_filter_data = self.solver_data.copy()
+        del self.subtractive_filter_data['properties']['couplers']
+
+        def custom_matcher(request):
+            url = urlparse(request.path_url)
+            filter = dict(parse_qsl(url.query)).get('filter', '')
+
+            if filter == self.additive_filter:
+                data = self.additive_filter_data
+            elif filter == self.subtractive_filter:
+                data = self.subtractive_filter_data
+            elif filter == '':
+                data = self.solver_data
+            else:
+                return None
+
+            def reply(data):
+                resp = requests.Response()
+                resp.status_code = 200
+                resp.raw = io.BytesIO(json.dumps(data).encode('ascii'))
+                return resp
+
+            if url.path == urlparse(self.solver_uri).path:
+                return reply(data)
+            elif url.path == urlparse(self.list_uri).path:
+                return reply([data])
+            else:
+                return None
+
+        self.mocker.add_matcher(custom_matcher)
+
+        self.mocker.start()
+        self.api = Solvers(token=self.token, endpoint=self.endpoint, version_strict_mode=False)
+
+    def tearDown(self):
+        self.api.close()
+        self.mocker.stop()
+
+
 @unittest.skipUnless(config, "SAPI access not configured.")
-class TestCloudSolvers(unittest.TestCase):
+class TestLiveSolvers(FilteringTestsMixin, unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):

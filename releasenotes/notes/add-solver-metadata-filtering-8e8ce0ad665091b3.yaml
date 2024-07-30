@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Add support for retrieving filtered solver configuration to
+    ``dwave.cloud.api.resources.Solvers`` methods.
