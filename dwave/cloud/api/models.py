@@ -46,6 +46,21 @@ class SolverConfiguration(RootModel):
     def __getattr__(self, item):
         return getattr(self.root, item)
 
+    def __setattr__(self, name, value):
+        return setattr(self.root, name, value)
+
+    # we implement getitem interface so that `SolverConfiguration` can be used
+    # as a drop-in replacement for data dict in `Solver(..., data=...)`
+    # TODO: break `Solver()` backwards compat and require pydantic model
+    def __getitem__(self, name):
+        return getattr(self.root, name)
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except AttributeError:
+            return default
+
 
 class ProblemInitialStatus(BaseModel):
     id: str
