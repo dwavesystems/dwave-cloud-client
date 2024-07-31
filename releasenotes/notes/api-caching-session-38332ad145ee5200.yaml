@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Add API response caching support to ``dwave.cloud.api`` interface. Cache
+    is validated using a conditional request based on ``ETag``.

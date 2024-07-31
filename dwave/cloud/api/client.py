@@ -14,9 +14,12 @@
 
 from __future__ import annotations
 
+import io
+import hashlib
 import logging
+import os
 from collections import deque, namedtuple
-from typing import Optional, Union, TYPE_CHECKING
+from typing import Callable, Mapping, Optional, TypedDict, Union, TYPE_CHECKING
 
 import requests
 import urllib3
@@ -27,6 +30,7 @@ import dwave.cloud.config   # don't use `from` to break circular import (config 
 from dwave.cloud.api import constants, exceptions
 from dwave.cloud.utils.exception import is_caused_by
 from dwave.cloud.utils.http import PretimedHTTPAdapter, BaseUrlSession, default_user_agent
+from dwave.cloud.utils.time import epochnow
 
 if TYPE_CHECKING:
     from dwave.cloud.config.models import ClientConfig
@@ -228,6 +232,152 @@ class VersionedAPISession(LoggingSession):
         return response
 
 
+class CachingSession(VersionedAPISession):
+    """A `requests.Session` subclass (technically, further specialized
+    :class:`.VersionedAPISession`) that caches responses and uses conditional
+    requests for smart cache updates.
+
+    Args:
+        cache (dict):
+            Cache configuration in a dict with keys:
+
+                * ``enabled`` (bool):
+                    Enable request caching.
+
+                * ``maxage`` (float):
+                    Default response maxage, in case server response
+                    doesn't specify ``Cache-Control``.
+
+                * ``store`` (mapping, callable):
+                    Define cache storage (with a Mapping interface). Default to
+                    ``diskcache.Cache`` with pickle serialization.
+
+    """
+
+    _cache_enabled = False
+    _maxage = None
+    _store = None
+
+    class CacheConfig(TypedDict, total=False):
+        enabled: bool
+        maxage: float
+        store: Union[Mapping, Callable[[], Mapping]]
+
+    @staticmethod
+    def _create_default_cache_store(**kwargs) -> Mapping:
+        # TODO: de-dup vs `dwave.cloud.utils.decorators.cached`
+
+        # defer to break circular imports
+        from dwave.cloud.config import get_cache_dir
+
+        directory = kwargs.pop('directory', get_cache_dir())
+
+        # defer import and construction until needed
+        import diskcache
+        return diskcache.Cache(directory=os.path.join(directory, 'api'))
+
+    # default cache config
+    _default_cache_config = CacheConfig(enabled=True,
+                                        maxage=0,
+                                        store=_create_default_cache_store)
+
+    def __init__(self, cache: Union[CacheConfig, bool, None] = None, **kwargs):
+        if cache is None:
+            cache = self._default_cache_config
+
+        if not isinstance(cache, dict):
+            enabled = bool(cache)
+            cache = self._default_cache_config
+            cache.update(enabled=enabled)
+
+        self.configure_cache(cache)
+
+        super().__init__(**kwargs)
+
+    def configure_cache(self, cache: CacheConfig) -> None:
+        config = {opt: cache.get(opt, default)
+                  for opt, default in self._default_cache_config.items()}
+
+        self._cache_enabled = enabled = config['enabled']
+        if not enabled:
+            logger.debug("[%s] cache disabled.", type(self).__name__)
+            return
+
+        self._maxage = config['maxage']
+        self._store = config['store']
+        if callable(self._store):
+            self._store = self._store()
+
+        logger.debug("[%s] configured cache: (enabled=%r, maxage=%r, store=%r)",
+                     type(self).__name__, self._cache_enabled, self._maxage, self._store)
+
+    def request(self, method, url, *,
+                params: Optional[dict] = None,
+                headers: Optional[dict] = None,
+                **kwargs
+                ) -> requests.Response:
+
+        # read CachingSession-specific params
+        no_cache = kwargs.pop('no_cache', None)
+        suggested_maxage = kwargs.pop('maxage', self._maxage)
+
+        if not self._cache_enabled or no_cache or method.lower() != 'get':
+            # completely bypass cache lookup and conditional request
+            return super().request(method, url, params=params, headers=headers, **kwargs)
+
+        key = (method,
+               self.base_url, url,
+               self.params, params,
+               self.headers, headers)
+
+        key_data = hashlib.sha256(repr(key).encode('utf8')).hexdigest()
+        key_meta = f"{key_data}:meta"
+
+        def make_response(content):
+            res = requests.Response()
+            res.status_code = 200
+            res.raw = io.BytesIO(content)
+            return res
+
+        if meta := self._store.get(key_meta):
+            maxage = meta.get('maxage', suggested_maxage) or 0
+
+            content = self._store.get(key_data)
+
+            if epochnow() - meta['created'] < maxage:
+                logger.debug('cache hit within maxage')
+                return make_response(content)
+
+            # conditional request
+            headers = {} if headers is None else headers.copy()
+            headers['If-None-Match'] = meta['etag']
+
+            res = super().request(method, url, params=params, headers=headers, **kwargs)
+
+            if res.status_code == requests.codes['not_modified']:
+                logger.debug('resource "not modified", using cached value')
+                meta['created'] = epochnow()
+                self._store[key_meta] = meta
+                return make_response(content)
+
+            else:
+                logger.debug('resource modified, updating cache')
+                meta = dict(created=epochnow(),
+                            etag=res.headers.get('etag'))
+                self._store[key_meta] = meta
+                self._store[key_data] = res.content
+                return res
+
+        else:
+            logger.debug('cache miss, updating cache')
+            res = super().request(method, url, params=params, headers=headers, **kwargs)
+            meta = dict(created=epochnow(),
+                        etag=res.headers.get('etag'))
+            self._store[key_meta] = meta
+            self._store[key_data] = res.content
+            return res
+
+
 class DWaveAPIClient:
     """Low-level client for D-Wave APIs. A thin wrapper around
     `requests.Session` that handles API specifics such as authentication,
@@ -271,10 +421,13 @@ class DWaveAPIClient:
         'history_size': 0,
 
         # response version strict mode validation, see :class:`VersionedAPISession`
-        'version_strict_mode': True
+        'version_strict_mode': True,
+
+        # enable conditional requests and response caching, see :class:`CachingSession`
+        'cache': dict(enabled=False),       # type: CachingSession.CacheConfig
     }
 
-    # client instance config, populated on init from kwargs overridding DEFAULTS
+    # client instance config, populated on init from kwargs overriding DEFAULTS
     config = None
 
     def __init__(self, **config):
@@ -394,10 +547,12 @@ class DWaveAPIClient:
             endpoint += '/'
 
         # configure request timeout and retries
-        session = VersionedAPISession(
+        session = CachingSession(
             base_url=endpoint,
             history_size=config['history_size'],
-            strict_mode=config['version_strict_mode'])
+            strict_mode=config['version_strict_mode'],
+            cache=config['cache'],
+        )
         timeout = config['timeout']
         retry = config['retry']
         session.mount('http://', PretimedHTTPAdapter(
