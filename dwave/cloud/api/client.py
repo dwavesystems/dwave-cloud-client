@@ -177,7 +177,7 @@ class VersionedAPISession(LoggingSession):
         """Validate response's `Content-Type` matches the expected media type
         and version range.
         """
-        if self._media_type is None or not response.ok:
+        if self._media_type is None or not 200 <= response.status_code < 300:
             return
 
         content_type = response.headers.get('Content-Type')
