@@ -54,7 +54,7 @@ from itertools import chain, zip_longest
 from functools import partial, wraps
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Union
 
 import requests
 import urllib3
@@ -67,7 +67,7 @@ from dwave.cloud.exceptions import *    # TODO: fix
 from dwave.cloud.computation import Future
 from dwave.cloud.config import load_config, update_config, validate_config_v1
 from dwave.cloud.config.models import ClientConfig
-from dwave.cloud.solver import Solver, available_solvers
+from dwave.cloud.solver import available_solvers, StructuredSolver, UnstructuredSolver
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.regions import get_regions, resolve_endpoints
 from dwave.cloud.upload import ChunkedData
@@ -341,7 +341,7 @@ class Client(object):
     _POLL_GROUP_TIMEFRAME = 2
 
     # Downloaded solver definition cache maxage [sec]
-    _SOLVERS_CACHE_MAXAGE = 300     # 5 min
+    _SOLVERS_CACHE_MAXAGE = 3600        # 1 hour
 
     # Downloaded region metadata cache maxage [sec]
     _REGIONS_CACHE_MAXAGE = 7 * 86400   # 7 days
@@ -681,37 +681,70 @@ class Client(object):
 
         return {r.code: {"name": r.name, "endpoint": r.endpoint} for r in rs}
 
-    @cached(maxage=_SOLVERS_CACHE_MAXAGE)
-    def _fetch_solvers(self, name=None):
+    @property
+    def solvers_session(self) -> api.resources.Solvers:
+        session = getattr(self, '_solvers_session', None)
+
+        # init on first use
+        if session is None:
+            session = self._solvers_session = \
+                api.Solvers.from_config(
+                    config=self.config,
+                    cache=dict(
+                        enabled=True,
+                        #maxage=self._SOLVERS_CACHE_MAXAGE)
+                    )
+                )
+
+        return session
+
+    def _fetch_solvers(self,
+                       name: Optional[str] = None,
+                       refresh_: Optional[bool] = False,    # not used; here for backwards-compat
+                       ) -> List[Union[StructuredSolver, UnstructuredSolver]]:
+
+        static_fields = 'all,-avg_load'
+        dynamic_fields = 'none,+id,+avg_load'
+
         if name is not None:
             logger.info("Fetching definition of a solver with name=%r", name)
-            url = 'solvers/remote/{}/'.format(name)
+
+            try:
+                solver = self.solvers_session.get_solver(
+                    solver_id=name, filter=static_fields)
+                load = self.solvers_session.list_solvers(
+                    solver_id=name, filter=dynamic_fields, no_cache=True)
+
+                solver.avg_load = load.avg_load
+                solvers = [solver]
+
+            except api.exceptions.ResourceNotFoundError as exc:
+                raise SolverNotFoundError(f"No solver with name={name!r} available") from exc
+
         else:
             logger.info("Fetching definitions of all available solvers")
-            url = 'solvers/remote/'
 
-        try:
-            data = Client._sapi_request(self.session.get, url)
-        except SAPIError as exc:
-            if name is not None and exc.error_code == 404:
-                raise SolverNotFoundError("No solver with name={!r} available".format(name))
-            else:
-                raise
+            solvers = self.solvers_session.list_solvers(filter=static_fields)
+            loads = {item.id: item.avg_load
+                     for item
+                     in self.solvers_session.list_solvers(
+                         filter=dynamic_fields, no_cache=True)}
 
-        if name is not None:
-            data = [data]
+            for solver in solvers:
+                solver.avg_load = loads.get(solver.id, 0.0)
 
-        logger.info("Received solver data for %d solver(s).", len(data))
-        logger.trace("Solver data received for solver name=%r: %r", name, data)
+        logger.info("Received solver data for %d solver(s).", len(solvers))
+        if logger.isEnabledFor(logging.TRACE):
+            logger.trace("Solver data received for solver name=%r: %r", name, solvers)
 
-        solvers = []
-        for solver_desc in data:
+        instantiated_solvers = []
+        for solver_desc in solvers:
             for solver_class in available_solvers:
                 try:
                     logger.debug("Trying to instantiate %r", solver_class.__name__)
-                    solver = solver_class(self, solver_desc)
+                    solver = solver_class(client=self, data=solver_desc)
                     if self.is_solver_handled(solver):
-                        solvers.append(solver)
+                        instantiated_solvers.append(solver)
                         logger.info("Adding solver %r", solver)
                         break
                     else:
@@ -722,7 +755,7 @@ class Client(object):
 
             # propagate all other/decoding errors, like InvalidAPIResponseError, etc.
 
-        return solvers
+        return instantiated_solvers
 
     def retrieve_answer(self, id_):
         """Retrieve a problem by id.
