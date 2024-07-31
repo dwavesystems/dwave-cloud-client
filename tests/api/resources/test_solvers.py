@@ -136,16 +136,25 @@ class FilteringTestsMixin:
             self.assertIsInstance(solver.root, models.SolverFilteredConfiguration)
             self.assertEqual(solver.model_dump().keys(), {'id'})
 
-            # test getitem interface while we're here
-            self.assertEqual(solver['id'], solver.id)
-            self.assertEqual(solver.get('id'), solver.id)
-            self.assertEqual(solver.get('nonexisting', 'x'), 'x')
-
         with self.subTest('SAPI subtractive filtering'):
             solver = self.api.get_solver(solver_id=solver_id, filter=self.subtractive_filter)
             self.assertIsInstance(solver.root, models.SolverCompleteConfiguration)
             self.assertNotIn('couplers', solver.properties)
             self.assertIn('qubits', solver.properties)
+
+    def test_solver_model_is_drop_in_for_dict(self):
+        solver = models.SolverConfiguration(id='id')
+
+        # getters
+        self.assertEqual(solver['id'], solver.id)
+        self.assertEqual(solver.get('id'), solver.id)
+        self.assertEqual(solver.get('nonexisting', 'x'), 'x')
+
+        # setters
+        solver['nonexisting'] = 'x'
+        self.assertEqual(solver.nonexisting, 'x')
+        solver.another = 'y'
+        self.assertEqual(solver['another'], 'y')
 
 
 class TestFiltering(FilteringTestsMixin, unittest.TestCase):
