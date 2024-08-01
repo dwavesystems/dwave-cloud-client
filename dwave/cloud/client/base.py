@@ -712,10 +712,12 @@ class Client(object):
             try:
                 solver = self.solvers_session.get_solver(
                     solver_id=name, filter=static_fields)
-                load = self.solvers_session.list_solvers(
+                load = self.solvers_session.get_solver(
                     solver_id=name, filter=dynamic_fields, no_cache=True)
 
-                solver.avg_load = load.avg_load
+                # note: avg_load may not exist in solver data
+                if 'avg_load' in load:
+                    solver.avg_load = load.avg_load
                 solvers = [solver]
 
             except api.exceptions.ResourceNotFoundError as exc:
@@ -725,13 +727,14 @@ class Client(object):
             logger.info("Fetching definitions of all available solvers")
 
             solvers = self.solvers_session.list_solvers(filter=static_fields)
-            loads = {item.id: item.avg_load
-                     for item
+            loads = {solver.id: solver.get('avg_load')
+                     for solver
                      in self.solvers_session.list_solvers(
                          filter=dynamic_fields, no_cache=True)}
 
             for solver in solvers:
-                solver.avg_load = loads.get(solver.id, 0.0)
+                if avg_load := loads.get(solver.id) is not None:
+                    solver.avg_load = avg_load
 
         logger.info("Received solver data for %d solver(s).", len(solvers))
         if logger.isEnabledFor(logging.TRACE):
