@@ -1090,7 +1090,17 @@ class Client(object):
             query['name'] = filters['name__eq']
 
         # filter
-        solvers = self._fetch_solvers(**query)
+        try:
+            solvers = self._fetch_solvers(**query)
+
+        # wrap exceptions for backwards-compatibility
+        except api.exceptions.ResourceAuthenticationError as e:
+            raise SolverAuthenticationError from e
+        except api.exceptions.ResourceBadResponseError as e:
+            raise InvalidAPIResponseError(e) from e
+        except requests.exceptions.JSONDecodeError as e:
+            raise InvalidAPIResponseError("JSON response expected") from e
+
         solvers = [s for s in solvers if all(p(s) for p in predicates)]
 
         # sort: undefined (None) key values go last
