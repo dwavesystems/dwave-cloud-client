@@ -391,7 +391,7 @@ class TestResponseCaching(unittest.TestCase):
             with self.subTest("cache hit"):
                 m.reset_mock()
 
-                r = client.session.get(path_a, maxage=10)
+                r = client.session.get(path_a, maxage_=10)
                 self.assertEqual(r.json(), data_a)
 
                 # if mock not called, data came from cache
@@ -421,7 +421,15 @@ class TestResponseCaching(unittest.TestCase):
             with self.subTest("cache skipped"):
                 m.reset_mock()
 
-                r = client.session.get(path_a, no_cache=True)
+                r = client.session.get(path_a, no_cache_=True)
                 self.assertEqual(r.json(), data_a)
 
-                self.assertEqual(client.session.history[-1].response.status_code, 200)
+                self.assertTrue(m.called)
+
+            with self.subTest("cache refreshed"):
+                m.reset_mock()
+
+                r = client.session.get(path_a, maxage_=10, refresh_=True)
+                self.assertEqual(r.json(), data_a)
+
+                self.assertTrue(m.called)

@@ -252,6 +252,18 @@ class CachingSession(VersionedAPISession):
                     Define cache storage (with a Mapping interface). Default to
                     ``diskcache.Cache`` with pickle serialization.
 
+    :meth:`CachingSession.request` accepts the following keyword arguments,
+    in addition to the base class method:
+
+        * ``maxage_`` (float):
+            Suggested maxage for heuristic caching, overriding the default value
+            from cache config.
+
+        * ``no_cache_`` (bool):
+            Skip cache.
+
+        * ``refresh_`` (bool):
+            Force cache update, skipping time-based or etag-based validation.
     """
 
     _cache_enabled = False
@@ -321,8 +333,9 @@ class CachingSession(VersionedAPISession):
                 ) -> requests.Response:
 
         # read CachingSession-specific params
-        no_cache = kwargs.pop('no_cache', None)
-        suggested_maxage = kwargs.pop('maxage', self._maxage)
+        refresh = kwargs.pop('refresh_', False)
+        no_cache = kwargs.pop('no_cache_', False)
+        suggested_maxage = kwargs.pop('maxage_', self._maxage)
 
         if not self._cache_enabled or no_cache or method.lower() != 'get':
             # completely bypass cache lookup and conditional request
@@ -333,6 +346,7 @@ class CachingSession(VersionedAPISession):
                self.params, params,
                self.headers, headers)
 
+        # note: metadata split from data for faster metadata-only updates
         key_data = hashlib.sha256(repr(key).encode('utf8')).hexdigest()
         key_meta = f"{key_data}:meta"
 
@@ -342,7 +356,7 @@ class CachingSession(VersionedAPISession):
             res.raw = io.BytesIO(content)
             return res
 
-        if meta := self._store.get(key_meta):
+        if not refresh and (meta := self._store.get(key_meta)):
             maxage = meta.get('maxage', suggested_maxage) or 0
 
             content = self._store.get(key_data)

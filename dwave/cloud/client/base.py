@@ -700,7 +700,7 @@ class Client(object):
 
     def _fetch_solvers(self,
                        name: Optional[str] = None,
-                       refresh_: Optional[bool] = False,    # not used; here for backwards-compat
+                       refresh_: Optional[bool] = False,
                        ) -> List[Union[StructuredSolver, UnstructuredSolver]]:
 
         static_fields = 'all,-avg_load'
@@ -711,9 +711,9 @@ class Client(object):
 
             try:
                 solver = self.solvers_session.get_solver(
-                    solver_id=name, filter=static_fields)
+                    solver_id=name, filter=static_fields, refresh_=refresh_)
                 load = self.solvers_session.get_solver(
-                    solver_id=name, filter=dynamic_fields, no_cache=True)
+                    solver_id=name, filter=dynamic_fields, no_cache_=True)
 
                 # note: avg_load may not exist in solver data
                 if 'avg_load' in load:
@@ -726,11 +726,12 @@ class Client(object):
         else:
             logger.info("Fetching definitions of all available solvers")
 
-            solvers = self.solvers_session.list_solvers(filter=static_fields)
+            solvers = self.solvers_session.list_solvers(
+                filter=static_fields, refresh_=refresh_)
             loads = {solver.id: solver.get('avg_load')
                      for solver
                      in self.solvers_session.list_solvers(
-                         filter=dynamic_fields, no_cache=True)}
+                         filter=dynamic_fields, no_cache_=True)}
 
             for solver in solvers:
                 if avg_load := loads.get(solver.id) is not None:
