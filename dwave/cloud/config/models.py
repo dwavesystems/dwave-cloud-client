@@ -14,6 +14,7 @@
 
 import ast
 import copy
+import enum
 import json
 import logging
 from collections import abc
@@ -27,7 +28,8 @@ from dwave.cloud.config.loaders import update_config
 from dwave.cloud.api.constants import (
     DEFAULT_REGION, DEFAULT_METADATA_API_ENDPOINT, DEFAULT_LEAP_API_ENDPOINT)
 
-__all__ = ['RequestRetryConfig', 'PollingSchedule', 'ClientConfig',
+__all__ = ['RequestRetryConfig', 'ClientConfig',
+           'BackoffPollingSchedule', 'LongPollingSchedule',
            'validate_config_v1', 'dump_config_v1', 'load_config_v1']
 
 logger = logging.getLogger(__name__)
@@ -87,8 +89,16 @@ class RequestRetryConfig(BaseModel, GetterMixin):
         return retry
 
 
-class PollingSchedule(BaseModel, GetterMixin):
+class PollingStrategy(str, enum.Enum):
+    BACKOFF = "backoff"
+    LONG_POLLING = "long-polling"
+
+
+class BackoffPollingSchedule(BaseModel):
     """Problem status polling exponential back-off schedule params."""
+
+    #: Polling with exponential backoff
+    strategy: Literal[PollingStrategy.BACKOFF] = PollingStrategy.BACKOFF
 
     #: Duration of the first interval (between first and second poll), in seconds.
     backoff_min: Optional[float] = 0.05
@@ -99,6 +109,19 @@ class PollingSchedule(BaseModel, GetterMixin):
     #: Exponential function base. For poll `i`, back-off period (in seconds) is
     #: defined as `backoff_min * (backoff_base ** i)`.
     backoff_base: Optional[float] = 1.3
+
+
+class LongPollingSchedule(BaseModel):
+    """Problem status long polling params."""
+
+    #: Long polling strategy
+    strategy: Literal[PollingStrategy.LONG_POLLING] = PollingStrategy.LONG_POLLING
+
+    #: Maximum duration long polling connection is kept open, in seconds.
+    wait_time: Optional[float] = 30.0
+
+    #: Pause between two successive long polling connections, in seconds.
+    pause: Optional[float] = 0.0
 
 
 def _literal_eval(obj):
@@ -124,8 +147,11 @@ class ClientConfig(BaseModel, GetterMixin):
     client: Optional[str] = None
     solver: Optional[Dict[str, Any]] = None
 
-    # [sapi client specific] poll back-off schedule defaults [sec]
-    polling_schedule: Optional[PollingSchedule] = PollingSchedule()
+    # [sapi client specific] polling schedule defaults [sec]
+    # note: discriminated unions are faster than unions, but we want to be able
+    # to set a defautl value when `strategy` is not specified
+    polling_schedule: Optional[Union[BackoffPollingSchedule,
+                                     LongPollingSchedule]] = BackoffPollingSchedule()
     polling_timeout: Optional[float] = None
 
     # general http(s) connection params

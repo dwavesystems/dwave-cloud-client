@@ -1,0 +1,8 @@
+---
+features:
+  - |
+    Add long polling as problem status/answer polling strategy.
+
+    We add the following config options: ``poll_strategy`` (``"backoff"`` is the
+    current default, ``"long-polling"`` is the new strategy), ``poll_wait_time``,
+    and ``poll_pause``.
