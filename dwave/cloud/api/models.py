@@ -27,6 +27,32 @@ from dwave.cloud.utils.coders import coerce_numpy_to_python
 AnyIncludingNumpy = Annotated[Any, AfterValidator(coerce_numpy_to_python)]
 
 
+class _RootGetterMixin:
+    """Proxy getter calls to root model."""
+
+    def __getattr__(self, item):
+        return getattr(self.root, item)
+
+    def __getitem__(self, name):
+        return getattr(self.root, name)
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except AttributeError:
+            return default
+
+
+class _RootSetterMixin:
+    """Proxy setter calls to root model."""
+
+    def __setattr__(self, name, value):
+        return setattr(self.root, name, value)
+
+    def __setitem__(self, name, value):
+        return setattr(self.root, name, value)
+
+
 class SolverCompleteConfiguration(BaseModel):
     id: str
     status: str
@@ -40,11 +66,11 @@ class SolverFilteredConfiguration(BaseModel):
     model_config = ConfigDict(extra='allow')
 
 
-class SolverConfiguration(RootModel):
+# NOTE: we implement getitem interface so that `SolverConfiguration` can be
+# used as a drop-in replacement for data dict in `Solver(..., data=...)`
+# TODO: break `Solver()` backwards compat and require pydantic model
+class SolverConfiguration(_RootGetterMixin, _RootSetterMixin, RootModel):
     root: Union[SolverCompleteConfiguration, SolverFilteredConfiguration]
-
-    def __getattr__(self, item):
-        return getattr(self.root, item)
 
 
 class ProblemInitialStatus(BaseModel):
@@ -83,13 +109,10 @@ class UnstructuredProblemAnswerBinaryRef(BaseModel):
     shape: dict
 
 
-class ProblemAnswer(RootModel):
+class ProblemAnswer(_RootGetterMixin, RootModel):
     root: Union[StructuredProblemAnswer,
                 UnstructuredProblemAnswer,
                 UnstructuredProblemAnswerBinaryRef]
-
-    def __getattr__(self, item):
-        return getattr(self.root, item)
 
 
 class ProblemStatusWithAnswer(ProblemStatus):
@@ -112,11 +135,8 @@ class UnstructuredProblemData(BaseModel):
     data: str
 
 
-class ProblemData(RootModel):
+class ProblemData(_RootGetterMixin, RootModel):
     root: Union[StructuredProblemData, UnstructuredProblemData]
-
-    def __getattr__(self, item):
-        return getattr(self.root, item)
 
 
 class ProblemMetadata(BaseModel):

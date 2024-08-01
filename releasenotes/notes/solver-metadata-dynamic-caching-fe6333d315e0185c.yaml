@@ -1,0 +1,10 @@
+---
+features:
+  - |
+    Cache solver metadata on disk, using conditional requests for cache validation
+    (update).
+
+    Static and dynamic parts of solver metadata are fetched and stored separately,
+    to enable efficient caching.
+
+    See `#613 <https://github.com/dwavesystems/dwave-cloud-client/issues/613>`_.

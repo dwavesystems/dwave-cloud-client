@@ -667,7 +667,8 @@ class ClientConfigIntegration(unittest.TestCase):
                     self.assertEqual(kwargs.get('timeout'), request_timeout)
                     response = requests.Response()
                     response.status_code = 200
-                    response._content = b'{}'
+                    response._content = b'[]'
+                    response.headers = {'Content-Type': 'application/vnd.dwave.sapi.solver-definition-list+json; version=2.0'}
                     return response
 
                 with mock.patch("requests.adapters.HTTPAdapter.send", mock_send):

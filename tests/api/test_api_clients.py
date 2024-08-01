@@ -16,6 +16,7 @@ import json
 import uuid
 import unittest
 
+import diskcache
 import requests
 import requests_mock
 
@@ -326,3 +327,109 @@ class TestResponseParsing(unittest.TestCase):
 
                 self.assertEqual(exc.error_msg, error_msg)
                 self.assertEqual(exc.error_code, error_code)
+
+
+class TestResponseCaching(unittest.TestCase):
+
+    def test_config(self):
+        with self.subTest("cache disabled by default"):
+            with DWaveAPIClient(endpoint='https://mock') as client:
+                self.assertFalse(client.session._cache_enabled)
+
+        with self.subTest("cache disabled with config"):
+            with DWaveAPIClient(endpoint='https://mock', cache=False) as client:
+                self.assertFalse(client.session._cache_enabled)
+
+        with self.subTest("cache enabled with config"):
+            with DWaveAPIClient(endpoint='https://mock', cache=True) as client:
+                self.assertTrue(client.session._cache_enabled)
+                self.assertIsNotNone(client.session._maxage)
+                self.assertIsInstance(client.session._store, diskcache.Cache)
+
+        with self.subTest("cache configured"):
+            with DWaveAPIClient(endpoint='https://mock',
+                                cache=dict(maxage=5, store={})) as client:
+                self.assertTrue(client.session._cache_enabled)
+                self.assertEqual(client.session._maxage, 5)
+                self.assertIsInstance(client.session._store, dict)
+
+    @requests_mock.Mocker()
+    def test_caching(self, m):
+        endpoint = 'https://mock'
+
+        path_a = 'path-a'
+        etag_a = 'etag-a'
+        data_a = {"a": 1}
+
+        path_b = 'path-b'
+        etag_b = 'etag-b'
+        data_b = {"b": 1}
+        etag_bb = 'etag-bb'
+        data_bb = {"bb": 1}
+
+        # mock: resource not modified
+        m.get(f"{endpoint}/{path_a}", json=data_a, headers={'ETag': etag_a})
+        m.get(f"{endpoint}/{path_a}", request_headers={'If-None-Match': etag_a}, status_code=304)
+
+        # mock: resource modified between requests
+        m.get(f"{endpoint}/{path_b}", json=data_b, headers={'ETag': etag_b})
+        m.get(f"{endpoint}/{path_b}", request_headers={'If-None-Match': etag_b}, json=data_bb, headers={'ETag': etag_bb})
+
+        store = {}
+
+        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store), history_size=1) as client:
+
+            with self.subTest("cache miss"):
+                self.assertEqual(len(store), 0)
+
+                r = client.session.get(path_a)
+                self.assertEqual(r.json(), data_a)
+
+                self.assertTrue(m.called)
+                self.assertEqual(len(store), 2)     # data + meta
+
+            with self.subTest("cache hit"):
+                m.reset_mock()
+
+                r = client.session.get(path_a, maxage_=10)
+                self.assertEqual(r.json(), data_a)
+
+                # if mock not called, data came from cache
+                self.assertFalse(m.called)
+
+            with self.subTest("cache validate, not modified"):
+                m.reset_mock()
+
+                r = client.session.get(path_a)
+                self.assertEqual(r.json(), data_a)
+
+                self.assertTrue(m.called)
+                self.assertEqual(client.session.history[-1].response.status_code, 304)
+
+            with self.subTest("cache validate, modified"):
+                m.reset_mock()
+
+                r = client.session.get(path_b)
+                self.assertEqual(r.json(), data_b)
+
+                r = client.session.get(path_b)
+                self.assertEqual(r.json(), data_bb)
+
+                self.assertEqual(m.call_count, 2)
+                self.assertEqual(client.session.history[-1].response.status_code, 200)
+
+            with self.subTest("cache skipped"):
+                m.reset_mock()
+
+                r = client.session.get(path_a, no_cache_=True)
+                self.assertEqual(r.json(), data_a)
+
+                self.assertTrue(m.called)
+
+            with self.subTest("cache refreshed"):
+                m.reset_mock()
+
+                r = client.session.get(path_a, maxage_=10, refresh_=True)
+                self.assertEqual(r.json(), data_a)
+
+                self.assertTrue(m.called)
