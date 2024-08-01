@@ -13,16 +13,20 @@
 # limitations under the License.
 
 import io
+import contextlib
+import tempfile
 import uuid
 import unittest
+from functools import partial
 from urllib.parse import urljoin, urlparse, parse_qsl
 
 import json
 import requests
 import requests_mock
 
-from dwave.cloud.api.resources import Solvers
 from dwave.cloud.api import exceptions, models
+from dwave.cloud.api.client import CachingSession
+from dwave.cloud.api.resources import Solvers
 from dwave.cloud.config import validate_config_v1
 from dwave.cloud.testing.mocks import qpu_clique_solver_data
 
@@ -250,3 +254,38 @@ class TestLiveSolvers(FilteringTestsMixin, unittest.TestCase):
 
         with self.assertRaises(exceptions.ResourceNotFoundError):
             self.api.get_solver('non-existing-solver')
+
+
+@unittest.skipUnless(config, "SAPI access not configured.")
+class TestLiveSolversCaching(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmpdir = tempfile.TemporaryDirectory()
+        cls.store = partial(CachingSession._create_default_cache_store, directory=cls.tmpdir.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        with contextlib.suppress(OSError):
+            cls.tmpdir.cleanup()
+
+    def test_cache_1_validation(self):
+        with Solvers.from_config(validate_config_v1(config),
+                                 cache=dict(store=self.store),
+                                 history_size=1,
+                                 ) as resource:
+            solvers = resource.list_solvers(filter='none,+id')
+            self.assertGreater(len(solvers), 0)
+
+            solvers = resource.list_solvers(filter='none,+id')
+            self.assertEqual(resource.session.history[-1].response.status_code, 304)
+
+    def test_cache_2_hit(self):
+        with Solvers.from_config(validate_config_v1(config),
+                                 cache=dict(maxage=3600, store=self.store),
+                                 history_size=1,
+                                 ) as resource:
+            solvers = resource.list_solvers(filter='none,+id')
+            self.assertGreater(len(solvers), 0)
+            print(resource.session.history)
+            self.assertEqual(len(resource.session.history), 0)
