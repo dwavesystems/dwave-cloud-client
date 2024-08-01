@@ -27,17 +27,6 @@ from dwave.cloud.solver import Solver
 from dwave.cloud.exceptions import *
 
 
-url = 'https://dwavesys.com'
-token = 'abc123abc123abc123abc123abc123abc123'
-solver1_name = 'first_solver'
-solver2_name = 'second_solver'
-solver3_incomplete_name = 'incomplete_properties'
-solver4_truncated_name = 'invalid_data_format'
-
-bad_url = 'https://not-a-subdomain.dwavesys.com'
-bad_token = '------------------------'
-
-
 def solver_data(id_, cat='qpu', incomplete=False, subset='all'):
     """Return data dict describing a single solver."""
     obj = {
@@ -74,170 +63,153 @@ def solver_object(id_, **kwargs):
     return Solver(client=None, data=solver_data(id_, **kwargs))
 
 
-def setup_server(m):
-    """Add endpoints to the server."""
-
-    solver1_url = '{}/solvers/remote/{}'.format(url, solver1_name)
-    solver2_url = '{}/solvers/remote/{}'.format(url, solver2_name)
-    solver3_incomplete_url = '{}/solvers/remote/{}'.format(url, solver3_incomplete_name)
-    solver4_truncated_url = '{}/solvers/remote/{}'.format(url, solver4_truncated_name)
-    all_solvers_url = '{}/solvers/remote/'.format(url)
-
-    valid_token_headers = {'X-Auth-Token': token}
-    invalid_token_headers = {'X-Auth-Token': bad_token}
-
-    solver_content_type = {'Content-Type': 'application/vnd.dwave.sapi.solver-definition+json; version=2.0'}
-    solvers_content_type = {'Content-Type': 'application/vnd.dwave.sapi.solver-definition-list+json; version=2.0'}
-
-    m.get(requests_mock.ANY, status_code=404)
-    m.get(requests_mock.ANY, status_code=401, request_headers=invalid_token_headers)
-
-    def add_mock_solver(m, url, name, incomplete=False):
-        m.get(url, json=solver_data(name, incomplete=incomplete), request_headers=valid_token_headers, headers=solver_content_type)
-        m.get(f"{url}?filter=all,-avg_load",
-              json=solver_data(name, subset='static', incomplete=incomplete), request_headers=valid_token_headers, headers=solver_content_type)
-        m.get(f"{url}?filter=none,+id,+avg_load",
-              json=solver_data(name, subset='dynamic', incomplete=incomplete), request_headers=valid_token_headers, headers=solver_content_type)
-
-    add_mock_solver(m, solver1_url, solver1_name)
-    add_mock_solver(m, solver2_url, solver2_name)
-    add_mock_solver(m, solver3_incomplete_url, solver3_incomplete_name, incomplete=True)
-
-    m.get(solver4_truncated_url,
-          text='{"id', request_headers=valid_token_headers, headers=solver_content_type)
-    m.get(f"{solver4_truncated_url}?filter=all,-avg_load",
-          text='{"id', request_headers=valid_token_headers, headers=solver_content_type)
-    m.get(f"{solver4_truncated_url}?filter=none,+id,+avg_load",
-          text='{"id', request_headers=valid_token_headers, headers=solver_content_type)
-
-    m.get(all_solvers_url,
-          json=[solver_data(solver1_name), solver_data(solver2_name)],
-          request_headers=valid_token_headers, headers=solvers_content_type)
-    m.get(f"{all_solvers_url}?filter=all,-avg_load",
-          json=[solver_data(solver1_name, subset='static'), solver_data(solver2_name, subset='static')],
-          request_headers=valid_token_headers, headers=solvers_content_type)
-    m.get(f"{all_solvers_url}?filter=none,+id,+avg_load",
-          json=[solver_data(solver1_name, subset='dynamic'), solver_data(solver2_name, subset='static')],
-          request_headers=valid_token_headers, headers=solvers_content_type)
-
-
-class MockConnectivityTests(unittest.TestCase):
-    """Test connecting some related failure modes."""
-
-    def test_bad_url(self):
-        """Connect with a bad URL."""
-        with requests_mock.Mocker() as m:
-            setup_server(m)
-            with self.assertRaises(SAPIError):
-                with Client(endpoint=bad_url, token=token) as client:
-                    client.get_solvers()
-
-    def test_bad_token(self):
-        """Connect with a bad token."""
-        with requests_mock.Mocker() as m:
-            setup_server(m)
-            with self.assertRaises(SolverAuthenticationError) as err:
-                with Client(endpoint=url, token=bad_token) as client:
-                    client.get_solvers()
-
-    def test_good_connection(self):
-        """Connect with a valid URL and token."""
-        with requests_mock.mock() as m:
-            setup_server(m)
-            with Client(endpoint=url, token=token) as client:
-                self.assertTrue(len(client.get_solvers()) > 0)
-
-
 class MockSolverLoading(unittest.TestCase):
 
+    endpoint = 'https://dwavesys.com'
+    token = 'abc123abc123abc123abc123abc123abc123'
+
+    solver1_name = 'first_solver'
+    solver2_name = 'second_solver'
+    solver3_incomplete_name = 'incomplete_properties'
+    solver4_truncated_name = 'invalid_data_format'
+
+    bad_endpoint = 'https://not-a-subdomain.dwavesys.com'
+    bad_token = '------------------------'
+
+    def setUp(self):
+        m = self.mocker = requests_mock.Mocker()
+
+        base = self.endpoint
+
+        solver1_url = f'{base}/solvers/remote/{self.solver1_name}'
+        solver2_url = f'{base}/solvers/remote/{self.solver2_name}'
+        solver3_incomplete_url = f'{base}/solvers/remote/{self.solver3_incomplete_name}'
+        solver4_truncated_url = f'{base}/solvers/remote/{self.solver4_truncated_name}'
+        all_solvers_url = f'{base}/solvers/remote/'
+
+        valid_token_headers = {'X-Auth-Token': self.token}
+        invalid_token_headers = {'X-Auth-Token': self.bad_token}
+
+        solver_content_type = {
+            'Content-Type': 'application/vnd.dwave.sapi.solver-definition+json; version=2.0'}
+        solvers_content_type = {
+            'Content-Type': 'application/vnd.dwave.sapi.solver-definition-list+json; version=2.0'}
+
+        m.get(requests_mock.ANY, status_code=404)
+        m.get(requests_mock.ANY, status_code=401, request_headers=invalid_token_headers)
+
+        def add_mock_solver(m, url, name, incomplete=False):
+            m.get(url, json=solver_data(name, incomplete=incomplete),
+                  request_headers=valid_token_headers, headers=solver_content_type)
+            m.get(f"{url}?filter=all,-avg_load",
+                  json=solver_data(name, subset='static', incomplete=incomplete),
+                  request_headers=valid_token_headers, headers=solver_content_type)
+            m.get(f"{url}?filter=none,+id,+avg_load",
+                  json=solver_data(name, subset='dynamic', incomplete=incomplete),
+                  request_headers=valid_token_headers, headers=solver_content_type)
+
+        add_mock_solver(m, solver1_url, self.solver1_name)
+        add_mock_solver(m, solver2_url, self.solver2_name)
+        add_mock_solver(m, solver3_incomplete_url, self.solver3_incomplete_name, incomplete=True)
+
+        m.get(solver4_truncated_url,
+              text='{"id', request_headers=valid_token_headers, headers=solver_content_type)
+        m.get(f"{solver4_truncated_url}?filter=all,-avg_load",
+              text='{"id', request_headers=valid_token_headers, headers=solver_content_type)
+        m.get(f"{solver4_truncated_url}?filter=none,+id,+avg_load",
+              text='{"id', request_headers=valid_token_headers, headers=solver_content_type)
+
+        m.get(all_solvers_url,
+              json=[solver_data(self.solver1_name), solver_data(self.solver2_name)],
+              request_headers=valid_token_headers, headers=solvers_content_type)
+        m.get(f"{all_solvers_url}?filter=all,-avg_load",
+              json=[solver_data(self.solver1_name, subset='static'),
+                    solver_data(self.solver2_name, subset='static')],
+              request_headers=valid_token_headers, headers=solvers_content_type)
+        m.get(f"{all_solvers_url}?filter=none,+id,+avg_load",
+              json=[solver_data(self.solver1_name, subset='dynamic'),
+                    solver_data(self.solver2_name, subset='static')],
+              request_headers=valid_token_headers, headers=solvers_content_type)
+
+        m.start()
+
+    def tearDown(self):
+        self.mocker.stop()
+
+    def test_bad_endpoint(self):
+        with self.assertRaises(SAPIError):
+            with Client(endpoint=self.bad_endpoint, token=self.token) as client:
+                client.get_solvers()
+
+    def test_bad_token(self):
+        with self.assertRaises(SolverAuthenticationError) as err:
+            with Client(endpoint=self.endpoint, token=self.bad_token) as client:
+                client.get_solvers()
+
+    def test_good_connection(self):
+        with Client(endpoint=self.endpoint, token=self.token) as client:
+            self.assertTrue(len(client.get_solvers()) > 0)
+
     def test_load_solver(self):
-        """Load a single solver."""
-        with requests_mock.mock() as m:
-            setup_server(m)
+        with Client(endpoint=self.endpoint, token=self.token) as client:
+            solver = client.get_solver(self.solver1_name)
+            self.assertEqual(solver.id, self.solver1_name)
 
-            with Client(endpoint=url, token=token) as client:
-                solver = client.get_solver(solver1_name)
-                self.assertEqual(solver.id, solver1_name)
-
-    @requests_mock.Mocker()
-    def test_load_all_solvers(self, m):
-        """Load the list of solver names."""
-
-        setup_server(m)
-
-        store = {}
-
+    def test_load_all_solvers(self):
         with unittest.mock.patch.multiple(
-                Client, _DEFAULT_SOLVERS_CACHE_CONFIG=dict(maxage=60, store=store)):
+                Client, _DEFAULT_SOLVERS_CACHE_CONFIG=dict(maxage=60, store={})):
 
-            with Client(endpoint=url, token=token) as client:
+            with Client(endpoint=self.endpoint, token=self.token) as client:
 
                 with self.subTest("initial solver fetch"):
-                    m.reset_mock()
+                    self.mocker.reset_mock()
 
                     solvers = client.get_solvers()
 
                     self.assertEqual(len(solvers), 2)
-                    self.assertEqual(m.call_count, 2)
+                    self.assertEqual(self.mocker.call_count, 2)
 
                 with self.subTest("cache hit for static data"):
-                    m.reset_mock()
+                    self.mocker.reset_mock()
 
                     solvers = client.get_solvers()
 
                     self.assertEqual(len(solvers), 2)
-                    self.assertEqual(m.call_count, 1)
+                    self.assertEqual(self.mocker.call_count, 1)
 
                 with self.subTest("cache refresh forced"):
-                    m.reset_mock()
+                    self.mocker.reset_mock()
 
                     solvers = client.get_solvers(refresh=True)
 
                     self.assertEqual(len(solvers), 2)
-                    self.assertEqual(m.call_count, 2)
+                    self.assertEqual(self.mocker.call_count, 2)
 
     def test_load_missing_solver(self):
-        """Try to load a solver that does not exist."""
-        with requests_mock.mock() as m:
-            m.get(requests_mock.ANY, status_code=404)
-
-            with Client(endpoint=url, token=token) as client:
-                with self.assertRaises(SolverNotFoundError):
-                    client.get_solver(solver1_name)
+        with Client(endpoint=self.endpoint, token=self.token) as client:
+            with self.assertRaises(SolverNotFoundError):
+                client.get_solver("non-existing")
 
     def test_load_solver_missing_data(self):
-        """Try to load a solver that has incomplete data."""
-        with requests_mock.mock() as m:
-            setup_server(m)
-
-            with Client(endpoint=url, token=token) as client:
-                with self.assertRaises(SolverNotFoundError):
-                    client.get_solver(solver3_incomplete_name)
+        with Client(endpoint=self.endpoint, token=self.token) as client:
+            with self.assertRaises(SolverNotFoundError):
+                client.get_solver(self.solver3_incomplete_name)
 
     def test_load_solver_broken_response(self):
-        """Try to load a solver for which the server has returned a truncated response."""
-        with requests_mock.mock() as m:
-            setup_server(m)
-
-            with Client(endpoint=url, token=token) as client:
-                with self.assertRaises(InvalidAPIResponseError):
-                    client.get_solver(solver4_truncated_name)
+        with Client(endpoint=self.endpoint, token=self.token) as client:
+            with self.assertRaises(InvalidAPIResponseError):
+                client.get_solver(self.solver4_truncated_name)
 
     def test_get_solver_reproducible(self):
-        """get_solver should return same solver (assuming cache hasn't changed)"""
+        # prefer solvers with longer name: that's our second solver
+        defaults = dict(solver=dict(order_by=lambda s: -len(s.id)))
 
-        with requests_mock.mock() as m:
-            setup_server(m)
+        with Client(endpoint=self.endpoint, token=self.token, defaults=defaults) as client:
+            solver = client.get_solver()
+            self.assertEqual(solver.id, self.solver2_name)
 
-            # prefer solvers with longer name: that's our second solver
-            defaults = dict(solver=dict(order_by=lambda s: -len(s.id)))
-
-            with Client(endpoint=url, token=token, defaults=defaults) as client:
-                solver = client.get_solver()
-                self.assertEqual(solver.id, solver2_name)
-
-                solver = client.get_solver()
-                self.assertEqual(solver.id, solver2_name)
+            solver = client.get_solver(refresh=True)
+            self.assertEqual(solver.id, self.solver2_name)
 
     def test_solver_filtering_in_client(self):
         # base client
