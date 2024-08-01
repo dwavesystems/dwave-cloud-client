@@ -232,6 +232,19 @@ class VersionedAPISession(LoggingSession):
         return response
 
 
+def _create_default_cache_store(**kwargs) -> Mapping:
+    # TODO: de-dup vs `dwave.cloud.utils.decorators.cached`?
+
+    # defer to break circular imports
+    from dwave.cloud.config import get_cache_dir
+
+    directory = kwargs.pop('directory', os.path.join(get_cache_dir(), 'api'))
+
+    # defer import and construction until needed
+    import diskcache
+    return diskcache.Cache(directory=directory)
+
+
 class CachingSession(VersionedAPISession):
     """A `requests.Session` subclass (technically, further specialized
     :class:`.VersionedAPISession`) that caches responses and uses conditional
@@ -274,19 +287,6 @@ class CachingSession(VersionedAPISession):
         enabled: bool
         maxage: float
         store: Union[Mapping, Callable[[], Mapping]]
-
-    @staticmethod
-    def _create_default_cache_store(**kwargs) -> Mapping:
-        # TODO: de-dup vs `dwave.cloud.utils.decorators.cached`
-
-        # defer to break circular imports
-        from dwave.cloud.config import get_cache_dir
-
-        directory = kwargs.pop('directory', os.path.join(get_cache_dir(), 'api'))
-
-        # defer import and construction until needed
-        import diskcache
-        return diskcache.Cache(directory=directory)
 
     # default cache config
     _default_cache_config = CacheConfig(enabled=True,

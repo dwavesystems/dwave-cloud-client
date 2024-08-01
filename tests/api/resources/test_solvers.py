@@ -262,7 +262,8 @@ class TestLiveSolversCaching(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmpdir = tempfile.TemporaryDirectory()
-        cls.store = partial(CachingSession._create_default_cache_store, directory=cls.tmpdir.name)
+        cls.store = partial(CachingSession._default_cache_config['store'],
+                            directory=cls.tmpdir.name)
 
     @classmethod
     def tearDownClass(cls):
