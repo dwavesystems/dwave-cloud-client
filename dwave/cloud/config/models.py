@@ -246,6 +246,9 @@ def validate_config_v1(raw_config: dict) -> ClientConfig:
     config['polling_schedule'] = {k[len(prefix):]: v for k, v in config.items()
                                   if k.startswith(prefix)}
 
+    # set a default polling strategy
+    config['polling_schedule'].setdefault('strategy', PollingStrategy.BACKOFF.value)
+
     # retry
     prefix = 'http_retry_'
     config['request_retry'] = {k[len(prefix):]: v for k, v in config.items()
@@ -311,10 +314,14 @@ _V1_CONFIG_DEFAULTS = {
     'headers': None,
     'client_cert': None,
     'client_cert_key': None,
+    'poll_strategy': 'backoff',
     # poll back-off schedule defaults
     'poll_backoff_min': 0.05,
     'poll_backoff_max': 60,
     'poll_backoff_base': 1.3,
+    # long polling parameters
+    'poll_wait_time': 30,
+    'poll_pause': 0,
     # idempotent http requests retry params
     'http_retry_total': 10,
     'http_retry_connect': None,

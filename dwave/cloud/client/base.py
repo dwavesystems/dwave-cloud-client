@@ -307,10 +307,14 @@ class Client(object):
         'headers': None,
         'client_cert': None,
         'client_cert_key': None,
+        'poll_strategy': 'backoff',
         # poll back-off schedule defaults [sec]
         'poll_backoff_min': 0.05,
         'poll_backoff_max': 60,
         'poll_backoff_base': 1.3,
+        # long polling parameters
+        'poll_wait_time': 30,
+        'poll_pause': 0,
         # idempotent http requests retry params
         'http_retry_total': 10,
         'http_retry_connect': None,
