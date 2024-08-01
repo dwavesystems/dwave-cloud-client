@@ -15,10 +15,15 @@
 import json
 import subprocess
 
+from copy import deepcopy
 from functools import partial
 from pathlib import Path
+from typing import List
 
-from dwave.cloud import Client
+from pydantic import TypeAdapter
+
+from dwave.cloud.client import Client
+from dwave.cloud.api.models import SolverConfiguration
 from dwave.cloud.coders import encode_problem_as_qp
 from dwave.cloud.config import ClientConfig
 from dwave.cloud.solver import StructuredSolver, BQMSolver, CQMSolver, DQMSolver, NLSolver
@@ -166,16 +171,31 @@ class SolverMetadataJSONDecode:
 
 
 class SolverSelection:
-    version = "1"
+    version = "2"
 
     def setup(self):
         self.client = Client(token='mock')
         solvers_data = json.loads((Path(__file__).parent / 'fixtures/solvers.json').read_bytes())
-        self._original_sapi_request = Client._sapi_request
-        Client._sapi_request = lambda session, url: solvers_data
 
-    def teardown(self):
-        Client._sapi_request = self._original_sapi_request
+        static_data = deepcopy(solvers_data)
+        for solver in static_data:
+            del solver['avg_load']
+
+        dynamic_data = [{"id": s['id'], "avg_load": s['avg_load']} for s in solvers_data]
+
+        static_conf = TypeAdapter(List[SolverConfiguration]).validate_python(static_data)
+        dynamic_conf = TypeAdapter(List[SolverConfiguration]).validate_python(dynamic_data)
+
+        class mock_session:
+            def list_solvers(self, filter=None, **kwargs):
+                if filter == 'none,+id,+avg_load':
+                    return dynamic_conf
+                elif filter == 'all,-avg_load':
+                    return static_conf
+                else:
+                    raise ValueError
+
+        self.client._solvers_session = mock_session()
 
     def time_get_solvers(self):
         self.client.get_solvers()
