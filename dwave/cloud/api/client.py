@@ -270,11 +270,11 @@ class CachingSession(VersionedAPISession):
         # defer to break circular imports
         from dwave.cloud.config import get_cache_dir
 
-        directory = kwargs.pop('directory', get_cache_dir())
+        directory = kwargs.pop('directory', os.path.join(get_cache_dir(), 'api'))
 
         # defer import and construction until needed
         import diskcache
-        return diskcache.Cache(directory=os.path.join(directory, 'api'))
+        return diskcache.Cache(directory=directory)
 
     # default cache config
     _default_cache_config = CacheConfig(enabled=True,
@@ -310,6 +310,9 @@ class CachingSession(VersionedAPISession):
 
         logger.debug("[%s] configured cache: (enabled=%r, maxage=%r, store=%r)",
                      type(self).__name__, self._cache_enabled, self._maxage, self._store)
+
+        if hasattr(self._store, 'directory'):
+            logger.debug("cache.store.directory=%r", self._store.directory)
 
     def request(self, method, url, *,
                 params: Optional[dict] = None,
