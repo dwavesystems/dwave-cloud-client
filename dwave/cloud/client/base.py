@@ -340,8 +340,11 @@ class Client(object):
     # Poll grouping time frame; two scheduled polls are grouped if closer than [sec]:
     _POLL_GROUP_TIMEFRAME = 2
 
-    # Downloaded solver definition cache maxage [sec]
-    _SOLVERS_CACHE_MAXAGE = 3600        # 1 hour
+    # Downloaded solver definition cache config
+    _DEFAULT_SOLVERS_CACHE_CONFIG = dict(
+        enabled=True,
+        maxage=900,     # 15 min heuristic maxage (TODO: API cache-control to override it)
+    )
 
     # Downloaded region metadata cache maxage [sec]
     _REGIONS_CACHE_MAXAGE = 7 * 86400   # 7 days
@@ -690,10 +693,7 @@ class Client(object):
             session = self._solvers_session = \
                 api.Solvers.from_config(
                     config=self.config,
-                    cache=dict(
-                        enabled=True,
-                        #maxage=self._SOLVERS_CACHE_MAXAGE)
-                    )
+                    cache=self._DEFAULT_SOLVERS_CACHE_CONFIG
                 )
 
         return session
