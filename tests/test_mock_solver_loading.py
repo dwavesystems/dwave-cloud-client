@@ -14,8 +14,8 @@
 
 """Try to load solver data from mock servers."""
 
-import json
 import unittest
+import unittest.mock
 
 import requests_mock
 
@@ -31,12 +31,14 @@ url = 'https://dwavesys.com'
 token = 'abc123abc123abc123abc123abc123abc123'
 solver1_name = 'first_solver'
 solver2_name = 'second_solver'
+solver3_incomplete_name = 'incomplete_properties'
+solver4_truncated_name = 'invalid_data_format'
 
 bad_url = 'https://not-a-subdomain.dwavesys.com'
 bad_token = '------------------------'
 
 
-def structured_solver_data(id_, cat='qpu', incomplete=False):
+def solver_data(id_, cat='qpu', incomplete=False, subset='all'):
     """Return data dict describing a single solver."""
     obj = {
         "properties": {
@@ -49,41 +51,74 @@ def structured_solver_data(id_, cat='qpu', incomplete=False):
         },
         "id": id_,
         "description": "A test solver",
-        "status": "ONLINE"
+        "status": "ONLINE",
+        "avg_load": 0.1
     }
 
     if incomplete:
         del obj['properties']['supported_problem_types']
 
+    if subset == 'static':
+        del obj['avg_load']
+
+    if subset == 'dynamic':
+        obj = {
+            "id": id_,
+            "avg_load": obj["avg_load"]
+        }
+
     return obj
 
-def solver_object(id_, cat='qpu', incomplete=False):
-    return Solver(client=None, data=structured_solver_data(id_, cat, incomplete))
 
-
-# Define the endpoints
-solver1_url = '{}/solvers/remote/{}/'.format(url, solver1_name)
-solver2_url = '{}/solvers/remote/{}/'.format(url, solver2_name)
-all_solver_url = '{}/solvers/remote/'.format(url)
+def solver_object(id_, **kwargs):
+    return Solver(client=None, data=solver_data(id_, **kwargs))
 
 
 def setup_server(m):
     """Add endpoints to the server."""
 
-    solver1_data = structured_solver_data(solver1_name)
-    solver2_data = structured_solver_data(solver2_name)
-    all_solver_data = [solver1_data, solver2_data]
+    solver1_url = '{}/solvers/remote/{}'.format(url, solver1_name)
+    solver2_url = '{}/solvers/remote/{}'.format(url, solver2_name)
+    solver3_incomplete_url = '{}/solvers/remote/{}'.format(url, solver3_incomplete_name)
+    solver4_truncated_url = '{}/solvers/remote/{}'.format(url, solver4_truncated_name)
+    all_solvers_url = '{}/solvers/remote/'.format(url)
 
-    # Setup the server
     valid_token_headers = {'X-Auth-Token': token}
     invalid_token_headers = {'X-Auth-Token': bad_token}
+
+    solver_content_type = {'Content-Type': 'application/vnd.dwave.sapi.solver-definition+json; version=2.0'}
+    solvers_content_type = {'Content-Type': 'application/vnd.dwave.sapi.solver-definition-list+json; version=2.0'}
 
     m.get(requests_mock.ANY, status_code=404)
     m.get(requests_mock.ANY, status_code=401, request_headers=invalid_token_headers)
 
-    m.get(solver1_url, json=solver1_data, request_headers=valid_token_headers)
-    m.get(solver2_url, json=solver2_data, request_headers=valid_token_headers)
-    m.get(all_solver_url, json=all_solver_data, request_headers=valid_token_headers)
+    def add_mock_solver(m, url, name, incomplete=False):
+        m.get(url, json=solver_data(name, incomplete=incomplete), request_headers=valid_token_headers, headers=solver_content_type)
+        m.get(f"{url}?filter=all,-avg_load",
+              json=solver_data(name, subset='static', incomplete=incomplete), request_headers=valid_token_headers, headers=solver_content_type)
+        m.get(f"{url}?filter=none,+id,+avg_load",
+              json=solver_data(name, subset='dynamic', incomplete=incomplete), request_headers=valid_token_headers, headers=solver_content_type)
+
+    add_mock_solver(m, solver1_url, solver1_name)
+    add_mock_solver(m, solver2_url, solver2_name)
+    add_mock_solver(m, solver3_incomplete_url, solver3_incomplete_name, incomplete=True)
+
+    m.get(solver4_truncated_url,
+          text='{"id', request_headers=valid_token_headers, headers=solver_content_type)
+    m.get(f"{solver4_truncated_url}?filter=all,-avg_load",
+          text='{"id', request_headers=valid_token_headers, headers=solver_content_type)
+    m.get(f"{solver4_truncated_url}?filter=none,+id,+avg_load",
+          text='{"id', request_headers=valid_token_headers, headers=solver_content_type)
+
+    m.get(all_solvers_url,
+          json=[solver_data(solver1_name), solver_data(solver2_name)],
+          request_headers=valid_token_headers, headers=solvers_content_type)
+    m.get(f"{all_solvers_url}?filter=all,-avg_load",
+          json=[solver_data(solver1_name, subset='static'), solver_data(solver2_name, subset='static')],
+          request_headers=valid_token_headers, headers=solvers_content_type)
+    m.get(f"{all_solvers_url}?filter=none,+id,+avg_load",
+          json=[solver_data(solver1_name, subset='dynamic'), solver_data(solver2_name, subset='static')],
+          request_headers=valid_token_headers, headers=solvers_content_type)
 
 
 class MockConnectivityTests(unittest.TestCase):
@@ -93,11 +128,9 @@ class MockConnectivityTests(unittest.TestCase):
         """Connect with a bad URL."""
         with requests_mock.Mocker() as m:
             setup_server(m)
-            with self.assertRaises(SAPIError) as err:
+            with self.assertRaises(SAPIError):
                 with Client(endpoint=bad_url, token=token) as client:
                     client.get_solvers()
-            # TODO: fix when exceptions/sapi call generalized
-            self.assertEqual(err.exception.error_code, 404)
 
     def test_bad_token(self):
         """Connect with a bad token."""
@@ -116,74 +149,58 @@ class MockConnectivityTests(unittest.TestCase):
 
 
 class MockSolverLoading(unittest.TestCase):
-    """Test loading solvers in a few different configurations.
-
-    Note:
-        A mock server does not test authentication.
-
-    Expect three responses from the server for /solvers/*:
-        - A single solver when a single solver is requested
-        - A list of single solver objects when all solvers are requested
-        - A 404 error when the requested solver does not exist
-    An additional condition to test for is that the server may have configured
-    a given solver such that it does not provide all the required information
-    about it.
-    """
 
     def test_load_solver(self):
         """Load a single solver."""
         with requests_mock.mock() as m:
             setup_server(m)
 
-            # test default, cached solver get
             with Client(endpoint=url, token=token) as client:
-                # fetch solver not present in cache
                 solver = client.get_solver(solver1_name)
                 self.assertEqual(solver.id, solver1_name)
 
-                # modify cached solver and re-fetch it
-                solver.id = 'different-solver'
-                # cached solver name doesn't match, so it won't be returned
-                with self.assertRaises(SolverError):
-                    client.get_solver(solver1_name, refresh=False)
-                # cache is refreshed?
-                self.assertEqual(client.get_solver(solver1_name, refresh=True).id, solver1_name)
-
-    def test_load_all_solvers(self):
+    @requests_mock.Mocker()
+    def test_load_all_solvers(self, m):
         """Load the list of solver names."""
 
-        def spoof_cache(client, clear_val=False, clear_created=False):
-            store = client._fetch_solvers.cached.store
-            for args in store:
-                if clear_val:
-                    store[args]['val'] = []
-                if clear_created:
-                    store[args]['created'] = 0
+        setup_server(m)
 
-        with requests_mock.mock() as m:
-            setup_server(m)
+        store = {}
 
-            # test default case, fetch all solvers for the first time
+        with unittest.mock.patch.multiple(
+                Client, _DEFAULT_SOLVERS_CACHE_CONFIG=dict(maxage=60, store=store)):
+
             with Client(endpoint=url, token=token) as client:
-                solvers = client.get_solvers()
 
-                self.assertEqual(len(solvers), 2)
+                with self.subTest("initial solver fetch"):
+                    m.reset_mock()
 
-                # test default refresh
-                spoof_cache(client, clear_created=True)
-                self.assertEqual(len(client.get_solvers()), 2)      # should refresh
+                    solvers = client.get_solvers()
 
-                # test no refresh
-                spoof_cache(client, clear_val=True)
-                self.assertEqual(len(client.get_solvers(refresh=False)), 0)     # should not refresh
+                    self.assertEqual(len(solvers), 2)
+                    self.assertEqual(m.call_count, 2)
 
-                # test refresh
-                self.assertEqual(len(client.get_solvers(refresh=True)), 2)      # should refresh
+                with self.subTest("cache hit for static data"):
+                    m.reset_mock()
+
+                    solvers = client.get_solvers()
+
+                    self.assertEqual(len(solvers), 2)
+                    self.assertEqual(m.call_count, 1)
+
+                with self.subTest("cache refresh forced"):
+                    m.reset_mock()
+
+                    solvers = client.get_solvers(refresh=True)
+
+                    self.assertEqual(len(solvers), 2)
+                    self.assertEqual(m.call_count, 2)
 
     def test_load_missing_solver(self):
         """Try to load a solver that does not exist."""
         with requests_mock.mock() as m:
             m.get(requests_mock.ANY, status_code=404)
+
             with Client(endpoint=url, token=token) as client:
                 with self.assertRaises(SolverNotFoundError):
                     client.get_solver(solver1_name)
@@ -191,19 +208,20 @@ class MockSolverLoading(unittest.TestCase):
     def test_load_solver_missing_data(self):
         """Try to load a solver that has incomplete data."""
         with requests_mock.mock() as m:
-            m.get(solver1_url, json=structured_solver_data(solver1_name, incomplete=True))
+            setup_server(m)
+
             with Client(endpoint=url, token=token) as client:
                 with self.assertRaises(SolverNotFoundError):
-                    client.get_solver(solver1_name)
+                    client.get_solver(solver3_incomplete_name)
 
     def test_load_solver_broken_response(self):
         """Try to load a solver for which the server has returned a truncated response."""
         with requests_mock.mock() as m:
-            body = json.dumps(structured_solver_data(solver1_name))
-            m.get(solver1_url, text=body[0:len(body)//2])
+            setup_server(m)
+
             with Client(endpoint=url, token=token) as client:
                 with self.assertRaises(InvalidAPIResponseError):
-                    client.get_solver(solver1_name)
+                    client.get_solver(solver4_truncated_name)
 
     def test_get_solver_reproducible(self):
         """get_solver should return same solver (assuming cache hasn't changed)"""
@@ -223,55 +241,55 @@ class MockSolverLoading(unittest.TestCase):
 
     def test_solver_filtering_in_client(self):
         # base client
-        self.assertTrue(Client.is_solver_handled(solver_object('test', 'qpu')))
-        self.assertTrue(Client.is_solver_handled(solver_object('test', 'software')))
-        self.assertTrue(Client.is_solver_handled(solver_object('test', 'hybrid')))
-        self.assertTrue(Client.is_solver_handled(solver_object('test', 'whatever')))
+        self.assertTrue(Client.is_solver_handled(solver_object('test', cat='qpu')))
+        self.assertTrue(Client.is_solver_handled(solver_object('test', cat='software')))
+        self.assertTrue(Client.is_solver_handled(solver_object('test', cat='hybrid')))
+        self.assertTrue(Client.is_solver_handled(solver_object('test', cat='whatever')))
         self.assertTrue(Client.is_solver_handled(None))
         # qpu client
-        self.assertTrue(QPUClient.is_solver_handled(solver_object('test', 'qpu')))
-        self.assertFalse(QPUClient.is_solver_handled(solver_object('test', 'software')))
-        self.assertFalse(QPUClient.is_solver_handled(solver_object('test', 'hybrid')))
-        self.assertFalse(QPUClient.is_solver_handled(solver_object('test', 'whatever')))
+        self.assertTrue(QPUClient.is_solver_handled(solver_object('test', cat='qpu')))
+        self.assertFalse(QPUClient.is_solver_handled(solver_object('test', cat='software')))
+        self.assertFalse(QPUClient.is_solver_handled(solver_object('test', cat='hybrid')))
+        self.assertFalse(QPUClient.is_solver_handled(solver_object('test', cat='whatever')))
         self.assertFalse(QPUClient.is_solver_handled(None))
         # sw client
-        self.assertFalse(SoftwareClient.is_solver_handled(solver_object('test', 'qpu')))
-        self.assertTrue(SoftwareClient.is_solver_handled(solver_object('test', 'software')))
-        self.assertFalse(SoftwareClient.is_solver_handled(solver_object('test', 'hybrid')))
-        self.assertFalse(SoftwareClient.is_solver_handled(solver_object('test', 'whatever')))
+        self.assertFalse(SoftwareClient.is_solver_handled(solver_object('test', cat='qpu')))
+        self.assertTrue(SoftwareClient.is_solver_handled(solver_object('test', cat='software')))
+        self.assertFalse(SoftwareClient.is_solver_handled(solver_object('test', cat='hybrid')))
+        self.assertFalse(SoftwareClient.is_solver_handled(solver_object('test', cat='whatever')))
         self.assertFalse(SoftwareClient.is_solver_handled(None))
         # hybrid client
-        self.assertFalse(HybridClient.is_solver_handled(solver_object('test', 'qpu')))
-        self.assertFalse(HybridClient.is_solver_handled(solver_object('test', 'software')))
-        self.assertTrue(HybridClient.is_solver_handled(solver_object('test', 'hybrid')))
-        self.assertFalse(HybridClient.is_solver_handled(solver_object('test', 'whatever')))
+        self.assertFalse(HybridClient.is_solver_handled(solver_object('test', cat='qpu')))
+        self.assertFalse(HybridClient.is_solver_handled(solver_object('test', cat='software')))
+        self.assertTrue(HybridClient.is_solver_handled(solver_object('test', cat='hybrid')))
+        self.assertFalse(HybridClient.is_solver_handled(solver_object('test', cat='whatever')))
         self.assertFalse(HybridClient.is_solver_handled(None))
 
     def test_solver_feature_properties(self):
-        self.assertTrue(solver_object('solver', 'qpu').qpu)
-        self.assertTrue(solver_object('solver', 'QPU').qpu)
-        self.assertFalse(solver_object('solver', 'qpu').software)
-        self.assertFalse(solver_object('solver', 'qpu').hybrid)
-        self.assertFalse(solver_object('solver', 'software').qpu)
-        self.assertTrue(solver_object('solver', 'software').software)
-        self.assertFalse(solver_object('solver', 'software').hybrid)
-        self.assertTrue(solver_object('solver', 'hybrid').hybrid)
-        self.assertFalse(solver_object('solver', 'hybrid').qpu)
-        self.assertFalse(solver_object('solver', 'hybrid').software)
+        self.assertTrue(solver_object('solver', cat='qpu').qpu)
+        self.assertTrue(solver_object('solver', cat='QPU').qpu)
+        self.assertFalse(solver_object('solver', cat='qpu').software)
+        self.assertFalse(solver_object('solver', cat='qpu').hybrid)
+        self.assertFalse(solver_object('solver', cat='software').qpu)
+        self.assertTrue(solver_object('solver', cat='software').software)
+        self.assertFalse(solver_object('solver', cat='software').hybrid)
+        self.assertTrue(solver_object('solver', cat='hybrid').hybrid)
+        self.assertFalse(solver_object('solver', cat='hybrid').qpu)
+        self.assertFalse(solver_object('solver', cat='hybrid').software)
 
         self.assertFalse(solver_object('solver').is_vfyc)
         self.assertEqual(solver_object('solver').num_qubits, 3)
         self.assertFalse(solver_object('solver').has_flux_biases)
 
         # test .num_qubits vs .num_actual_qubits
-        data = structured_solver_data('test')
+        data = solver_data('test')
         data['properties']['num_qubits'] = 7
         solver = Solver(None, data)
         self.assertEqual(solver.num_qubits, 7)
         self.assertEqual(solver.num_active_qubits, 3)
 
         # test .is_vfyc
-        data = structured_solver_data('test')
+        data = solver_data('test')
         data['properties']['vfyc'] = 'error'
         self.assertFalse(Solver(None, data).is_vfyc)
         data['properties']['vfyc'] = True
@@ -289,7 +307,7 @@ class MockSolverLoading(unittest.TestCase):
 
         # test `.online` property
         self.assertTrue(solver_object('solver').online)
-        data = structured_solver_data('test')
+        data = solver_data('test')
         data['status'] = 'offline'
         self.assertFalse(Solver(None, data).online)
         del data['status']
