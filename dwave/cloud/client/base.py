@@ -66,7 +66,7 @@ from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *    # TODO: fix
 from dwave.cloud.computation import Future
 from dwave.cloud.config import load_config, update_config, validate_config_v1
-from dwave.cloud.config.models import ClientConfig
+from dwave.cloud.config.models import ClientConfig, PollingStrategy
 from dwave.cloud.solver import available_solvers, StructuredSolver, UnstructuredSolver
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.regions import get_regions, resolve_endpoints
@@ -338,7 +338,7 @@ class Client(object):
     _UPLOAD_PART_THREAD_COUNT = 10
     _ENCODE_PROBLEM_THREAD_COUNT = _UPLOAD_PROBLEM_THREAD_COUNT
     _CANCEL_THREAD_COUNT = 1
-    _POLL_THREAD_COUNT = 2
+    _POLL_THREAD_COUNT = 5
     _LOAD_THREAD_COUNT = 5
 
     # Poll grouping time frame; two scheduled polls are grouped if closer than [sec]:
@@ -1453,9 +1453,16 @@ class Client(object):
         finally:
             session.close()
 
-    def _poll(self, future):
+    def _poll(self, future: Future) -> None:
         """Enqueue a problem to poll the server for status."""
 
+        # split for simplicity
+        if self.config.polling_schedule.strategy == PollingStrategy.BACKOFF:
+            return self._poll_using_backoff(future)
+        else:
+            return self._poll_using_long_polling(future)
+
+    def _poll_using_backoff(self, future: Future) -> None:
         if future._poll_backoff is None:
             # on first poll, start with minimal back-off
             future._poll_backoff = self.config.polling_schedule.backoff_min
@@ -1483,6 +1490,13 @@ class Client(object):
 
         self._poll_queue.put((at, future))
 
+    def _poll_using_long_polling(self, future: Future) -> None:
+        # we use problem submit time to prioritize polling of jobs submitted earlier
+        at = datetime_to_timestamp(future.time_created)
+
+        # use the same priority queue as for backoff polling
+        self._poll_queue.put((at, future))
+
     def _do_poll_problems(self):
         """Poll the server for the status of a set of problems.
 
@@ -1492,7 +1506,11 @@ class Client(object):
         session = self.create_session()
         try:
             # grouped futures (all scheduled within _POLL_GROUP_TIMEFRAME)
+            # and/or up to _STATUS_QUERY_SIZE (depending on strategy)
             frame_futures = {}
+
+            use_long_polling = (
+                self.config.polling_schedule.strategy == PollingStrategy.LONG_POLLING)
 
             def task_done():
                 self._poll_queue.task_done()
@@ -1522,6 +1540,7 @@ class Client(object):
                     return
 
                 # try grouping if scheduled within grouping timeframe
+                # (or in the long polling case, add up to _STATUS_QUERY_SIZE available futures)
                 while len(frame_futures) < self._STATUS_QUERY_SIZE:
                     try:
                         task = self._poll_queue.get_nowait()
@@ -1529,7 +1548,7 @@ class Client(object):
                         break
 
                     at, future = task
-                    if at - frame_earliest <= self._POLL_GROUP_TIMEFRAME:
+                    if use_long_polling or (at - frame_earliest <= self._POLL_GROUP_TIMEFRAME):
                         if not add(future):
                             return
                     else:
@@ -1541,18 +1560,21 @@ class Client(object):
                 ids = [future.id for future in frame_futures.values()]
                 logger.debug("Polling for status of futures: %s", ids)
                 query_string = 'problems/?id=' + ','.join(ids)
+                if use_long_polling:
+                    query_string += f'&timeout={self.config.polling_schedule.wait_time}'
 
                 # if futures were cancelled while `add`ing, skip empty frame
                 if not ids:
                     continue
 
-                # wait until `frame_earliest` before polling
-                delay = frame_earliest - time.time()
-                if delay > 0:
-                    logger.debug("Pausing polling %.2f sec for futures: %s", delay, ids)
-                    time.sleep(delay)
-                else:
-                    logger.trace("Skipping non-positive delay of %.2f sec", delay)
+                if not use_long_polling:
+                    # wait until `frame_earliest` before polling
+                    delay = frame_earliest - time.time()
+                    if delay > 0:
+                        logger.debug("Pausing polling %.2f sec for futures: %s", delay, ids)
+                        time.sleep(delay)
+                    else:
+                        logger.trace("Skipping non-positive delay of %.2f sec", delay)
 
                 # execute and handle the polling request
                 try:
@@ -1587,6 +1609,10 @@ class Client(object):
 
                 for id_ in frame_futures.keys():
                     task_done()
+
+                if use_long_polling and (pause := self.config.polling_schedule.pause) > 0:
+                    logger.debug("Pausing %.3f sec between long polling requests", pause)
+                    time.sleep(pause)
 
         except Exception as err:
             logger.exception(err)
