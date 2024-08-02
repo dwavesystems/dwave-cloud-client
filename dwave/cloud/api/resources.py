@@ -185,17 +185,25 @@ class Problems(ResourceBase):
         return models.ProblemStatusMaybeWithAnswer.model_validate(status)
 
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
-    def get_problem_status(self, problem_id: str) -> models.ProblemStatus:
+    def get_problem_status(self,
+                           problem_id: str,
+                           timeout: Optional[int] = None,
+                           ) -> models.ProblemStatus:
         """Retrieve short status of a single problem."""
         path = ''
         params = dict(id=problem_id)
+        if timeout is not None:
+            params.setdefault('timeout', timeout)
         response = self.session.get(path, params=params)
         status = response.json()[0]
         return models.ProblemStatus.model_validate(status)
 
     # XXX: @pydantic.validate_arguments
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
-    def get_problem_statuses(self, problem_ids: List[str]) -> List[models.ProblemStatus]:
+    def get_problem_statuses(self,
+                             problem_ids: List[str],
+                             timeout: Optional[int] = None,
+                             ) -> List[models.ProblemStatus]:
         """Retrieve short problem statuses for a list of problems."""
         if not isinstance(problem_ids, list):
             raise TypeError('a list of problem ids expected')
@@ -204,6 +212,8 @@ class Problems(ResourceBase):
 
         path = ''
         params = dict(id=','.join(problem_ids))
+        if timeout is not None:
+            params.setdefault('timeout', timeout)
         response = self.session.get(path, params=params)
         statuses = response.json()
         return TypeAdapter(List[models.ProblemStatus]).validate_python(statuses)

@@ -118,7 +118,7 @@ class LongPollingSchedule(BaseModel):
     strategy: Literal[PollingStrategy.LONG_POLLING] = PollingStrategy.LONG_POLLING
 
     #: Maximum duration long polling connection is kept open, in seconds.
-    wait_time: Optional[float] = 30.0
+    wait_time: Optional[int] = 30
 
     #: Pause between two successive long polling connections, in seconds.
     pause: Optional[float] = 0.0

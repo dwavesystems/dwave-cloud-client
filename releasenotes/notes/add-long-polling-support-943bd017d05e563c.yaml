@@ -6,3 +6,11 @@ features:
     We add the following config options: ``poll_strategy`` (``"backoff"`` is the
     current default, ``"long-polling"`` is the new strategy), ``poll_wait_time``,
     and ``poll_pause``.
+
+  - |
+    Add ``timeout`` keyword argument to ``api.resources.Problems.get_problem_status()``
+    and ``api.resources.Problems.get_problem_statuses()`` methods.
+
+    Use it to enable long polling on problem status API endpoint. The connection
+    is closed (server-side) when at least one problem completes, or the ``timeout``
+    (in seconds) elapses, whatever comes first.

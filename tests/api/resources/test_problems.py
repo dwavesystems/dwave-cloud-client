@@ -160,12 +160,33 @@ class ProblemResourcesBaseTests(abc.ABC):
         self.assertIsInstance(status, models.ProblemStatus)
         self.verify_problem_status(status, solved=True)
 
+    def test_get_problem_status_long_polling(self):
+        """Problem status retrieved by problem id, long polling variant."""
+
+        problem_id = self.problem_id
+        status = self.api.get_problem_status(problem_id, timeout=self.poll_wait_time)
+
+        self.assertIsInstance(status, models.ProblemStatus)
+        self.verify_problem_status(status, solved=True)
+
     def test_get_problem_statuses(self):
         """Multiple problem statuses retrieved by problem ids."""
 
         problem_id = self.problem_id
         ids = [problem_id] * 3
         statuses = self.api.get_problem_statuses(ids)
+
+        self.assertEqual(len(statuses), len(ids))
+        for status in statuses:
+            self.assertIsInstance(status, models.ProblemStatus)
+            self.verify_problem_status(status, solved=True)
+
+    def test_get_problem_statuses_long_polling(self):
+        """Multiple problem statuses retrieved by problem ids, long polling variant."""
+
+        problem_id = self.problem_id
+        ids = [problem_id] * 3
+        statuses = self.api.get_problem_statuses(ids, timeout=self.poll_wait_time)
 
         self.assertEqual(len(statuses), len(ids))
         for status in statuses:
@@ -427,6 +448,9 @@ class ProblemResourcesMockerMixin:
         all_solvers = [self.solver_id]
         all_statuses = {s.value for s in constants.ProblemStatus}
 
+        # long polling param
+        self.poll_wait_time = 20
+
         # problem status et al
         self.mocker.get(
             url(f'problems/{p1_id}'),
@@ -434,6 +458,11 @@ class ProblemResourcesMockerMixin:
             request_headers=headers)
         self.mocker.get(
             url(f'problems/?id={p1_id}'),
+            complete_qs=True,
+            json=[p1_status],
+            request_headers=headers)
+        self.mocker.get(
+            url(f'problems/?id={p1_id}&timeout={self.poll_wait_time}'),
             complete_qs=True,
             json=[p1_status],
             request_headers=headers)
@@ -465,6 +494,11 @@ class ProblemResourcesMockerMixin:
             request_headers=headers)
         self.mocker.get(
             url(f'problems/?id={p1_id},{p1_id},{p1_id}'),
+            complete_qs=True,
+            json=[p1_status] * 3,
+            request_headers=headers)
+        self.mocker.get(
+            url(f'problems/?id={p1_id},{p1_id},{p1_id}&timeout={self.poll_wait_time}'),
             complete_qs=True,
             json=[p1_status] * 3,
             request_headers=headers)
@@ -653,7 +687,7 @@ class TestMockProblemsUnstructured(UnstructuredProblemTestsMixin,
 
 
 @unittest.skipUnless(dimod, "dimod not installed")
-class TestMockProblemsUnstructuredWithBinaryRefAsnwer(TestMockProblemsUnstructured):
+class TestMockProblemsUnstructuredWithBinaryRefAnswer(TestMockProblemsUnstructured):
     """Verify `dwave.cloud.api.resources.Problems` handle unstructured problems
     with answers in the `binary-ref` format, using mocked SAPI responses.
     """
@@ -691,6 +725,7 @@ class TestCloudProblemsStructured(StructuredProblemTestsMixin,
         with Client(**config) as client:
             cls.token = client.config.token
             cls.api = Problems.from_config(client.config)
+            cls.poll_wait_time = 2
 
             # submit and solve an Ising problem as a fixture
             solver = client.get_solver(qpu=True)
@@ -731,6 +766,7 @@ class TestCloudProblemsUnstructured(UnstructuredProblemTestsMixin,
         with Client(**config) as client:
             cls.token = client.config.token
             cls.api = Problems.from_config(client.config)
+            cls.poll_wait_time = 2
 
             # submit and solve an Ising problem as a fixture
             solver = client.get_solver(hybrid=True)
