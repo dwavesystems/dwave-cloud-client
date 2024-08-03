@@ -285,7 +285,7 @@ class CachingSession(VersionedAPISession):
 
     class CacheConfig(TypedDict, total=False):
         enabled: bool
-        maxage: float
+        maxage: int
         store: Union[Mapping, Callable[[], Mapping]]
 
     # default cache config
@@ -315,7 +315,10 @@ class CachingSession(VersionedAPISession):
             logger.debug("[%s] cache disabled.", type(self).__name__)
             return
 
-        self._maxage = config['maxage']
+        if not isinstance(_maxage := config.get('maxage'), int) or _maxage < 0:
+            raise ValueError("A non-negative integer required for 'maxage'.")
+        self._maxage = _maxage
+
         self._store = config['store']
         if callable(self._store):
             self._store = self._store()
