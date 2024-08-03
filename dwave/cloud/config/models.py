@@ -22,7 +22,7 @@ from typing import Optional, Union, Literal, Tuple, Dict, Any
 from typing_extensions import Annotated     # backport for py37, py38
 
 import urllib3
-from pydantic import BaseModel, BeforeValidator
+from pydantic import BaseModel, BeforeValidator, NonNegativeInt
 
 from dwave.cloud.config.loaders import update_config
 from dwave.cloud.api.constants import (
@@ -117,8 +117,9 @@ class LongPollingSchedule(BaseModel):
     #: Long polling strategy
     strategy: Literal[PollingStrategy.LONG_POLLING] = PollingStrategy.LONG_POLLING
 
-    #: Maximum duration long polling connection is kept open, in seconds.
-    wait_time: Optional[int] = 30
+    #: Maximum duration a long polling connection is kept open, in whole number of seconds.
+    #: Note: SAPI requires a non-negative integer wait_time
+    wait_time: Optional[NonNegativeInt] = 30
 
     #: Pause between two successive long polling connections, in seconds.
     pause: Optional[float] = 0.0
