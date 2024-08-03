@@ -366,6 +366,8 @@ class CachingSession(VersionedAPISession):
         # update cache from response according to cache-control
         # returns: updated?
 
+        # etag and cache-control are present in 304 if they're in 200 response
+        # see: https://datatracker.ietf.org/doc/html/rfc9110#name-304-not-modified
         etag = response.headers.get('ETag')
         cache_control = response.headers.get('Cache-Control')
 
