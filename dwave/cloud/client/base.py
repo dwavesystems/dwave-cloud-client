@@ -1459,8 +1459,10 @@ class Client(object):
         # split for simplicity
         if self.config.polling_schedule.strategy == PollingStrategy.BACKOFF:
             return self._poll_using_backoff(future)
-        else:
+        elif self.config.polling_schedule.strategy == PollingStrategy.LONG_POLLING:
             return self._poll_using_long_polling(future)
+        else:
+            raise RuntimeError("unexpected polling strategy")
 
     def _poll_using_backoff(self, future: Future) -> None:
         if future._poll_backoff is None:
