@@ -19,12 +19,12 @@ import hashlib
 import logging
 import os
 from collections import deque, namedtuple
-from typing import Callable, Mapping, Optional, TypedDict, Union, TYPE_CHECKING
+from typing import Callable, Mapping, Optional, Tuple, TypedDict, Union, TYPE_CHECKING
 
 import requests
 import urllib3
+import werkzeug
 from packaging.specifiers import SpecifierSet
-from werkzeug.http import parse_options_header, dump_options_header
 
 import dwave.cloud.config   # don't use `from` to break circular import (config <> api.constants)
 from dwave.cloud.api import constants, exceptions
@@ -189,7 +189,7 @@ class VersionedAPISession(LoggingSession):
             else:
                 return
 
-        media_type, params = parse_options_header(content_type)
+        media_type, params = werkzeug.http.parse_options_header(content_type)
 
         if media_type != self._media_type:
             raise exceptions.ResourceBadResponseError(
@@ -220,7 +220,7 @@ class VersionedAPISession(LoggingSession):
                 params['version'] = self._ask_version
 
             headers = {} if headers is None else headers.copy()
-            headers['Accept'] = dump_options_header(self._media_type, params)
+            headers['Accept'] = werkzeug.http.dump_options_header(self._media_type, params)
 
         response = super().request(*args, headers=headers, **kwargs)
 
@@ -329,6 +329,65 @@ class CachingSession(VersionedAPISession):
         if hasattr(self._store, 'directory'):
             logger.debug("cache.store.directory=%r", self._store.directory)
 
+    def _parse_cache_control(
+            self,
+            cache_control: Optional[str] = None,
+            ) -> Tuple[bool, Optional[int]]:
+        # parse Cache-Control header field (if present) and derive a suitable max-age value
+        # returns: (cache?, maxage)
+
+        # note:
+        # - we always revalidate after expiry, so we can ignore `must-revalidate`
+        # - and we never transform the response, so safe to ignore `no-transform`
+        # - our cache is private (for a single user), so we can ignore `private`,
+        #   `public` and `s-maxage` directives
+
+        cc = werkzeug.http.parse_cache_control_header(
+                cache_control, cls=werkzeug.datastructures.ResponseCacheControl)
+
+        if cc.no_cache:
+            # cache, but always validate
+            return (True, 0)
+
+        if cc.no_store:
+            # skip cache
+            return (False, 0)
+
+        # cache for up to max_age
+        return (True, cc.max_age)
+
+    def _update_cache(
+            self,
+            response: requests.Response,
+            key_meta: str,
+            key_data: Optional[str] = None,
+            only_meta: bool = False
+            ) -> bool:
+        # update cache from response according to cache-control
+        # returns: updated?
+
+        etag = response.headers.get('ETag')
+        cache_control = response.headers.get('Cache-Control')
+
+        use_cache, maxage = self._parse_cache_control(cache_control)
+        if use_cache:
+            meta = dict(created=epochnow(), maxage=maxage, etag=etag)
+            self._store[key_meta] = meta
+            if not only_meta:
+                self._store[key_data] = response.content
+
+            logger.debug("response cached for maxage=%r", maxage)
+            return True
+
+        else:
+            if key_meta in self._store:
+                del self._store[key_meta]
+            if key_data in self._store:
+                del self._store[key_data]
+
+            logger.debug("response caching skipped at server's request")
+            return False
+
     def request(self, method, url, *,
                 params: Optional[dict] = None,
                 headers: Optional[dict] = None,
@@ -338,10 +397,10 @@ class CachingSession(VersionedAPISession):
         # read CachingSession-specific params
         refresh = kwargs.pop('refresh_', False)
         no_cache = kwargs.pop('no_cache_', False)
-        suggested_maxage = kwargs.pop('maxage_', self._maxage)
+        default_maxage = kwargs.pop('maxage_', self._maxage)
 
         if not self._cache_enabled or no_cache or method.lower() != 'get':
-            # completely bypass cache lookup and conditional request
+            # completely bypass cache lookup and validation
             return super().request(method, url, params=params, headers=headers, **kwargs)
 
         key = (method,
@@ -360,8 +419,14 @@ class CachingSession(VersionedAPISession):
             return res
 
         if not refresh and (meta := self._store.get(key_meta)):
-            maxage = meta.get('maxage', suggested_maxage) or 0
+            # respect max-age from response cache-control
+            maxage = meta.get('maxage')
+            if maxage is None:
+                # but if cache-control was absent, client gets do decide
+                maxage = default_maxage
 
+            # note: by deferring this lookup, we could save a few ms in case
+            # when upstream content was modified (but that doesn't happen often)
             content = self._store.get(key_data)
 
             if epochnow() - meta['created'] < maxage:
@@ -375,26 +440,21 @@ class CachingSession(VersionedAPISession):
             res = super().request(method, url, params=params, headers=headers, **kwargs)
 
             if res.status_code == requests.codes['not_modified']:
+                # see 4.3.4. in rfc9111 (http caching)
+                # we know SAPI only uses weak validators
                 logger.debug('resource "not modified", using cached value')
-                meta['created'] = epochnow()
-                self._store[key_meta] = meta
+                self._update_cache(res, key_meta=key_meta, only_meta=True)
                 return make_response(content)
 
             else:
                 logger.debug('resource modified, updating cache')
-                meta = dict(created=epochnow(),
-                            etag=res.headers.get('etag'))
-                self._store[key_meta] = meta
-                self._store[key_data] = res.content
+                self._update_cache(res, key_meta=key_meta, key_data=key_data)
                 return res
 
         else:
             logger.debug('cache miss, updating cache')
             res = super().request(method, url, params=params, headers=headers, **kwargs)
-            meta = dict(created=epochnow(),
-                        etag=res.headers.get('etag'))
-            self._store[key_meta] = meta
-            self._store[key_data] = res.content
+            self._update_cache(res, key_meta=key_meta, key_data=key_data)
             return res
 
 

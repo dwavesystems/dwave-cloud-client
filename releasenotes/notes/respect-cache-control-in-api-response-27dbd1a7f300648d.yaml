@@ -1,0 +1,9 @@
+---
+features:
+  - |
+    Parse ``Cache-Control`` header field if present in API response, and use it
+    to guide local caching policy.
+
+    This means ``dwave.cloud.api.DWaveAPIClient`` and ``dwave.cloud.api.resource``
+    classes now respect origin server response caching policy.
+    See `#646 <https://github.com/dwavesystems/dwave-cloud-client/issues/646>`_.
