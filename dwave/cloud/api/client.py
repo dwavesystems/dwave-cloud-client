@@ -435,9 +435,10 @@ class CachingSession(VersionedAPISession):
                 logger.debug('cache hit within maxage')
                 return make_response(content)
 
-            # conditional request
-            headers = {} if headers is None else headers.copy()
-            headers['If-None-Match'] = meta['etag']
+            # validate with conditional request if possible
+            if etag := meta.get('etag'):
+                headers = {} if headers is None else headers.copy()
+                headers['If-None-Match'] = etag
 
             res = super().request(method, url, params=params, headers=headers, **kwargs)
 

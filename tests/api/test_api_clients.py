@@ -355,7 +355,7 @@ class TestResponseCaching(unittest.TestCase):
                 self.assertIsInstance(client.session._store, dict)
 
     @requests_mock.Mocker()
-    def test_caching_no_cache_control(self, m):
+    def test_conditional_requests_with_no_cache_control(self, m):
         endpoint = 'https://mock'
 
         path_a = 'path-a'
@@ -556,3 +556,49 @@ class TestResponseCaching(unittest.TestCase):
 
                 self.assertTrue(m.called)
                 self.assertEqual(client.session.history[-1].response.status_code, 304)
+
+    @requests_mock.Mocker()
+    def test_time_based_validation_only(self, m):
+        # when etag is not available, cache validation is base on time/maxage
+
+        endpoint = 'https://mock'
+        path = 'path'
+        data = {"a": 1}
+
+        m.get(f"{endpoint}/{path}", json=data)
+
+        store = {}
+        maxage = 10
+
+        with DWaveAPIClient(endpoint=endpoint,
+                            cache=dict(store=store, maxage=maxage)) as client:
+
+            with self.subTest("cache miss"):
+                self.assertEqual(len(store), 0)
+
+                r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+
+                self.assertTrue(m.called)
+                self.assertEqual(len(store), 2)     # data + meta
+
+            with self.subTest("cache hit"):
+                m.reset_mock()
+
+                with unittest.mock.patch('dwave.cloud.api.client.epochnow',
+                                         lambda: time.time() + maxage - 1):
+                    r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+
+                # if mock not called, data came from cache
+                self.assertFalse(m.called)
+
+            with self.subTest("cache expired"):
+                m.reset_mock()
+
+                with unittest.mock.patch('dwave.cloud.api.client.epochnow',
+                                         lambda: time.time() + maxage + 1):
+                    r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+
+                self.assertTrue(m.called)
