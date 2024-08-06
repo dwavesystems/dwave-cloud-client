@@ -32,7 +32,7 @@ from plucky import merge
 
 from dwave.cloud.api import constants, models, Regions
 from dwave.cloud.client import Client
-from dwave.cloud.config.models import dump_config_v1
+from dwave.cloud.config.models import dump_config_v1, PollingStrategy
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, SolverError, SolverNotFoundError)
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
@@ -542,30 +542,53 @@ class ClientConstruction(unittest.TestCase):
                 self.assertEqual(client.config.cert, client_cert)
 
     def test_polling_params_from_config(self):
-        poll_conf = {"poll_backoff_min": "0.1", "poll_backoff_max": "1"}
-        conf = dict(token='token', **poll_conf)
+        with self.subTest("defaults"):
+            conf = {"token": "token"}
+            with mock.patch("dwave.cloud.config.loaders.load_profile_from_files",
+                            lambda *pa, **kw: conf):
+                with dwave.cloud.Client.from_config() as client:
+                    ps = client.config.polling_schedule
+                    self.assertEqual(ps.strategy, Client.DEFAULTS['poll_strategy'])
+                    self.assertEqual(ps.backoff_min, Client.DEFAULTS['poll_backoff_min'])
+                    self.assertEqual(ps.backoff_max, Client.DEFAULTS['poll_backoff_max'])
 
-        # polling params from config file propagated to client object
-        with mock.patch("dwave.cloud.config.loaders.load_profile_from_files", lambda *pa, **kw: conf):
-            with dwave.cloud.Client.from_config() as client:
-                self.assertEqual(client.config.polling_schedule.backoff_min, 0.1)
-                self.assertEqual(client.config.polling_schedule.backoff_max, 1.0)
+        with self.subTest("backoff"):
+            conf = {"poll_strategy": "backoff",
+                    "poll_backoff_min": "0.1",
+                    "poll_backoff_max": "1",
+                    "token": "token"}
+            with mock.patch("dwave.cloud.config.loaders.load_profile_from_files",
+                            lambda *pa, **kw: conf):
+                with dwave.cloud.Client.from_config() as client:
+                    ps = client.config.polling_schedule
+                    self.assertEqual(ps.strategy, PollingStrategy.BACKOFF)
+                    self.assertEqual(ps.backoff_min, 0.1)
+                    self.assertEqual(ps.backoff_max, 1.0)
 
-        # test defaults
-        conf = dict(token='token')
-        with mock.patch("dwave.cloud.config.loaders.load_profile_from_files", lambda *pa, **kw: conf):
-            with dwave.cloud.Client.from_config() as client:
-                self.assertEqual(client.config.polling_schedule.backoff_min, Client.DEFAULTS['poll_backoff_min'])
-                self.assertEqual(client.config.polling_schedule.backoff_max, Client.DEFAULTS['poll_backoff_max'])
+        with self.subTest("long polling"):
+            conf = {"poll_strategy": "long-polling",
+                    "poll_wait_time": "10",
+                    "poll_pause": "1",
+                    "token": "token"}
+            with mock.patch("dwave.cloud.config.loaders.load_profile_from_files", lambda *pa, **kw: conf):
+                with dwave.cloud.Client.from_config() as client:
+                    ps = client.config.polling_schedule
+                    self.assertEqual(ps.strategy, PollingStrategy.LONG_POLLING)
+                    self.assertEqual(ps.wait_time, 10)
+                    self.assertEqual(ps.pause, 1.0)
 
+    @mock.patch("dwave.cloud.config.loaders.load_profile_from_files",
+                lambda *pa, **kw: dict(token='token'))
     def test_polling_params_from_kwargs(self):
-        poll_conf = {"poll_backoff_min": "0.1", "poll_backoff_max": "1"}
-        conf = dict(token='token', **poll_conf)
-
-        with mock.patch("dwave.cloud.config.loaders.load_profile_from_files", lambda *pa, **kw: conf):
-            with dwave.cloud.Client.from_config(poll_backoff_min=0.5) as client:
+        with self.subTest("backoff"):
+            with dwave.cloud.Client.from_config(poll_strategy="backoff",
+                                                poll_backoff_min=0.5) as client:
                 self.assertEqual(client.config.polling_schedule.backoff_min, 0.5)
-                self.assertEqual(client.config.polling_schedule.backoff_max, 1.0)
+
+        with self.subTest("long polling"):
+            with dwave.cloud.Client.from_config(poll_strategy="long-polling",
+                                                poll_wait_time=10) as client:
+                self.assertEqual(client.config.polling_schedule.wait_time, 10)
 
     def _verify_retry_config(self, retry, opts):
         self.assertEqual(retry.total, opts['http_retry_total'])

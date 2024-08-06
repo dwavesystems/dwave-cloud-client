@@ -29,7 +29,7 @@ from dwave.cloud.testing import iterable_mock_open
 from dwave.cloud.config import (
     get_configfile_paths, load_config_from_files, load_config,
     parse_float, parse_int, parse_boolean, get_cache_dir, update_config)
-from dwave.cloud.config.models import ClientConfig
+from dwave.cloud.config.models import ClientConfig, PollingStrategy
 from dwave.cloud.config.models import validate_config_v1, load_config_v1, dump_config_v1
 
 
@@ -642,6 +642,27 @@ class TestConfigModel(unittest.TestCase):
     def test_polling_schedule(self, key, raw_value, model_value):
         self._verify(raw_config={f"poll_{key}": raw_value},
                      get_field=lambda config: getattr(config.polling_schedule, key),
+                     model_value=model_value)
+
+    @parameterized.expand([
+        ("default",
+            {}, "strategy", PollingStrategy.BACKOFF),
+        ("explicit backoff",
+            {"poll_strategy": "backoff"}, "strategy", PollingStrategy.BACKOFF),
+        ("explicit long-polling",
+            {"poll_strategy": "long-polling"}, "strategy", PollingStrategy.LONG_POLLING),
+        ("implicit strategy, conformant value accepted",
+            {"poll_backoff_min": 1}, "backoff_min", 1.0),
+        ("implicit strategy, non-conformant value ignored",
+            {"poll_wait_time": 1}, "wait_time", OMITTED),
+        ("explicit strategy, conformant value accepted",
+            {"poll_wait_time": 1, "poll_strategy": "long-polling"}, "wait_time", 1.0),
+        ("explicit strategy, non-conformant value ignored",
+            {"poll_backoff_min": 1, "poll_strategy": "long-polling"}, "backoff_min", OMITTED),
+    ])
+    def test_polling_schedule_union(self, desc, raw_config, key, model_value):
+        self._verify(raw_config=raw_config,
+                     get_field=lambda config: getattr(config.polling_schedule, key, self.OMITTED),
                      model_value=model_value)
 
     @parameterized.expand([
