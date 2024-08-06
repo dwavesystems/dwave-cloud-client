@@ -629,8 +629,12 @@ class Client(object):
                             self._poll_workers, self._load_workers):
             worker.join()
 
-        # Close the main thread's session
+        # Close the main thread's sessions
         self.session.close()
+
+        solvers_session = getattr(self, '_solvers_session', None)
+        if solvers_session:
+            solvers_session.close()
 
     def __enter__(self):
         """Let connections be used in with blocks."""
