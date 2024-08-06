@@ -347,7 +347,7 @@ class Client(object):
     # Downloaded solver definition cache config
     _DEFAULT_SOLVERS_CACHE_CONFIG = dict(
         enabled=True,
-        maxage=900,     # 15 min heuristic maxage (TODO: API cache-control to override it)
+        maxage=3600,    # 1 hour heuristic maxage (cache-control in response overrides it)
     )
 
     # Downloaded region metadata cache maxage [sec]

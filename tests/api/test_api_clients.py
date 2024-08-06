@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import json
+import time
 import uuid
 import unittest
 
@@ -354,7 +355,7 @@ class TestResponseCaching(unittest.TestCase):
                 self.assertIsInstance(client.session._store, dict)
 
     @requests_mock.Mocker()
-    def test_caching(self, m):
+    def test_caching_no_cache_control(self, m):
         endpoint = 'https://mock'
 
         path_a = 'path-a'
@@ -369,11 +370,15 @@ class TestResponseCaching(unittest.TestCase):
 
         # mock: resource not modified
         m.get(f"{endpoint}/{path_a}", json=data_a, headers={'ETag': etag_a})
-        m.get(f"{endpoint}/{path_a}", request_headers={'If-None-Match': etag_a}, status_code=304)
+        m.get(f"{endpoint}/{path_a}",
+              request_headers={'If-None-Match': etag_a}, status_code=304,
+              headers={'ETag': etag_a})
 
         # mock: resource modified between requests
         m.get(f"{endpoint}/{path_b}", json=data_b, headers={'ETag': etag_b})
-        m.get(f"{endpoint}/{path_b}", request_headers={'If-None-Match': etag_b}, json=data_bb, headers={'ETag': etag_bb})
+        m.get(f"{endpoint}/{path_b}",
+              request_headers={'If-None-Match': etag_b}, json=data_bb,
+              headers={'ETag': etag_bb})
 
         store = {}
 
@@ -433,3 +438,121 @@ class TestResponseCaching(unittest.TestCase):
                 self.assertEqual(r.json(), data_a)
 
                 self.assertTrue(m.called)
+
+    @requests_mock.Mocker()
+    def test_cache_control_maxage(self, m):
+        # verify max-age from cache-control header is respected
+
+        endpoint = 'https://mock'
+
+        path = 'path'
+        etag = 'etag'
+        data = {"a": 1}
+
+        maxage = 10
+
+        # mock: resource not modified
+        m.get(f"{endpoint}/{path}", json=data,
+              headers={'ETag': etag, 'Cache-Control': f'public, max-age={maxage}'})
+        m.get(f"{endpoint}/{path}",
+              request_headers={'If-None-Match': etag}, status_code=304,
+              headers={'ETag': etag, 'Cache-Control': f'public, max-age={maxage}'})
+
+        store = {}
+
+        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store), history_size=1) as client:
+
+            with self.subTest("cache miss"):
+                self.assertEqual(len(store), 0)
+
+                r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+
+                self.assertTrue(m.called)
+                self.assertEqual(len(store), 2)     # data + meta
+
+            with self.subTest("cache hit"):
+                m.reset_mock()
+
+                with unittest.mock.patch('dwave.cloud.api.client.epochnow',
+                                         lambda: time.time() + maxage - 1):
+                    r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+
+                # if mock not called, data came from cache
+                self.assertFalse(m.called)
+
+            with self.subTest("cache expired, validated"):
+                m.reset_mock()
+
+                with unittest.mock.patch('dwave.cloud.api.client.epochnow',
+                                         lambda: time.time() + maxage + 1):
+                    r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+
+                self.assertTrue(m.called)
+                self.assertEqual(client.session.history[-1].response.status_code, 304)
+
+    @requests_mock.Mocker()
+    def test_cache_control_no_store(self, m):
+        # verify we don't cache when server forbids caching
+
+        endpoint = 'https://mock'
+
+        path = 'path'
+        etag = 'etag'
+        data = {"a": 1}
+
+        m.get(f"{endpoint}/{path}", json=data,
+              headers={'ETag': etag, 'Cache-Control': 'no-store'})
+
+        store = {}
+
+        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store)) as client:
+
+            with self.subTest("cache miss"):
+                self.assertEqual(len(store), 0)
+
+                r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+
+                self.assertTrue(m.called)
+                self.assertEqual(len(store), 0)
+
+    @requests_mock.Mocker()
+    def test_cache_control_no_cache(self, m):
+        # verify we cache but always validate when cache-control is no-cache
+
+        endpoint = 'https://mock'
+
+        path = 'path'
+        etag = 'etag'
+        data = {"a": 1}
+
+        m.get(f"{endpoint}/{path}", json=data,
+              headers={'ETag': etag, 'Cache-Control': f'no-cache, max-age=100'})
+        m.get(f"{endpoint}/{path}",
+              request_headers={'If-None-Match': etag}, status_code=304,
+              headers={'ETag': etag, 'Cache-Control': f'no-cache, max-age=100'})
+
+        store = {}
+
+        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store), history_size=1) as client:
+
+            with self.subTest("cache miss"):
+                self.assertEqual(len(store), 0)
+
+                r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+
+                self.assertTrue(m.called)
+                self.assertEqual(len(store), 2)
+
+            with self.subTest("cache validated"):
+                m.reset_mock()
+
+                r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+
+                self.assertTrue(m.called)
+                self.assertEqual(client.session.history[-1].response.status_code, 304)
