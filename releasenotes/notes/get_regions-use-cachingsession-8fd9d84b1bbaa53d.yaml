@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Enable regions metadata API cache control in ``dwave.cloud.regions.get_regions()``
+    by switching to ``api.Regions`` built-in caching session.
+    See `#647 <https://github.com/dwavesystems/dwave-cloud-client/issues/647>`_.
