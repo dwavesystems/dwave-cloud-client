@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import io
-import json
+import orjson
 from typing import List, Union, Optional, Callable, get_type_hints, TYPE_CHECKING
 from functools import wraps
 
@@ -270,9 +270,11 @@ class Problems(ResourceBase):
         answer, if problem is solved within the (undisclosed) time limit.
         """
         path = ''
-        body = dict(data=data.model_dump(), params=params, solver=solver,
-                    type=type, label=label)
-        data = json.dumps(body, cls=NumpyEncoder)
+        # note: orjson.dumps(model.model_dump()) is about 6-7x faster then
+        # model.model_dump_json() - 45us vs 300us (including model construction)
+        job_dict = dict(data=data.model_dump(), params=params, solver=solver,
+                        type=type, label=label)
+        data = orjson.dumps(job_dict, option=orjson.OPT_SERIALIZE_NUMPY)
         response = self.session.post(
             path, data=data, headers={'Content-Type': 'application/json'})
         rtype = get_type_hints(self.submit_problem)['return']
@@ -283,10 +285,10 @@ class Problems(ResourceBase):
             List[Union[models.ProblemInitialStatus, models.ProblemSubmitError]]:
         """Asynchronous multi-problem submit, returning initial statuses."""
         path = ''
-        # encode iteratively so that timestamps are serialized (via pydantic json encoder)
-        body = '[%s]' % ','.join(p.model_dump_json() for p in problems)
+        # note: TypeAdapter().dump_json() is 2ms vs 50us by orjson.dumps(model.model_dump())
+        data = orjson.dumps([job.model_dump() for job in problems])
         response = self.session.post(
-            path, data=body, headers={'Content-Type': 'application/json'})
+            path, data=data, headers={'Content-Type': 'application/json'})
         rtype = get_type_hints(self.submit_problems)['return']
         return TypeAdapter(rtype).validate_python(response.json())
 
