@@ -31,8 +31,8 @@ You can list all solvers available to a :class:`~dwave.cloud.client.Client` with
 import io
 import concurrent.futures
 import copy
-import json
 import logging
+import orjson
 import typing
 from collections.abc import Mapping
 from functools import partial
@@ -47,7 +47,6 @@ from dwave.cloud.coders import (
 from dwave.cloud.computation import Future
 from dwave.cloud.concurrency import Present
 from dwave.cloud.events import dispatches_events
-from dwave.cloud.utils.coders import NumpyEncoder
 from dwave.cloud.utils.qubo import reformat_qubo_as_ising
 
 # Use numpy if available for fast encoding/decoding
@@ -447,8 +446,8 @@ class BaseUnstructuredSolver(BaseSolver):
         }
         if label is not None:
             body['label'] = label
-        body_data = json.dumps(body, cls=NumpyEncoder)
-        logger.trace("Sampling request encoded as: %s", body_data)
+        body_data = orjson.dumps(body, option=orjson.OPT_SERIALIZE_NUMPY)
+        logger.trace("Sampling request encoded as: %r", body_data)
 
         return body_data
 
@@ -1237,8 +1236,8 @@ class StructuredSolver(BaseSolver):
         }
         if label is not None:
             body_dict['label'] = label
-        body_data = json.dumps(body_dict, cls=NumpyEncoder)
-        logger.trace("Encoded sample request: %s", body_data)
+        body_data = orjson.dumps(body_dict, option=orjson.OPT_SERIALIZE_NUMPY)
+        logger.trace("Encoded sample request: %r", body_data)
 
         body = Present(result=body_data)
         computation = Future(solver=self, id_=None, return_matrix=self.return_matrix)

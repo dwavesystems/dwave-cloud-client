@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
+import orjson
 import subprocess
 
 from copy import deepcopy
@@ -20,6 +20,8 @@ from functools import partial
 from pathlib import Path
 from typing import List
 
+import requests
+import requests_mock
 from pydantic import TypeAdapter
 
 from dwave.cloud.client import Client
@@ -167,7 +169,7 @@ class SolverMetadataJSONDecode:
 
     def time_json_loads(self):
         # match the decoder used by requests (Response.json())
-        json.loads(self.data)
+        orjson.loads(self.data)
 
 
 class SolverSelection:
@@ -175,7 +177,7 @@ class SolverSelection:
 
     def setup(self):
         self.client = Client(token='mock')
-        solvers_data = json.loads((Path(__file__).parent / 'fixtures/solvers.json').read_bytes())
+        solvers_data = orjson.loads((Path(__file__).parent / 'fixtures/solvers.json').read_bytes())
 
         static_data = deepcopy(solvers_data)
         for solver in static_data:
@@ -219,3 +221,41 @@ class SolverSelection:
             topology__type='zephyr',
             num_qubits__within=(1000, 2000),
             order_by='-num_active_qubits')
+
+
+class JSONResponseDecode:
+    version = "1"
+
+    def setup(self):
+        self.data = (Path(__file__).parent / 'fixtures/solvers.json').read_bytes()
+        self.mocker = requests_mock.Mocker()
+        self.mocker.get(
+            requests_mock.ANY,
+            content=self.data,
+            headers={'Content-Type': 'application/json'})
+        self.mocker.start()
+
+    def teardown(self):
+        self.mocker.stop()
+
+    def time_response_json(self):
+        requests.get('http://mock').json()
+
+    def time_response_orjson(self):
+        orjson.loads(requests.get('http://mock').content)
+
+    def time_model_from_python_json(self):
+        solvers = requests.get('http://mock').json()
+        TypeAdapter(List[SolverConfiguration]).validate_python(solvers)
+
+    def time_model_from_json(self):
+        content = requests.get('http://mock').content
+        TypeAdapter(List[SolverConfiguration]).validate_json(content)
+
+    def time_model_from_python_orjson(self):
+        solvers = orjson.loads(requests.get('http://mock').content)
+        TypeAdapter(List[SolverConfiguration]).validate_python(solvers)
+
+    def time_manual_model_from_python_orjson(self):
+        solvers = orjson.loads(requests.get('http://mock').content)
+        [SolverConfiguration.model_validate(solver) for solver in solvers]

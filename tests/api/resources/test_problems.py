@@ -799,20 +799,19 @@ class NumpyParamsSerialization(unittest.TestCase):
         (numpy.ubyte(1), 1), (numpy.uint8(1), 1),
         (numpy.short(1), 1), (numpy.int16(1), 1),
         (numpy.ushort(1), 1), (numpy.uint16(1), 1),
-        (numpy.intc(1), 1), (numpy.int32(1), 1),
-        (numpy.uintc(1), 1), (numpy.uint32(1), 1),
+        (numpy.int32(1), 1),    # numpy.intc
+        (numpy.uint32(1), 1),   # numpy.uintc
         (numpy.int_(1), 1), (numpy.int32(1), 1),
         (numpy.uint(1), 1), (numpy.uint32(1), 1),
-        (numpy.longlong(1), 1), (numpy.int64(1), 1),
-        (numpy.ulonglong(1), 1), (numpy.uint64(1), 1),
+        (numpy.int64(1), 1),    # numpy.longlong
+        (numpy.uint64(1), 1),   # numpy.ulonglong
         (numpy.half(1.0), 1.0), (numpy.float16(1.0), 1.0),
         (numpy.single(1.0), 1.0), (numpy.float32(1.0), 1.0),
         (numpy.double(1.0), 1.0), (numpy.float64(1.0), 1.0),
-        (numpy.longdouble(1.0), 1.0)
-    ] + ([
-        (numpy.float128(1.0), 1.0)      # unavailable on windows
-    ] if hasattr(numpy, 'float128') else [
-    ])
+        # note: orjson does not currently support:
+        #       longlong, ulonglong, longdouble/float128, intc, uintc
+        # see: https://github.com/ijl/orjson/issues/469
+    ]
 
     @classmethod
     def setUpClass(cls):

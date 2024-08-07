@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import io
-import json
+import orjson
 from typing import List, Union, Optional, Callable, get_type_hints, TYPE_CHECKING
 from functools import wraps
 
@@ -24,7 +24,6 @@ from pydantic import TypeAdapter
 from dwave.cloud.api.client import (
     DWaveAPIClient, SolverAPIClient, MetadataAPIClient, LeapAPIClient)
 from dwave.cloud.api import constants, models
-from dwave.cloud.utils.coders import NumpyEncoder
 
 if TYPE_CHECKING:
     from dwave.cloud.config.models import ClientConfig
@@ -109,14 +108,14 @@ class Regions(ResourceBase):
     def list_regions(self, **kwargs) -> List[models.Region]:
         path = ''
         response = self.session.get(path, **kwargs)
-        regions = response.json()
+        regions = orjson.loads(response.content)
         return TypeAdapter(List[models.Region]).validate_python(regions)
 
     @accepts(media_type='application/vnd.dwave.metadata.region+json', version='~=1.0')
     def get_region(self, code: str, **kwargs) -> models.Region:
         path = '{}'.format(code)
         response = self.session.get(path, **kwargs)
-        region = response.json()
+        region = orjson.loads(response.content)
         return TypeAdapter(models.Region).validate_python(region)
 
 
@@ -130,7 +129,10 @@ class Solvers(ResourceBase):
         path = 'remote/'
         params = {'filter': filter} if filter is not None else None
         response = self.session.get(path, params=params, **kwargs)
-        solvers = response.json()
+        # see asv benchmarks `JSONResponseDecode` for json -> model performance
+        # tl;dr: model_validate() on orjson-decoded content is much faster then
+        #        model_validate_json() and faster than model_validate on json-decoded
+        solvers = orjson.loads(response.content)
         return TypeAdapter(List[models.SolverConfiguration]).validate_python(solvers)
 
     @accepts(media_type='application/vnd.dwave.sapi.solver-definition+json', version='~=2.0')
@@ -138,7 +140,7 @@ class Solvers(ResourceBase):
         path = 'remote/{}'.format(solver_id)
         params = {'filter': filter} if filter is not None else None
         response = self.session.get(path, params=params, **kwargs)
-        solver = response.json()
+        solver = orjson.loads(response.content)
         return models.SolverConfiguration.model_validate(solver)
 
 
@@ -173,7 +175,7 @@ class Problems(ResourceBase):
 
         path = ''
         response = self.session.get(path, params=params)
-        statuses = response.json()
+        statuses = orjson.loads(response.content)
         return TypeAdapter(List[models.ProblemStatus]).validate_python(statuses)
 
     @accepts(media_type='application/vnd.dwave.sapi.problem+json', version='>=2.1,<3')
@@ -181,7 +183,7 @@ class Problems(ResourceBase):
         """Retrieve problem short status and answer if answer is available."""
         path = '{}'.format(problem_id)
         response = self.session.get(path)
-        status = response.json()
+        status = orjson.loads(response.content)
         return models.ProblemStatusMaybeWithAnswer.model_validate(status)
 
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
@@ -195,7 +197,7 @@ class Problems(ResourceBase):
         if timeout is not None:
             params.setdefault('timeout', timeout)
         response = self.session.get(path, params=params)
-        status = response.json()[0]
+        status = orjson.loads(response.content)[0]
         return models.ProblemStatus.model_validate(status)
 
     # XXX: @pydantic.validate_arguments
@@ -215,7 +217,7 @@ class Problems(ResourceBase):
         if timeout is not None:
             params.setdefault('timeout', timeout)
         response = self.session.get(path, params=params)
-        statuses = response.json()
+        statuses = orjson.loads(response.content)
         return TypeAdapter(List[models.ProblemStatus]).validate_python(statuses)
 
     @accepts(media_type='application/vnd.dwave.sapi.problem-data+json', version='>=2.1,<3')
@@ -223,7 +225,7 @@ class Problems(ResourceBase):
         """Retrieve complete problem info."""
         path = '{}/info'.format(problem_id)
         response = self.session.get(path)
-        info = response.json()
+        info = orjson.loads(response.content)
         return models.ProblemInfo.model_validate(info)
 
     @accepts(media_type='application/vnd.dwave.sapi.problem-answer+json', version='>=2.1,<3')
@@ -231,7 +233,7 @@ class Problems(ResourceBase):
         """Retrieve problem answer."""
         path = '{}/answer'.format(problem_id)
         response = self.session.get(path)
-        answer = response.json()['answer']
+        answer = orjson.loads(response.content)['answer']
         return models.ProblemAnswer.model_validate(answer)
 
     @accepts(media_type='application/octet-stream')
@@ -256,7 +258,7 @@ class Problems(ResourceBase):
         """Retrieve list of problem messages."""
         path = '{}/messages'.format(problem_id)
         response = self.session.get(path)
-        return response.json()
+        return orjson.loads(response.content)
 
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
     def submit_problem(self, *,
@@ -270,25 +272,27 @@ class Problems(ResourceBase):
         answer, if problem is solved within the (undisclosed) time limit.
         """
         path = ''
-        body = dict(data=data.model_dump(), params=params, solver=solver,
-                    type=type, label=label)
-        data = json.dumps(body, cls=NumpyEncoder)
+        # note: orjson.dumps(model.model_dump()) is about 6-7x faster then
+        # model.model_dump_json() - 45us vs 300us (including model construction)
+        job_dict = dict(data=data.model_dump(), params=params, solver=solver,
+                        type=type, label=label)
+        data = orjson.dumps(job_dict, option=orjson.OPT_SERIALIZE_NUMPY)
         response = self.session.post(
             path, data=data, headers={'Content-Type': 'application/json'})
         rtype = get_type_hints(self.submit_problem)['return']
-        return TypeAdapter(rtype).validate_python(response.json())
+        return TypeAdapter(rtype).validate_python(orjson.loads(response.content))
 
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
     def submit_problems(self, problems: List[models.ProblemJob]) -> \
             List[Union[models.ProblemInitialStatus, models.ProblemSubmitError]]:
         """Asynchronous multi-problem submit, returning initial statuses."""
         path = ''
-        # encode iteratively so that timestamps are serialized (via pydantic json encoder)
-        body = '[%s]' % ','.join(p.model_dump_json() for p in problems)
+        # note: TypeAdapter().dump_json() is 2ms vs 50us by orjson.dumps(model.model_dump())
+        data = orjson.dumps([job.model_dump() for job in problems])
         response = self.session.post(
-            path, data=body, headers={'Content-Type': 'application/json'})
+            path, data=data, headers={'Content-Type': 'application/json'})
         rtype = get_type_hints(self.submit_problems)['return']
-        return TypeAdapter(rtype).validate_python(response.json())
+        return TypeAdapter(rtype).validate_python(orjson.loads(response.content))
 
     @accepts(media_type='application/vnd.dwave.sapi.problem+json', version='>=2.1,<3')
     def cancel_problem(self, problem_id: str) -> \
@@ -297,7 +301,7 @@ class Problems(ResourceBase):
         path = '{}'.format(problem_id)
         response = self.session.delete(path)
         rtype = get_type_hints(self.cancel_problem)['return']
-        return TypeAdapter(rtype).validate_python(response.json())
+        return TypeAdapter(rtype).validate_python(orjson.loads(response.content))
 
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
     def cancel_problems(self, problem_ids: List[str]) -> \
@@ -306,7 +310,7 @@ class Problems(ResourceBase):
         path = ''
         response = self.session.delete(path, json=problem_ids)
         rtype = get_type_hints(self.cancel_problems)['return']
-        return TypeAdapter(rtype).validate_python(response.json())
+        return TypeAdapter(rtype).validate_python(orjson.loads(response.content))
 
 
 class LeapAccount(ResourceBase):
@@ -320,14 +324,16 @@ class LeapAccount(ResourceBase):
         """Retrieve user's active Leap project, as selected in Leap dashboard."""
         path = 'active_project/oauth/'
         response = self.session.get(path)
-        parsed = models._LeapActiveProjectResponse.model_validate(response.json())
+        parsed = models._LeapActiveProjectResponse.model_validate(
+            orjson.loads(response.content))
         return parsed.data.project
 
     def list_projects(self) -> List[models.LeapProject]:
         """Retrieve list of Leap projects accessible to the authenticated user."""
         path = 'projects/oauth/'
         response = self.session.get(path)
-        parsed = models._LeapProjectsResponse.model_validate(response.json())
+        parsed = models._LeapProjectsResponse.model_validate(
+            orjson.loads(response.content))
         return [p.project for p in parsed.data.projects]
 
     def get_project_token(self, *,
@@ -341,5 +347,6 @@ class LeapAccount(ResourceBase):
         path = 'token/oauth/'
         query = {'project_id': project_id}
         response = self.session.get(path, params=query)
-        parsed = models._LeapProjectTokenResponse.model_validate(response.json())
+        parsed = models._LeapProjectTokenResponse.model_validate(
+            orjson.loads(response.content))
         return parsed.data.token

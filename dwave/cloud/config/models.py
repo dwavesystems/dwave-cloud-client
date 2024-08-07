@@ -15,8 +15,8 @@
 import ast
 import copy
 import enum
-import json
 import logging
+import orjson
 from collections import abc
 from typing import Optional, Union, Literal, Tuple, Dict, Any
 from typing_extensions import Annotated     # backport for py37, py38
@@ -225,7 +225,7 @@ def validate_config_v1(raw_config: dict) -> ClientConfig:
     elif isinstance(solver, str):
         # support features dict encoded as JSON in our config INI file
         try:
-            solver_def = json.loads(solver)
+            solver_def = orjson.loads(solver)
         except Exception:
             # unparseable (or non-dict) json, assume string name for solver
             # we'll deprecate this eventually, but for now just convert it to
@@ -284,7 +284,7 @@ def dump_config_v1(config: ClientConfig) -> dict:
     raw_config.update(zip(("client_cert", "client_cert_key"), cert_pair))
     del raw_config['cert']
 
-    raw_config['solver'] = json.dumps(raw_config['solver'])
+    raw_config['solver'] = orjson.dumps(raw_config['solver']).decode('utf8')
 
     # expand/translate polling
     raw_config.update({f"poll_{k}": v for k, v in raw_config['polling_schedule'].items()})
