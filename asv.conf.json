@@ -33,7 +33,7 @@
 
     // Customizable commands for installing and uninstalling the project.
     // See asv.conf.json documentation.
-    "install_command": ["in-dir={env_dir} python -mpip install {wheel_file}[cqm,nlm,mocks]"],
+    "install_command": ["in-dir={env_dir} python -mpip install {wheel_file}[cqm,nlm,mocks,test]"],
 
     // "uninstall_command": ["return-code=any python -mpip uninstall -y {project}"],
 
