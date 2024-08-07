@@ -15,7 +15,7 @@
 import os
 import sys
 import ast
-import json
+import orjson
 import subprocess
 from collections.abc import Sequence
 from configparser import ConfigParser
@@ -434,7 +434,7 @@ def standardized_output(fn):
 
         def flush():
             if json_output:
-                click.echo(json.dumps(info))
+                click.echo(orjson.dumps(info))
 
         try:
             fn(*args, output=output, **kwargs)
@@ -475,7 +475,7 @@ def ping(*, config_file, profile, endpoint, region, client_type, solver_def,
     params = {}
     if sampling_params is not None:
         try:
-            params = json.loads(sampling_params)
+            params = orjson.loads(sampling_params)
             assert isinstance(params, dict)
         except:
             raise CLIError("sampling parameters required as JSON-encoded "
@@ -613,7 +613,7 @@ def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
     params = {}
     if sampling_params is not None:
         try:
-            params = json.loads(sampling_params)
+            params = orjson.loads(sampling_params)
             assert isinstance(params, dict)
         except:
             raise CLIError("sampling parameters required as JSON-encoded "
