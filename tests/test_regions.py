@@ -13,11 +13,12 @@
 # limitations under the License.
 
 import unittest
-from secrets import token_hex
 from unittest import mock
-import contextlib
+from typing import List
 
+import requests_mock
 from parameterized import parameterized
+from pydantic import TypeAdapter
 
 from dwave.cloud.api.models import Region
 from dwave.cloud.api import constants
@@ -63,56 +64,52 @@ class GetRegionsInit(unittest.TestCase):
 class GetRegionsFunctionality(unittest.TestCase):
 
     def test_config(self):
-        mock_regions = [
-            Region(code='A', name='Region A', endpoint='http://a/'),
-            Region(code='B', name='Region B', endpoint='http://b/'),
-        ]
-        # use a random mock metadata api to avoid cache contamination with mock data
-        # XXX: alternatively, we flush the cache after this test
-        mock_metadata_api_endpoint = f'https://example.com/meta/{token_hex(8)}/'
+        # get_regions() caching params are passed down to CachingSession
 
-        # mock `api.Regions.from_config().list_regions()` call
-        @contextlib.contextmanager
-        def mock_regions_from_config(*args, **kwargs):
-            class mock_regions_obj:
-                def list_regions(_):
-                    return mock_regions
-            yield mock_regions_obj()
-
-        with mock.patch("dwave.cloud.regions.api.Regions.from_config",
-                        side_effect=mock_regions_from_config) as m:
+        with mock.patch("dwave.cloud.regions.api.Regions.from_config") as m:
+            ls = m.return_value.__enter__.return_value.list_regions
 
             with self.subTest('default call'):
-                ret = get_regions(mock_metadata_api_endpoint)
-                m.assert_called()
-                self.assertEqual(ret, mock_regions)
-
-            with self.subTest('caching'):
-                m.reset_mock()
-                ret = get_regions(mock_metadata_api_endpoint)
-                m.assert_not_called()
-                self.assertEqual(ret, mock_regions)
+                get_regions()
+                ls.assert_called()
 
             with self.subTest('cache refresh'):
                 m.reset_mock()
-                ret = get_regions(mock_metadata_api_endpoint, refresh=True)
-                m.assert_called()
+                get_regions(refresh=True)
+                self.assertTrue(ls.call_args.kwargs.get('refresh_'))
 
-            with self.subTest('cache refresh'):
+            with self.subTest('cache maxage'):
                 m.reset_mock()
-                ret = get_regions(mock_metadata_api_endpoint, maxage=0)
-                m.assert_called()
+                get_regions(maxage=0)
+                self.assertEqual(ls.call_args.kwargs.get('maxage_'), 0)
 
             with self.subTest('cache bypass'):
                 m.reset_mock()
-                ret = get_regions(mock_metadata_api_endpoint, no_cache=True)
-                m.assert_called()
+                get_regions(no_cache=True)
+                self.assertTrue(ls.call_args.kwargs.get('no_cache_'))
 
     @mock.patch("dwave.cloud.regions._fetch_available_regions",
                 side_effect=ResourceAccessForbiddenError)
     def test_fetch_error(self, fetch_mock: mock.Mock):
         with self.assertRaises(ValueError):
             get_regions()
+
+    @requests_mock.Mocker()
+    def test_end_to_end_mocked(self, m):
+
+        mock_endpoint = 'https://mock'
+
+        mock_regions = [
+            Region(code='A', name='Region A', endpoint='http://a/'),
+            Region(code='B', name='Region B', endpoint='http://b/'),
+        ]
+        mock_json = TypeAdapter(List[Region]).dump_python(mock_regions)
+
+        m.get(f"{mock_endpoint}/regions/", json=mock_json,
+              headers={'Content-Type': 'application/vnd.dwave.metadata.regions+json; version=1.0'})
+
+        regions = get_regions(mock_endpoint)
+        self.assertEqual(regions, mock_regions)
 
 
 class ResolveEndpointsMocked(unittest.TestCase):

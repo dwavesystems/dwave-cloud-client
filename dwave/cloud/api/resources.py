@@ -106,16 +106,16 @@ class Regions(ResourceBase):
     client_class = MetadataAPIClient
 
     @accepts(media_type='application/vnd.dwave.metadata.regions+json', version='~=1.0')
-    def list_regions(self) -> List[models.Region]:
+    def list_regions(self, **kwargs) -> List[models.Region]:
         path = ''
-        response = self.session.get(path)
+        response = self.session.get(path, **kwargs)
         regions = response.json()
         return TypeAdapter(List[models.Region]).validate_python(regions)
 
     @accepts(media_type='application/vnd.dwave.metadata.region+json', version='~=1.0')
-    def get_region(self, code: str) -> models.Region:
+    def get_region(self, code: str, **kwargs) -> models.Region:
         path = '{}'.format(code)
-        response = self.session.get(path)
+        response = self.session.get(path, **kwargs)
         region = response.json()
         return TypeAdapter(models.Region).validate_python(region)
 

@@ -14,37 +14,35 @@
 
 import logging
 import re
-from functools import partial
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 from urllib.parse import urlsplit
-
-from pydantic import TypeAdapter
 
 from dwave.cloud import api
 from dwave.cloud.api.constants import (
     DEFAULT_REGION, DEFAULT_SOLVER_API_ENDPOINT, DEFAULT_LEAP_API_ENDPOINT,
     DEFAULT_METADATA_API_ENDPOINT)
 from dwave.cloud.config.models import ClientConfig, validate_config_v1
-from dwave.cloud.utils.decorators import cached
 
 __all__ = ['get_regions']
 
 logger = logging.getLogger(__name__)
 
-_REGIONS_CACHE_MAXAGE = 7 * 86400   # 7 days
+_DEFAULT_REGIONS_CACHE_CONFIG = dict(
+    enabled=True,
+    maxage=7 * 86400    # 7 days
+)
 
 
-@cached.ondisk(maxage=_REGIONS_CACHE_MAXAGE, key='cache_key', bucket='regions')
-def _fetch_available_regions(cache_key: Any, config: ClientConfig) -> Dict[str, str]:
+def _fetch_available_regions(config: ClientConfig, **kwargs) -> Dict[str, str]:
     logger.debug("Fetching available regions from the Metadata API at %r",
                  config.metadata_api_endpoint)
 
-    with api.Regions.from_config(config) as regions:
-        regions = regions.list_regions()
-        data = TypeAdapter(Any).dump_python(regions)
+    with api.Regions.from_config(
+            config, cache=_DEFAULT_REGIONS_CACHE_CONFIG) as regions:
+        regions = regions.list_regions(**kwargs)
 
-    logger.debug("Received region metadata: %r", data)
-    return data
+    logger.debug("Received region metadata: %r", regions)
+    return regions
 
 
 def get_regions(config: Optional[Union[ClientConfig, str, dict]] = None,
@@ -66,7 +64,8 @@ def get_regions(config: Optional[Union[ClientConfig, str, dict]] = None,
         refresh:
             Force regions cache refresh.
         maxage:
-            Maximum allowed age, in seconds, of cached regions metadata.
+            Default maximum allowed age, in seconds, of cached regions metadata.
+            Overridden by Metadata API cache control.
         no_cache:
             Do not use cache.
 
@@ -76,6 +75,10 @@ def get_regions(config: Optional[Union[ClientConfig, str, dict]] = None,
 
     .. versionadded:: 0.11.0
         Added :func:`.get_regions`.
+
+    .. versionchanged:: 0.12.2
+        ``maxage`` parameter is now just a default value for the maximum allowed
+        cache age, and it's typically overridden by regions API's cache control.
 
     """
     if isinstance(config, str):
@@ -87,26 +90,14 @@ def get_regions(config: Optional[Union[ClientConfig, str, dict]] = None,
     elif not isinstance(config, ClientConfig):
         raise TypeError(f"'config' type {type(config).__name__!r} not supported")
 
-    # make sure we don't cache by noise in config
-    cache_key = (config.metadata_api_endpoint, config.cert, config.headers,
-                 config.proxy, config.permissive_ssl,
-                 config.request_retry, config.request_timeout)
-
-    fetch = partial(_fetch_available_regions,
-        cache_key=cache_key, config=config, refresh_=refresh, maxage_=maxage)
-
-    if no_cache:
-        fetch = cached.disabled()(fetch)
-
     try:
-        obj = fetch()
-    except api.exceptions.RequestError as exc:
+        return _fetch_available_regions(
+            config=config, refresh_=refresh, maxage_=maxage, no_cache_=no_cache)
+
+    except api.exceptions.RequestError:
         logger.debug("Metadata API unavailable", exc_info=True)
         raise ValueError(
             f"Metadata API unavailable at {config.metadata_api_endpoint!r}")
-
-    regions = TypeAdapter(List[api.models.Region]).validate_python(obj)
-    return regions
 
 
 def _infer_leap_api_endpoint(solver_api_endpoint: str,

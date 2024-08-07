@@ -20,6 +20,7 @@ import unittest
 import diskcache
 import requests
 import requests_mock
+from parameterized import parameterized
 
 from dwave.cloud.api import exceptions, constants
 from dwave.cloud.api.client import (
@@ -354,8 +355,28 @@ class TestResponseCaching(unittest.TestCase):
                 self.assertEqual(client.session._maxage, 5)
                 self.assertIsInstance(client.session._store, dict)
 
+    @parameterized.expand([
+        (None, ),
+        (2j, ),
+        (-1.0, ),
+    ])
+    def test_invalid_maxage(self, maxage):
+        with self.assertRaises(ValueError):
+            DWaveAPIClient(
+                endpoint='https://mock', cache=dict(maxage=maxage, store={}))
+
+    @parameterized.expand([
+        (0, ),
+        (1, ),
+        (2.0, ),
+    ])
+    def test_valid_maxage(self, maxage):
+        with DWaveAPIClient(endpoint='https://mock',
+                            cache=dict(maxage=maxage, store={})) as client:
+            self.assertEqual(client.session._maxage, maxage)
+
     @requests_mock.Mocker()
-    def test_caching_no_cache_control(self, m):
+    def test_conditional_requests_with_no_cache_control(self, m):
         endpoint = 'https://mock'
 
         path_a = 'path-a'
@@ -556,3 +577,68 @@ class TestResponseCaching(unittest.TestCase):
 
                 self.assertTrue(m.called)
                 self.assertEqual(client.session.history[-1].response.status_code, 304)
+
+    @requests_mock.Mocker()
+    def test_time_based_validation_only(self, m):
+        # when etag is not available, cache validation is based on time/maxage
+
+        endpoint = 'https://mock'
+        path = 'path'
+        data = {"a": 1}
+
+        m.get(f"{endpoint}/{path}", json=data)
+
+        store = {}
+        maxage = 10
+
+        with DWaveAPIClient(endpoint=endpoint,
+                            cache=dict(store=store, maxage=maxage)) as client:
+
+            with self.subTest("cache miss"):
+                self.assertEqual(len(store), 0)
+
+                r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+
+                self.assertTrue(m.called)
+                self.assertEqual(len(store), 2)     # data + meta
+
+            with self.subTest("cache hit"):
+                m.reset_mock()
+
+                with unittest.mock.patch('dwave.cloud.api.client.epochnow',
+                                         lambda: time.time() + maxage - 1):
+                    r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+
+                # if mock not called, data came from cache
+                self.assertFalse(m.called)
+
+            with self.subTest("cache expired"):
+                m.reset_mock()
+
+                with unittest.mock.patch('dwave.cloud.api.client.epochnow',
+                                         lambda: time.time() + maxage + 1):
+                    r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+
+                self.assertTrue(m.called)
+
+            with self.subTest("ignored maxage=None"):
+                m.reset_mock()
+                store.clear()
+
+                r = client.session.get(path, maxage_=None)
+                self.assertEqual(r.json(), data)
+
+                self.assertTrue(m.called)
+
+            with self.subTest("warn about invalid maxage"):
+                m.reset_mock()
+                store.clear()
+
+                with self.assertWarns(UserWarning):
+                    r = client.session.get(path, maxage_=-1)
+                self.assertEqual(r.json(), data)
+
+                self.assertTrue(m.called)

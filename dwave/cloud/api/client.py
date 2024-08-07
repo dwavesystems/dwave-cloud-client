@@ -17,7 +17,9 @@ from __future__ import annotations
 import io
 import hashlib
 import logging
+import numbers
 import os
+import warnings
 from collections import deque, namedtuple
 from typing import Callable, Mapping, Optional, Tuple, TypedDict, Union, TYPE_CHECKING
 
@@ -285,7 +287,7 @@ class CachingSession(VersionedAPISession):
 
     class CacheConfig(TypedDict, total=False):
         enabled: bool
-        maxage: int
+        maxage: float
         store: Union[Mapping, Callable[[], Mapping]]
 
     # default cache config
@@ -315,8 +317,9 @@ class CachingSession(VersionedAPISession):
             logger.debug("[%s] cache disabled.", type(self).__name__)
             return
 
-        if not isinstance(_maxage := config.get('maxage'), int) or _maxage < 0:
-            raise ValueError("A non-negative integer required for 'maxage'.")
+        _maxage = config.get('maxage')
+        if not isinstance(_maxage, numbers.Real) or _maxage < 0:
+            raise ValueError("A non-negative real value required for 'maxage'.")
         self._maxage = _maxage
 
         self._store = config['store']
@@ -399,7 +402,14 @@ class CachingSession(VersionedAPISession):
         # read CachingSession-specific params
         refresh = kwargs.pop('refresh_', False)
         no_cache = kwargs.pop('no_cache_', False)
-        default_maxage = kwargs.pop('maxage_', self._maxage)
+        default_maxage = kwargs.pop('maxage_', None)
+        if default_maxage is None:
+            default_maxage = self._maxage
+        elif not isinstance(default_maxage, numbers.Real) or default_maxage < 0:
+           warnings.warn(
+               f"non-negative real value required for 'maxage_'; ignoring {default_maxage}",
+               UserWarning, stacklevel=2)
+           default_maxage = self._maxage
 
         if not self._cache_enabled or no_cache or method.lower() != 'get':
             # completely bypass cache lookup and validation
@@ -435,9 +445,10 @@ class CachingSession(VersionedAPISession):
                 logger.debug('cache hit within maxage')
                 return make_response(content)
 
-            # conditional request
-            headers = {} if headers is None else headers.copy()
-            headers['If-None-Match'] = meta['etag']
+            # validate with conditional request if possible
+            if etag := meta.get('etag'):
+                headers = {} if headers is None else headers.copy()
+                headers['If-None-Match'] = etag
 
             res = super().request(method, url, params=params, headers=headers, **kwargs)
 
