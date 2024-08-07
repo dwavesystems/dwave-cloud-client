@@ -10,6 +10,7 @@ packaging>=19
 werkzeug>=2.2,<3
 typing-extensions>=4.5.0,<5
 authlib>=1.2,<2
+orjson>=3.10
 
 # bring in py312 semantics of importlib.metadata.entry_points()
 importlib_metadata>=5.0.0

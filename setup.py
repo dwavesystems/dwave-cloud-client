@@ -19,6 +19,7 @@ install_requires = ['requests[socks]>=2.25,<3', 'urllib3>=1.26,<3',
                     'diskcache>=5.2.1,<6', 'packaging>=19', 'werkzeug>=2.2,<4',
                     'typing-extensions>=4.5.0,<5', 'authlib>=1.2,<2',
                     'importlib_metadata>=5.0.0',    # can be dropped in py312+
+                    'orjson>=3.10',
                     ]
 
 # Package extras requirements
