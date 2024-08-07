@@ -14,7 +14,6 @@
 
 """Test problem submission to mock unstructured solvers."""
 
-import collections
 import io
 import unittest
 from unittest import mock
@@ -22,7 +21,6 @@ from unittest import mock
 import numpy
 import orjson
 from parameterized import parameterized
-from requests import HTTPError
 
 from dwave.cloud.client import Client
 from dwave.cloud.solver import (
@@ -30,6 +28,8 @@ from dwave.cloud.solver import (
     BQMSolver, CQMSolver, DQMSolver, NLSolver)
 from dwave.cloud.concurrency import Present
 from dwave.cloud.testing.mocks import qpu_pegasus_solver_data, hybrid_nl_solver_data
+
+from tests.api.mocks import choose_reply
 
 try:
     import dimod
@@ -93,43 +93,6 @@ def complete_reply_binary_ref(answer_data_uri, id_="problem-id", type_='cqm', la
 
 def answer_data_reply(data):
     return data
-
-def choose_reply(path, replies, statuses=None):
-    """Choose the right response based on the path and make a mock response."""
-    # dedup vs test_mock_submissions.choose_reply
-
-    if statuses is None:
-        statuses = collections.defaultdict(lambda: iter([200]))
-
-    if path in replies:
-        response = mock.Mock(['content', 'text', 'json', 'raise_for_status'])
-        response.status_code = next(statuses[path])
-        content = replies[path]
-        if isinstance(content, str):
-            content = content.encode('utf8')
-        elif not isinstance(content, bytes):
-            content = orjson.dumps(content)
-        response.content = content
-        response.text = content.decode('utf8')
-        response.json.side_effect = lambda: replies[path]
-
-        def raise_for_status():
-            if not 200 <= response.status_code < 400:
-                raise HTTPError(response.status_code)
-        response.raise_for_status = raise_for_status
-
-        def ok():
-            try:
-                response.raise_for_status()
-            except HTTPError:
-                return False
-            return True
-        ok_property = mock.PropertyMock(side_effect=ok)
-        type(response).ok = ok_property
-
-        return response
-    else:
-        raise NotImplementedError(path)
 
 
 class TestUnstructuredSolver(unittest.TestCase):

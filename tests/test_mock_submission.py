@@ -14,7 +14,6 @@
 
 """Test problem submission against hard-coded replies with unittest.mock."""
 
-import collections
 import threading
 import time
 import unittest
@@ -26,8 +25,6 @@ from urllib.parse import urlencode
 import numpy
 import orjson
 from parameterized import parameterized
-from requests.exceptions import HTTPError
-from requests.structures import CaseInsensitiveDict
 
 try:
     import dimod
@@ -43,48 +40,7 @@ from dwave.cloud.solver import Solver
 from dwave.cloud.utils.qubo import evaluate_ising
 from dwave.cloud.utils.time import utcrel
 
-from tests.api.mocks import StructuredSapiMockResponses
-
-
-def choose_reply(path, replies, statuses=None, date=None):
-    """Choose the right response based on the path and make a mock response."""
-
-    if statuses is None:
-        statuses = collections.defaultdict(lambda: iter([200]))
-
-    if date is None:
-        date = utcrel(0)
-
-    if path in replies:
-        response = mock.Mock(['content', 'text', 'json', 'raise_for_status', 'headers'])
-        response.status_code = next(statuses[path])
-        content = replies[path]
-        if isinstance(content, str):
-            content = content.encode('utf8')
-        elif not isinstance(content, bytes):
-            content = orjson.dumps(content)
-        response.content = content
-        response.text = content.decode('utf8')
-        response.json.side_effect = lambda: replies[path]
-        response.headers = CaseInsensitiveDict({'Date': date.isoformat()})
-
-        def raise_for_status():
-            if not 200 <= response.status_code < 400:
-                raise HTTPError(response.status_code)
-        response.raise_for_status = raise_for_status
-
-        def ok():
-            try:
-                response.raise_for_status()
-            except HTTPError:
-                return False
-            return True
-        ok_property = mock.PropertyMock(side_effect=ok)
-        type(response).ok = ok_property
-
-        return response
-    else:
-        raise NotImplementedError(path)
+from tests.api.mocks import StructuredSapiMockResponses, choose_reply
 
 
 def fix_status_paths(replies: Dict[str, Any], **params):
