@@ -15,7 +15,6 @@
 """Test problem submission against hard-coded replies with unittest.mock."""
 
 import collections
-import json
 import threading
 import time
 import unittest
@@ -25,6 +24,7 @@ from unittest import mock
 from urllib.parse import urlencode
 
 import numpy
+import orjson
 from parameterized import parameterized
 from requests.exceptions import HTTPError
 from requests.structures import CaseInsensitiveDict
@@ -56,12 +56,15 @@ def choose_reply(path, replies, statuses=None, date=None):
         date = utcrel(0)
 
     if path in replies:
-        response = mock.Mock(['text', 'json', 'raise_for_status', 'headers'])
+        response = mock.Mock(['content', 'text', 'json', 'raise_for_status', 'headers'])
         response.status_code = next(statuses[path])
-        text = replies[path]
-        if not isinstance(text, str):
-            text = json.dumps(text)
-        response.text = text
+        content = replies[path]
+        if isinstance(content, str):
+            content = content.encode('utf8')
+        elif not isinstance(content, bytes):
+            content = orjson.dumps(content)
+        response.content = content
+        response.text = content.decode('utf8')
         response.json.side_effect = lambda: replies[path]
         response.headers = CaseInsensitiveDict({'Date': date.isoformat()})
 
@@ -145,7 +148,7 @@ class MockSubmissionBaseTests(_QueryTest):
         # the mocked responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
-            session.post = lambda a, _: choose_reply(a, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': ''})
             return session
 
@@ -166,9 +169,9 @@ class MockSubmissionBaseTests(_QueryTest):
         # the mocked responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
-            session.post = lambda a, _: choose_reply(a, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
-            session.get = lambda a: choose_reply(a, {
+            session.get = lambda path, **kwargs: choose_reply(path, {
                 'problems/123/': self.sapi.complete_reply(id='123')})
             return session
 
@@ -190,9 +193,9 @@ class MockSubmissionBaseTests(_QueryTest):
         # the mocked responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
-            session.post = lambda a, _: choose_reply(a, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
-            session.get = lambda a: choose_reply(a, {
+            session.get = lambda path, **kwargs: choose_reply(path, {
                 'problems/123/': self.sapi.complete_reply(id='123')})
             return session
 
@@ -222,9 +225,9 @@ class MockSubmissionBaseTests(_QueryTest):
         # the mocked responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
-            session.post = lambda a, _: choose_reply(a, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
-            session.get = lambda a: choose_reply(a, {
+            session.get = lambda path, **kwargs: choose_reply(path, {
                 'problems/123/': self.sapi.complete_reply(
                     id='123', answer_patch=qubo_answer_diff, **qubo_msg_diff)})
             return session
@@ -258,9 +261,9 @@ class MockSubmissionBaseTests(_QueryTest):
         # the mocked responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
-            session.post = lambda a, _: choose_reply(a, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
-            session.get = lambda a: choose_reply(a, {
+            session.get = lambda path, **kwargs: choose_reply(path, {
                 'problems/123/': self.sapi.complete_reply(
                     id='123', answer_patch=qubo_answer_diff, **qubo_msg_diff)})
             return session
@@ -286,7 +289,7 @@ class MockSubmissionBaseTests(_QueryTest):
         # the mocked responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
-            session.post = lambda a, _: choose_reply(a, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [self.sapi.error_reply(error_message='An error message')]})
             return session
 
@@ -307,7 +310,7 @@ class MockSubmissionBaseTests(_QueryTest):
         # the mocked responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
-            session.post = lambda a, _: choose_reply(a, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [self.sapi.immediate_error_reply(
                     code=400, msg="Missing parameter 'num_reads' in problem JSON")]})
             return session
@@ -334,7 +337,7 @@ class MockSubmissionBaseTests(_QueryTest):
         # the mocked responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
-            session.post = lambda a, _: choose_reply(a, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [self.sapi.cancel_reply()]})
             return session
 
@@ -358,7 +361,7 @@ class MockSubmissionBaseTests(_QueryTest):
         # the mocked responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
-            session.post = lambda path, _: choose_reply(path, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
             session.get = lambda path: choose_reply(
                 path, replies={
@@ -387,7 +390,7 @@ class MockSubmissionBaseTests(_QueryTest):
         # the mocked responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
-            session.post = lambda a, _: choose_reply(a, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [self.sapi.continue_reply(id='123')]
             })
             session.get = lambda a: choose_reply(a, fix_status_paths({
@@ -413,7 +416,7 @@ class MockSubmissionBaseTests(_QueryTest):
         # the mocked responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
-            session.post = lambda a, _: choose_reply(a, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [self.sapi.continue_reply(id='123')]})
             session.get = lambda a: choose_reply(a, fix_status_paths({
                 'problems/?id=123': [self.sapi.error_reply(id='123')]
@@ -465,8 +468,8 @@ class MockSubmissionBaseTests(_QueryTest):
                                              self.sapi.error_reply(id='1')]
                     }, **self.poll_params))
 
-            def accept_problems_with_continue_reply(path, body, ids=iter('12')):
-                problems = json.loads(body)
+            def accept_problems_with_continue_reply(path, data, ids=iter('12')):
+                problems = orjson.loads(data)
                 return choose_reply(path, {
                     'problems/': [self.sapi.continue_reply(id=next(ids)) for _ in problems]
                 })
@@ -507,7 +510,7 @@ class MockSubmissionWithShortPolling(MockSubmissionBaseTests,
             session = mock.Mock()
 
             # on submit, return status pending
-            session.post = lambda path, _: choose_reply(path, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [self.sapi.continue_reply(id='123')]
             })
 
@@ -552,7 +555,7 @@ class MockSubmissionWithShortPolling(MockSubmissionBaseTests,
         # responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
-            session.post = lambda path, _: choose_reply(path, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [self.sapi.continue_reply(id='1')]
             })
             session.get = lambda path: choose_reply(path, fix_status_paths({
@@ -583,7 +586,7 @@ class MockSubmissionWithShortPolling(MockSubmissionBaseTests,
         def create_mock_session(client):
             badnow = utcrel(100)
             session = mock.Mock()
-            session.post = lambda path, _: choose_reply(path, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [self.sapi.continue_reply(id='1')]
             }, date=badnow)
             session.get = lambda path: choose_reply(path, fix_status_paths({
@@ -613,7 +616,7 @@ class MockSubmissionWithShortPolling(MockSubmissionBaseTests,
             session = mock.Mock()
 
             # on submit, return status pending
-            session.post = lambda path, _: choose_reply(path, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [self.sapi.continue_reply(id='123')]
             })
 
@@ -674,7 +677,10 @@ class DeleteEvent(Exception):
     @staticmethod
     def handle(path, **kwargs):
         """Callback useable to mock a delete request."""
-        raise DeleteEvent(path, json.dumps(kwargs['json']))
+        data = kwargs.get('data') or orjson.dumps(kwargs.get('json'))
+        if isinstance(data, bytes):
+            data = data.decode('utf8')
+        raise DeleteEvent(path, data)
 
 
 @mock.patch('time.sleep', lambda *x: None)
@@ -697,7 +703,7 @@ class MockCancel(unittest.TestCase):
         def create_mock_session(client):
             session = mock.Mock()
             reply_body = [self.sapi.continue_reply(id=submission_id, solver='solver')]
-            session.get = lambda a: choose_reply(a, {
+            session.get = lambda path, **kwargs: choose_reply(path, {
                 'problems/?id={}'.format(submission_id): reply_body})
             session.delete = DeleteEvent.handle
             return session
@@ -732,10 +738,10 @@ class MockCancel(unittest.TestCase):
             reply_body = [self.sapi.continue_reply(id=submission_id)]
 
             session = mock.Mock()
-            session.get = lambda a: choose_reply(a, {
+            session.get = lambda path, **kwargs: choose_reply(path, {
                 'problems/?id={}'.format(submission_id): reply_body})
 
-            def post(a, _):
+            def post(a, **kwargs):
                 release_reply.wait()
                 return choose_reply(a, {'problems/': reply_body})
 
@@ -802,7 +808,7 @@ class TestComputationID(unittest.TestCase):
             session = mock.Mock()
 
             # delayed submit; emulates waiting in queue
-            def post(path, _):
+            def post(path, **kwargs):
                 release_reply.wait()
                 reply_body = self.sapi.complete_reply(id=submission_id, solver=solver_name)
                 return choose_reply(path, {'problems/': [reply_body]})
@@ -863,10 +869,10 @@ class TestOffsetHandling(_QueryTest):
         # the mocked responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
-            session.post = lambda a, _: choose_reply(a, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [self.sapi.complete_no_answer_reply(
                     id='123')]})
-            session.get = lambda a: choose_reply(a, {
+            session.get = lambda path, **kwargs: choose_reply(path, {
                 'problems/123/': self.sapi.complete_reply(
                     id='123', answer_patch=dict(offset=offset))})
             return session
@@ -891,9 +897,9 @@ class TestOffsetHandling(_QueryTest):
         # the mocked responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
-            session.post = lambda a, _: choose_reply(a, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
-            session.get = lambda a: choose_reply(a, {
+            session.get = lambda path, **kwargs: choose_reply(path, {
                 'problems/123/': self.sapi.complete_reply(id='123')})
             return session
 
@@ -919,9 +925,9 @@ class TestOffsetHandling(_QueryTest):
         # the mocked responses are stateless
         def create_mock_session(client):
             session = mock.Mock()
-            session.post = lambda a, _: choose_reply(a, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
-            session.get = lambda a: choose_reply(a, {
+            session.get = lambda path, **kwargs: choose_reply(path, {
                 'problems/123/': self.sapi.complete_reply(
                     id='123', answer_patch=dict(offset=answer_offset))})
             return session
@@ -956,7 +962,7 @@ class TestProblemLabel(unittest.TestCase):
 
         # replacement for Client._submit()
         def _submit(client, body_data, computation):
-            body = json.loads(body_data.result())
+            body = orjson.loads(body_data.result())
 
             if 'label' not in body:
                 if expected_label is None:
@@ -1018,9 +1024,9 @@ class TestProblemLabel(unittest.TestCase):
         def make_session_generator(label):
             def create_mock_session(client):
                 session = mock.Mock()
-                session.post = lambda a, _: choose_reply(a, {
+                session.post = lambda path, **kwargs: choose_reply(path, {
                     'problems/': [self.sapi.complete_no_answer_reply(id='123', label=None)]})
-                session.get = lambda a: choose_reply(a, {
+                session.get = lambda path, **kwargs: choose_reply(path, {
                     'problems/123/': self.sapi.complete_reply(id='123', label=label)})
                 return session
             return create_mock_session
@@ -1055,9 +1061,9 @@ class TestComputationSamplesetCaching(unittest.TestCase):
 
         def create_mock_session(client):
             session = mock.Mock()
-            session.post = lambda a, _: choose_reply(a, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [sapi.complete_no_answer_reply(id='123')]})
-            session.get = lambda a: choose_reply(a, {
+            session.get = lambda path, **kwargs: choose_reply(path, {
                 'problems/123/': sapi.complete_reply(id='123')})
             return session
 
@@ -1099,9 +1105,9 @@ class TestThreadSafety(unittest.TestCase):
 
         def create_mock_session(client):
             session = mock.Mock()
-            session.post = lambda a, _: choose_reply(a, {
+            session.post = lambda path, **kwargs: choose_reply(path, {
                 'problems/': [sapi.complete_no_answer_reply(id='123')]})
-            session.get = lambda a: choose_reply(a, {
+            session.get = lambda path, **kwargs: choose_reply(path, {
                 'problems/123/': sapi.complete_reply(id='123')})
             return session
 
@@ -1146,7 +1152,7 @@ class TestSerialization(unittest.TestCase):
 
         # replacement for Client._submit(), called with exact network request data
         def _submit(client, body_data, computation):
-            body = json.loads(body_data.result())
+            body = orjson.loads(body_data.result())
 
             params = body.get('params')
             if params != expected_params:
@@ -1174,20 +1180,19 @@ class TestSerialization(unittest.TestCase):
         (numpy.ubyte(1), 1), (numpy.uint8(1), 1),
         (numpy.short(1), 1), (numpy.int16(1), 1),
         (numpy.ushort(1), 1), (numpy.uint16(1), 1),
-        (numpy.intc(1), 1), (numpy.int32(1), 1),
-        (numpy.uintc(1), 1), (numpy.uint32(1), 1),
+        (numpy.int32(1), 1),    # numpy.intc
+        (numpy.uint32(1), 1),   # numpy.uintc
         (numpy.int_(1), 1), (numpy.int32(1), 1),
         (numpy.uint(1), 1), (numpy.uint32(1), 1),
-        (numpy.longlong(1), 1), (numpy.int64(1), 1),
-        (numpy.ulonglong(1), 1), (numpy.uint64(1), 1),
+        (numpy.int64(1), 1),    # numpy.longlong
+        (numpy.uint64(1), 1),   # numpy.ulonglong
         (numpy.half(1.0), 1.0), (numpy.float16(1.0), 1.0),
         (numpy.single(1.0), 1.0), (numpy.float32(1.0), 1.0),
         (numpy.double(1.0), 1.0), (numpy.float64(1.0), 1.0),
-        (numpy.longdouble(1.0), 1.0)
-    ] + ([
-        (numpy.float128(1.0), 1.0)      # unavailable on windows
-    ] if hasattr(numpy, 'float128') else [
-    ]))
+        # note: orjson does not currently support:
+        #       longlong, ulonglong, longdouble/float128, intc, uintc
+        # see: https://github.com/ijl/orjson/issues/469
+    ])
     @mock.patch.object(Client, 'create_session', lambda client: mock.Mock())
     def test_params_are_serialized(self, np_val, py_val):
         """Parameters supplied as NumPy types are correctly serialized."""

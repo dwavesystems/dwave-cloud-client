@@ -56,6 +56,7 @@ from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Union
 
+import orjson
 import requests
 import urllib3
 from dateutil.parser import parse as parse_datetime
@@ -1284,9 +1285,11 @@ class Client(object):
                 # Submit the problems
                 logger.debug("Submitting %d problems", len(ready_problems))
                 try:
-                    body = '[' + ','.join(msg.body.result() for msg in ready_problems) + ']'
+                    body = orjson.dumps([
+                        orjson.Fragment(msg.body.result()) for msg in ready_problems
+                    ])
                     logger.debug('Size of POST body = %d', len(body))
-                    message = Client._sapi_request(session.post, 'problems/', body)
+                    message = Client._sapi_request(session.post, 'problems/', data=body)
                     logger.debug("Finished submitting %d problems", len(ready_problems))
 
                 except Exception as exc:
@@ -1439,8 +1442,8 @@ class Client(object):
                 # Submit the problems, attach the ids as a json list in the
                 # body of the delete query.
                 try:
-                    ids = [item[0] for item in item_list]
-                    Client._sapi_request(session.delete, 'problems/', json=ids)
+                    ids = orjson.dumps([item[0] for item in item_list])
+                    Client._sapi_request(session.delete, 'problems/', data=ids)
 
                 except Exception as exc:
                     for _, future in item_list:
@@ -1780,8 +1783,9 @@ class Client(object):
                 raise
 
         # parse response
-        logger.trace("[%s] response: (code=%r, body=%r, headers=%r)",
-                     caller, response.status_code, response.text, response.headers)
+        if logger.isEnabledFor(logging.TRACE):
+            logger.trace("[%s] response: (code=%r, content=%r, headers=%r)",
+                         caller, response.status_code, response.content, response.headers)
 
         # workaround for charset_normalizer episode in requests>=2.26.0,
         # where decoding of an empty json object '{}' fails.
