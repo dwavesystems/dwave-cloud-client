@@ -1063,7 +1063,8 @@ def capture_stderr(fn):
     """Decorator that captures stderr and provides access via `output` argument."""
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        with contextlib.redirect_stderr(io.StringIO()) as output:
+        stream = io.TextIOWrapper(io.BytesIO())
+        with contextlib.redirect_stderr(stream) as output:
             return fn(*args, output=output, **kwargs)
     return wrapper
 
@@ -1078,7 +1079,8 @@ class TestLogging(unittest.TestCase):
         logger.warning('secret: beefcafe-aaaa-bbbb-cccc-0123456789ab')
 
         # level is warning+, and secrets are filtered
-        lines = output.getvalue().splitlines()
+        output.seek(0)
+        lines = output.readlines()
         self.assertEqual(len(lines), 1)
         self.assertIn('bee...9ab', lines[0])
 
@@ -1089,7 +1091,8 @@ class TestLogging(unittest.TestCase):
         logger.info('test', extra=dict(key='value'))
 
         # level is info+, json output contains the extra dict
-        lines = output.getvalue().splitlines()
+        output.seek(0)
+        lines = output.readlines()
         self.assertEqual(len(lines), 1)
         record = json.loads(lines[0])
         self.assertEqual(record.get('message'), 'test')
@@ -1097,7 +1100,7 @@ class TestLogging(unittest.TestCase):
 
     @capture_stderr
     def test_multiple_handlers(self, output):
-        structured_stream = io.StringIO()
+        structured_stream = io.BytesIO()
 
         configure_logging(
             logger, handler_level=logging.ERROR)
@@ -1109,11 +1112,12 @@ class TestLogging(unittest.TestCase):
         logger.error('error')
 
         # structured_stream has all as json, stderr only errors in text
-        error = output.getvalue().splitlines()
+        output.seek(0)
+        error = output.readlines()
         self.assertEqual(len(error), 1)
         self.assertIn('error', error[0])
 
-        debug = list(map(json.loads, structured_stream.getvalue().splitlines()))
+        debug = list(map(json.loads, structured_stream.getvalue().decode('utf8').splitlines()))
         self.assertEqual(len(debug), 2)
         self.assertEqual(debug[0].get('message'), 'debug')
         self.assertEqual(debug[1].get('message'), 'error')

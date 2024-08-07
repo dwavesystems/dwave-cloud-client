@@ -17,8 +17,8 @@
 import datetime
 import inspect
 import io
-import json
 import logging
+import orjson
 import os
 import re
 import sys
@@ -65,13 +65,22 @@ class FilteredSecretsFormatter(logging.Formatter):
 
 
 class JSONFormatter(ISOFormatter):
+    """Encode record dict as JSON (bytes)."""
+
     def format(self, record: logging.LogRecord) -> str:
         super().format(record)
         # filter out message template and potentially unserializable args
         rec = record.__dict__.copy()
         del rec['args']
         del rec['msg']
-        return json.dumps(rec)
+        return orjson.dumps(rec)
+
+
+class BinaryFormatter(logging.Formatter):
+    """Encode string format message to bytes."""
+
+    def format(self, record: logging.LogRecord) -> bytes:
+        return super().format(record).encode('utf8')
 
 
 def parse_loglevel(level_name: typing.Union[str, int],
@@ -129,11 +138,22 @@ def add_loglevel(name: str, value: int) -> None:
     setattr(logging.Logger, name.lower(), log_method)
 
 
+class BinaryStreamHandler(logging.StreamHandler):
+    """StreamHandler that emits to a binary stream."""
+
+    terminator = b'\n'
+
+    def __init__(self, stream=None):
+        if stream is None:
+            stream = sys.stderr.buffer
+        super().__init__(stream=stream)
+
+
 def configure_logging(logger: typing.Optional[logging.Logger] = None,
                       *,
                       level: typing.Union[str, int] = logging.WARNING,
                       filter_secrets: bool = True,
-                      output_stream: typing.Optional[io.IOBase] = None,
+                      output_stream: typing.Optional[io.BytesIO] = None,
                       in_utc: bool = False,
                       structured_output: bool = False,
                       handler_level: typing.Optional[int] = None,
@@ -157,7 +177,7 @@ def configure_logging(logger: typing.Optional[logging.Logger] = None,
     if logger is None:
         logger = logging.getLogger('dwave.cloud')
     if output_stream is None:
-        output_stream = sys.stderr
+        output_stream = sys.stderr.buffer
     if handler_level is None:
         handler_level = level
 
@@ -167,15 +187,16 @@ def configure_logging(logger: typing.Optional[logging.Logger] = None,
     )
 
     if structured_output:
-        formatter_base = JSONFormatter
+        output_formatter = JSONFormatter
     else:
-        formatter_base = ISOFormatter
+        output_formatter = BinaryFormatter
 
     if filter_secrets:
-        class Formatter(FilteredSecretsFormatter, formatter_base):
+        class Formatter(output_formatter, FilteredSecretsFormatter, ISOFormatter):
             pass
     else:
-        Formatter = formatter_base
+        class Formatter(output_formatter, ISOFormatter):
+            pass
 
     if not additive:
         # make sure handlers are not accumulated
@@ -183,7 +204,7 @@ def configure_logging(logger: typing.Optional[logging.Logger] = None,
             logger.removeHandler(logger.handlers[-1])
 
     formatter = Formatter(**format)
-    handler = logging.StreamHandler(stream=output_stream)
+    handler = BinaryStreamHandler(stream=output_stream)
     handler.setFormatter(formatter)
     handler.setLevel(handler_level)
 
