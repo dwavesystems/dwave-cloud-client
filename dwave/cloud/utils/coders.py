@@ -19,6 +19,7 @@
 """
 
 import json
+import warnings
 
 try:
     import numpy
@@ -58,6 +59,12 @@ class NumpyEncoder(json.JSONEncoder):
     """
 
     def default(self, obj):
+        warnings.warn(
+            f"`dwave.cloud.utils.coders.NumpyEncoder` is deprecated since "
+            f"dwave-cloud-client 0.12.2, and will be removed in 0.14.0. "
+            f"Use `orjson.dumps()` with `OPT_SERIALIZE_NUMPY` option instead.",
+            DeprecationWarning, stacklevel=2)
+
         if isinstance(obj, numpy.integer):
             return int(obj)
         elif isinstance(obj, numpy.floating):

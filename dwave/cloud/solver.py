@@ -47,7 +47,6 @@ from dwave.cloud.coders import (
 from dwave.cloud.computation import Future
 from dwave.cloud.concurrency import Present
 from dwave.cloud.events import dispatches_events
-from dwave.cloud.utils.coders import NumpyEncoder
 from dwave.cloud.utils.qubo import reformat_qubo_as_ising
 
 # Use numpy if available for fast encoding/decoding

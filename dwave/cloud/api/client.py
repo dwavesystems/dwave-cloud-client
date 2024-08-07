@@ -23,6 +23,7 @@ import warnings
 from collections import deque, namedtuple
 from typing import Callable, Mapping, Optional, Tuple, TypedDict, Union, TYPE_CHECKING
 
+import orjson
 import requests
 import urllib3
 import werkzeug
@@ -693,7 +694,7 @@ class DWaveAPIClient:
         # error -> body can be json or plain text error message
         if not response.ok:
             try:
-                msg = response.json()
+                msg = orjson.loads(response.content)
                 error_msg = msg['error_msg']
                 error_code = msg['error_code']
             except:

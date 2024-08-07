@@ -1108,7 +1108,7 @@ class Client(object):
             raise SolverAuthenticationError from e
         except api.exceptions.ResourceBadResponseError as e:
             raise InvalidAPIResponseError(e) from e
-        except requests.exceptions.JSONDecodeError as e:
+        except orjson.JSONDecodeError as e:
             raise InvalidAPIResponseError("JSON response expected") from e
 
         solvers = [s for s in solvers if all(p(s) for p in predicates)]
@@ -1802,7 +1802,7 @@ class Client(object):
         # error -> body can be json or plain text error message
         if response.ok:
             try:
-                return response.json()
+                return orjson.loads(response.content)
             except:
                 raise InvalidAPIResponseError("JSON response expected")
 
@@ -1811,7 +1811,7 @@ class Client(object):
                 raise SolverAuthenticationError(error_code=401)
 
             try:
-                msg = response.json()
+                msg = orjson.loads(response.content)
                 error_msg = msg['error_msg']
                 error_code = msg['error_code']
             except:

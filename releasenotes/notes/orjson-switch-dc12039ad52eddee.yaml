@@ -1,0 +1,10 @@
+---
+features:
+  - |
+    Speed-up JSON encoding and decoding by switching to ``orjson``.
+    See `#423 <https://github.com/dwavesystems/dwave-cloud-client/issues/423>`_
+deprecations:
+  - |
+    ``dwave.cloud.utils.coders.NumpyEncoder`` is deprecated and will be removed
+    in ``dwave-cloud-client==0.14.0``.
+    Use ``orjson.dumps()`` with ``OPT_SERIALIZE_NUMPY`` option instead.

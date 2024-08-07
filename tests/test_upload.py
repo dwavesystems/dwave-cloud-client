@@ -22,6 +22,7 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor, wait
 from unittest import mock
 
+import orjson
 from parameterized import parameterized
 from requests.exceptions import HTTPError
 
@@ -411,19 +412,26 @@ class TestChunkedData(unittest.TestCase):
         self.assertListEqual(chunks_expected, chunks_generated)
 
 
-def choose_reply(key, replies, statuses=None):
+def choose_reply(path, replies, statuses=None):
     """Choose the right response based on a hashable `key` and make a mock
     response.
     """
+    # dedup vs test_mock_submissions.choose_reply
 
     if statuses is None:
         statuses = collections.defaultdict(lambda: iter([200]))
 
-    if key in replies:
-        response = mock.Mock(['text', 'json', 'raise_for_status', 'headers'])
-        response.status_code = next(statuses[key])
-        response.text = replies[key]
-        response.json.side_effect = lambda: json.loads(replies[key])
+    if path in replies:
+        response = mock.Mock(['content', 'text', 'json', 'raise_for_status', 'headers'])
+        response.status_code = next(statuses[path])
+        content = replies[path]
+        if isinstance(content, str):
+            content = content.encode('utf8')
+        elif not isinstance(content, bytes):
+            content = orjson.dumps(content)
+        response.content = content
+        response.text = content.decode('utf8')
+        response.json.side_effect = lambda: replies[path]
         response.headers = {}
 
         def raise_for_status():
@@ -442,7 +450,7 @@ def choose_reply(key, replies, statuses=None):
 
         return response
     else:
-        raise NotImplementedError(key)
+        raise NotImplementedError(path)
 
 
 @mock.patch('time.sleep', lambda *args: None)
