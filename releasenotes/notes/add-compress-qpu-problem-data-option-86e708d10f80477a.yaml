@@ -1,0 +1,9 @@
+---
+features:
+  - |
+    Enable QPU problem data compression on upload using ``deflate`` content
+    encoding.
+
+    Compression is controlled with a new config option, ``compress_qpu_problem_data``,
+    defaulting to true, and it can be turned off either in config file or via
+    ``Client()`` kwarg.

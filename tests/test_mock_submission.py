@@ -17,6 +17,7 @@
 import threading
 import time
 import unittest
+import zlib
 from concurrent.futures import TimeoutError, ThreadPoolExecutor
 from typing import Any, Dict
 from unittest import mock
@@ -84,9 +85,7 @@ class _QueryTest:
             self.assertEqual(state, list(record.sample))
 
 
-@mock.patch('time.sleep', lambda *x: None)
-class MockSubmissionBaseTests(_QueryTest):
-    """Test connecting and some related failure modes."""
+class MockSubmissionBase(_QueryTest):
 
     @classmethod
     def setUpClass(cls):
@@ -94,8 +93,14 @@ class MockSubmissionBaseTests(_QueryTest):
         cls.config = dict(
             endpoint='endpoint',
             token='token',
-            poll_strategy=cls.poll_strategy,
         )
+        if hasattr(cls, 'poll_strategy'):
+            cls.config['poll_strategy'] = cls.poll_strategy
+
+
+@mock.patch('time.sleep', lambda *x: None)
+class MockSubmissionBaseTests(MockSubmissionBase):
+    """Test connecting and some related failure modes."""
 
     def test_submit_null_reply(self):
         """Get an error when the server's response is incomplete."""
@@ -424,7 +429,12 @@ class MockSubmissionBaseTests(_QueryTest):
                                              self.sapi.error_reply(id='1')]
                     }, **self.poll_params))
 
-            def accept_problems_with_continue_reply(path, data, ids=iter('12')):
+            def accept_problems_with_continue_reply(path, data=None, headers=None, ids=iter('12')):
+                if headers is None:
+                    headers = {}
+                encoding = headers.get('Content-Encoding', 'identity').lower()
+                if encoding == 'deflate':
+                    data = zlib.decompress(data)
                 problems = orjson.loads(data)
                 return choose_reply(path, {
                     'problems/': [self.sapi.continue_reply(id=next(ids)) for _ in problems]
@@ -450,6 +460,60 @@ class MockSubmissionBaseTests(_QueryTest):
                 with self.assertRaises(SolverFailureError):
                     self._check(results1, linear, quadratic, **params)
                 self._check(results2, linear, quadratic, **params)
+
+
+class TestUploadCompression(MockSubmissionBase, unittest.TestCase):
+    """Verify `compress_qpu_problem_data` config directive is respected, i.e.
+    QPU problem data is compressed on upload, and Content-Encoding is correctly
+    set."""
+
+    @parameterized.expand([
+        (True, ),
+        (False, ),
+    ])
+    def test_compression_on_upload(self, compress):
+        # make sure POST data is compressed if `compress_qpu_problem_data` config
+        # option is set
+
+        class Invalid(Exception):
+            pass
+
+        def create_mock_session(client):
+            session = mock.Mock()
+
+            def post(path, **kwargs):
+                data = kwargs.pop('data')
+                headers = kwargs.pop('headers', {})
+                encoding = headers.get('Content-Encoding', 'identity')
+
+                if compress and encoding == 'deflate':
+                    data = zlib.decompress(data)
+
+                if compress and encoding != 'deflate':
+                    raise Invalid
+
+                problem = orjson.loads(data)
+                if problem[0]['data'] != self.sapi.problem_data():
+                    raise Invalid
+
+                return choose_reply(path, {
+                    'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
+
+            session.post = post
+            session.get = lambda path, **kwargs: choose_reply(path, {
+                'problems/123/': self.sapi.complete_reply(id='123')})
+
+            return session
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client(compress_qpu_problem_data=compress, **self.config) as client:
+                solver = Solver(client, self.sapi.solver.data)
+
+                linear, quadratic = self.sapi.problem
+                params = dict(num_reads=100)
+                results = solver.sample_ising(linear, quadratic, **params)
+
+                self._check(results, linear, quadratic, **params)
 
 
 class MockSubmissionWithShortPolling(MockSubmissionBaseTests,
