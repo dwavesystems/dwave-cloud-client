@@ -163,6 +163,7 @@ class ClientConfig(BaseModel, GetterMixin):
     # specific connection options
     permissive_ssl: Optional[bool] = False
     connection_close: Optional[bool] = False
+    compress_qpu_problem_data: Optional[bool] = True
 
     # api request retry params
     request_retry: Optional[RequestRetryConfig] = RequestRetryConfig()
@@ -312,6 +313,7 @@ _V1_CONFIG_DEFAULTS = {
     'request_timeout': 60,
     'polling_timeout': None,
     'connection_close': False,
+    'compress_qpu_problem_data': True,
     'headers': None,
     'client_cert': None,
     'client_cert_key': None,

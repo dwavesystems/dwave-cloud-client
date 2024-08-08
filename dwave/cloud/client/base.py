@@ -49,6 +49,7 @@ import base64
 import hashlib
 import codecs
 import concurrent.futures
+import zlib
 
 from itertools import chain, zip_longest
 from functools import partial, wraps
@@ -157,6 +158,10 @@ class Client(object):
         connection_close (bool, default=False):
             Force HTTP(S) connection close after each request. Set to ``True``
             to prevent intermediate network equipment closing idle connections.
+
+        compress_qpu_problem_data (bool, default=True):
+            Enable QPU problem data compression on upload to SAPI. Enabled by
+            default. Set to ``False`` to disable compression.
 
         headers (dict/str, optional):
             Newline-separated additional HTTP headers to include with each
@@ -305,6 +310,7 @@ class Client(object):
         'request_timeout': 60,
         'polling_timeout': None,
         'connection_close': False,
+        'compress_qpu_problem_data': True,
         'headers': None,
         'client_cert': None,
         'client_cert_key': None,
@@ -1285,11 +1291,19 @@ class Client(object):
                 # Submit the problems
                 logger.debug("Submitting %d problems", len(ready_problems))
                 try:
-                    body = orjson.dumps([
+                    data = orjson.dumps([
                         orjson.Fragment(msg.body.result()) for msg in ready_problems
                     ])
-                    logger.debug('Size of POST body = %d', len(body))
-                    message = Client._sapi_request(session.post, 'problems/', data=body)
+                    logger.debug('Size of problems/jobs data = %d', len(data))
+
+                    headers = {}
+                    if self.config.compress_qpu_problem_data:
+                        data = zlib.compress(data)
+                        headers['Content-Encoding'] = 'deflate'
+                        logger.debug("Compressed with 'deflate', new size = %d", len(data))
+
+                    message = Client._sapi_request(
+                        session.post, 'problems/', data=data, headers=headers)
                     logger.debug("Finished submitting %d problems", len(ready_problems))
 
                 except Exception as exc:
