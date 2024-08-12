@@ -1,0 +1,11 @@
+---
+features:
+  - |
+    Add ``timeout`` keyword argument to ``api.resources.Problems.get_problem()``
+    method.
+
+    Use it to enable long polling on problem fetch API endpoint. The connection
+    is closed (server-side) when the problem completes, or the ``timeout``
+    (in seconds) elapses, whatever comes first. In case problem completed in
+    time, problem answer is returned in addition to problem status (which is
+    always returned).

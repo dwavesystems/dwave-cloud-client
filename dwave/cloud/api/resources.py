@@ -179,10 +179,16 @@ class Problems(ResourceBase):
         return TypeAdapter(List[models.ProblemStatus]).validate_python(statuses)
 
     @accepts(media_type='application/vnd.dwave.sapi.problem+json', version='>=2.1,<3')
-    def get_problem(self, problem_id: str) -> models.ProblemStatusMaybeWithAnswer:
+    def get_problem(self,
+                    problem_id: str,
+                    timeout: Optional[int] = None,
+                    ) -> models.ProblemStatusMaybeWithAnswer:
         """Retrieve problem short status and answer if answer is available."""
         path = '{}'.format(problem_id)
-        response = self.session.get(path)
+        params = {}
+        if timeout is not None:
+            params.setdefault('timeout', timeout)
+        response = self.session.get(path, params=params)
         status = orjson.loads(response.content)
         return models.ProblemStatusMaybeWithAnswer.model_validate(status)
 
