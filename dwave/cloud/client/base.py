@@ -731,8 +731,8 @@ class Client(object):
                     solver_id=name, filter=dynamic_fields, no_cache_=True)
 
                 # note: avg_load may not exist in solver data
-                if 'avg_load' in load:
-                    solver.avg_load = load.avg_load
+                if (avg_load := load.get('avg_load')) is not None:
+                    solver.avg_load = avg_load
                 solvers = [solver]
 
             except api.exceptions.ResourceNotFoundError as exc:
@@ -749,7 +749,7 @@ class Client(object):
                          filter=dynamic_fields, no_cache_=True)}
 
             for solver in solvers:
-                if avg_load := loads.get(solver.id) is not None:
+                if (avg_load := loads.get(solver.id)) is not None:
                     solver.avg_load = avg_load
 
         logger.info("Received solver data for %d solver(s).", len(solvers))

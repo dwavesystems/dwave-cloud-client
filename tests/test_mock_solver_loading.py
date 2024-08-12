@@ -16,6 +16,7 @@
 
 import unittest
 import unittest.mock
+from urllib.parse import urlencode
 
 import requests_mock
 
@@ -27,7 +28,7 @@ from dwave.cloud.solver import Solver
 from dwave.cloud.exceptions import *
 
 
-def solver_data(id_, cat='qpu', incomplete=False, subset='all'):
+def solver_data(id_, status="ONLINE", avg_load=0.1, cat='qpu', incomplete=False, subset='all'):
     """Return data dict describing a single solver."""
     obj = {
         "properties": {
@@ -40,8 +41,8 @@ def solver_data(id_, cat='qpu', incomplete=False, subset='all'):
         },
         "id": id_,
         "description": "A test solver",
-        "status": "ONLINE",
-        "avg_load": 0.1
+        "status": status,
+        "avg_load": avg_load,
     }
 
     if incomplete:
@@ -50,11 +51,14 @@ def solver_data(id_, cat='qpu', incomplete=False, subset='all'):
     if subset == 'static':
         del obj['avg_load']
 
-    if subset == 'dynamic':
+    elif subset == 'dynamic':
         obj = {
             "id": id_,
             "avg_load": obj["avg_load"]
         }
+
+    elif subset != 'all':
+        raise ValueError(f'unknown subset {subset!r}')
 
     return obj
 
@@ -65,7 +69,7 @@ def solver_object(id_, **kwargs):
 
 class MockSolverLoading(unittest.TestCase):
 
-    endpoint = 'https://dwavesys.com'
+    endpoint = 'https://mock'
     token = 'abc123abc123abc123abc123abc123abc123'
 
     solver1_name = 'first_solver'
@@ -99,12 +103,12 @@ class MockSolverLoading(unittest.TestCase):
         m.get(requests_mock.ANY, status_code=401, request_headers=invalid_token_headers)
 
         def add_mock_solver(m, url, name, incomplete=False):
-            m.get(url, json=solver_data(name, incomplete=incomplete),
+            m.get(url, complete_qs=True, json=solver_data(name, incomplete=incomplete),
                   request_headers=valid_token_headers, headers=solver_content_type)
-            m.get(f"{url}?filter=all,-avg_load",
+            m.get(f"{url}?{urlencode(dict(filter='all,-avg_load'))}",
                   json=solver_data(name, subset='static', incomplete=incomplete),
                   request_headers=valid_token_headers, headers=solver_content_type)
-            m.get(f"{url}?filter=none,+id,+avg_load",
+            m.get(f"{url}?{urlencode(dict(filter='none,+id,+avg_load'))}",
                   json=solver_data(name, subset='dynamic', incomplete=incomplete),
                   request_headers=valid_token_headers, headers=solver_content_type)
 
@@ -114,21 +118,21 @@ class MockSolverLoading(unittest.TestCase):
 
         m.get(solver4_truncated_url,
               text='{"id', request_headers=valid_token_headers, headers=solver_content_type)
-        m.get(f"{solver4_truncated_url}?filter=all,-avg_load",
+        m.get(f"{solver4_truncated_url}?{urlencode(dict(filter='all,-avg_load'))}",
               text='{"id', request_headers=valid_token_headers, headers=solver_content_type)
-        m.get(f"{solver4_truncated_url}?filter=none,+id,+avg_load",
+        m.get(f"{solver4_truncated_url}?{urlencode(dict(filter='none,+id,+avg_load'))}",
               text='{"id', request_headers=valid_token_headers, headers=solver_content_type)
 
         m.get(all_solvers_url,
               json=[solver_data(self.solver1_name), solver_data(self.solver2_name)],
               request_headers=valid_token_headers, headers=solvers_content_type)
-        m.get(f"{all_solvers_url}?filter=all,-avg_load",
+        m.get(f"{all_solvers_url}?{urlencode(dict(filter='all,-avg_load'))}",
               json=[solver_data(self.solver1_name, subset='static'),
                     solver_data(self.solver2_name, subset='static')],
               request_headers=valid_token_headers, headers=solvers_content_type)
-        m.get(f"{all_solvers_url}?filter=none,+id,+avg_load",
+        m.get(f"{all_solvers_url}?{urlencode(dict(filter='none,+id,+avg_load'))}",
               json=[solver_data(self.solver1_name, subset='dynamic'),
-                    solver_data(self.solver2_name, subset='static')],
+                    solver_data(self.solver2_name, subset='dynamic')],
               request_headers=valid_token_headers, headers=solvers_content_type)
 
         m.start()
@@ -151,11 +155,38 @@ class MockSolverLoading(unittest.TestCase):
             self.assertTrue(len(client.get_solvers()) > 0)
 
     def test_load_solver(self):
+        ref = solver_object(self.solver1_name)
+
         with Client(endpoint=self.endpoint, token=self.token) as client:
             solver = client.get_solver(self.solver1_name)
-            self.assertEqual(solver.id, self.solver1_name)
+
+            with self.subTest("static properties initialized"):
+                self.assertEqual(solver.id, ref.id)
+                self.assertEqual(solver.properties, ref.properties)
+
+            with self.subTest("dynamic properties initialized"):
+                self.assertEqual(solver.data['status'], ref.data['status'])
+                self.assertEqual(solver.data['avg_load'], ref.data['avg_load'])
 
     def test_load_all_solvers(self):
+        refs = [solver_object(self.solver1_name), solver_object(self.solver2_name)]
+
+        with Client(endpoint=self.endpoint, token=self.token) as client:
+            solvers = client.get_solvers()
+
+            self.assertEqual(len(solvers), 2)
+
+            _f = lambda attr, solvers: [getattr(s, attr) for s in solvers]
+            with self.subTest("static properties initialized"):
+                self.assertEqual(_f('id', solvers), _f('id', refs))
+                self.assertEqual(_f('properties', solvers), _f('properties', refs))
+
+            _f = lambda key, solvers: [s.data[key] for s in solvers]
+            with self.subTest("dynamic properties initialized"):
+                self.assertEqual(_f('status', solvers), _f('status', refs))
+                self.assertEqual(_f('avg_load', solvers), _f('avg_load', refs))
+
+    def test_solvers_cache(self):
         with unittest.mock.patch.multiple(
                 Client, _DEFAULT_SOLVERS_CACHE_CONFIG=dict(maxage=60, store={})):
 
