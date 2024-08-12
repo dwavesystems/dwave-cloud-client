@@ -732,7 +732,7 @@ class Client(object):
 
                 # note: avg_load may not exist in solver data
                 if (avg_load := load.get('avg_load')) is not None:
-                    solver.avg_load = load.avg_load
+                    solver.avg_load = avg_load
                 solvers = [solver]
 
             except api.exceptions.ResourceNotFoundError as exc:
