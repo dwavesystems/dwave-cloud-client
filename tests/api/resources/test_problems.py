@@ -151,6 +151,18 @@ class ProblemResourcesBaseTests(abc.ABC):
         self.assertIsInstance(status.answer, models.ProblemAnswer)
         self.verify_problem_answer(status.answer)
 
+    def test_get_problem_long_polling(self):
+        """Problem status with answer retrieved by problem id, long polling variant"""
+
+        problem_id = self.problem_id
+        status = self.api.get_problem(problem_id, timeout=self.poll_wait_time)
+
+        self.assertIsInstance(status, models.ProblemStatusMaybeWithAnswer)
+        self.verify_problem_status(status, solved=True)
+
+        self.assertIsInstance(status.answer, models.ProblemAnswer)
+        self.verify_problem_answer(status.answer)
+
     def test_get_problem_status(self):
         """Problem status retrieved by problem id."""
 
@@ -454,6 +466,12 @@ class ProblemResourcesMockerMixin:
         # problem status et al
         self.mocker.get(
             url(f'problems/{p1_id}'),
+            complete_qs=True,
+            json=p1_status_with_answer,
+            request_headers=headers)
+        self.mocker.get(
+            url(f'problems/{p1_id}?timeout={self.poll_wait_time}'),
+            complete_qs=True,
             json=p1_status_with_answer,
             request_headers=headers)
         self.mocker.get(
@@ -478,18 +496,22 @@ class ProblemResourcesMockerMixin:
             request_headers=headers)
         self.mocker.get(
             url(f'problems/{p1_id}/info'),
+            complete_qs=True,
             json=p1_info,
             request_headers=headers)
         self.mocker.get(
             url(f'problems/{p1_id}/answer'),
+            complete_qs=True,
             json=p1_answer,
             request_headers=headers)
         self.mocker.get(
             p1_answer_data_uri,
+            complete_qs=True,
             body=p1_answer_data,
             request_headers=headers)
         self.mocker.get(
             url(f'problems/{p1_id}/messages'),
+            complete_qs=True,
             json=p1_messages,
             request_headers=headers)
         self.mocker.get(
@@ -516,10 +538,12 @@ class ProblemResourcesMockerMixin:
             request_headers=headers)
         self.mocker.get(
             url('problems/?max_results=1'),
+            complete_qs=True,
             json=[p1_status],
             request_headers=headers)
         self.mocker.get(
             url('problems/?status=COMPLETED'),
+            complete_qs=True,
             json=[p1_status],
             request_headers=headers)
 
