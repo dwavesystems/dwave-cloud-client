@@ -40,7 +40,6 @@ import time
 import copy
 import queue
 import logging
-import inspect
 import warnings
 import operator
 import threading
@@ -74,10 +73,11 @@ from dwave.cloud.concurrency import PriorityThreadPoolExecutor
 from dwave.cloud.regions import get_regions, resolve_endpoints
 from dwave.cloud.upload import ChunkedData
 from dwave.cloud.events import dispatches_events
-from dwave.cloud.utils.http import PretimedHTTPAdapter, BaseUrlSession, default_user_agent
-from dwave.cloud.utils.time import datetime_to_timestamp, utcnow
-from dwave.cloud.utils.decorators import cached, retried
+from dwave.cloud.utils.decorators import retried
 from dwave.cloud.utils.exception import is_caused_by
+from dwave.cloud.utils.http import PretimedHTTPAdapter, BaseUrlSession, default_user_agent
+from dwave.cloud.utils.logging import get_caller_name
+from dwave.cloud.utils.time import datetime_to_timestamp, utcnow
 
 __all__ = ['Client']
 
@@ -1782,9 +1782,10 @@ class Client(object):
             :class:`~dwave.cloud.exceptions.RequestTimeout`.
         """
 
-        caller = inspect.stack()[1].function
-        verb = meth.__name__
-        logger.trace("[%s] request: session.%s(*%r, **%r)", caller, verb, args, kwargs)
+        caller = get_caller_name()
+        if logger.isEnabledFor(logging.TRACE):
+            logger.trace("[%s] request: session.%s(*%r, **%r)",
+                         caller, meth.__name__, args, kwargs)
 
         # execute request
         try:
