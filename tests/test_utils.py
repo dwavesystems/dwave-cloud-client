@@ -14,6 +14,7 @@
 
 import contextlib
 import copy
+import inspect
 import io
 import json
 import logging
@@ -45,7 +46,8 @@ from dwave.cloud.utils.dist import (
 from dwave.cloud.utils.exception import hasinstance, exception_chain, is_caused_by
 from dwave.cloud.utils.http import user_agent, default_user_agent, platform_tags
 from dwave.cloud.utils.logging import (
-    FilteredSecretsFormatter, configure_logging, parse_loglevel)
+    FilteredSecretsFormatter, configure_logging, parse_loglevel,
+    fast_stack)
 from dwave.cloud.utils.qubo import (
     uniform_iterator, uniform_get,
     active_qubits, generate_random_ising_problem)
@@ -1121,6 +1123,25 @@ class TestLogging(unittest.TestCase):
         self.assertEqual(len(debug), 2)
         self.assertEqual(debug[0].get('message'), 'debug')
         self.assertEqual(debug[1].get('message'), 'error')
+
+
+class TestLoggingHelpers(unittest.TestCase):
+
+    def test_fast_stack(self):
+        def f():
+            return inspect.stack()
+
+        def g():
+            return fast_stack()
+
+        stack = f()
+        fast = g()
+
+        self.assertEqual(len(stack), len(fast))
+        self.assertTrue(all(s.filename == f.filename for s,f in zip(stack,fast)))
+
+    def test_max_depth(self):
+        self.assertEqual(len(fast_stack(max_depth=3)), 3)
 
 
 if __name__ == '__main__':

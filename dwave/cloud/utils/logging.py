@@ -17,11 +17,13 @@
 import datetime
 import inspect
 import io
+import itertools
 import logging
 import orjson
 import os
 import re
 import sys
+import types
 import typing
 
 __all__ = []
@@ -235,3 +237,47 @@ def configure_logging_from_env(logger: logging.Logger) -> bool:
 def pretty_argvalues():
     """Pretty-formatted function call arguments, from the caller's frame."""
     return inspect.formatargvalues(*inspect.getargvalues(inspect.currentframe().f_back))
+
+
+# taken from: https://stackoverflow.com/a/78770438/, shared under
+# CC BY-SA 4.0 license (https://creativecommons.org/licenses/by-sa/4.0/)
+#
+# note: performance gained over `inspect.stack()` mostly by not parsing code
+# files, but also by limiting traversal depth.
+def fast_stack(max_depth: typing.Optional[int] = None) -> typing.List[inspect.FrameInfo]:
+    """Fast alternative to `inspect.stack()`
+
+    Use optional `max_depth` to limit search depth
+    Based on: github.com/python/cpython/blob/3.11/Lib/inspect.py
+
+    Compared to `inspect.stack()`:
+     * Does not read source files to load neighboring context
+     * Less accurate filename determination, still correct for most cases
+     * Does not compute 3.11+ code positions (PEP 657)
+
+    Compare:
+
+    In [3]: %timeit stack_depth(100, lambda: inspect.stack())
+    67.7 ms ± 1.35 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
+
+    In [4]: %timeit stack_depth(100, lambda: inspect.stack(0))
+    22.7 ms ± 747 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
+
+    In [5]: %timeit stack_depth(100, lambda: fast_stack())
+    108 µs ± 180 ns per loop (mean ± std. dev. of 7 runs, 10,000 loops each)
+
+    In [6]: %timeit stack_depth(100, lambda: fast_stack(10))
+    14.1 µs ± 33.4 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
+    """
+    def frame_infos(frame: typing.Optional[types.FrameType]):
+        while frame := frame and frame.f_back:
+            yield inspect.FrameInfo(
+                frame=frame,
+                filename=inspect.getfile(frame),
+                lineno=frame.f_lineno,
+                function=frame.f_code.co_name,
+                code_context=None,
+                index=None,
+            )
+
+    return list(itertools.islice(frame_infos(inspect.currentframe()), max_depth))
