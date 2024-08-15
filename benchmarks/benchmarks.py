@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 import orjson
 import subprocess
 
@@ -32,6 +33,7 @@ from dwave.cloud.solver import StructuredSolver, BQMSolver, CQMSolver, DQMSolver
 from dwave.cloud.regions import resolve_endpoints, get_regions
 from dwave.cloud.testing import isolated_environ, mocks
 from dwave.cloud.utils.qubo import generate_random_ising_problem
+from dwave.cloud.utils.logging import get_caller_name
 
 
 # note: looks like timeraw benchmarks can't be parameterized
@@ -259,3 +261,13 @@ class JSONResponseDecode:
     def time_manual_model_from_python_orjson(self):
         solvers = orjson.loads(requests.get('http://mock').content)
         [SolverConfiguration.model_validate(solver) for solver in solvers]
+
+
+class InspectStack:
+    version = "1"
+
+    def time_caller_from_stack(self):
+        inspect.stack()[0].function
+
+    def time_fast_caller(self):
+        get_caller_name()

@@ -281,3 +281,12 @@ def fast_stack(max_depth: typing.Optional[int] = None) -> typing.List[inspect.Fr
             )
 
     return list(itertools.islice(frame_infos(inspect.currentframe()), max_depth))
+
+
+def get_caller_name(depth: int = 0) -> str:
+    """Return caller function name (for `depth=0`), or nth ancestor name (`depth>0`).
+    """
+    if depth < 0:
+        raise ValueError("non-negative integer required for 'depth'")
+
+    return fast_stack(max_depth=depth + 2)[depth + 1].function
