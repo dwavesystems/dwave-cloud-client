@@ -14,6 +14,7 @@
 
 """Try to load solver data from mock servers."""
 
+import time
 import unittest
 import unittest.mock
 from urllib.parse import urlencode
@@ -49,12 +50,14 @@ def solver_data(id_, status="ONLINE", avg_load=0.1, cat='qpu', incomplete=False,
         del obj['properties']['supported_problem_types']
 
     if subset == 'static':
+        del obj['status']
         del obj['avg_load']
 
     elif subset == 'dynamic':
         obj = {
             "id": id_,
-            "avg_load": obj["avg_load"]
+            "status": status,
+            "avg_load": avg_load
         }
 
     elif subset != 'all':
@@ -105,10 +108,10 @@ class MockSolverLoading(unittest.TestCase):
         def add_mock_solver(m, url, name, incomplete=False):
             m.get(url, complete_qs=True, json=solver_data(name, incomplete=incomplete),
                   request_headers=valid_token_headers, headers=solver_content_type)
-            m.get(f"{url}?{urlencode(dict(filter='all,-avg_load'))}",
+            m.get(f"{url}?{urlencode(dict(filter='all,-status,-avg_load'))}",
                   json=solver_data(name, subset='static', incomplete=incomplete),
                   request_headers=valid_token_headers, headers=solver_content_type)
-            m.get(f"{url}?{urlencode(dict(filter='none,+id,+avg_load'))}",
+            m.get(f"{url}?{urlencode(dict(filter='none,+id,+status,+avg_load'))}",
                   json=solver_data(name, subset='dynamic', incomplete=incomplete),
                   request_headers=valid_token_headers, headers=solver_content_type)
 
@@ -118,19 +121,19 @@ class MockSolverLoading(unittest.TestCase):
 
         m.get(solver4_truncated_url,
               text='{"id', request_headers=valid_token_headers, headers=solver_content_type)
-        m.get(f"{solver4_truncated_url}?{urlencode(dict(filter='all,-avg_load'))}",
+        m.get(f"{solver4_truncated_url}?{urlencode(dict(filter='all,-status,-avg_load'))}",
               text='{"id', request_headers=valid_token_headers, headers=solver_content_type)
-        m.get(f"{solver4_truncated_url}?{urlencode(dict(filter='none,+id,+avg_load'))}",
+        m.get(f"{solver4_truncated_url}?{urlencode(dict(filter='none,+id,+status,+avg_load'))}",
               text='{"id', request_headers=valid_token_headers, headers=solver_content_type)
 
         m.get(all_solvers_url,
               json=[solver_data(self.solver1_name), solver_data(self.solver2_name)],
               request_headers=valid_token_headers, headers=solvers_content_type)
-        m.get(f"{all_solvers_url}?{urlencode(dict(filter='all,-avg_load'))}",
+        m.get(f"{all_solvers_url}?{urlencode(dict(filter='all,-status,-avg_load'))}",
               json=[solver_data(self.solver1_name, subset='static'),
                     solver_data(self.solver2_name, subset='static')],
               request_headers=valid_token_headers, headers=solvers_content_type)
-        m.get(f"{all_solvers_url}?{urlencode(dict(filter='none,+id,+avg_load'))}",
+        m.get(f"{all_solvers_url}?{urlencode(dict(filter='none,+id,+status,+avg_load'))}",
               json=[solver_data(self.solver1_name, subset='dynamic'),
                     solver_data(self.solver2_name, subset='dynamic')],
               request_headers=valid_token_headers, headers=solvers_content_type)
@@ -188,7 +191,10 @@ class MockSolverLoading(unittest.TestCase):
 
     def test_solvers_cache(self):
         with unittest.mock.patch.multiple(
-                Client, _DEFAULT_SOLVERS_CACHE_CONFIG=dict(maxage=60, store={})):
+                Client,
+                _DEFAULT_SOLVERS_STATIC_PART_MAXAGE=60,
+                _DEFAULT_SOLVERS_DYNAMIC_PART_MAXAGE=10,
+                _DEFAULT_SOLVERS_CACHE_CONFIG=dict(maxage=60, store={})):
 
             with Client(endpoint=self.endpoint, token=self.token) as client:
 
@@ -200,13 +206,13 @@ class MockSolverLoading(unittest.TestCase):
                     self.assertEqual(len(solvers), 2)
                     self.assertEqual(self.mocker.call_count, 2)
 
-                with self.subTest("cache hit for static data"):
+                with self.subTest("cache hit"):
                     self.mocker.reset_mock()
 
                     solvers = client.get_solvers()
 
                     self.assertEqual(len(solvers), 2)
-                    self.assertEqual(self.mocker.call_count, 1)
+                    self.assertEqual(self.mocker.call_count, 0)
 
                 with self.subTest("cache refresh forced"):
                     self.mocker.reset_mock()
@@ -215,6 +221,19 @@ class MockSolverLoading(unittest.TestCase):
 
                     self.assertEqual(len(solvers), 2)
                     self.assertEqual(self.mocker.call_count, 2)
+
+                with self.subTest("cache updated for dynamic parts"):
+                    with unittest.mock.patch(
+                        'dwave.cloud.api.client.epochnow',
+                        lambda: time.time() + client._DEFAULT_SOLVERS_DYNAMIC_PART_MAXAGE + 1
+                    ):
+                        self.mocker.reset_mock()
+
+                        solvers = client.get_solvers()
+
+                        self.assertEqual(len(solvers), 2)
+                        self.assertEqual(self.mocker.call_count, 1)
+
 
     def test_load_missing_solver(self):
         with Client(endpoint=self.endpoint, token=self.token) as client:

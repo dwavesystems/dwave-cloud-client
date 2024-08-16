@@ -1,0 +1,11 @@
+---
+fixes:
+  - |
+    During solver metadata filtering, treat solver ``status`` as a dynamic field.
+    This is to handle an edge case when solver is marked ``offline``, but it's
+    still available via API.
+
+features:
+  - |
+    Cache dynamic solver metadata for up to 15 minutes, unless defined
+    differently by API cache control response header.
