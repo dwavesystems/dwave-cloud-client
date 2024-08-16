@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Speed-up function calls that dispatch events by short-circuiting the
+    dispatch in case no event handlers are registered.

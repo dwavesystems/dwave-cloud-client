@@ -65,15 +65,18 @@ def add_handler(name, handler):
     _client_event_hooks_registry[name].append(handler)
 
 
+def has_handler(name: str) -> bool:
+    """Check if event ``name`` has a handler registered."""
+
+    return len(_client_event_hooks_registry.get(name)) > 0
+
+
 def dispatch_event(name, *args, **kwargs):
     """Call the complete chain of event handlers attached to event `name`."""
 
     logger.trace("dispatch_event(%r, *%r, **%r)", name, args, kwargs)
 
-    if name not in _client_event_hooks_registry:
-        raise ValueError('invalid event name')
-
-    for handler in _client_event_hooks_registry[name]:
+    for handler in _client_event_hooks_registry.get(name, []):
         try:
             handler(name, *args, **kwargs)
         except Exception as e:
@@ -84,9 +87,15 @@ def dispatch_event(name, *args, **kwargs):
 class dispatches_events:
     """Decorate function to :func:`.dispatch_event` on entry and exit."""
 
+    def validate_event_name(self, name):
+        if name not in _client_event_hooks_registry:
+            raise ValueError(f'invalid event name {name!r}')
+
     def __init__(self, basename):
         self.before_eventname = 'before_' + basename
         self.after_eventname = 'after_' + basename
+        self.validate_event_name(self.before_eventname)
+        self.validate_event_name(self.after_eventname)
 
     def __call__(self, fn):
         if not callable(fn):
@@ -94,6 +103,11 @@ class dispatches_events:
 
         @wraps(fn)
         def wrapped(*pargs, **kwargs):
+            if not (has_handler(self.before_eventname) or
+                    has_handler(self.after_eventname)):
+                # skip dispatch altogether
+                return fn(*pargs, **kwargs)
+
             sig = inspect.signature(fn)
             bound = sig.bind(*pargs, **kwargs)
             bound.apply_defaults()

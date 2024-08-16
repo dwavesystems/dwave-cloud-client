@@ -29,6 +29,7 @@ from dwave.cloud.client import Client
 from dwave.cloud.api.models import SolverConfiguration
 from dwave.cloud.coders import encode_problem_as_qp
 from dwave.cloud.config import ClientConfig
+from dwave.cloud.events import dispatches_events
 from dwave.cloud.solver import StructuredSolver, BQMSolver, CQMSolver, DQMSolver, NLSolver
 from dwave.cloud.regions import resolve_endpoints, get_regions
 from dwave.cloud.testing import isolated_environ, mocks
@@ -271,3 +272,15 @@ class InspectStack:
 
     def time_fast_caller(self):
         get_caller_name()
+
+
+class EventDispatch:
+    version = "1"
+
+    # create an event-dispatch decorated functions with a non-empty signature
+    @dispatches_events('sample')
+    def dispatch(self, a, b, c=1, d=2, **kwargs):
+        return True
+
+    def time_null_event_dispatch(self):
+        self.dispatch(1, 2, d=1, e=2)
