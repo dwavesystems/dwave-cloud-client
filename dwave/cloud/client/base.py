@@ -314,7 +314,7 @@ class Client(object):
         'headers': None,
         'client_cert': None,
         'client_cert_key': None,
-        'poll_strategy': 'backoff',
+        'poll_strategy': 'long-polling',
         # poll back-off schedule defaults [sec]
         'poll_backoff_min': 0.05,
         'poll_backoff_max': 60,

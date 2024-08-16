@@ -1,0 +1,17 @@
+---
+features:
+  - |
+    Poll for problem status update using long polling strategy by default.
+
+    Long polling strategy enables faster status change propagation to the client,
+    especially for longer jobs, or during heavy QPU usage.
+
+upgrade:
+  - |
+    Short polling with exponential backoff is not used by default anymore, but
+    it is still available. If for some reason you want to use it, set::
+
+      poll_strategy = backoff
+
+    configuration parameter in your config file, or the keyword argument in calls
+    to ``Client()`` or ``Client.from_config()``.

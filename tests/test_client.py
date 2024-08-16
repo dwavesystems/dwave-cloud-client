@@ -415,7 +415,7 @@ class ClientConstruction(unittest.TestCase):
                     self.assertEqual(client.config.solver, {})
 
                     self.assertEqual(client.config.connection_close, DEFAULTS['connection_close'])
-                    self.assertEqual(client.config.polling_schedule.backoff_min, DEFAULTS['poll_backoff_min'])
+                    self.assertEqual(client.config.polling_schedule.wait_time, DEFAULTS['poll_wait_time'])
 
     def test_defaults_as_kwarg(self):
         token = 'value'
@@ -549,8 +549,8 @@ class ClientConstruction(unittest.TestCase):
                 with dwave.cloud.Client.from_config() as client:
                     ps = client.config.polling_schedule
                     self.assertEqual(ps.strategy, Client.DEFAULTS['poll_strategy'])
-                    self.assertEqual(ps.backoff_min, Client.DEFAULTS['poll_backoff_min'])
-                    self.assertEqual(ps.backoff_max, Client.DEFAULTS['poll_backoff_max'])
+                    self.assertEqual(ps.wait_time, Client.DEFAULTS['poll_wait_time'])
+                    self.assertEqual(ps.pause, Client.DEFAULTS['poll_pause'])
 
         with self.subTest("backoff"):
             conf = {"poll_strategy": "backoff",
