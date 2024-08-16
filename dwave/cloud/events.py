@@ -65,6 +65,12 @@ def add_handler(name, handler):
     _client_event_hooks_registry[name].append(handler)
 
 
+def has_handler(name: str) -> bool:
+    """Check if event ``name`` has a handler registered."""
+
+    return len(_client_event_hooks_registry.get(name)) > 0
+
+
 def dispatch_event(name, *args, **kwargs):
     """Call the complete chain of event handlers attached to event `name`."""
 
@@ -97,6 +103,11 @@ class dispatches_events:
 
         @wraps(fn)
         def wrapped(*pargs, **kwargs):
+            if not (has_handler(self.before_eventname) or
+                    has_handler(self.after_eventname)):
+                # skip dispatch altogether
+                return fn(*pargs, **kwargs)
+
             sig = inspect.signature(fn)
             bound = sig.bind(*pargs, **kwargs)
             bound.apply_defaults()
