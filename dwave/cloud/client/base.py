@@ -174,13 +174,13 @@ class Client(object):
             Path to client side certificate key file.
 
         poll_strategy (str, 'backoff' | 'long-polling', default='long-polling'):
-            Problem status polling strategy. Chose between short-polling with
-            exponential back-off (configured with `poll_backoff_*` parameters),
-            and long polling, configured with `poll_wait_time` and `poll_pause`
+            Polling strategy for problem status. Supported options are short polling 
+            with exponential back-off, configured with ``poll_backoff_*`` parameters,
+            and long polling, configured with ``poll_wait_time`` and ``poll_pause``
             parameters.
 
             .. versionadded:: 0.13.0
-                Added long polling strategy support. Long polling is the new
+                Added support for long polling strategy. Long polling is the new
                 default, but the ``"backoff"`` strategy can still be used if
                 desired.
 
@@ -203,16 +203,16 @@ class Client(object):
             with upper bound set to ``poll_backoff_max``.
 
         poll_wait_time (int, in range [0, 30], default=30):
-            When problem status is polled using long polling, the maximum time a
-            long polling connection will wait for the API response is given with
-            ``poll_wait_time`` in seconds.
+            When problem status is polled using long polling, this value sets the 
+            maximum time, in seconds, a long polling connection waits for the API 
+            response.
 
             .. versionadded:: 0.13.0
 
         poll_pause (float, default=0.0):
-            When problem status is polled using long polling, a delay introduced
-            between two successive long polling connections is limited to
-            ``poll_pause`` seconds. It's preferred to keep this value at zero.
+            When problem status is polled using long polling, this value limits the 
+            delay, in seconds, between two successive long polling connections.
+            It's preferred to keep this value at zero.
 
             .. versionadded:: 0.13.0
 

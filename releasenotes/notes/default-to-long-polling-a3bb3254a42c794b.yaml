@@ -1,9 +1,9 @@
 ---
 features:
   - |
-    Poll for problem status update using long polling strategy by default.
+    Poll for problem-status update using long-polling strategy by default.
 
-    Long polling strategy enables faster status change propagation to the client,
+    Long-polling strategy enables faster status-change propagation to the client,
     especially for longer jobs, or during heavy QPU usage.
 
 upgrade:
