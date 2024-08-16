@@ -1515,10 +1515,17 @@ class Client(object):
 
     def _poll_using_long_polling(self, future: Future) -> None:
         # we use problem submit time to prioritize polling of jobs submitted earlier
-        at = datetime_to_timestamp(future.time_created)
+        created_at = datetime_to_timestamp(future.time_created)
+
+        # don't enqueue for next poll if polling_timeout is exceeded by then
+        future_age = time.time() - created_at
+        if self.config.polling_timeout is not None and future_age > self.config.polling_timeout:
+            logger.debug("Polling timeout exceeded before next poll: %.2f sec > %.2f sec, aborting polling!",
+                         future_age, self.config.polling_timeout)
+            raise PollingTimeout
 
         # use the same priority queue as for backoff polling
-        self._poll_queue.put((at, future))
+        self._poll_queue.put((created_at, future))
 
     def _do_poll_problems(self):
         """Poll the server for the status of a set of problems.
