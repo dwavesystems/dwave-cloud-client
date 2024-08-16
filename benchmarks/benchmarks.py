@@ -32,7 +32,7 @@ from dwave.cloud.config import ClientConfig
 from dwave.cloud.solver import StructuredSolver, BQMSolver, CQMSolver, DQMSolver, NLSolver
 from dwave.cloud.regions import resolve_endpoints, get_regions
 from dwave.cloud.testing import isolated_environ, mocks
-from dwave.cloud.utils.qubo import generate_random_ising_problem
+from dwave.cloud.utils.qubo import generate_random_ising_problem, active_qubits
 from dwave.cloud.utils.logging import get_caller_name
 
 
@@ -149,6 +149,12 @@ class ProblemEncoding:
 
     def time_encode_qp(self, key):
         encode_problem_as_qp(self.solver, *self.problem)
+
+    def time_active_qubits(self, key):
+        active_qubits(*self.problem)
+
+    def time_check_problem(self, key):
+        self.solver.check_problem(*self.problem)
 
 
 # requires internet access
