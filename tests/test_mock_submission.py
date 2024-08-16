@@ -704,12 +704,11 @@ class DeleteEvent(Exception):
 
 
 @mock.patch('time.sleep', lambda *x: None)
-class MockCancel(unittest.TestCase):
+class MockCancel(MockSubmissionBase, unittest.TestCase):
     """Make sure cancel works at the two points in the process where it should."""
 
-    @classmethod
-    def setUpClass(cls):
-        cls.sapi = StructuredSapiMockResponses()
+    poll_strategy = "long-polling"
+    poll_params = dict(timeout=Client.DEFAULTS['poll_wait_time'])
 
     def test_cancel_with_id(self):
         """Make sure the cancel method submits to the right endpoint.
@@ -723,13 +722,14 @@ class MockCancel(unittest.TestCase):
         def create_mock_session(client):
             session = mock.Mock()
             reply_body = [self.sapi.continue_reply(id=submission_id, solver='solver')]
-            session.get = lambda path, **kwargs: choose_reply(path, {
-                'problems/?id={}'.format(submission_id): reply_body})
+            session.get = lambda path, **kwargs: choose_reply(path, fix_status_paths({
+                f'problems/?id={submission_id}': reply_body
+            }, **self.poll_params))
             session.delete = DeleteEvent.handle
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client(endpoint='endpoint', token='token') as client:
+            with Client(**self.config) as client:
                 solver = Solver(client, self.sapi.solver.data)
                 future = solver._retrieve_problem(submission_id)
                 future.cancel()
@@ -758,8 +758,9 @@ class MockCancel(unittest.TestCase):
             reply_body = [self.sapi.continue_reply(id=submission_id)]
 
             session = mock.Mock()
-            session.get = lambda path, **kwargs: choose_reply(path, {
-                'problems/?id={}'.format(submission_id): reply_body})
+            session.get = lambda path, **kwargs: choose_reply(path, fix_status_paths({
+                f'problems/?id={submission_id}': reply_body
+            }, **self.poll_params))
 
             def post(a, **kwargs):
                 release_reply.wait()
@@ -771,7 +772,7 @@ class MockCancel(unittest.TestCase):
             return session
 
         with mock.patch.object(Client, 'create_session', create_mock_session):
-            with Client(endpoint='endpoint', token='token') as client:
+            with Client(**self.config) as client:
                 solver = Solver(client, self.sapi.solver.data)
 
                 linear, quadratic = self.sapi.problem

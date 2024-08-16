@@ -152,7 +152,7 @@ class ClientConfig(BaseModel, GetterMixin):
     # note: discriminated unions are faster than unions, but we want to be able
     # to set a defautl value when `strategy` is not specified
     polling_schedule: Optional[Union[BackoffPollingSchedule,
-                                     LongPollingSchedule]] = BackoffPollingSchedule()
+                                     LongPollingSchedule]] = LongPollingSchedule()
     polling_timeout: Optional[float] = None
 
     # general http(s) connection params
@@ -317,7 +317,7 @@ _V1_CONFIG_DEFAULTS = {
     'headers': None,
     'client_cert': None,
     'client_cert_key': None,
-    'poll_strategy': 'backoff',
+    'poll_strategy': 'long-polling',
     # poll back-off schedule defaults
     'poll_backoff_min': 0.05,
     'poll_backoff_max': 60,
