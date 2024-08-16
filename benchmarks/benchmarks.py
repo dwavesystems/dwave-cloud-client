@@ -196,7 +196,7 @@ class SolverMetadataJSONDecode:
 
 
 class SolverSelection:
-    version = "2"
+    version = "3"
 
     def setup(self):
         self.client = Client(token='mock')
@@ -204,18 +204,23 @@ class SolverSelection:
 
         static_data = deepcopy(solvers_data)
         for solver in static_data:
+            del solver['status']
             del solver['avg_load']
 
-        dynamic_data = [{"id": s['id'], "avg_load": s['avg_load']} for s in solvers_data]
+        dynamic_data = [{
+            "id": s['id'],
+            "status": s['status'],
+            "avg_load": s['avg_load']
+        } for s in solvers_data]
 
         static_conf = TypeAdapter(List[SolverConfiguration]).validate_python(static_data)
         dynamic_conf = TypeAdapter(List[SolverConfiguration]).validate_python(dynamic_data)
 
         class mock_session:
             def list_solvers(self, filter=None, **kwargs):
-                if filter == 'none,+id,+avg_load':
+                if filter == 'none,+id,+status,+avg_load':
                     return dynamic_conf
-                elif filter == 'all,-avg_load':
+                elif filter == 'all,-status,-avg_load':
                     return static_conf
                 else:
                     raise ValueError

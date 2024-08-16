@@ -377,9 +377,12 @@ class Client(object):
     _POLL_GROUP_TIMEFRAME = 2
 
     # Downloaded solver definition cache config
+    _DEFAULT_SOLVERS_STATIC_PART_MAXAGE = 3600  # 1 hour
+    _DEFAULT_SOLVERS_DYNAMIC_PART_MAXAGE = 900  # 15 min
     _DEFAULT_SOLVERS_CACHE_CONFIG = dict(
         enabled=True,
-        maxage=3600,    # 1 hour heuristic maxage (cache-control in response overrides it)
+        # heuristic maxage (cache-control in response overrides it)
+        maxage=_DEFAULT_SOLVERS_STATIC_PART_MAXAGE,
     )
 
     # Downloaded region metadata cache maxage [sec]
@@ -743,8 +746,8 @@ class Client(object):
                        refresh_: Optional[bool] = False,
                        ) -> List[Union[StructuredSolver, UnstructuredSolver]]:
 
-        static_fields = 'all,-avg_load'
-        dynamic_fields = 'none,+id,+avg_load'
+        static_fields = 'all,-status,-avg_load'
+        dynamic_fields = 'none,+id,+status,+avg_load'
 
         if name is not None:
             logger.info("Fetching definition of a solver with name=%r", name)
@@ -752,12 +755,14 @@ class Client(object):
             try:
                 solver = self.solvers_session.get_solver(
                     solver_id=name, filter=static_fields, refresh_=refresh_)
-                load = self.solvers_session.get_solver(
-                    solver_id=name, filter=dynamic_fields, no_cache_=True)
+                status = self.solvers_session.get_solver(
+                    solver_id=name, filter=dynamic_fields, refresh_=refresh_,
+                    maxage_=self._DEFAULT_SOLVERS_DYNAMIC_PART_MAXAGE)
 
-                # note: avg_load may not exist in solver data
-                if (avg_load := load.get('avg_load')) is not None:
-                    solver.avg_load = avg_load
+                # merge static and dynamic properties
+                solver.status = status.get('status')
+                solver.avg_load = status.get('avg_load')
+
                 solvers = [solver]
 
             except api.exceptions.ResourceNotFoundError as exc:
@@ -768,14 +773,16 @@ class Client(object):
 
             solvers = self.solvers_session.list_solvers(
                 filter=static_fields, refresh_=refresh_)
-            loads = {solver.id: solver.get('avg_load')
-                     for solver
-                     in self.solvers_session.list_solvers(
-                         filter=dynamic_fields, no_cache_=True)}
+            dynamic = self.solvers_session.list_solvers(
+                filter=dynamic_fields, refresh_=refresh_,
+                maxage_=self._DEFAULT_SOLVERS_DYNAMIC_PART_MAXAGE)
 
+            # add dynamic properties to static solvers
+            # note: allow solver list mismatch
+            statuses = {solver.id: solver for solver in dynamic}
             for solver in solvers:
-                if (avg_load := loads.get(solver.id)) is not None:
-                    solver.avg_load = avg_load
+                solver.status = statuses.get(solver.id, {}).get('status', 'offline')
+                solver.avg_load = statuses.get(solver.id, {}).get('avg_load', 0)
 
         logger.info("Received solver data for %d solver(s).", len(solvers))
         if logger.isEnabledFor(logging.TRACE):
