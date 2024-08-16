@@ -70,10 +70,7 @@ def dispatch_event(name, *args, **kwargs):
 
     logger.trace("dispatch_event(%r, *%r, **%r)", name, args, kwargs)
 
-    if name not in _client_event_hooks_registry:
-        raise ValueError('invalid event name')
-
-    for handler in _client_event_hooks_registry[name]:
+    for handler in _client_event_hooks_registry.get(name, []):
         try:
             handler(name, *args, **kwargs)
         except Exception as e:
@@ -84,9 +81,15 @@ def dispatch_event(name, *args, **kwargs):
 class dispatches_events:
     """Decorate function to :func:`.dispatch_event` on entry and exit."""
 
+    def validate_event_name(self, name):
+        if name not in _client_event_hooks_registry:
+            raise ValueError(f'invalid event name {name!r}')
+
     def __init__(self, basename):
         self.before_eventname = 'before_' + basename
         self.after_eventname = 'after_' + basename
+        self.validate_event_name(self.before_eventname)
+        self.validate_event_name(self.after_eventname)
 
     def __call__(self, fn):
         if not callable(fn):
