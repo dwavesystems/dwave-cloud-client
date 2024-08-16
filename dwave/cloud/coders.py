@@ -14,7 +14,7 @@
 
 import struct
 import base64
-from typing import Callable, Dict, List, Tuple, Union
+from typing import Callable, Dict, List, Sequence, Tuple, Union
 
 try:
     # note: TypedDict is available in py38+, but NotRequired only in py311+
@@ -73,6 +73,10 @@ def encode_problem_as_qp(solver: 'dwave.cloud.solver.StructuredSolver',
     Returns:
         Encoded submission dictionary.
     """
+    # convert legacy format (list) to dict for performance
+    if isinstance(linear, Sequence):
+        linear = dict(enumerate(linear))
+
     active = active_qubits(linear, quadratic)
 
     # Encode linear terms. The coefficients of the linear terms of the objective
@@ -82,7 +86,7 @@ def encode_problem_as_qp(solver: 'dwave.cloud.solver.StructuredSolver',
     # specified by the server.
     # Note: only active qubits are coded with double, inactive with NaN
     nan = float('nan')
-    lin = [uniform_get(linear, qubit, 0 if qubit in active else nan)
+    lin = [linear.get(qubit, 0 if qubit in active else nan)
            for qubit in solver._encoding_qubits]
 
     lin = base64.b64encode(struct.pack('<' + ('d' * len(lin)), *lin))

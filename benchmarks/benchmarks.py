@@ -21,6 +21,7 @@ from functools import partial
 from pathlib import Path
 from typing import List
 
+import dimod
 import requests
 import requests_mock
 from pydantic import TypeAdapter
@@ -33,7 +34,7 @@ from dwave.cloud.events import dispatches_events
 from dwave.cloud.solver import StructuredSolver, BQMSolver, CQMSolver, DQMSolver, NLSolver
 from dwave.cloud.regions import resolve_endpoints, get_regions
 from dwave.cloud.testing import isolated_environ, mocks
-from dwave.cloud.utils.qubo import generate_random_ising_problem
+from dwave.cloud.utils.qubo import generate_random_ising_problem, active_qubits
 from dwave.cloud.utils.logging import get_caller_name
 
 
@@ -147,9 +148,28 @@ class ProblemEncoding:
     def setup(self, key):
         self.solver = StructuredSolver(client=None, data=InitQPUSolver.generators[key]())
         self.problem = generate_random_ising_problem(self.solver)
+        self.bqm = dimod.BQM.from_ising(*self.problem)
 
     def time_encode_qp(self, key):
         encode_problem_as_qp(self.solver, *self.problem)
+
+    def time_encode_qp_from_bqm(self, key):
+        encode_problem_as_qp(self.solver, self.bqm.linear, self.bqm.quadratic)
+
+    def time_encode_qp_from_bqm_to_dict(self, key):
+        encode_problem_as_qp(self.solver, dict(self.bqm.linear), dict(self.bqm.quadratic))
+
+    def time_active_qubits(self, key):
+        active_qubits(*self.problem)
+
+    def time_active_qubits_from_bqm(self, key):
+        active_qubits(self.bqm.linear, self.bqm.quadratic)
+
+    def time_check_problem(self, key):
+        self.solver.check_problem(*self.problem)
+
+    def time_check_problem_from_bqm(self, key):
+        self.solver.check_problem(self.bqm.linear, self.bqm.quadratic)
 
 
 # requires internet access

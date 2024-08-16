@@ -92,9 +92,11 @@ def active_qubits(linear: Union[Mapping, Sequence],
             Active qubits' indices.
     """
 
-    active = {idx for idx, bias in uniform_iterator(linear)}
-    for edge, _ in quadratic.items():
-        active.update(edge)
+    if isinstance(linear, Sequence):
+        active = set(range(len(linear)))
+    else:
+        active = set(linear)
+    active.update(*quadratic)
     return active
 
 
