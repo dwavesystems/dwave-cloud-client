@@ -1177,7 +1177,11 @@ class StructuredSolver(BaseSolver):
         else:
             raise TypeError("unknown/unsupported vartype")
 
-        return self._sample(problem_type, bqm.linear, bqm.quadratic, bqm.offset,
+        # convert to dicts once, to save multiple conversions later on
+        linear = dict(bqm.linear)
+        quadratic = dict(bqm.quadratic)
+
+        return self._sample(problem_type, linear, quadratic, bqm.offset,
                             params, label=label, undirected_biases=True)
 
     @dispatches_events('sample')

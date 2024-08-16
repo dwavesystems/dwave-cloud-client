@@ -155,6 +155,9 @@ class ProblemEncoding:
     def time_encode_qp_from_bqm(self, key):
         encode_problem_as_qp(self.solver, self.bqm.linear, self.bqm.quadratic)
 
+    def time_encode_qp_from_bqm_to_dict(self, key):
+        encode_problem_as_qp(self.solver, dict(self.bqm.linear), dict(self.bqm.quadratic))
+
     def time_active_qubits(self, key):
         active_qubits(*self.problem)
 

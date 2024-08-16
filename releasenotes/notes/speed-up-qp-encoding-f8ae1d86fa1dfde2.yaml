@@ -3,3 +3,6 @@ features:
   - |
     Speed-up ``dwave.cloud.utils.qubo.active_qubits`` utility function by ~50%,
     and ``dwave.cloud.coders.encode_problem_as_qp`` by 20-30%.
+  - |
+    Speed-up QPU problem sampling when problem submitted as BQM by 40%. For best
+    performance, keep linear and quadratic biases in ``dict``s.
