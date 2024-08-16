@@ -89,13 +89,14 @@ class TestConfigCreate(unittest.TestCase):
     def test_auto_create(self, mock_fetch_sapi_token):
         runner = CliRunner(mix_stderr=False)
         with runner.isolated_filesystem():
+            local_config_file = './dwave.conf'
             result = runner.invoke(cli, [
-                'config', 'create', '--config-file', 'dwave.conf', '--auto'
+                'config', 'create', '--config-file', local_config_file, '--auto'
             ])
             self.assertEqual(result.exit_code, 0)
 
             # load and verify config
-            config = load_config()
+            config = load_config(config_file=local_config_file)
             self.assertEqual(config.get('token'), 'auto-token')
 
     @parameterized.expand([

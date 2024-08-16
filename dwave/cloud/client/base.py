@@ -173,23 +173,48 @@ class Client(object):
         client_cert_key (str, optional):
             Path to client side certificate key file.
 
+        poll_strategy (str, 'backoff' | 'long-polling', default='long-polling'):
+            Problem status polling strategy. Chose between short-polling with
+            exponential back-off (configured with `poll_backoff_*` parameters),
+            and long polling, configured with `poll_wait_time` and `poll_pause`
+            parameters.
+
+            .. versionadded:: 0.13.0
+                Added long polling strategy support. Long polling is the new
+                default, but the ``"backoff"`` strategy can still be used if
+                desired.
+
         poll_backoff_min (float, default=0.05):
-            Problem status is polled with exponential back-off schedule.
-            Duration of the first interval (between first and second poll) is
+            When problem status is polled with exponential back-off schedule, the
+            duration of the first interval (between first and second poll) is
             set to ``poll_backoff_min`` seconds.
 
         poll_backoff_max (float, default=60):
-            Problem status is polled with exponential back-off schedule.
-            Maximum back-off period is limited to ``poll_backoff_max`` seconds.
+            When problem status is polled with exponential back-off schedule, the
+            maximum back-off period is limited to ``poll_backoff_max`` seconds.
 
         poll_backoff_base (float, default=1.3):
-            Problem status is polled with exponential back-off schedule.
-            The exponential function base is defined with ``poll_backoff_base``.
+            When problem status is polled with exponential back-off schedule,
+            the exponential function base is defined with ``poll_backoff_base``.
             Interval between ``poll_idx`` and ``poll_idx + 1`` is given with::
 
                 poll_backoff_min * poll_backoff_base ** poll_idx
 
             with upper bound set to ``poll_backoff_max``.
+
+        poll_wait_time (int, in range [0, 30], default=30):
+            When problem status is polled using long polling, the maximum time a
+            long polling connection will wait for the API response is given with
+            ``poll_wait_time`` in seconds.
+
+            .. versionadded:: 0.13.0
+
+        poll_pause (float, default=0.0):
+            When problem status is polled using long polling, a delay introduced
+            between two successive long polling connections is limited to
+            ``poll_pause`` seconds. It's preferred to keep this value at zero.
+
+            .. versionadded:: 0.13.0
 
         http_retry_total (int, default=10):
             Total number of retries of failing idempotent HTTP requests to
