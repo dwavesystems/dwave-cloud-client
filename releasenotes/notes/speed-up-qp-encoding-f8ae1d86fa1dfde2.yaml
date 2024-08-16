@@ -1,4 +1,5 @@
 ---
 features:
   - |
-    Speed-up ``dwave.cloud.utils.qubo.active_qubits`` utility function by ~50%.
+    Speed-up ``dwave.cloud.utils.qubo.active_qubits`` utility function by ~50%,
+    and ``dwave.cloud.coders.encode_problem_as_qp`` by 20-30%.
