@@ -84,35 +84,6 @@ __all__ = ['Client']
 logger = logging.getLogger(__name__)
 
 
-def _deprecated_config_properties_to_config_map(options):
-    # Return a map of old/deprecated config property name to new lookup path
-    # in the config model.
-
-    def _translate(old_prefix, new_prefix):
-        return {k: f"{new_prefix}{k[len(old_prefix):]}"
-                for k in options if k.startswith(old_prefix)}
-
-    properties_map = {
-        'metadata_api_endpoint': 'metadata_api_endpoint',
-        'leap_api_endpoint': 'leap_api_endpoint',
-        'region': 'region',
-        'endpoint': 'endpoint',
-        'token': 'token',
-        'default_solver': 'solver',
-        'client_cert': 'cert',
-        'request_timeout': 'request_timeout',
-        'polling_timeout': 'polling_timeout',
-        'headers': 'headers',
-        'proxy': 'proxy',
-        'permissive_ssl': 'permissive_ssl',
-        'connection_close': 'connection_close',
-    }
-    properties_map.update(_translate("poll_", "polling_schedule."))
-    properties_map.update(_translate("http_retry_", "request_retry."))
-
-    return properties_map
-
-
 class Client(object):
     """Base client class for all D-Wave API clients. Used by QPU, software and
     hybrid :term:`sampler` classes.
@@ -279,14 +250,13 @@ class Client(object):
 
         Instance-level defaults can be specified via ``defaults`` argument.
 
-    .. deprecated:: 0.11.0
-        Config attributes on :class:`.Client` are deprecated in favor of config
-        model attributes available on ``Client.config`` and will be removed
-        in 0.13.0.
-
     .. versionremoved:: 0.12.0
         Positional arguments in :class:`.Client` constructor, deprecated in 0.10.0,
         are removed in 0.12.0. Use keyword arguments instead.
+
+    .. versionremoved:: 0.13.0
+        Config attributes on :class:`.Client`, deprecated in 0.11.0, are removed
+        in 0.13.0. Use config model attributes on ``Client.config`` instead.
 
     Examples:
         This example directly initializes a :class:`.Client`.
@@ -357,9 +327,6 @@ class Client(object):
         'http_retry_backoff_max': 60,
     }
 
-    _DEPRECATED_CONFIG_PROPERTIES_MAP = \
-        _deprecated_config_properties_to_config_map(DEFAULTS)
-
     # Number of problems to include in a submit/status query
     _SUBMIT_BATCH_SIZE = 20
     _STATUS_QUERY_SIZE = 100
@@ -396,15 +363,6 @@ class Client(object):
 
     # Binary-ref answer download parameters
     _DOWNLOAD_ANSWER_THREAD_COUNT = 2
-
-    @staticmethod
-    def _legacy_config_property_proxy(self, legacy_property, config_path):
-        warnings.warn(
-            f"`Client.{legacy_property}` property is deprecated since "
-            f"dwave-cloud-client 0.11.0, and will be removed in 0.13.0. "
-            f"Use `Client.config.{config_path}` instead.",
-            DeprecationWarning, stacklevel=2)
-        return pluck(self.config, config_path)
 
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None, **kwargs):
@@ -479,13 +437,6 @@ class Client(object):
     @dispatches_events('client_init')
     def __init__(self, **kwargs):
         logger.debug("Client init called with: %r", kwargs)
-
-        # insert deprecated config properties that proxy values from the new `Client.config`
-        for legacy_property, config_path in Client._DEPRECATED_CONFIG_PROPERTIES_MAP.items():
-            proxy = partial(Client._legacy_config_property_proxy,
-                            legacy_property=legacy_property,
-                            config_path=config_path)
-            setattr(Client, legacy_property, property(proxy))
 
         # derive instance-level defaults from class defaults and init defaults
         self.defaults = copy.deepcopy(self.DEFAULTS)
@@ -713,12 +664,12 @@ class Client(object):
         .. deprecated:: 0.11.0
             :meth:`.Client.get_regions` method is deprecated in favor of
             :func:`dwave.cloud.regions.get_regions` function and will be
-            removed in 0.13.0.
+            removed in 0.14.0.
 
         """
         warnings.warn(
             f"`Client.get_regions` method is deprecated since "
-            f"dwave-cloud-client 0.11.0, and will be removed in 0.13.0. "
+            f"dwave-cloud-client 0.11.0, and will be removed in 0.14.0. "
             f"Use `dwave.cloud.regions.get_regions` for greater flexibility instead.",
             DeprecationWarning, stacklevel=2)
 

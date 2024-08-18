@@ -1,0 +1,16 @@
+---
+upgrade:
+  - |
+    Config attributes previously available directly on ``Client`` instance,
+    deprecated in ``dwave-cloud-client==0.11.0``, are removed in
+    ``dwave-cloud-client==0.13.0``.
+
+    Use config model (``dwave.cloud.config.models.ClientConfig``) available as
+    ``Client.config`` to access client configuration instead.
+
+    Path to most attributes translates directly. For example, ``Client.region``
+    is now available as ``Client.config.region``. One attribute has been
+    renamed (``Client.default_solver`` is now ``Client.config.solver``), and
+    all ``Client.poll_*`` config options are consolidated under
+    ``Client.config.polling_schedule.*``. Similarly ``Client.http_retry_*``
+    options are now available under ``Client.config.request_retry.*``.
