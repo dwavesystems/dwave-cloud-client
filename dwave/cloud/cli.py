@@ -356,8 +356,8 @@ def _get_client_solver(config, output=None):
     if profile:
         output("Using profile: {profile}", profile=profile)
 
-    output("Using endpoint: {endpoint}", endpoint=client.endpoint)
-    output("Using region: {region}", region=client.region)
+    output("Using endpoint: {endpoint}", endpoint=client.config.endpoint)
+    output("Using region: {region}", region=client.config.region)
 
     # get solver
     try:
@@ -551,7 +551,7 @@ def solvers(config_file, profile, endpoint, region, client_type, solver_def,
             client=client_type, solver=solver_def) as client:
 
         try:
-            solvers = client.get_solvers(**client.default_solver)
+            solvers = client.get_solvers(**client.config.solver)
         except SolverNotFoundError:
             click.echo("Solver(s) {} not found.".format(solver_def))
             return 1
@@ -716,7 +716,7 @@ def upload(config_file, profile, endpoint, region, client_type, solver_def,
         click.echo("Using configuration file: {}".format(config_file))
     if profile:
         click.echo("Using profile: {}".format(profile))
-    click.echo("Using endpoint: {}".format(client.endpoint))
+    click.echo("Using endpoint: {}".format(client.config.endpoint))
 
     click.echo(("Preparing to upload a problem from {!r} "
                 "in {!r} format.").format(input_file.name, format))
