@@ -664,12 +664,12 @@ class Client(object):
         .. deprecated:: 0.11.0
             :meth:`.Client.get_regions` method is deprecated in favor of
             :func:`dwave.cloud.regions.get_regions` function and will be
-            removed in 0.13.0.
+            removed in 0.14.0.
 
         """
         warnings.warn(
             f"`Client.get_regions` method is deprecated since "
-            f"dwave-cloud-client 0.11.0, and will be removed in 0.13.0. "
+            f"dwave-cloud-client 0.11.0, and will be removed in 0.14.0. "
             f"Use `dwave.cloud.regions.get_regions` for greater flexibility instead.",
             DeprecationWarning, stacklevel=2)
 
