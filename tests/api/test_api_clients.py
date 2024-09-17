@@ -22,10 +22,10 @@ import requests
 import requests_mock
 from parameterized import parameterized
 
-from dwave.cloud.api import exceptions, constants
+from dwave.cloud.api import exceptions
 from dwave.cloud.api.client import (
     DWaveAPIClient, SolverAPIClient, MetadataAPIClient, LeapAPIClient)
-from dwave.cloud.config import ClientConfig
+from dwave.cloud.config import ClientConfig, constants
 from dwave.cloud.package_info import __packagename__, __version__
 
 

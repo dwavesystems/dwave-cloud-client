@@ -29,8 +29,8 @@ import urllib3
 import werkzeug
 from packaging.specifiers import SpecifierSet
 
-import dwave.cloud.config   # don't use `from` to break circular import (config <> api.constants)
-from dwave.cloud.api import constants, exceptions
+import dwave.cloud.config
+from dwave.cloud.api import exceptions
 from dwave.cloud.utils.exception import is_caused_by
 from dwave.cloud.utils.http import PretimedHTTPAdapter, BaseUrlSession, default_user_agent
 from dwave.cloud.utils.time import epochnow
@@ -729,7 +729,7 @@ class SolverAPIClient(DWaveAPIClient):
     def __init__(self, **config):
         # TODO: make endpoint region-sensitive
         self.DEFAULTS = super().DEFAULTS.copy()
-        self.DEFAULTS.update(endpoint=constants.DEFAULT_SOLVER_API_ENDPOINT)
+        self.DEFAULTS.update(endpoint=dwave.cloud.config.constants.DEFAULT_SOLVER_API_ENDPOINT)
 
         super().__init__(**config)
 
@@ -740,7 +740,7 @@ class MetadataAPIClient(DWaveAPIClient):
     def __init__(self, **config):
         # TODO: make endpoint region-sensitive
         self.DEFAULTS = super().DEFAULTS.copy()
-        self.DEFAULTS.update(endpoint=constants.DEFAULT_METADATA_API_ENDPOINT)
+        self.DEFAULTS.update(endpoint=dwave.cloud.config.constants.DEFAULT_METADATA_API_ENDPOINT)
 
         super().__init__(**config)
 
@@ -761,7 +761,7 @@ class LeapAPIClient(DWaveAPIClient):
     def __init__(self, **config):
         # TODO: make endpoint region-sensitive
         self.DEFAULTS = super().DEFAULTS.copy()
-        self.DEFAULTS.update(endpoint=constants.DEFAULT_LEAP_API_ENDPOINT)
+        self.DEFAULTS.update(endpoint=dwave.cloud.config.constants.DEFAULT_LEAP_API_ENDPOINT)
 
         super().__init__(**config)
 
