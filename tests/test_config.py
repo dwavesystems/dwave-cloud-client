@@ -23,12 +23,12 @@ from typing import Any, Dict, Callable
 from parameterized import parameterized
 
 from dwave.cloud.package_info import __packagename__, __version__
-from dwave.cloud.exceptions import ConfigFileParseError, ConfigFileReadError
 from dwave.cloud.testing import iterable_mock_open
 from dwave.cloud.config import (
     get_configfile_paths, load_config_from_files, load_config,
     parse_float, parse_int, parse_boolean, get_cache_dir, update_config)
 from dwave.cloud.config.constants import DEFAULT_METADATA_API_ENDPOINT
+from dwave.cloud.config.exceptions import ConfigFileParseError, ConfigFileReadError
 from dwave.cloud.config.models import ClientConfig, PollingStrategy
 from dwave.cloud.config.models import validate_config_v1, load_config_v1, dump_config_v1
 

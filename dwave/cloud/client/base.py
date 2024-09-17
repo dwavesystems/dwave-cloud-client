@@ -407,10 +407,10 @@ class Client(object):
                 Appropriate instance of a QPU/software/hybrid client.
 
         Raises:
-            :exc:`~dwave.cloud.exceptions.ConfigFileReadError`:
+            :exc:`~dwave.cloud.config.exceptions.ConfigFileReadError`:
                 Config file specified or detected could not be opened or read.
 
-            :exc:`~dwave.cloud.exceptions.ConfigFileParseError`:
+            :exc:`~dwave.cloud.config.exceptions.ConfigFileParseError`:
                 Config file parse failed.
 
             :exc:`ValueError`:

@@ -20,7 +20,7 @@ from typing import List, Optional, Union
 
 import homebase
 
-from dwave.cloud.exceptions import ConfigFileReadError, ConfigFileParseError
+from dwave.cloud.config.exceptions import ConfigFileReadError, ConfigFileParseError
 from dwave.cloud.package_info import __version__, __packagename__
 
 __all__ = ['get_configfile_paths', 'get_configfile_path',
@@ -282,10 +282,10 @@ def load_config_from_files(filenames=None):
             mapping of per-profile keys holding values.
 
     Raises:
-        :exc:`~dwave.cloud.exceptions.ConfigFileReadError`:
+        :exc:`~dwave.cloud.config.exceptions.ConfigFileReadError`:
             Config file specified or detected could not be opened or read.
 
-        :exc:`~dwave.cloud.exceptions.ConfigFileParseError`:
+        :exc:`~dwave.cloud.config.exceptions.ConfigFileParseError`:
             Config file parse failed.
 
     """
@@ -339,10 +339,10 @@ def load_profile_from_files(filenames=None, profile=None):
             is found, returns an empty dict.
 
     Raises:
-        :exc:`~dwave.cloud.exceptions.ConfigFileReadError`:
+        :exc:`~dwave.cloud.config.exceptions.ConfigFileReadError`:
             Config file specified or detected could not be opened or read.
 
-        :exc:`~dwave.cloud.exceptions.ConfigFileParseError`:
+        :exc:`~dwave.cloud.config.exceptions.ConfigFileParseError`:
             Config file parse failed.
 
         :exc:`ValueError`:
@@ -484,8 +484,8 @@ def load_config(config_file: Optional[Union[str, bool]] = None,
 
     If a configuration file explicitly specified, via an argument or
     environment variable, does not exist or is unreadable, loading fails with
-    :exc:`~dwave.cloud.exceptions.ConfigFileReadError`. Loading fails
-    with :exc:`~dwave.cloud.exceptions.ConfigFileParseError` if the file is
+    :exc:`~dwave.cloud.config.exceptions.ConfigFileReadError`. Loading fails
+    with :exc:`~dwave.cloud.config.exceptions.ConfigFileParseError` if the file is
     readable but invalid as a configuration file.
 
     Similarly, if a profile explicitly specified, via an argument or
@@ -539,10 +539,10 @@ def load_config(config_file: Optional[Union[str, bool]] = None,
         :exc:`ValueError`:
             Invalid (non-existing) profile name.
 
-        :exc:`~dwave.cloud.exceptions.ConfigFileReadError`:
+        :exc:`~dwave.cloud.config.exceptions.ConfigFileReadError`:
             Config file specified or detected could not be opened or read.
 
-        :exc:`~dwave.cloud.exceptions.ConfigFileParseError`:
+        :exc:`~dwave.cloud.config.exceptions.ConfigFileParseError`:
             Config file parse failed.
 
     Note:
