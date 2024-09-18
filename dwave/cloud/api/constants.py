@@ -14,15 +14,11 @@
 
 import enum
 
-
-# Default API endpoints
-DEFAULT_SOLVER_API_ENDPOINT = 'https://cloud.dwavesys.com/sapi/'
-
-DEFAULT_METADATA_API_ENDPOINT = 'https://cloud.dwavesys.com/metadata/v1/'
-
-DEFAULT_LEAP_API_ENDPOINT = 'https://cloud.dwavesys.com/leap/api/'
-
-DEFAULT_REGION = 'na-west-1'
+# note: for backwards compatibility in 0.13.1+
+# TODO: remove in 0.14.0
+from dwave.cloud.config.constants import (
+    DEFAULT_METADATA_API_ENDPOINT, DEFAULT_REGION,
+    DEFAULT_SOLVER_API_ENDPOINT, DEFAULT_LEAP_API_ENDPOINT)
 
 
 # Default API version

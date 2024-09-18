@@ -24,9 +24,8 @@ from typing_extensions import Annotated     # backport for py37, py38
 import urllib3
 from pydantic import BaseModel, BeforeValidator, NonNegativeInt
 
+from dwave.cloud.config import constants
 from dwave.cloud.config.loaders import update_config
-from dwave.cloud.api.constants import (
-    DEFAULT_REGION, DEFAULT_METADATA_API_ENDPOINT, DEFAULT_LEAP_API_ENDPOINT)
 
 __all__ = ['RequestRetryConfig', 'ClientConfig',
            'BackoffPollingSchedule', 'LongPollingSchedule',
@@ -133,7 +132,7 @@ def _literal_eval(obj):
 
 class ClientConfig(BaseModel, GetterMixin):
     # api region
-    metadata_api_endpoint: Optional[str] = DEFAULT_METADATA_API_ENDPOINT
+    metadata_api_endpoint: Optional[str] = constants.DEFAULT_METADATA_API_ENDPOINT
     region: Optional[str] = None
 
     # resolved api endpoint
@@ -301,9 +300,9 @@ def dump_config_v1(config: ClientConfig) -> dict:
 # XXX: replace with model defaults?
 _V1_CONFIG_DEFAULTS = {
     'client': 'base',
-    'metadata_api_endpoint': DEFAULT_METADATA_API_ENDPOINT,
-    'leap_api_endpoint': DEFAULT_LEAP_API_ENDPOINT,
-    'region': DEFAULT_REGION,
+    'metadata_api_endpoint': constants.DEFAULT_METADATA_API_ENDPOINT,
+    'leap_api_endpoint': constants.DEFAULT_LEAP_API_ENDPOINT,
+    'region': constants.DEFAULT_REGION,
     'endpoint': None,
     'token': None,
     'leap_client_id': None,

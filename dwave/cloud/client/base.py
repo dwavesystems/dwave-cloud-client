@@ -67,6 +67,7 @@ from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *    # TODO: fix
 from dwave.cloud.computation import Future
 from dwave.cloud.config import load_config, update_config, validate_config_v1
+from dwave.cloud.config import constants as config_constants
 from dwave.cloud.config.models import ClientConfig, PollingStrategy
 from dwave.cloud.solver import available_solvers, StructuredSolver, UnstructuredSolver
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
@@ -283,8 +284,8 @@ class Client(object):
 
     # Default API endpoint
     # TODO: remove when refactored to use `dwave.cloud.api`?
-    DEFAULT_API_ENDPOINT = api.constants.DEFAULT_SOLVER_API_ENDPOINT
-    DEFAULT_API_REGION = api.constants.DEFAULT_REGION
+    DEFAULT_API_ENDPOINT = config_constants.DEFAULT_SOLVER_API_ENDPOINT
+    DEFAULT_API_REGION = config_constants.DEFAULT_REGION
 
     # Class-level defaults for all constructor and factory arguments
     DEFAULTS = {
@@ -293,7 +294,7 @@ class Client(object):
         'profile': None,
         'client': 'base',
         # constructor (and factory)
-        'metadata_api_endpoint': api.constants.DEFAULT_METADATA_API_ENDPOINT,
+        'metadata_api_endpoint': config_constants.DEFAULT_METADATA_API_ENDPOINT,
         'region': DEFAULT_API_REGION,
         'leap_api_endpoint': None,
         'leap_client_id': None,
@@ -406,10 +407,10 @@ class Client(object):
                 Appropriate instance of a QPU/software/hybrid client.
 
         Raises:
-            :exc:`~dwave.cloud.exceptions.ConfigFileReadError`:
+            :exc:`~dwave.cloud.config.exceptions.ConfigFileReadError`:
                 Config file specified or detected could not be opened or read.
 
-            :exc:`~dwave.cloud.exceptions.ConfigFileParseError`:
+            :exc:`~dwave.cloud.config.exceptions.ConfigFileParseError`:
                 Config file parse failed.
 
             :exc:`ValueError`:

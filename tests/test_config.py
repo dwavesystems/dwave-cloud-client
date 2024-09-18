@@ -22,13 +22,13 @@ from typing import Any, Dict, Callable
 
 from parameterized import parameterized
 
-from dwave.cloud.api import constants
 from dwave.cloud.package_info import __packagename__, __version__
-from dwave.cloud.exceptions import ConfigFileParseError, ConfigFileReadError
 from dwave.cloud.testing import iterable_mock_open
 from dwave.cloud.config import (
     get_configfile_paths, load_config_from_files, load_config,
     parse_float, parse_int, parse_boolean, get_cache_dir, update_config)
+from dwave.cloud.config.constants import DEFAULT_METADATA_API_ENDPOINT
+from dwave.cloud.config.exceptions import ConfigFileParseError, ConfigFileReadError
 from dwave.cloud.config.models import ClientConfig, PollingStrategy
 from dwave.cloud.config.models import validate_config_v1, load_config_v1, dump_config_v1
 
@@ -591,7 +591,7 @@ class TestConfigModel(unittest.TestCase):
         ("null meta", "metadata_api_endpoint", None, None),
         ("null leap", "leap_api_endpoint", None, None),
         ("null sapi", "endpoint", None, None),
-        ("omitted meta", "metadata_api_endpoint", OMITTED, constants.DEFAULT_METADATA_API_ENDPOINT),
+        ("omitted meta", "metadata_api_endpoint", OMITTED, DEFAULT_METADATA_API_ENDPOINT),
         ("omitted leap", "leap_api_endpoint", OMITTED, None),
         ("omitted sapi", "endpoint", OMITTED, None),
         ("url meta", "metadata_api_endpoint", "https://metadata.api/v1", "https://metadata.api/v1"),

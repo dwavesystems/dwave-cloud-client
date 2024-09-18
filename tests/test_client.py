@@ -30,8 +30,9 @@ import requests
 from parameterized import parameterized
 from plucky import merge
 
-from dwave.cloud.api import constants, models, Regions
+from dwave.cloud.api import models, Regions
 from dwave.cloud.client import Client
+from dwave.cloud.config import constants
 from dwave.cloud.config.models import dump_config_v1, PollingStrategy
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, SolverError, SolverNotFoundError)

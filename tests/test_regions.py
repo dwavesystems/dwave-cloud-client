@@ -21,8 +21,8 @@ from parameterized import parameterized
 from pydantic import TypeAdapter
 
 from dwave.cloud.api.models import Region
-from dwave.cloud.api import constants
 from dwave.cloud.api.exceptions import ResourceAccessForbiddenError
+from dwave.cloud.config.constants import DEFAULT_METADATA_API_ENDPOINT
 from dwave.cloud.config.models import ClientConfig
 from dwave.cloud.regions import get_regions, resolve_endpoints
 
@@ -135,7 +135,7 @@ class ResolveEndpointsMocked(unittest.TestCase):
                         self.mock_regions[0].code):
             resolve_endpoints(config, inplace=True, shortcircuit=False)
 
-        self.assertEqual(config.metadata_api_endpoint, constants.DEFAULT_METADATA_API_ENDPOINT)
+        self.assertEqual(config.metadata_api_endpoint, DEFAULT_METADATA_API_ENDPOINT)
         self.assertEqual(config.region, self.mock_regions[0].code)
         self.assertEqual(config.endpoint, self.mock_regions[0].endpoint)
         self.assertEqual(config.leap_api_endpoint, self.mock_regions[0].leap_api_endpoint)
@@ -146,7 +146,7 @@ class ResolveEndpointsMocked(unittest.TestCase):
 
         resolve_endpoints(config, inplace=True)
 
-        self.assertEqual(config.metadata_api_endpoint, constants.DEFAULT_METADATA_API_ENDPOINT)
+        self.assertEqual(config.metadata_api_endpoint, DEFAULT_METADATA_API_ENDPOINT)
         self.assertIsNone(config.region)
         self.assertEqual(config.endpoint, endpoint)
         self.assertIsNotNone(config.leap_api_endpoint)
@@ -157,7 +157,7 @@ class ResolveEndpointsMocked(unittest.TestCase):
 
         resolve_endpoints(config, inplace=True)
 
-        self.assertEqual(config.metadata_api_endpoint, constants.DEFAULT_METADATA_API_ENDPOINT)
+        self.assertEqual(config.metadata_api_endpoint, DEFAULT_METADATA_API_ENDPOINT)
         self.assertIsNone(config.region)
         self.assertEqual(config.leap_api_endpoint, leap_api_endpoint)
         self.assertIsNotNone(config.endpoint)

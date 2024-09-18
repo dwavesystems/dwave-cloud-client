@@ -19,16 +19,6 @@ from dwave.cloud.api import exceptions as _api
 SAPIError = _api.RequestError
 
 
-class ConfigFileError(Exception):
-    """Base exception for all config file processing errors."""
-
-class ConfigFileReadError(ConfigFileError):
-    """Non-existing or unreadable config file specified or implied."""
-
-class ConfigFileParseError(ConfigFileError):
-    """Invalid format of config file."""
-
-
 class SolverError(_api.RequestError):
     """Generic solver-related error"""
 
@@ -64,9 +54,6 @@ class Timeout(_api.RequestError):
 class PollingTimeout(Exception):
     """Problem polling timed out."""
 
-# for backward compatibility
-from dwave.cloud.api.exceptions import RequestTimeout
-
 
 class CanceledFutureError(Exception):
     """An exception raised when code tries to read from a canceled future."""
@@ -88,3 +75,9 @@ class ProblemStructureError(InvalidProblemError):   # inherit for backwards comp
 
 class ProblemUploadError(Exception):
     """Problem multipart upload failed."""
+
+
+# for backward compatibility
+from dwave.cloud.api.exceptions import RequestTimeout
+
+from dwave.cloud.config.exceptions import *

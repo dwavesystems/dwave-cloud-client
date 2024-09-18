@@ -158,5 +158,7 @@ Examples:
     >>> client.close() # doctest: +SKIP
 """
 
+from .constants import *
+from .exceptions import *
 from .loaders import *
 from .models import *

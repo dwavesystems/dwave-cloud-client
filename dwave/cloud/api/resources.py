@@ -21,9 +21,9 @@ from functools import wraps
 
 from pydantic import TypeAdapter
 
+from dwave.cloud.api import constants, models
 from dwave.cloud.api.client import (
     DWaveAPIClient, SolverAPIClient, MetadataAPIClient, LeapAPIClient)
-from dwave.cloud.api import constants, models
 
 if TYPE_CHECKING:
     from dwave.cloud.config.models import ClientConfig

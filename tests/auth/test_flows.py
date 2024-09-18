@@ -26,8 +26,7 @@ import requests_mock
 from dwave.cloud.auth.flows import AuthFlow, LeapAuthFlow, OAuthError
 from dwave.cloud.auth.config import OCEAN_SDK_CLIENT_ID, OCEAN_SDK_SCOPES
 from dwave.cloud.auth.creds import Credentials
-from dwave.cloud.config import ClientConfig
-from dwave.cloud.api.constants import DEFAULT_LEAP_API_ENDPOINT
+from dwave.cloud.config import ClientConfig, DEFAULT_LEAP_API_ENDPOINT
 
 
 class TestAuthFlow(unittest.TestCase):
