@@ -81,7 +81,7 @@ jobs:
         type: string
       xcode:
         type: string
-        default: "14.2.0"
+        default: "16.0.0"
 
     macos:
       xcode: << parameters.xcode >>
@@ -325,7 +325,7 @@ workflows:
           context: &ctx-build "ocean-build"
           matrix:
             parameters:
-              python-version: &python-versions ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13.0rc3"]
+              python-version: &python-versions ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
               dimod-numpy-version: ["", "dimod~=0.9.0 numpy~=1.23.0", "dimod~=0.10.0", "dimod~=0.11.0", "dimod~=0.12.0"]
             exclude:
               # dimod < 0.10 not supported on py310+
@@ -335,7 +335,7 @@ workflows:
                 dimod-numpy-version: "dimod~=0.9.0 numpy~=1.23.0"
               - python-version: "3.12"
                 dimod-numpy-version: "dimod~=0.9.0 numpy~=1.23.0"
-              - python-version: "3.13.0rc3"
+              - python-version: "3.13"
                 dimod-numpy-version: "dimod~=0.9.0 numpy~=1.23.0"
               # dimod < 0.12 not supported on py311+
               - python-version: "3.11"
@@ -346,9 +346,9 @@ workflows:
                 dimod-numpy-version: "dimod~=0.10.0"
               - python-version: "3.12"
                 dimod-numpy-version: "dimod~=0.11.0"
-              - python-version: "3.13.0rc3"
+              - python-version: "3.13"
                 dimod-numpy-version: "dimod~=0.10.0"
-              - python-version: "3.13.0rc3"
+              - python-version: "3.13"
                 dimod-numpy-version: "dimod~=0.11.0"
 
       - test-macos:
