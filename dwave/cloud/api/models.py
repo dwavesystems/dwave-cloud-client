@@ -13,8 +13,7 @@
 # limitations under the License.
 
 from datetime import datetime
-from typing import List, Union, Optional, Dict, Any
-from typing_extensions import Annotated     # backport for py37, py38
+from typing import List, Union, Optional, Dict, Any, Annotated
 
 from pydantic import BaseModel, RootModel, ConfigDict
 from pydantic.functional_validators import AfterValidator

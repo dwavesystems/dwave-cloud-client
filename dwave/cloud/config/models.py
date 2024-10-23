@@ -18,8 +18,7 @@ import enum
 import logging
 import orjson
 from collections import abc
-from typing import Optional, Union, Literal, Tuple, Dict, Any
-from typing_extensions import Annotated     # backport for py37, py38
+from typing import Optional, Union, Literal, Tuple, Dict, Any, Annotated
 
 import urllib3
 from pydantic import BaseModel, BeforeValidator, NonNegativeInt
