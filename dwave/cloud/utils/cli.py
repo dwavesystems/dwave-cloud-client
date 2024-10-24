@@ -18,15 +18,16 @@
    These functions previously lived under ``dwave.cloud.utils``.
 """
 
+from collections import abc
 from functools import partial
-from typing import Any, Callable, Optional, Union, Sequence
+from typing import Any, Optional, Union
 
 __all__ = []
 
 
 def default_text_input(prompt: str, default: Optional[Any] = None, *,
                        optional: bool = True,
-                       choices: Optional[Sequence[Any]] = None) -> Union[str, None]:
+                       choices: Optional[abc.Sequence[Any]] = None) -> Union[str, None]:
     # CLI util; defer click import until actually needed (see #473)
     import click
 
@@ -70,7 +71,7 @@ class CLIError(Exception):
         self.code = code
 
 
-def deprecated_option(msg: Optional[str] = None, update: Optional[str] = None) -> Callable:
+def deprecated_option(msg: Optional[str] = None, update: Optional[str] = None) -> abc.Callable:
     """Generate a Click callback function that will print a deprecation notice
     to stderr with a customized message and copy option value to new option.
 

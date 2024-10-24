@@ -14,7 +14,8 @@
 
 import struct
 import base64
-from typing import Callable, Dict, List, Sequence, Tuple, Union
+from collections import abc
+from typing import Union
 
 try:
     # note: TypedDict is available in py38+, but NotRequired only in py311+
@@ -40,14 +41,14 @@ class EncodedQP(TypedDict):
     offset: NotRequired[float]
 
 class QuadraticProblem(TypedDict):
-    linear: Dict[int, float]
-    quadratic: Dict[Tuple[int, int], float]
+    linear: dict[int, float]
+    quadratic: dict[tuple[int, int], float]
     offset: NotRequired[float]
 
 
 def encode_problem_as_qp(solver: 'dwave.cloud.solver.StructuredSolver',
-                         linear: Union[List[float], Dict[int, float]],
-                         quadratic: Dict[Tuple[int, int], float],
+                         linear: Union[list[float], dict[int, float]],
+                         quadratic: dict[tuple[int, int], float],
                          offset: float = 0,
                          undirected_biases: bool = False
                          ) -> EncodedQP:
@@ -74,7 +75,7 @@ def encode_problem_as_qp(solver: 'dwave.cloud.solver.StructuredSolver',
         Encoded submission dictionary.
     """
     # convert legacy format (list) to dict for performance
-    if isinstance(linear, Sequence):
+    if isinstance(linear, abc.Sequence):
         linear = dict(enumerate(linear))
 
     active = active_qubits(linear, quadratic)
@@ -417,7 +418,7 @@ def decode_bq(msg):
     return result
 
 
-def decode_binary_ref(msg: dict, ref_resolver: Callable) -> dict:
+def decode_binary_ref(msg: dict, ref_resolver: abc.Callable) -> dict:
     """Decode binary-ref answer."""
 
     answer = msg['answer']

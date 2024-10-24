@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 # package-global event hooks registry
-# Dict[event_name: str, handler_functions: list]
+# dict[event_name: str, handler_functions: list]
 _client_event_hooks_registry = {
     'before_client_init': [],
     'after_client_init': [],

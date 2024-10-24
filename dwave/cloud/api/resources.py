@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import io
 import orjson
-from typing import List, Union, Optional, Callable, get_type_hints, TYPE_CHECKING
+from collections import abc
+from typing import Union, Optional, get_type_hints, TYPE_CHECKING
 from functools import wraps
 
 from pydantic import TypeAdapter
@@ -44,7 +45,7 @@ class accepts:
         self.ctx = dict(media_type=media_type, accept_version=version)
         self.ctx.update(kwargs)
 
-    def __call__(self, fn: Callable):
+    def __call__(self, fn: abc.Callable):
         @wraps(fn)
         def wrapper(obj: 'ResourceBase', *args, **kwargs):
             try:
@@ -105,11 +106,11 @@ class Regions(ResourceBase):
     client_class = MetadataAPIClient
 
     @accepts(media_type='application/vnd.dwave.metadata.regions+json', version='~=1.0')
-    def list_regions(self, **kwargs) -> List[models.Region]:
+    def list_regions(self, **kwargs) -> list[models.Region]:
         path = ''
         response = self.session.get(path, **kwargs)
         regions = orjson.loads(response.content)
-        return TypeAdapter(List[models.Region]).validate_python(regions)
+        return TypeAdapter(list[models.Region]).validate_python(regions)
 
     @accepts(media_type='application/vnd.dwave.metadata.region+json', version='~=1.0')
     def get_region(self, code: str, **kwargs) -> models.Region:
@@ -125,7 +126,7 @@ class Solvers(ResourceBase):
     client_class = SolverAPIClient
 
     @accepts(media_type='application/vnd.dwave.sapi.solver-definition-list+json', version='~=2.0')
-    def list_solvers(self, filter: Optional[str] = None, **kwargs) -> List[models.SolverConfiguration]:
+    def list_solvers(self, filter: Optional[str] = None, **kwargs) -> list[models.SolverConfiguration]:
         path = 'remote/'
         params = {'filter': filter} if filter is not None else None
         response = self.session.get(path, params=params, **kwargs)
@@ -133,7 +134,7 @@ class Solvers(ResourceBase):
         # tl;dr: model_validate() on orjson-decoded content is much faster then
         #        model_validate_json() and faster than model_validate on json-decoded
         solvers = orjson.loads(response.content)
-        return TypeAdapter(List[models.SolverConfiguration]).validate_python(solvers)
+        return TypeAdapter(list[models.SolverConfiguration]).validate_python(solvers)
 
     @accepts(media_type='application/vnd.dwave.sapi.solver-definition+json', version='~=2.0')
     def get_solver(self, solver_id: str, filter: Optional[str] = None, **kwargs) -> models.SolverConfiguration:
@@ -156,7 +157,7 @@ class Problems(ResourceBase):
                       max_results: int = None,
                       status: Union[str, constants.ProblemStatus] = None,
                       solver: str = None,
-                      **params) -> List[models.ProblemStatus]:
+                      **params) -> list[models.ProblemStatus]:
         """Retrieve a filtered list of submitted problems."""
 
         # build query
@@ -176,7 +177,7 @@ class Problems(ResourceBase):
         path = ''
         response = self.session.get(path, params=params)
         statuses = orjson.loads(response.content)
-        return TypeAdapter(List[models.ProblemStatus]).validate_python(statuses)
+        return TypeAdapter(list[models.ProblemStatus]).validate_python(statuses)
 
     @accepts(media_type='application/vnd.dwave.sapi.problem+json', version='>=2.1,<3')
     def get_problem(self,
@@ -209,9 +210,9 @@ class Problems(ResourceBase):
     # XXX: @pydantic.validate_arguments
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
     def get_problem_statuses(self,
-                             problem_ids: List[str],
+                             problem_ids: list[str],
                              timeout: Optional[int] = None,
-                             ) -> List[models.ProblemStatus]:
+                             ) -> list[models.ProblemStatus]:
         """Retrieve short problem statuses for a list of problems."""
         if not isinstance(problem_ids, list):
             raise TypeError('a list of problem ids expected')
@@ -224,7 +225,7 @@ class Problems(ResourceBase):
             params.setdefault('timeout', timeout)
         response = self.session.get(path, params=params)
         statuses = orjson.loads(response.content)
-        return TypeAdapter(List[models.ProblemStatus]).validate_python(statuses)
+        return TypeAdapter(list[models.ProblemStatus]).validate_python(statuses)
 
     @accepts(media_type='application/vnd.dwave.sapi.problem-data+json', version='>=2.1,<3')
     def get_problem_info(self, problem_id: str) -> models.ProblemInfo:
@@ -260,7 +261,7 @@ class Problems(ResourceBase):
         return output
 
     @accepts(media_type='application/vnd.dwave.sapi.problem-message+json', version='>=2.1,<3')
-    def get_problem_messages(self, problem_id: str) -> List[dict]:
+    def get_problem_messages(self, problem_id: str) -> list[dict]:
         """Retrieve list of problem messages."""
         path = '{}/messages'.format(problem_id)
         response = self.session.get(path)
@@ -272,7 +273,7 @@ class Problems(ResourceBase):
                        params: dict,
                        solver: str,
                        type: constants.ProblemType,
-                       label: str = None) -> \
+                       label: Optional[str] = None) -> \
             Union[models.ProblemStatusMaybeWithAnswer, models.ProblemSubmitError]:
         """Blocking problem submit with timeout, returning final status and
         answer, if problem is solved within the (undisclosed) time limit.
@@ -289,8 +290,8 @@ class Problems(ResourceBase):
         return TypeAdapter(rtype).validate_python(orjson.loads(response.content))
 
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
-    def submit_problems(self, problems: List[models.ProblemJob]) -> \
-            List[Union[models.ProblemInitialStatus, models.ProblemSubmitError]]:
+    def submit_problems(self, problems: list[models.ProblemJob]) -> \
+            list[Union[models.ProblemInitialStatus, models.ProblemSubmitError]]:
         """Asynchronous multi-problem submit, returning initial statuses."""
         path = ''
         # note: TypeAdapter().dump_json() is 2ms vs 50us by orjson.dumps(model.model_dump())
@@ -310,8 +311,8 @@ class Problems(ResourceBase):
         return TypeAdapter(rtype).validate_python(orjson.loads(response.content))
 
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
-    def cancel_problems(self, problem_ids: List[str]) -> \
-            List[Union[models.ProblemStatus, models.ProblemCancelError]]:
+    def cancel_problems(self, problem_ids: list[str]) -> \
+            list[Union[models.ProblemStatus, models.ProblemCancelError]]:
         """Initiate problem cancel for a list of problems."""
         path = ''
         response = self.session.delete(path, json=problem_ids)
@@ -334,7 +335,7 @@ class LeapAccount(ResourceBase):
             orjson.loads(response.content))
         return parsed.data.project
 
-    def list_projects(self) -> List[models.LeapProject]:
+    def list_projects(self) -> list[models.LeapProject]:
         """Retrieve list of Leap projects accessible to the authenticated user."""
         path = 'projects/oauth/'
         response = self.session.get(path)

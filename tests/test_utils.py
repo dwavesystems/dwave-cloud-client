@@ -32,7 +32,7 @@ from datetime import datetime
 from dateutil.tz import UTC
 from functools import partial, wraps
 from itertools import count
-from typing import Tuple, Union
+from typing import Union
 from unittest import mock
 
 import numpy
@@ -983,7 +983,7 @@ class TestFilteredSecretsFormatter(unittest.TestCase):
 
     # dev note: define as unbound local function, to be used in class def context only
     # in py310+ we can declare it as @staticmethod and call it as regular function
-    def _snipped(inp: Union[str, uuid.UUID]) -> Tuple[str, str]:
+    def _snipped(inp: Union[str, uuid.UUID]) -> tuple[str, str]:
         """Naively assuming `inp` is a secret/token, scrub the middle part."""
         return (lambda x: (x, f"{x[:3]}...{x[-3:]}"))(str(inp))
 

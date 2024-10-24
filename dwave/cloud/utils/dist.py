@@ -18,9 +18,9 @@
    These functions previously lived under ``dwave.cloud.utils``.
 """
 
-from importlib.metadata import (
-    EntryPoint, Distribution, PackageNotFoundError)
-from typing import List, OrderedDict, Union
+from collections import OrderedDict
+from importlib.metadata import EntryPoint, Distribution, PackageNotFoundError
+from typing import Union
 
 from importlib_metadata import entry_points
 from packaging.requirements import Requirement
@@ -28,7 +28,7 @@ from packaging.requirements import Requirement
 __all__ = ['get_distribution', 'PackageNotFoundError', 'VersionNotFoundError']
 
 
-def get_contrib_config() -> List[EntryPoint]:
+def get_contrib_config() -> list[EntryPoint]:
     """Return all registered contrib (non-open-source) Ocean packages."""
 
     # Note: we use `entry_points` from `importlib_metadata>=5` to simplify access

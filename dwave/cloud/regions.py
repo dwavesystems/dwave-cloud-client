@@ -14,7 +14,7 @@
 
 import logging
 import re
-from typing import Dict, List, Optional, Union
+from typing import Optional, Union
 from urllib.parse import urlsplit
 
 from dwave.cloud import api
@@ -33,7 +33,7 @@ _DEFAULT_REGIONS_CACHE_CONFIG = dict(
 )
 
 
-def _fetch_available_regions(config: ClientConfig, **kwargs) -> Dict[str, str]:
+def _fetch_available_regions(config: ClientConfig, **kwargs) -> list[api.models.Region]:
     logger.debug("Fetching available regions from the Metadata API at %r",
                  config.metadata_api_endpoint)
 
@@ -49,7 +49,7 @@ def get_regions(config: Optional[Union[ClientConfig, str, dict]] = None,
                 *,
                 refresh: bool = False,
                 maxage: Optional[float] = None,
-                no_cache: bool = False) -> List[api.models.Region]:
+                no_cache: bool = False) -> list[api.models.Region]:
     """Retrieve available Solver API regions.
 
     Args:

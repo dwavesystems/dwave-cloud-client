@@ -15,7 +15,6 @@
 import unittest
 
 import copy
-import networkx as nx
 from parameterized import parameterized, parameterized_class
 
 try:

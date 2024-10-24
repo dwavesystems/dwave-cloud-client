@@ -18,12 +18,13 @@
    These functions previously lived under ``dwave.cloud.utils``.
 """
 
-from typing import Any, Iterable, Tuple, Union
+from collections import abc
+from typing import Any, Union
 
 __all__ = ['hasinstance', 'exception_chain', 'is_caused_by']
 
 
-def hasinstance(objs: Iterable[Any], class_or_tuple: Union[Any, Tuple[Any]]):
+def hasinstance(objs: abc.Iterable[Any], class_or_tuple: Union[Any, tuple[Any]]):
     """Extension of ``isinstance`` to iterables/sequences. Returns True iff the
     sequence contains at least one object which is instance of ``class_or_tuple``.
     """
@@ -71,7 +72,7 @@ def exception_chain(exception: Exception):
 
 
 def is_caused_by(exception: Exception,
-                 exception_types: Union[Exception, Tuple[Exception]]
+                 exception_types: Union[Exception, tuple[Exception]]
                  ) -> bool:
     """Check if any of ``exception_types`` is causing the ``exception``.
     Equivalently, check if any of ``exception_types`` is contained in the

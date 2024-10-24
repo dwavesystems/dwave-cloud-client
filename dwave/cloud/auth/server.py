@@ -12,13 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import logging
 import random
 import sys
 import threading
 import traceback
+from collections import abc
 from socketserver import ThreadingMixIn
-from typing import Callable, Iterator, Optional, Union
+from typing import Optional, Union
 from urllib.parse import urljoin, urlsplit, parse_qsl, SplitResult
 from wsgiref.simple_server import make_server, WSGIRequestHandler, WSGIServer
 from wsgiref.util import request_uri
@@ -102,7 +105,7 @@ class ThreadingWSGIServer(ThreadingMixIn, SocketTimeoutTCPServerMixin,
 
 
 def iterports(start: int, end: int,
-              n_lin: int, n_rand: Optional[int] = None) -> Iterator[int]:
+              n_lin: int, n_rand: Optional[int] = None) -> abc.Iterator[int]:
     """Server port proposal generator. Starts with a linear search, then
     switches to a randomized search (random permutation of remaining ports).
     """
@@ -167,7 +170,7 @@ class BackgroundAppServer(threading.Thread):
 
             return self._server
 
-    def __init__(self, *, host: str, base_port: int, max_port: int, app: Callable,
+    def __init__(self, *, host: str, base_port: int, max_port: int, app: abc.Callable,
                  linear_tries: int = 1, randomized_tries: Optional[int] = None,
                  timeout: Optional[float] = 10):
         super().__init__(daemon=True)
@@ -285,7 +288,7 @@ class RequestCaptureApp:
         if hasattr(self, '_exc') and self._exc:
             raise self._exc
 
-    def __call__(self, environ: dict, start_response: Callable):
+    def __call__(self, environ: dict, start_response: abc.Callable):
         self.store_request(environ)
 
         start_response("200 OK", [('Content-Type', 'text/plain; charset=utf-8')])
@@ -298,14 +301,14 @@ class RequestCaptureAndRedirectApp(RequestCaptureApp):
     """
 
     def __init__(self, message: str,
-                 redirect_uri: Union[str, Callable],
+                 redirect_uri: Union[str, abc.Callable],
                  include_query: bool = True):
         super().__init__(message)
 
         self.redirect_uri = redirect_uri
         self.include_query = include_query
 
-    def __call__(self, environ: dict, start_response: Callable):
+    def __call__(self, environ: dict, start_response: abc.Callable):
         self.store_request(environ)
 
         if callable(self.redirect_uri):

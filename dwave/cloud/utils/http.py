@@ -20,7 +20,7 @@
 
 import platform
 import sys
-import typing
+from typing import Optional
 from urllib.parse import urljoin
 
 import requests
@@ -89,8 +89,8 @@ class BaseUrlSession(requests.Session):
         return urljoin(self.base_url, url)
 
 
-def user_agent(name: typing.Optional[str] = None,
-               version: typing.Optional[str] = None,
+def user_agent(name: Optional[str] = None,
+               version: Optional[str] = None,
                *,
                include_platform_tags: bool = True) -> str:
     """Return User-Agent ~ "name/version language/version interpreter/version os/version".
@@ -149,7 +149,7 @@ def default_user_agent() -> str:
         name=__packagename__, version=__version__, include_platform_tags=False)
 
 
-def platform_tags() -> typing.List[str]:
+def platform_tags() -> list[str]:
     """Return a list of platform tags generated from registered entry points."""
 
     # import only when needed, as it's pretty slow! (~10ms)

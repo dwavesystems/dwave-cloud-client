@@ -15,7 +15,7 @@
 import uuid
 import itertools
 import random
-from typing import List, Optional
+from typing import Optional
 
 __all__ = [
     'solver_configuration_data',
@@ -63,8 +63,8 @@ def structured_solver_data(id: str = None,
                            description: str = None,
                            properties: dict = None,
                            # specific properties for convenience, override `properties` dict
-                           qubits: List[int] = None,
-                           couplers: List[List[int]] = None,
+                           qubits: list[int] = None,
+                           couplers: list[list[int]] = None,
                            **kwargs) -> dict:
     """Return data dict describing a structured solver. By default, solver has
     only one qubit.
@@ -318,7 +318,7 @@ def unstructured_solver_data(id: str = None,
                              description: str = None,
                              properties: dict = None,
                              # specific properties for convenience, override `properties` dict
-                             supported_problem_types: List[str] = None,
+                             supported_problem_types: list[str] = None,
                              **kwargs) -> dict:
     """Return data dict describing an unstructured solver."""
 

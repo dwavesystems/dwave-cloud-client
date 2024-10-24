@@ -19,7 +19,6 @@ import subprocess
 from copy import deepcopy
 from functools import partial
 from pathlib import Path
-from typing import List
 
 import dimod
 import requests
@@ -213,8 +212,8 @@ class SolverSelection:
             "avg_load": s['avg_load']
         } for s in solvers_data]
 
-        static_conf = TypeAdapter(List[SolverConfiguration]).validate_python(static_data)
-        dynamic_conf = TypeAdapter(List[SolverConfiguration]).validate_python(dynamic_data)
+        static_conf = TypeAdapter(list[SolverConfiguration]).validate_python(static_data)
+        dynamic_conf = TypeAdapter(list[SolverConfiguration]).validate_python(dynamic_data)
 
         class mock_session:
             def list_solvers(self, filter=None, **kwargs):
@@ -274,15 +273,15 @@ class JSONResponseDecode:
 
     def time_model_from_python_json(self):
         solvers = requests.get('http://mock').json()
-        TypeAdapter(List[SolverConfiguration]).validate_python(solvers)
+        TypeAdapter(list[SolverConfiguration]).validate_python(solvers)
 
     def time_model_from_json(self):
         content = requests.get('http://mock').content
-        TypeAdapter(List[SolverConfiguration]).validate_json(content)
+        TypeAdapter(list[SolverConfiguration]).validate_json(content)
 
     def time_model_from_python_orjson(self):
         solvers = orjson.loads(requests.get('http://mock').content)
-        TypeAdapter(List[SolverConfiguration]).validate_python(solvers)
+        TypeAdapter(list[SolverConfiguration]).validate_python(solvers)
 
     def time_manual_model_from_python_orjson(self):
         solvers = orjson.loads(requests.get('http://mock').content)

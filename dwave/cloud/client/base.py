@@ -54,7 +54,7 @@ from itertools import chain, zip_longest
 from functools import partial, wraps
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Optional, Union
+from typing import Optional, Union
 
 import orjson
 import requests
@@ -652,7 +652,7 @@ class Client(object):
         """
         return True
 
-    def get_regions(self, refresh: bool = False) -> Dict[str, Dict[str, str]]:
+    def get_regions(self, refresh: bool = False) -> dict[str, dict[str, str]]:
         """Retrieve available API regions.
 
         Args:
@@ -696,7 +696,7 @@ class Client(object):
     def _fetch_solvers(self,
                        name: Optional[str] = None,
                        refresh_: Optional[bool] = False,
-                       ) -> List[Union[StructuredSolver, UnstructuredSolver]]:
+                       ) -> list[Union[StructuredSolver, UnstructuredSolver]]:
 
         static_fields = 'all,-status,-avg_load'
         dynamic_fields = 'none,+id,+status,+avg_load'
@@ -1865,7 +1865,7 @@ class Client(object):
     @staticmethod
     def _combined_checksum(checksums):
         # TODO: drop this requirement server-side
-        # checksums: Dict[int, str] => hex(md5(cat(digests))): str
+        # checksums: dict[int, str] => hex(md5(cat(digests))): str
         combined = ''.join(h for _, h in sorted(checksums.items()))
         digest = codecs.decode(combined, 'hex')
         return Client._checksum_hex(Client._digest(digest))

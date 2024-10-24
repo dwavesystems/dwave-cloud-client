@@ -18,7 +18,8 @@ import unittest
 import configparser
 from unittest import mock
 from functools import partial
-from typing import Any, Dict, Callable
+from collections import abc
+from typing import Any
 
 from parameterized import parameterized
 
@@ -531,8 +532,8 @@ class TestConfigModel(unittest.TestCase):
     OMITTED = object()
 
     def _verify(self,
-                raw_config: Dict[str, Any],
-                get_field: Callable[[ClientConfig], Any],
+                raw_config: dict[str, Any],
+                get_field: abc.Callable[[ClientConfig], Any],
                 model_value: Any):
         """For a given ``raw_config``, test both model validate and dump."""
 

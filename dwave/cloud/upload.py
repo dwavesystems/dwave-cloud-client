@@ -21,7 +21,7 @@ import logging
 import threading
 
 from abc import abstractmethod
-from collections.abc import Sized
+from collections import abc
 from functools import partial
 
 __all__ = ['ChunkedData']
@@ -29,7 +29,7 @@ __all__ = ['ChunkedData']
 logger = logging.getLogger(__name__)
 
 
-class Gettable(Sized):
+class Gettable(abc.Sized):
     """Abstract base class for objects that implement standard and efficient
     item getters.
 
