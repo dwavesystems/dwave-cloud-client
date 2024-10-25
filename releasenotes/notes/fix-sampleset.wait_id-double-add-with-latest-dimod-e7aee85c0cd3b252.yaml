@@ -1,0 +1,9 @@
+---
+fixes:
+  - |
+    Update sample set creation in ``dwave.cloud.computation.Future`` to support
+    dimod 0.12.18+. Previously, ``wait_id()`` method used to be added to the
+    ``from_future``-created sample sets in the cloud-client, and now the ``SampleSet``
+    interface propagates ``wait_id`` from the future by default.
+    See `dimod#1392 <https://github.com/dwavesystems/dimod/issues/1392>`_ and
+    `dwave-system#540 <https://github.com/dwavesystems/dwave-system/issues/540>`_.

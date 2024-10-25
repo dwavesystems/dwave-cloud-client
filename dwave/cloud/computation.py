@@ -801,9 +801,12 @@ class Future(object):
             energy=self.energies, num_occurrences=self.num_occurrences,
             info=info, sort_labels=True)
 
-        # the id is stored in the info field, but to be consistent with
-        # the samplesets constructed .from_future, we add the method as well
-        sampleset.wait_id = self.wait_id
+        if not hasattr(sampleset, 'wait_id'):
+            # the id is stored in the info field, but to be consistent with the
+            # samplesets constructed .from_future, we add the method as well
+            # note: sampleset has .wait_id() since dimod 0.12.18+, but we want
+            # to support older dimods as well
+            sampleset.wait_id = self.wait_id
 
         # cache the constructed sampleset on computation, but don't prevent the
         # gc from collecting it if unused in parent closure
@@ -832,10 +835,12 @@ class Future(object):
 
         sampleset = dimod.SampleSet.from_future(self, lambda f: f.wait_sampleset())
 
-        # propagate id to sampleset as well
-        # note: this requires dimod>=0.8.21 (before that version SampleSet
-        # had slots set which prevented dynamic addition of attributes).
-        sampleset.wait_id = self.wait_id
+        if not hasattr(sampleset, 'wait_id'):
+            # the id is stored in the info field, but to be consistent with the
+            # samplesets constructed .from_future, we add the method as well
+            # note: sampleset has .wait_id() since dimod 0.12.18+, but we want
+            # to support older dimods as well
+            sampleset.wait_id = self.wait_id
 
         return sampleset
 
