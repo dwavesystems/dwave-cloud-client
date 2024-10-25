@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import os
 import ast
 import logging
 import configparser
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import homebase
 
@@ -117,7 +119,7 @@ def parse_boolean(s, default=None):
 def get_configfile_paths(
         *, system: bool = True, user: bool = True, local: bool = True,
         only_existing: bool = True, app_author: str = CONF_AUTHOR,
-        app_name: str = CONF_APP, filename: str = CONF_FILENAME) -> List[str]:
+        app_name: str = CONF_APP, filename: str = CONF_FILENAME) -> list[str]:
     """Return a list of local configuration file paths.
 
     Search paths for configuration files on the local system

@@ -24,20 +24,20 @@ import os
 import re
 import sys
 import types
-import typing
+from typing import Optional, Union
 
 __all__ = []
 
 
 class ISOFormatter(logging.Formatter):
     # target timezone, e.g. `datetime.timezone.utc`, or `None` for naive timestamp
-    as_tz: typing.Optional[datetime.timezone] = None
+    as_tz: Optional[datetime.timezone] = None
 
-    def __init__(self, *args, as_tz: typing.Optional[datetime.timezone] = None, **kwargs):
+    def __init__(self, *args, as_tz: Optional[datetime.timezone] = None, **kwargs):
         self.as_tz = as_tz
         super().__init__(*args, **kwargs)
 
-    def formatTime(self, record: logging.LogRecord, datefmt: typing.Optional[str] = None) -> str:
+    def formatTime(self, record: logging.LogRecord, datefmt: Optional[str] = None) -> str:
         return datetime.datetime.fromtimestamp(record.created, tz=self.as_tz).isoformat()
 
 
@@ -85,7 +85,7 @@ class BinaryFormatter(logging.Formatter):
         return super().format(record).encode('utf8')
 
 
-def parse_loglevel(level_name: typing.Union[str, int],
+def parse_loglevel(level_name: Union[str, int],
                    default: int = logging.NOTSET) -> int:
     """Resolve numeric and symbolic log level names to numeric levels."""
 
@@ -118,7 +118,7 @@ def parse_loglevel(level_name: typing.Union[str, int],
     return level
 
 
-def set_loglevel(logger: logging.Logger, level: typing.Union[str, int]) -> None:
+def set_loglevel(logger: logging.Logger, level: Union[str, int]) -> None:
     level = parse_loglevel(level)
     logger.setLevel(level)
     logger.info("Log level for %r namespace set to %r", logger.name, level)
@@ -151,14 +151,14 @@ class BinaryStreamHandler(logging.StreamHandler):
         super().__init__(stream=stream)
 
 
-def configure_logging(logger: typing.Optional[logging.Logger] = None,
+def configure_logging(logger: Optional[logging.Logger] = None,
                       *,
-                      level: typing.Union[str, int] = logging.WARNING,
+                      level: Union[str, int] = logging.WARNING,
                       filter_secrets: bool = True,
-                      output_stream: typing.Optional[io.BytesIO] = None,
+                      output_stream: Optional[io.BytesIO] = None,
                       in_utc: bool = False,
                       structured_output: bool = False,
-                      handler_level: typing.Optional[int] = None,
+                      handler_level: Optional[int] = None,
                       additive: bool = False,
                       ) -> logging.Logger:
     """Configure cloud-client's `dwave.cloud` base logger.
@@ -244,7 +244,7 @@ def pretty_argvalues():
 #
 # note: performance gained over `inspect.stack()` mostly by not parsing code
 # files, but also by limiting traversal depth.
-def fast_stack(max_depth: typing.Optional[int] = None) -> typing.List[inspect.FrameInfo]:
+def fast_stack(max_depth: Optional[int] = None) -> list[inspect.FrameInfo]:
     """Fast alternative to `inspect.stack()`
 
     Use optional `max_depth` to limit search depth
@@ -269,7 +269,7 @@ def fast_stack(max_depth: typing.Optional[int] = None) -> typing.List[inspect.Fr
     In [6]: %timeit stack_depth(100, lambda: fast_stack(10))
     14.1 µs ± 33.4 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
     """
-    def frame_infos(frame: typing.Optional[types.FrameType]):
+    def frame_infos(frame: Optional[types.FrameType]):
         while frame := frame and frame.f_back:
             yield inspect.FrameInfo(
                 frame=frame,

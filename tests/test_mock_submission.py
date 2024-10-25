@@ -19,7 +19,7 @@ import time
 import unittest
 import zlib
 from concurrent.futures import TimeoutError, ThreadPoolExecutor
-from typing import Any, Dict
+from typing import Any
 from unittest import mock
 from urllib.parse import urlencode
 
@@ -44,7 +44,7 @@ from dwave.cloud.utils.time import utcrel
 from tests.api.mocks import StructuredSapiMockResponses, choose_reply
 
 
-def fix_status_paths(replies: Dict[str, Any], **params):
+def fix_status_paths(replies: dict[str, Any], **params):
     """Append URL params to problem status paths."""
 
     def fix(path, **params):

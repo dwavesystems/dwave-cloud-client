@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import ast
 import copy
 import enum
 import logging
 import orjson
 from collections import abc
-from typing import Optional, Union, Literal, Tuple, Dict, Any
-from typing_extensions import Annotated     # backport for py37, py38
+from typing import Optional, Union, Literal, Any, Annotated
 
 import urllib3
 from pydantic import BaseModel, BeforeValidator, NonNegativeInt
@@ -145,7 +146,7 @@ class ClientConfig(BaseModel, GetterMixin):
 
     # [sapi client specific] feature-based solver selection query
     client: Optional[str] = None
-    solver: Optional[Dict[str, Any]] = None
+    solver: Optional[abc.Mapping[str, Any]] = None
 
     # [sapi client specific] polling schedule defaults [sec]
     # note: discriminated unions are faster than unions, but we want to be able
@@ -155,8 +156,8 @@ class ClientConfig(BaseModel, GetterMixin):
     polling_timeout: Optional[float] = None
 
     # general http(s) connection params
-    cert: Optional[Union[str, Tuple[str, str]]] = None
-    headers: Optional[Dict[str, str]] = None
+    cert: Optional[Union[str, tuple[str, str]]] = None
+    headers: Optional[abc.Mapping[str, str]] = None
     proxy: Optional[str] = None
 
     # specific connection options
@@ -166,11 +167,11 @@ class ClientConfig(BaseModel, GetterMixin):
 
     # api request retry params
     request_retry: Optional[RequestRetryConfig] = RequestRetryConfig()
-    request_timeout: Annotated[Optional[Union[float, Tuple[float, float]]],
+    request_timeout: Annotated[Optional[Union[float, tuple[float, float]]],
                                BeforeValidator(_literal_eval)] = (60.0, 120.0)
 
 
-def validate_config_v1(raw_config: dict) -> ClientConfig:
+def validate_config_v1(raw_config: abc.Mapping) -> ClientConfig:
     """Validate raw config data (as obtained from the current INI-style config
     via :func:`~dwave.cloud.config.loaders.load_config`) and construct a
     :class:`ClientConfig` object.
@@ -179,7 +180,8 @@ def validate_config_v1(raw_config: dict) -> ClientConfig:
     and structure to fit the :class:`ClientConfig` model.
     """
 
-    config = raw_config.copy()
+    # shallow copy
+    config = dict(raw_config)
 
     # parse string headers
     headers = config.get('headers')

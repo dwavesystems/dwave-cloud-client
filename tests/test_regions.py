@@ -14,7 +14,6 @@
 
 import unittest
 from unittest import mock
-from typing import List
 
 import requests_mock
 from parameterized import parameterized
@@ -103,7 +102,7 @@ class GetRegionsFunctionality(unittest.TestCase):
             Region(code='A', name='Region A', endpoint='http://a/'),
             Region(code='B', name='Region B', endpoint='http://b/'),
         ]
-        mock_json = TypeAdapter(List[Region]).dump_python(mock_regions)
+        mock_json = TypeAdapter(list[Region]).dump_python(mock_regions)
 
         m.get(f"{mock_endpoint}/regions/", json=mock_json,
               headers={'Content-Type': 'application/vnd.dwave.metadata.regions+json; version=1.0'})

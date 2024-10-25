@@ -25,9 +25,10 @@ import numbers
 import time
 import warnings
 
+from collections import abc
 from functools import wraps
 from secrets import token_hex
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Union
+from typing import Any, Optional, Union
 
 from dwave.cloud.utils.time import epochnow
 
@@ -209,7 +210,7 @@ class cached:
         except:
             pass
 
-    def _argshash(self, args: List[Any], kwargs: Dict[Any, Any]):
+    def _argshash(self, args: abc.Sequence[Any], kwargs: abc.Mapping[Any, Any]):
         """Hash mutable arguments' containers with immutable keys and values."""
         if self.key is None:
             # the default: use all args and kwargs for cache key
@@ -223,7 +224,7 @@ class cached:
 
     def __init__(self, *,
                  maxage: Optional[float] = None,
-                 store: Union[Mapping, Callable[[], Mapping], None] = None,
+                 store: Union[abc.Mapping, abc.Callable[[], abc.Mapping], None] = None,
                  key: Optional[str] = None,
                  bucket: Optional[str] = None):
 
@@ -366,7 +367,7 @@ class deprecated:
         self.msg = msg
         self.stacklevel = stacklevel
 
-    def __call__(self, fn: Callable) -> Callable:
+    def __call__(self, fn: abc.Callable) -> abc.Callable:
         if not callable(fn):
             raise TypeError("decorated object must be callable")
 
@@ -416,13 +417,13 @@ class retried:
         # normalize `backoff` to callable
         if isinstance(backoff, numbers.Number):
             self.backoff = lambda retry: backoff
-        elif isinstance(backoff, Sequence):
+        elif isinstance(backoff, abc.Sequence):
             it = iter(backoff)
             self.backoff = lambda retry: next(it)
         else:
             self.backoff = backoff
 
-    def __call__(self, fn: Callable) -> Callable:
+    def __call__(self, fn: abc.Callable) -> abc.Callable:
         if not callable(fn):
             raise TypeError("decorated object must be callable")
 

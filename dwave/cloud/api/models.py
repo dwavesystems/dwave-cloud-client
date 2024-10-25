@@ -13,8 +13,7 @@
 # limitations under the License.
 
 from datetime import datetime
-from typing import List, Union, Optional, Dict, Any
-from typing_extensions import Annotated     # backport for py37, py38
+from typing import Annotated, Any, Optional, Union
 
 from pydantic import BaseModel, RootModel, ConfigDict
 from pydantic.functional_validators import AfterValidator
@@ -147,20 +146,20 @@ class ProblemMetadata(BaseModel):
     submitted_by: str
     submitted_on: datetime
     solved_on: Optional[datetime] = None
-    messages: Optional[List[dict]] = None
+    messages: Optional[list[dict]] = None
 
 
 class ProblemInfo(BaseModel):
     id: str
     data: ProblemData
-    params: Dict[str, AnyIncludingNumpy]
+    params: dict[str, AnyIncludingNumpy]
     metadata: ProblemMetadata
     answer: ProblemAnswer
 
 
 class ProblemJob(BaseModel):
     data: ProblemData
-    params: Dict[str, AnyIncludingNumpy]
+    params: dict[str, AnyIncludingNumpy]
     solver: str
     type: constants.ProblemType
     label: Optional[str] = None
@@ -210,7 +209,7 @@ class _LeapActiveProjectResponse(BaseModel):
 
 # LeapAPI / account / projects response
 class _LeapProjectsWrapper(BaseModel):
-    projects: List[_LeapProjectWrapper]
+    projects: list[_LeapProjectWrapper]
 
 class _LeapProjectsResponse(BaseModel):
     data: _LeapProjectsWrapper

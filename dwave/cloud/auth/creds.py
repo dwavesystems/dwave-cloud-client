@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
-from typing import List, Optional, Type, Union
+from typing import Optional, Type, Union
 
 from dwave.cloud.auth._creds import _Cache
 from dwave.cloud.config import get_configfile_paths, get_default_configfile_path
@@ -31,7 +33,7 @@ class AutoDetect:
 
 def _get_creds_paths(
         *, system: bool = True, user: bool = True, local: bool = True,
-        only_existing: bool = True) -> List[str]:
+        only_existing: bool = True) -> list[str]:
     return get_configfile_paths(system=system, user=user, local=local,
                                 only_existing=only_existing, filename=CREDS_FILENAME)
 

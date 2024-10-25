@@ -15,7 +15,7 @@
 import collections
 import io
 import uuid
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Optional, Union
 from unittest import mock
 
 import orjson
@@ -77,7 +77,7 @@ class SapiMockResponses:
 
     def __init__(self,
                  solver: Union[StructuredSolver, UnstructuredSolver],
-                 problem: Union[Tuple[dict, dict], 'dimod.BQM'],
+                 problem: Union[tuple[dict, dict], 'dimod.BQM'],
                  answer: dict,
                  problem_type: str,
                  problem_id: str = None,
@@ -94,7 +94,7 @@ class SapiMockResponses:
 
     def problem_data(self,
                      solver: Union[StructuredSolver, UnstructuredSolver] = None,
-                     problem: Union[Tuple[dict, dict], 'dimod.BQM'] = None) -> dict:
+                     problem: Union[tuple[dict, dict], 'dimod.BQM'] = None) -> dict:
         raise NotImplementedError
 
     def problem_messages(self) -> dict:
@@ -252,7 +252,7 @@ class StructuredSapiMockResponses(SapiMockResponses):
 
     def problem_data(self,
                      solver: StructuredSolver = None,
-                     problem: Tuple[dict, dict] = None) -> dict:
+                     problem: tuple[dict, dict] = None) -> dict:
         if solver is None:
             solver = self.solver
         if problem is None:

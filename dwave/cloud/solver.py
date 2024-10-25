@@ -33,10 +33,10 @@ import concurrent.futures
 import copy
 import logging
 import orjson
-import typing
-from collections.abc import Mapping
+from collections import abc
 from functools import partial
 from tempfile import SpooledTemporaryFile
+from typing import Any, Literal, Optional, Union, TYPE_CHECKING
 
 from dwave.cloud.exceptions import (
     InvalidAPIResponseError, SolverPropertyMissingError,
@@ -70,15 +70,15 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     # do a bit of fiddling
     try:
-        _Type = typing.Literal['qubo', 'ising']
+        _Type = Literal['qubo', 'ising']
     except ImportError:  # Python < 3.8
         _Type = str
 
     try:
-        _Vartype = typing.Union[_Type, dimod.typing.VartypeLike]
+        _Vartype = Union[_Type, dimod.typing.VartypeLike]
     except AttributeError:  # dimod not installed or too old
         _Vartype = _Type
 
@@ -187,11 +187,11 @@ class BaseSolver(object):
             return decode_qp(msg)
 
     def _download_binary_ref(self, *, auth_method: str, url: str,
-                             output: typing.Optional[io.IOBase] = None) -> typing.Union[bytes, io.IOBase]:
+                             output: Optional[io.IOBase] = None) -> Union[bytes, io.IOBase]:
         return self.client._download_answer_binary_ref(
             auth_method=auth_method, url=url, output=output).result()
 
-    def decode_response(self, msg, answer_data: typing.Optional[io.IOBase] = None):
+    def decode_response(self, msg, answer_data: Optional[io.IOBase] = None):
         if msg['type'] not in self._handled_problem_types:
             raise ValueError('Unknown problem type received.')
 
@@ -790,7 +790,7 @@ class NLSolver(BaseUnstructuredSolver):
     _handled_encoding_formats = {"binary-ref"}
 
     def _encode_problem_for_upload(self,
-                                   model: typing.Union['dwave.optimization.Model', io.IOBase],
+                                   model: Union['dwave.optimization.Model', io.IOBase],
                                    **kwargs
                                    ) -> io.IOBase:
         encode_params = {k: v for k, v in kwargs.items()
@@ -810,7 +810,7 @@ class NLSolver(BaseUnstructuredSolver):
 
     def sample_bqm(self,
                    bqm: 'dimod.BQM',
-                   label: typing.Optional[str] = None,
+                   label: Optional[str] = None,
                    **params) -> Future:
         """Use just for testing."""
         try:
@@ -834,9 +834,9 @@ class NLSolver(BaseUnstructuredSolver):
         return self.sample_nlm(nlm, label=label, **params)
 
     def sample_nlm(self,
-                   model: typing.Union['dwave.optimization.Model', io.IOBase, str],
-                   label: typing.Optional[str] = None,
-                   upload_params: typing.Optional[dict] = None,
+                   model: Union['dwave.optimization.Model', io.IOBase, str],
+                   label: Optional[str] = None,
+                   upload_params: Optional[dict] = None,
                    **sample_params
                    ) -> Future:
         """Sample from the specified :term:`NL model`.
@@ -888,7 +888,7 @@ class NLSolver(BaseUnstructuredSolver):
         return future
 
     def upload_nlm(self,
-                   model: typing.Union['dwave.optimization.Model', io.IOBase, bytes],
+                   model: Union['dwave.optimization.Model', io.IOBase, bytes],
                    **upload_params,
                    ) -> concurrent.futures.Future:
         r"""Upload the specified :term:`NL model` to SAPI, returning a Problem ID
@@ -1262,10 +1262,10 @@ class StructuredSolver(BaseSolver):
 
     @staticmethod
     def reformat_parameters(vartype: '_Vartype',
-                            parameters: typing.MutableMapping[str, typing.Any],
-                            properties: typing.Mapping[str, typing.Any],
+                            parameters: abc.MutableMapping[str, Any],
+                            properties: abc.Mapping[str, Any],
                             inplace: bool = False,
-                            ) -> typing.MutableMapping[str, typing.Any]:
+                            ) -> abc.MutableMapping[str, Any]:
         """Reformat some solver parameters for SAPI.
 
         Currently the only reformatted parameter is ``initial_state``. This
@@ -1308,7 +1308,7 @@ class StructuredSolver(BaseSolver):
         # update the parameters
         if 'initial_state' in parameters:
             initial_state = parameters['initial_state']
-            if isinstance(initial_state, typing.Mapping):
+            if isinstance(initial_state, abc.Mapping):
 
                 initial_state_list = [3]*properties['num_qubits']
 
@@ -1358,7 +1358,7 @@ class StructuredSolver(BaseSolver):
             True
         """
         # handle legacy format
-        if not isinstance(linear, Mapping):
+        if not isinstance(linear, abc.Mapping):
              linear = {idx: val for idx, val in enumerate(linear) if val != 0}
 
         return self.nodes.issuperset(linear) and self.edges.issuperset(quadratic)
@@ -1366,13 +1366,13 @@ class StructuredSolver(BaseSolver):
     def estimate_qpu_access_time(self,
                                  num_qubits: int,
                                  num_reads: int = 1,
-                                 annealing_time: typing.Optional[float] = None,
-                                 anneal_schedule: typing.Optional[typing.List[typing.Tuple[float, float]]] = None,
-                                 initial_state:  typing.Optional[typing.List[typing.Tuple[float, float]]] = None,
+                                 annealing_time: Optional[float] = None,
+                                 anneal_schedule: Optional[list[tuple[float, float]]] = None,
+                                 initial_state:  Optional[list[tuple[float, float]]] = None,
                                  reverse_anneal: bool = False,
                                  reinitialize_state: bool = False,
-                                 programming_thermalization: typing.Optional[float] = None,
-                                 readout_thermalization: typing.Optional[float] = None,
+                                 programming_thermalization: Optional[float] = None,
+                                 readout_thermalization: Optional[float] = None,
                                  reduce_intersample_correlation: bool = False,
                                  **kwargs) -> float:
         """Estimates QPU access time for a submission to the selected solver.

@@ -17,8 +17,9 @@ from __future__ import annotations
 import logging
 import time
 import webbrowser
+from collections import abc
 from operator import sub
-from typing import Any, Callable, Dict, Optional, Union, Sequence, Literal, TYPE_CHECKING
+from typing import Any, Optional, Union, Literal, TYPE_CHECKING
 from urllib.parse import urljoin
 
 import click
@@ -80,12 +81,12 @@ class AuthFlow:
 
     def __init__(self, *,
                  client_id: str,
-                 scopes: Sequence[str],
+                 scopes: abc.Sequence[str],
                  redirect_uri: str,
                  authorization_endpoint: str,
                  token_endpoint: str,
                  revocation_endpoint: Optional[str] = None,
-                 session_config: Optional[Dict[str, Any]] = None,
+                 session_config: Optional[abc.Mapping[str, Any]] = None,
                  leap_api_endpoint: Optional[str] = None,
                  creds: Optional[Credentials] = None
                  ):
@@ -130,7 +131,7 @@ class AuthFlow:
 
         logger.debug(f"{type(self).__name__} initialized with: {pretty_argvalues()}")
 
-    def update_session(self, config: Dict[str, Any]) -> None:
+    def update_session(self, config: abc.Mapping[str, Any]) -> None:
         """Update OAuth2Session/requests.Session with config values for:
         ``cert``, ``cookies``, ``headers``, ``proxies``, ``timeout``, ``verify``.
         """
@@ -378,7 +379,7 @@ class LeapAuthFlow(AuthFlow):
 
         return flow
 
-    def run_oob_flow(self, *, open_browser: Union[bool,Callable] = False):
+    def run_oob_flow(self, *, open_browser: Union[bool, abc.Callable] = False):
         """Run OAuth 2.0 code exchange (out-of-band flow.) 
         
         Runs the OAuth 2.0 Authorization Code exchange flow using the out-of-band code 
@@ -405,7 +406,7 @@ class LeapAuthFlow(AuthFlow):
         click.echo()
         return self.fetch_token(code=code)
 
-    def run_redirect_flow(self, *, open_browser: Union[bool,Callable] = False,
+    def run_redirect_flow(self, *, open_browser: Union[bool, abc.Callable] = False,
                           timeout: Optional[float] = None):
         """Run the OAuth 2.0 code exchange (using locally hosted redirect URI). 
         

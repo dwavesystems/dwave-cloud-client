@@ -20,8 +20,8 @@ import logging
 import numbers
 import os
 import warnings
-from collections import deque, namedtuple
-from typing import Callable, Mapping, Optional, Tuple, TypedDict, Union, TYPE_CHECKING
+from collections import deque, namedtuple, abc
+from typing import Optional, TypedDict, Union, TYPE_CHECKING
 
 import orjson
 import requests
@@ -235,7 +235,7 @@ class VersionedAPISession(LoggingSession):
         return response
 
 
-def _create_default_cache_store(**kwargs) -> Mapping:
+def _create_default_cache_store(**kwargs) -> abc.Mapping:
     # TODO: de-dup vs `dwave.cloud.utils.decorators.cached`?
 
     # defer to break circular imports
@@ -289,7 +289,7 @@ class CachingSession(VersionedAPISession):
     class CacheConfig(TypedDict, total=False):
         enabled: bool
         maxage: float
-        store: Union[Mapping, Callable[[], Mapping]]
+        store: Union[abc.Mapping, abc.Callable[[], abc.Mapping]]
 
     # default cache config
     _default_cache_config = CacheConfig(enabled=True,
@@ -336,7 +336,7 @@ class CachingSession(VersionedAPISession):
     def _parse_cache_control(
             self,
             cache_control: Optional[str] = None,
-            ) -> Tuple[bool, Optional[int]]:
+            ) -> tuple[bool, Optional[int]]:
         # parse Cache-Control header field (if present) and derive a suitable max-age value
         # returns: (cache?, maxage)
 
@@ -580,7 +580,7 @@ class DWaveAPIClient:
         return cls.from_config_model(config)
 
     @classmethod
-    def from_config(cls, config: Optional[Union[ClientConfig, str]] = None, **kwargs):
+    def from_config(cls, config: Union[ClientConfig, str, None] = None, **kwargs):
         """Create class instance based on client config or config file.
 
         Args:

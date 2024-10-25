@@ -17,12 +17,12 @@ import sys
 import ast
 import orjson
 import subprocess
-from collections.abc import Sequence
+from collections import abc
 from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps, partial
 from timeit import default_timer as timer
-from typing import Callable, Dict, Optional, Tuple
+from typing import Optional
 
 import click
 import requests.exceptions
@@ -207,7 +207,7 @@ def create(*, config_file, profile, ask_full, auto_token, project):
 
 def _input_config_variables(config: ConfigParser,
                             profile: str,
-                            prompts: Dict[str, Dict[str, str]]) -> ConfigParser:
+                            prompts: dict[str, dict[str, str]]) -> ConfigParser:
     """Update config variables in place with user-provided values."""
 
     for var, prompt in prompts.items():
@@ -652,7 +652,7 @@ def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
     else:
         try:
             linear = ast.literal_eval(biases) if biases else {}
-            if isinstance(linear, Sequence):
+            if isinstance(linear, abc.Sequence):
                 linear = dict(enumerate(linear))
         except Exception as e:
             raise CLIError(f"Invalid biases: {e}", code=99)
@@ -1133,7 +1133,7 @@ def leap_project_token(*, config_file, profile, project_hint, json_output, outpu
 
 def _get_sapi_token_for_leap_project(
         *, config_file: str, profile: str,
-        project_hint: Optional[str], output: Callable) -> Tuple[api.models.LeapProject, str]:
+        project_hint: Optional[str], output: abc.Callable) -> tuple[api.models.LeapProject, str]:
 
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
     flow = LeapAuthFlow.from_config_model(config)

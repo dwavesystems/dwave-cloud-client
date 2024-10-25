@@ -15,13 +15,14 @@
 """Old QUBO/Ising utilities for private and Ocean-internal use."""
 
 import random
-from typing import Any, Dict, Iterator, List, Mapping, Optional, Sequence, Set, Tuple, Union
+from collections.abc import Iterator, Mapping, Sequence
+from typing import Any, Optional, Union
 
 __all__ = []
 
 
 def uniform_iterator(sequence: Union[Mapping, Sequence]
-                     ) -> Iterator[Tuple[int, Any]]:
+                     ) -> Iterator[tuple[int, Any]]:
     """Uniform (key, value) iteration on a `dict`,
     or (idx, value) on a `list`."""
 
@@ -76,7 +77,7 @@ def evaluate_ising(linear: Union[Mapping, Sequence],
 
 def active_qubits(linear: Union[Mapping, Sequence],
                   quadratic: Mapping
-                  ) -> Set:
+                  ) -> set:
     """Calculate a set of all active qubits. Qubit is "active" if it has
     bias or coupling attached.
 
@@ -101,9 +102,9 @@ def active_qubits(linear: Union[Mapping, Sequence],
 
 
 def generate_random_ising_problem(solver: 'dwave.cloud.solver.Solver',
-                                  h_range: Optional[List[float]] = None,
-                                  j_range: Optional[List[float]] = None
-                                  ) -> Tuple[dict]:
+                                  h_range: Optional[Sequence[float]] = None,
+                                  j_range: Optional[Sequence[float]] = None
+                                  ) -> tuple[dict]:
     """Generates an Ising problem formulation valid for a particular solver,
     using all qubits and all couplings and linear/quadratic biases sampled
     uniformly from `h_range`/`j_range`.
@@ -123,12 +124,12 @@ def generate_random_ising_problem(solver: 'dwave.cloud.solver.Solver',
 def generate_const_ising_problem(solver: 'dwave.cloud.solver.Solver',
                                  h: float = 1,
                                  j: float = -1
-                                 ) -> Tuple[dict]:
+                                 ) -> tuple[dict]:
 
     return generate_random_ising_problem(solver, h_range=[h, h], j_range=[j, j])
 
 
-def reformat_qubo_as_ising(qubo: Dict[Tuple[int, int], float]) -> Tuple[dict]:
+def reformat_qubo_as_ising(qubo: Mapping[tuple[int, int], float]) -> tuple[dict]:
     """Split QUBO coefficients into linear and quadratic terms (the Ising form).
 
     Args:
