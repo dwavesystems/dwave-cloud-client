@@ -270,23 +270,31 @@ class TestLiveSolversCaching(unittest.TestCase):
         with contextlib.suppress(OSError):
             cls.tmpdir.cleanup()
 
-    def test_cache_1_validation(self):
-        with Solvers.from_config(validate_config_v1(config),
-                                 cache=dict(store=self.store),
-                                 history_size=1,
-                                 ) as resource:
-            solvers = resource.list_solvers(filter='none,+id')
-            self.assertGreater(len(solvers), 0)
+    def test_default(self):
+        # caching is disabled by default
+        # sapi is queried every time
+        with Solvers.from_config(validate_config_v1(config), history_size=2) as resource:
+            resource.list_solvers(filter='none,+id')
+            self.assertEqual(len(resource.session.history), 1)
+            self.assertEqual(resource.session.history[-1].response.status_code, 200)
 
-            solvers = resource.list_solvers(filter='none,+id')
-            self.assertEqual(resource.session.history[-1].response.status_code, 304)
+            resource.list_solvers(filter='none,+id')
+            self.assertEqual(len(resource.session.history), 2)
+            self.assertEqual(resource.session.history[-1].response.status_code, 200)
 
-    def test_cache_2_hit(self):
+    def test_cache(self):
         with Solvers.from_config(validate_config_v1(config),
-                                 cache=dict(maxage=3600, store=self.store),
-                                 history_size=1,
+                                 cache=dict(store=self.store, maxage=60),
+                                 history_size=2,
                                  ) as resource:
-            solvers = resource.list_solvers(filter='none,+id')
-            self.assertGreater(len(solvers), 0)
-            print(resource.session.history)
-            self.assertEqual(len(resource.session.history), 0)
+
+            with self.subTest("cache miss, solvers fetched from sapi"):
+                solvers1 = resource.list_solvers(filter='none,+id')
+                self.assertGreater(len(solvers1), 0)
+                self.assertEqual(len(resource.session.history), 1)
+                self.assertEqual(resource.session.history[-1].response.status_code, 200)
+
+            with self.subTest("cache hit"):
+                solvers2 = resource.list_solvers(filter='none,+id')
+                self.assertEqual(solvers1, solvers2)
+                self.assertEqual(len(resource.session.history), 1)
