@@ -89,7 +89,7 @@ class TestTimeouts(unittest.TestCase):
     def test_request_timeout(self):
         with self.assertRaises(dwave.cloud.exceptions.RequestTimeout):
             with Client(request_timeout=0.00001, **config) as client:
-                client.get_solvers()
+                client.get_solvers(refresh=True)
 
     def test_polling_timeout(self):
         with self.assertRaises(dwave.cloud.exceptions.PollingTimeout):
