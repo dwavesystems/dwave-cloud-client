@@ -37,7 +37,6 @@ from dwave.cloud.utils.http import user_agent
 from dwave.cloud.utils.logging import configure_logging
 from dwave.cloud.utils.qubo import generate_random_ising_problem
 from dwave.cloud.utils.time import datetime_to_timestamp, utcnow, epochnow
-from dwave.cloud.coders import bqm_as_file
 from dwave.cloud.package_info import __title__, __version__
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, InvalidAPIResponseError, UnsupportedSolverError,
@@ -734,7 +733,7 @@ def upload(config_file, profile, endpoint, region, client_type, solver_def,
         # fallback to reopen for now
         with open(input_file.name, 'rt') as fp:
             bqm = dimod.BinaryQuadraticModel.from_coo(fp)
-            problem_file = bqm_as_file(bqm)
+            problem_file = bqm.to_file()
 
     elif format == 'dimodbqm':
         problem_file = input_file
@@ -745,6 +744,7 @@ def upload(config_file, profile, endpoint, region, client_type, solver_def,
         future = client.upload_problem_encoded(
             problem=problem_file, problem_id=problem_id)
         remote_problem_id = future.result()
+        problem_file.close()
     except Exception as e:
         click.echo(e)
         return 2

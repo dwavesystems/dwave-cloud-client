@@ -43,7 +43,7 @@ from dwave.cloud.exceptions import (
     UnsupportedSolverError, ProblemStructureError)
 from dwave.cloud.coders import (
     encode_problem_as_qp, encode_problem_as_ref, decode_binary_ref,
-    decode_qp_numpy, decode_qp, decode_bq, bqm_as_file)
+    decode_qp_numpy, decode_qp, decode_bq)
 from dwave.cloud.computation import Future
 from dwave.cloud.concurrency import Present
 from dwave.cloud.events import dispatches_events
@@ -520,7 +520,7 @@ class BQMSolver(BaseUnstructuredSolver):
 
     def _encode_problem_for_upload(self, bqm):
         try:
-            data = bqm_as_file(bqm)
+            data = bqm.to_file()
         except Exception as e:
             logger.debug("BQM conversion to file failed with %r, "
                          "assuming data already encoded.", e)
