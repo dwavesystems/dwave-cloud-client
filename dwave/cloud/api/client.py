@@ -282,10 +282,6 @@ class CachingSession(VersionedAPISession):
             Force cache update, skipping time-based or etag-based validation.
     """
 
-    _cache_enabled = False
-    _maxage = None
-    _store = None
-
     class CacheConfig(TypedDict, total=False):
         enabled: bool
         maxage: float
@@ -404,6 +400,11 @@ class CachingSession(VersionedAPISession):
         refresh = kwargs.pop('refresh_', False)
         no_cache = kwargs.pop('no_cache_', False)
         default_maxage = kwargs.pop('maxage_', None)
+
+        if not self._cache_enabled or no_cache or method.lower() != 'get':
+            # completely bypass cache lookup and validation
+            return super().request(method, url, params=params, headers=headers, **kwargs)
+
         if default_maxage is None:
             default_maxage = self._maxage
         elif not isinstance(default_maxage, numbers.Real) or default_maxage < 0:
@@ -411,10 +412,6 @@ class CachingSession(VersionedAPISession):
                f"non-negative real value required for 'maxage_'; ignoring {default_maxage}",
                UserWarning, stacklevel=2)
            default_maxage = self._maxage
-
-        if not self._cache_enabled or no_cache or method.lower() != 'get':
-            # completely bypass cache lookup and validation
-            return super().request(method, url, params=params, headers=headers, **kwargs)
 
         key = (method,
                self.base_url, url,
