@@ -28,11 +28,9 @@ extras_require = {
 
     # bqm support
     'bqm': ['dimod>=0.10.5,<0.13,!=0.11.4', 'numpy>=1.17.3'],
-    'bqm-legacy': ['dimod~=0.9.0', 'numpy>=1.16,<1.24'],
 
     # dqm support
     'dqm': ['dimod>=0.10.5,<0.13,!=0.11.4', 'numpy>=1.17.3'],
-    'dqm-legacy': ['dimod~=0.9.7,<0.10', 'numpy>=1.16,<1.24'],
 
     # cqm support
     'cqm': ['dimod>=0.10.5,<0.13,!=0.11.4', 'numpy>=1.17.3'],

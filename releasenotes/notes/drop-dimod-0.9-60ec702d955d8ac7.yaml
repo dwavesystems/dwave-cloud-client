@@ -1,0 +1,5 @@
+---
+upgrade:
+  - |
+    Remove support for dimod 0.9.x. Upgrade dimod to 0.10.0+.
+    See `#595 <https://github.com/dwavesystems/dwave-cloud-client/issues/595>`_.
