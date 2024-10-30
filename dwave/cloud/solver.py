@@ -43,7 +43,7 @@ from dwave.cloud.exceptions import (
     UnsupportedSolverError, ProblemStructureError)
 from dwave.cloud.coders import (
     encode_problem_as_qp, encode_problem_as_ref, decode_binary_ref,
-    decode_qp_numpy, decode_qp, decode_bq, bqm_as_file)
+    decode_qp_numpy, decode_qp, decode_bq)
 from dwave.cloud.computation import Future
 from dwave.cloud.concurrency import Present
 from dwave.cloud.events import dispatches_events
@@ -366,16 +366,20 @@ class BaseUnstructuredSolver(BaseSolver):
         bqm = dimod.BinaryQuadraticModel.from_qubo(qubo, offset)
         return self.sample_bqm(bqm, label=label, **params)
 
-    def _encode_problem_for_upload(self, problem):
+    def _encode_problem_for_upload(self, problem, **kwargs):
         """Encode problem for upload to solver.
 
         Args:
             problem (dimod-model-like):
                 Problem of type `._handled_problem_types`.
 
+            **kwargs:
+                Optional problem encoding and upload parameters.
+
         Returns:
             file-like:
-                Binary stream ready for reading and seeking.
+                Binary stream ready for reading and seeking. Closing the stream
+                is left as an exercise to the caller.
         """
         raise NotImplementedError
 
@@ -383,10 +387,11 @@ class BaseUnstructuredSolver(BaseSolver):
         r"""Encode and upload the problem.
 
         Args:
-            problem (model-like):
+            problem (model-like/file-like):
                 A quadratic model or a nonlinear model handled by the solver,
                 for example :class:`~dimod.BQM`, :class:`~dimod.CQM` or
-                :class:`~dwave.optimization.Model`.
+                :class:`~dwave.optimization.Model`. Alternatively, encoded
+                problem is given in a file-like.
 
             **kwargs:
                 Optional problem encoding and upload parameters.
@@ -396,7 +401,15 @@ class BaseUnstructuredSolver(BaseSolver):
                 Problem ID in a Future. Problem ID can be used to submit
                 problems by reference.
         """
-        data = self._encode_problem_for_upload(problem, **kwargs)
+        try:
+            data = self._encode_problem_for_upload(problem, **kwargs)
+        except Exception as e:
+            data = problem
+            logger.debug("Problem encoding failed with: %r, "
+                         "assuming it's already encoded.", e)
+        else:
+            logger.debug("Problem encoded using params=%r for upload as %r", data)
+
         return self.client.upload_problem_encoded(data, **kwargs)
 
     def _encode_problem_for_submission(self, *, problem, problem_type,
@@ -518,16 +531,8 @@ class BQMSolver(BaseUnstructuredSolver):
     _handled_problem_types = {"bqm"}
     _handled_encoding_formats = {"bq"}
 
-    def _encode_problem_for_upload(self, bqm):
-        try:
-            data = bqm_as_file(bqm)
-        except Exception as e:
-            logger.debug("BQM conversion to file failed with %r, "
-                         "assuming data already encoded.", e)
-            # assume `bqm` given as file, ready for upload
-            data = bqm
-
-        return data
+    def _encode_problem_for_upload(self, bqm, **kwargs):
+        return bqm.to_file()
 
     def sample_bqm(self, bqm, label=None, **params):
         """Sample from the specified :term:`BQM`.
@@ -617,17 +622,8 @@ class DQMSolver(BaseUnstructuredSolver):
 
         return dqm
 
-    def _encode_problem_for_upload(self, dqm):
-        try:
-            data = dqm.to_file()
-        except Exception as e:
-            logger.debug("DQM conversion to file failed with %r, "
-                         "assuming data already encoded.", e)
-            # assume `dqm` given as file, ready for upload
-            data = dqm
-
-        logger.debug("Problem encoded for upload: %r", data)
-        return data
+    def _encode_problem_for_upload(self, dqm, **kwargs):
+        return dqm.to_file()
 
     def sample_bqm(self, bqm, label=None, **params):
         """Use for testing."""
@@ -701,17 +697,8 @@ class CQMSolver(BaseUnstructuredSolver):
     _handled_problem_types = {"cqm"}
     _handled_encoding_formats = {"bq"}
 
-    def _encode_problem_for_upload(self, cqm):
-        try:
-            data = cqm.to_file()
-        except Exception as e:
-            logger.debug("CQM conversion to file failed with %r, "
-                         "assuming data already encoded.", e)
-            # assume `cqm` given as file, ready for upload
-            data = cqm
-
-        logger.debug("Problem encoded for upload: %r", data)
-        return data
+    def _encode_problem_for_upload(self, cqm, **kwargs):
+        return cqm.to_file()
 
     def sample_bqm(self, bqm, label=None, **params):
         """Use for testing."""
@@ -795,18 +782,7 @@ class NLSolver(BaseUnstructuredSolver):
                                    ) -> io.IOBase:
         encode_params = {k: v for k, v in kwargs.items()
                          if k in {'max_num_states', 'only_decision'}}
-        try:
-            data = model.to_file(**encode_params)
-        except Exception as e:
-            logger.debug("NL model serialization failed with %r, "
-                         "assuming data already encoded.", e)
-            # assume `model` given as file, ready for upload
-            data = model
-        else:
-            logger.debug("Problem (model) encoded with encode_params=%r for upload in %r",
-                        encode_params, data)
-
-        return data
+        return model.to_file(**encode_params)
 
     def sample_bqm(self,
                    bqm: 'dimod.BQM',

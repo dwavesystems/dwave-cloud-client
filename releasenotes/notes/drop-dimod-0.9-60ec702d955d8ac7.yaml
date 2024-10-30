@@ -1,0 +1,10 @@
+---
+upgrade:
+  - |
+    Remove support for dimod 0.9.x. Upgrade dimod to 0.10.0+.
+    See `#595 <https://github.com/dwavesystems/dwave-cloud-client/issues/595>`_.
+deprecations:
+  - |
+    Client utility function ``dwave.cloud.coders.bqm_as_file()`` is deprecated in
+    favor of ``dimod.BQM.to_file()`` (available in dimod 0.10.0+) and will be
+    removed in dwave-cloud-client 0.15.0.

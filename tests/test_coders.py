@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
 import copy
 import base64
 import random
@@ -34,16 +33,6 @@ from dwave.cloud.coders import (
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
 from dwave.cloud.testing import mocks
 from dwave.cloud.utils.qubo import generate_const_ising_problem, generate_random_ising_problem
-
-# parse string version as tuple
-if dimod:
-    # python version strings are a lot more permissive, but this covers
-    # all the patterns we've used in dimod
-    match = re.match('^([0-9]+).([0-9]+).([0-9]+)(?:rc[0-9]*|.dev[0-9]*)*$',
-                     dimod.__version__)
-    dimod_version = tuple(map(int, match.groups()))
-else:
-    dimod_version = None
 
 
 def get_structured_solver():
@@ -264,7 +253,6 @@ class TestQPDecodersWithOffset(TestQPDecoders):
 @unittest.skipUnless(dimod, "dimod required for BQ coders")
 class TestBQCoders(unittest.TestCase):
 
-    @unittest.skipUnless(dimod and dimod_version < (0, 10, 0), "dimod < 0.10 required for BQ encoder")
     def test_bq_encodes_empty_bqm(self):
         """Empty BQM has to be trivially encoded."""
 
@@ -276,7 +264,6 @@ class TestBQCoders(unittest.TestCase):
         self.assertEqual(pluck(req, 'data.num_variables'), 0)
         self.assertEqual(pluck(req, 'data.num_interactions'), 0)
 
-    @unittest.skipUnless(dimod and dimod_version < (0, 10, 0), "dimod < 0.10 required for BQ encoder")
     def test_bq_encodes_ising_bqm(self):
         """Simple Ising BQM properly encoded."""
 
@@ -289,7 +276,6 @@ class TestBQCoders(unittest.TestCase):
         self.assertEqual(pluck(req, 'data.num_variables'), 2)
         self.assertEqual(pluck(req, 'data.num_interactions'), 1)
 
-    @unittest.skipUnless(dimod and dimod_version < (0, 10, 0), "dimod < 0.10 required for BQ encoder")
     def test_bq_encodes_qubo_bqm(self):
         """Simple Qubo BQM properly encoded."""
 
@@ -302,7 +288,6 @@ class TestBQCoders(unittest.TestCase):
         self.assertEqual(pluck(req, 'data.num_variables'), 2)
         self.assertEqual(pluck(req, 'data.num_interactions'), 1)
 
-    @unittest.skipUnless(dimod and dimod_version < (0, 10, 0), "dimod < 0.10 required for BQ encoder")
     def test_bq_encodes_bqm_with_named_vars(self):
         """BQM with named variable properly encoded."""
 

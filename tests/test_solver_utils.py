@@ -40,7 +40,6 @@ from tests import config
 class TestCheckProblem(unittest.TestCase):
 
     def test_identity(self):
-        # NOTE: cast to list can be removed once we drop support for dimod 0.8.x
         bqm = dimod.generators.ran_r(1, list(self.solver.edges))
         self.assertTrue(self.solver.check_problem(bqm.linear, bqm.quadratic))
 
@@ -63,7 +62,6 @@ class TestCheckProblem(unittest.TestCase):
         self.assertFalse(self.solver.check_problem(bqm.linear, bqm.quadratic))
 
     def test_legacy_format(self):
-        # NOTE: cast to list can be removed once we drop support for dimod 0.8.x
         bqm = dimod.generators.ran_r(1, list(self.solver.edges))
         h = list(bqm.linear.values())   # h as list is still supported
         self.assertTrue(self.solver.check_problem(h, bqm.quadratic))

@@ -14,6 +14,7 @@
 
 import struct
 import base64
+import warnings
 from collections import abc
 from typing import Union
 
@@ -382,7 +383,8 @@ def encode_problem_as_bq(problem):
         job submit data, something none of the production solvers currently
         support.
     """
-    # NOTE: semi-deprecated format; see `bqm_as_file`.
+    # NOTE: semi-deprecated format; `bqm.to_serializable()` is still supported
+    # (as of dimod 0.12.18), but `bqm.to_file()` is preferred.
 
     if not hasattr(problem, 'to_serializable'):
         raise TypeError("unsupported problem type")
@@ -437,7 +439,9 @@ def decode_binary_ref(msg: dict, ref_resolver: abc.Callable) -> dict:
 
 
 def bqm_as_file(bqm, **options):
-    """Encode in-memory BQM as DIMODBQM binary file format.
+    """Deprecated. Use :func:`~dimod.binary.BinaryQuadraticModel.to_file` instead.
+
+    Encode in-memory BQM as DIMODBQM binary file format.
 
     Args:
         bqm (:class:`~dimod.BQM`):
@@ -449,43 +453,14 @@ def bqm_as_file(bqm, **options):
     Returns:
         file-like:
             Binary stream with BQM encoded in DIMODBQM format.
+
+    .. deprecated:: 0.13.2
+
+        This function will be removed in dwave-cloud-client 0.15.0.
     """
-    # TODO: replace with `bqm.to_file` when we drop support for dimod 0.9.x
+    warnings.warn("`bqm_as_file` is deprecated since dwave-cloud-client 0.13.2 and "
+                  "will be removed in 0.15.0. Use `bqm.to_file` instead",
+                  DeprecationWarning, stacklevel=2)
 
-    try:
-        import dimod
-    except ImportError: # pragma: no cover
-        raise RuntimeError("Can't encode BQM without 'dimod'. "
-                           "Re-install the library with 'bqm' support.")
-
-    try:
-        # Using `bqm.to_file()` for serialization is preferred since
-        # dwavesystems/dimod#599, but we need a fallback for older dimods.
-        # Specifically:
-        # - `Adj{Vector,Array,Map}BQM.to_file` was added in dimod 0.9.6.
-        # - `BQM.to_file` method was added in dimod 0.10.0.
-        bqm.to_file
-    except AttributeError: # pragma: no cover
-        pass
-    else:
-        return bqm.to_file(**options)
-
-    try:
-        # we need FileView in dimod < 0.9.6
-        from dimod.serialization.fileview import FileView as BQMFileView
-    except ImportError: # pragma: no cover
-        # this should never happen
-        raise RuntimeError(
-            f"Can't import FileView serializer from dimod=={dimod.__version__}")
-
-    if isinstance(bqm, BQMFileView):
-        return bqm
-
-    # test explicitly to avoid copy on cast if possible
-    # note: it's safe to use Adj*BQMs (removed in dimod 0.10), as we never get
-    # here if dimod 0.10 is used
-    fileviewable = (dimod.AdjArrayBQM, dimod.AdjVectorBQM, dimod.AdjMapBQM)
-    if not isinstance(bqm, fileviewable):
-        bqm = dimod.AdjVectorBQM(bqm)
-
-    return BQMFileView(bqm, **options)
+    # NOTE: to_file() added in dimod 0.10.0
+    return bqm.to_file(**options)
