@@ -744,10 +744,11 @@ def upload(config_file, profile, endpoint, region, client_type, solver_def,
         future = client.upload_problem_encoded(
             problem=problem_file, problem_id=problem_id)
         remote_problem_id = future.result()
-        problem_file.close()
     except Exception as e:
         click.echo(e)
         return 2
+    finally:
+        problem_file.close()
 
     click.echo("Upload done. Problem ID: {!r}".format(remote_problem_id))
 
