@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import os
 import sys
 import ast
@@ -119,6 +120,15 @@ def json_output(fn):
 
     fn = click.option('--json', 'json_output', default=False, is_flag=True,
                       help='JSON output')(fn)
+
+    return fn
+
+
+def raw_output(fn):
+    """Decorate `fn` with `--raw` option."""
+
+    fn = click.option('--raw', 'raw_output', default=False, is_flag=True,
+                      help='Raw output')(fn)
 
     return fn
 
@@ -419,21 +429,28 @@ def standardized_output(fn):
     def wrapped(*args, **kwargs):
         # text/json output taken from callee args
         json_output = kwargs.get('json_output', False)
+        raw_output = kwargs.get('raw_output', False)
 
         now = utcnow()
         info = dict(datetime=now.isoformat(), timestamp=datetime_to_timestamp(now), code=0)
+        raw_stream = io.StringIO()
 
         def output(fmt, maxlen=None, **params):
+            if raw := params.pop('raw', None):
+                raw_stream.write(raw)
             info.update(params)
-            if not json_output:
+            if not json_output and not raw_output:
                 msg = fmt.format(**params)
                 if maxlen is not None:
                     msg = strtrunc(msg, maxlen)
                 click.echo(msg)
 
         def flush():
-            if json_output:
+            if json_output and not raw_output:
                 click.echo(orjson.dumps(info))
+            if raw_output and raw_stream.tell():
+                raw_stream.seek(0)
+                click.echo(raw_stream.read())
 
         try:
             fn(*args, output=output, **kwargs)
@@ -1004,8 +1021,9 @@ def _login(*, config_file, profile, oob, skip_valid, output):
 @click.argument('token_type', default='access-token',
                 type=click.Choice(['access-token', 'refresh-token', 'id-token']))
 @json_output
+@raw_output
 @standardized_output
-def get(*, config_file, profile, token_type, json_output, output):
+def get(*, config_file, profile, token_type, json_output, raw_output, output):
     """Fetch Leap API token."""
 
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
@@ -1016,7 +1034,8 @@ def get(*, config_file, profile, token_type, json_output, output):
         raise CLIError('Token not found. Please run "dwave auth login".', code=100)
 
     token_pretty = token_type.replace('-', ' ').capitalize()
-    output(f"{token_pretty}: {{%s}}" % token_key, **{token_key: flow.token[token_key]})
+    token_val = flow.token[token_key]
+    output(f"{token_pretty}: {{%s}}" % token_key, raw=token_val, **{token_key: token_val})
 
     if token_type == 'access-token':
         expires_at = flow.token.get('expires_at')
@@ -1120,8 +1139,9 @@ def list_leap_projects(*, config_file, profile, json_output, output):
 @click.option('--project', 'project_hint', type=str, default=None,
               help='Leap project ID, name or code. If unspecified, currently active project is used.')
 @json_output
+@raw_output
 @standardized_output
-def leap_project_token(*, config_file, profile, project_hint, json_output, output):
+def leap_project_token(*, config_file, profile, project_hint, json_output, raw_output, output):
     """Get Solver API token for a selected Leap project."""
 
     project, token = _get_sapi_token_for_leap_project(
@@ -1129,7 +1149,7 @@ def leap_project_token(*, config_file, profile, project_hint, json_output, outpu
         project_hint=project_hint, output=output)
 
     output(f"Solver API token for project {project.name} ({project.code}) is {token}.",
-           token=token, project=project.model_dump())
+           token=token, project=project.model_dump(), raw=token)
 
 
 def _get_sapi_token_for_leap_project(
