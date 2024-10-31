@@ -435,12 +435,16 @@ def standardized_output(fn):
         info = dict(datetime=now.isoformat(), timestamp=datetime_to_timestamp(now), code=0)
         raw_stream = io.StringIO()
 
-        def output(fmt, maxlen=None, **params):
+        def output(fmt=None, maxlen=None, **params):
             if raw := params.pop('raw', None):
                 raw_stream.write(raw)
             info.update(params)
             if not json_output and not raw_output:
-                msg = fmt.format(**params)
+                if fmt is not None:
+                    msg = fmt.format(**params)
+                else:
+                    # logfmt-like output
+                    msg = ' '.join(f'{k}={v}' for k,v in params.items())
                 if maxlen is not None:
                     msg = strtrunc(msg, maxlen)
                 click.echo(msg)
@@ -1035,7 +1039,8 @@ def get(*, config_file, profile, token_type, json_output, raw_output, output):
 
     token_pretty = token_type.replace('-', ' ').capitalize()
     token_val = flow.token[token_key]
-    output(f"{token_pretty}: {{%s}}" % token_key, raw=token_val, **{token_key: token_val})
+    output(f"{token_pretty}: {{%s}}" % token_key, **{token_key: token_val})
+    output(raw=token_val)
 
     if token_type == 'access-token':
         expires_at = flow.token.get('expires_at')
