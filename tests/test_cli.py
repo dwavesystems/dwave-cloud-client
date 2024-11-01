@@ -529,6 +529,15 @@ class TestAuthCli(unittest.TestCase):
             self.assertEqual(result.exit_code, 0)
             self.assertIn(token['access_token'], result.output)
 
+        with self.subTest('dwave auth get access-token --raw'):
+            flow.reset_mock()
+            runner = CliRunner(mix_stderr=False)
+            with runner.isolated_filesystem():
+                result = runner.invoke(cli, ['auth', 'get', 'access-token', '--raw'])
+
+            self.assertEqual(result.exit_code, 0)
+            self.assertEqual(token['access_token'], result.output.strip())
+
         with self.subTest('dwave auth get refresh-token'):
             flow.reset_mock()
             runner = CliRunner(mix_stderr=False)
@@ -648,18 +657,29 @@ class TestAuthCli(unittest.TestCase):
             LeapProject(id=2, name='Project B', code='B'),
         ]
         project = 'b'
+        token = 'token-b'
 
         account.list_projects.return_value = projects
+        account.get_project_token.return_value = token
 
         with self.subTest('dwave leap project token'):
             runner = CliRunner(mix_stderr=False)
             with runner.isolated_filesystem():
-                result = runner.invoke(cli, ['leap', 'project', 'token',
-                                             '--project', project])
+                result = runner.invoke(cli, [
+                    'leap', 'project', 'token', '--project', project])
 
             self.assertEqual(result.exit_code, 0)
             account.list_projects.assert_called_once()
             account.get_project_token.assert_called_with(project=projects[1])
+
+        with self.subTest('dwave leap project token --raw'):
+            runner = CliRunner(mix_stderr=False)
+            with runner.isolated_filesystem():
+                result = runner.invoke(cli, [
+                    'leap', 'project', 'token', '--project', project, '--raw'])
+
+            self.assertEqual(result.exit_code, 0)
+            self.assertEqual(result.output.strip(), token)
 
 
 @unittest.skipUnless(config, "No live server configuration available.")
@@ -705,6 +725,7 @@ class TestCliLive(unittest.TestCase):
         ("bqm", 3),
         ("cqm", 5),
         ("dqm", 5),
+        ("nl", 1),
     ])
     def test_ping_unstructured_solver(self, problem_type, time_limit):
         solver = json.dumps({"supported_problem_types__contains": problem_type})

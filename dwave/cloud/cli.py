@@ -437,7 +437,7 @@ def standardized_output(fn):
 
         def output(fmt=None, maxlen=None, **params):
             if raw := params.pop('raw', None):
-                raw_stream.write(raw)
+                raw_stream.write(str(raw))
             info.update(params)
             if not json_output and not raw_output:
                 if fmt is not None:
