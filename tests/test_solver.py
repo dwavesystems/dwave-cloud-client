@@ -25,6 +25,7 @@ import warnings
 from datetime import datetime
 
 import numpy
+from parameterized import parameterized
 
 try:
     import dimod
@@ -455,6 +456,66 @@ class Submission(_QueryTest):
                 self.assertEqual(40, sum(computation.num_occurrences))
                 for energy, state in zip(computation.energies, computation.samples):
                     self.assertAlmostEqual(energy, evaluate_ising(linear, quad, state))
+
+
+@unittest.skipUnless(config, "No live server configuration available.")
+class UnstructuredSubmission(unittest.TestCase):
+    """Smoke test for hybrid solver live submit."""
+
+    @parameterized.expand([
+        ("bqm", "sample_bqm", 3, lambda: dimod.BQM.from_qubo({})),
+        ("cqm", "sample_cqm", 5, lambda: dimod.CQM.from_bqm(dimod.BQM.from_qubo({'ab': 1}))),
+        ("dqm", "sample_dqm", 5, lambda: dimod.DQM.from_numpy_vectors([0], [0], ([], [], []))),
+        ("nl", "sample_bqm", 1, lambda: dimod.BQM.from_ising({0: 1}, {})),
+    ])
+    @unittest.skipUnless(dimod, "dimod required to submit problems to Leap hybrid solvers")
+    def test_sample(self, problem_type, sample_meth, time_limit, problem_gen):
+
+        # use default config; skip loading config file, assume token in env
+        with Client.from_config(config_file=False) as client:
+            solver = client.get_solver(supported_problem_types__contains=problem_type)
+            problem = problem_gen()
+
+            f = getattr(solver, sample_meth)(problem, time_limit=time_limit)
+            f.result()
+
+            self.assertEqual(f.problem_type, problem_type)
+            if f.answer_data is None:
+                # bqm/cqm/dqm
+                self.assertIsInstance(f.sampleset, dimod.SampleSet)
+                self.assertEqual(f.sampleset.info.get('problem_id'), f.wait_id())
+            else:
+                # nlm
+                self.assertGreater(len(f.answer_data.read()), 0)
+
+    def test_sample_nl(self):
+        # test model states in addition to a simple smoke test above
+        try:
+            from dwave.optimization import Model
+        except ImportError:
+            self.skipTest("dwave-optimization required to submit NL problems to Leap hybrid solvers")
+
+        problem_type = "nl"
+        time_limit = 1
+
+        def model_gen():
+            # create a simple model
+            model = Model()
+            x = model.list(5)
+            W = model.constant(numpy.arange(25).reshape((5, 5)))
+            model.minimize(W[x, :][:, x].sum())
+            return model
+
+        # use default config; skip loading config file, assume token in env
+        with Client.from_config(config_file=False) as client:
+            solver = client.get_solver(supported_problem_types__contains=problem_type)
+            model = model_gen()
+
+            f = solver.sample_nlm(model, time_limit=time_limit)
+            f.result()
+
+            model.states.from_file(f.answer_data)
+            self.assertGreater(model.states.size(), 0)
 
 
 @unittest.skipUnless(config, "No live server configuration available.")
