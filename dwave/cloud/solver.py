@@ -408,7 +408,8 @@ class BaseUnstructuredSolver(BaseSolver):
             logger.debug("Problem encoding failed with: %r, "
                          "assuming it's already encoded.", e)
         else:
-            logger.debug("Problem encoded using params=%r for upload as %r", data)
+            logger.debug("Problem encoded using params=%r for upload as %r",
+                         kwargs, data)
 
         return self.client.upload_problem_encoded(data, **kwargs)
 
