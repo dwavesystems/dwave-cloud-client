@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Add ``--raw`` output mode to get-token CLI commands.
+    See `#598 <https://github.com/dwavesystems/dwave-cloud-client/issues/598>`_.
