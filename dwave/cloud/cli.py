@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
 import os
 import sys
 import ast
@@ -433,13 +432,15 @@ def standardized_output(fn):
 
         now = utcnow()
         info = dict(datetime=now.isoformat(), timestamp=datetime_to_timestamp(now), code=0)
-        raw_stream = io.StringIO()
 
         def output(fmt=None, maxlen=None, **params):
-            if raw := params.pop('raw', None):
-                raw_stream.write(str(raw))
-            info.update(params)
-            if not json_output and not raw_output:
+            raw = params.pop('raw', None)
+            if raw_output:
+                if raw is not None:
+                    click.echo(raw)
+            elif json_output:
+                info.update(params)
+            else:
                 if fmt is not None:
                     msg = fmt.format(**params)
                 else:
@@ -452,9 +453,6 @@ def standardized_output(fn):
         def flush():
             if json_output and not raw_output:
                 click.echo(orjson.dumps(info))
-            if raw_output and raw_stream.tell():
-                raw_stream.seek(0)
-                click.echo(raw_stream.read())
 
         try:
             fn(*args, output=output, **kwargs)
