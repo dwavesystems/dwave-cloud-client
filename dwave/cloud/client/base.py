@@ -1566,8 +1566,8 @@ class Client(object):
                         if not add(future):
                             return
                     else:
-                        task_done()
                         self._poll_queue.put(task)
+                        task_done()
                         break
 
                 # build a query string with ids of all futures in this frame
