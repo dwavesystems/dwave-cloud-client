@@ -33,6 +33,7 @@ import concurrent.futures
 import copy
 import logging
 import orjson
+import weakref
 from collections import abc
 from functools import partial
 from tempfile import SpooledTemporaryFile
@@ -113,9 +114,25 @@ class BaseSolver(object):
     _handled_problem_types = {}
     _handled_encoding_formats = {}
 
-    def __init__(self, client, data):
-        # client handles async api requests (via local thread pool)
-        self.client = client
+    _client_ref = None
+
+    @property
+    def client(self):
+        """Returns a reference to client if it still exists, or None otherwise."""
+
+        client = None
+        if self._client_ref is not None:
+            client = self._client_ref()
+            if client is None:
+                raise RuntimeError('Client unavailable / closed')
+
+        return client
+
+    def __init__(self, client: Optional['dwave.cloud.Client'], data: dict):
+        # note: we use a weakref so that client can be closed and gc'ed
+        #       while keeping solver instances alive
+        # dev note: allow None value for testing
+        self._client_ref = weakref.ref(client) if client is not None else None
 
         # data for each solver includes at least: id, description, properties,
         # status and avg_load
