@@ -65,6 +65,7 @@ from plucky import pluck
 from dwave.cloud import api
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *    # TODO: fix
+from dwave.cloud.exceptions import UseAfterCloseError
 from dwave.cloud.computation import Future
 from dwave.cloud.config import load_config, update_config, validate_config_v1
 from dwave.cloud.config import constants as config_constants
@@ -439,6 +440,8 @@ class Client(object):
     def __init__(self, **kwargs):
         logger.debug("Client init called with: %r", kwargs)
 
+        self._initialized = False
+
         # derive instance-level defaults from class defaults and init defaults
         self.defaults = copy.deepcopy(self.DEFAULTS)
         user_defaults = kwargs.pop('defaults', None)
@@ -519,6 +522,8 @@ class Client(object):
         self._download_answer_executor = \
             ThreadPoolExecutor(self._DOWNLOAD_ANSWER_THREAD_COUNT)
 
+        self._initialized = True
+
     def create_session(self):
         """Create a new requests session based on client's (self) params.
 
@@ -579,6 +584,9 @@ class Client(object):
             >>> client.close()    # doctest: +SKIP
 
         """
+        if not self._initialized:
+            return
+
         # Finish all the work that requires the connection
         logger.debug("Joining submission queue")
         self._submission_queue.join()
@@ -590,14 +598,13 @@ class Client(object):
         self._load_queue.join()
 
         logger.debug("Shutting down problem upload executor")
-        self._upload_problem_executor.shutdown()
+        self._upload_problem_executor.shutdown(wait=True)
         logger.debug("Shutting down problem part upload executor")
-        self._upload_part_executor.shutdown()
+        self._upload_part_executor.shutdown(wait=True)
         logger.debug("Shutting down problem encoder executor")
-        self._encode_problem_executor.shutdown()
-
+        self._encode_problem_executor.shutdown(wait=True)
         logger.debug("Shutting down answer download executor")
-        self._download_answer_executor.shutdown()
+        self._download_answer_executor.shutdown(wait=True)
 
         # Send kill-task to all worker threads
         # Note: threads can't be 'killed' in Python, they have to die by
@@ -622,6 +629,9 @@ class Client(object):
         solvers_session = getattr(self, '_solvers_session', None)
         if solvers_session:
             solvers_session.close()
+
+        # this client can't be used anymore
+        self._initialized = False
 
     def __enter__(self):
         """Let connections be used in with blocks."""
@@ -1205,7 +1215,12 @@ class Client(object):
 
         This method is thread safe.
         """
+        if not self._initialized:
+            raise UseAfterCloseError(
+                "Problem submit not allowed after client has been closed")
+
         self._submission_queue.put(self._submit.Message(body, future))
+
     _submit.Message = namedtuple('Message', ['body', 'future'])
 
     def _do_submit_problems(self):
@@ -1412,6 +1427,10 @@ class Client(object):
 
         This method is thread safe.
         """
+        if not self._initialized:
+            raise UseAfterCloseError(
+                "Problem cancel not allowed after client has been closed")
+
         self._cancel_queue.put((id_, future))
 
     def _do_cancel_problems(self):
@@ -1460,6 +1479,10 @@ class Client(object):
 
     def _poll(self, future: Future) -> None:
         """Enqueue a problem to poll the server for status."""
+
+        if not self._initialized:
+            raise UseAfterCloseError(
+                "Problem status polling not allowed after client has been closed")
 
         # split for simplicity
         if self.config.polling_schedule.strategy == PollingStrategy.BACKOFF:
@@ -1643,6 +1666,10 @@ class Client(object):
 
         This method is thread-safe.
         """
+        if not self._initialized:
+            raise UseAfterCloseError(
+                "Problem answer download not allowed after client has been closed")
+
         self._load_queue.put(future)
 
     def _do_load_results(self):
@@ -1701,6 +1728,10 @@ class Client(object):
             :class:`concurrent.futures.Future`[bytes | io.IOBase]:
                 Answer data in a Future.
         """
+        if not self._initialized:
+            raise UseAfterCloseError(
+                "Problem answer download not allowed after client has been closed")
+
         return self._download_answer_executor.submit(
             self._download_answer_worker, auth_method=auth_method, url=url, output=output)
 
@@ -1744,6 +1775,10 @@ class Client(object):
         Note:
             For a higher-level interface, use upload/submit solver methods.
         """
+        if not self._initialized:
+            raise UseAfterCloseError(
+                "Problem data upload not allowed after client has been closed")
+
         return self._upload_problem_executor.submit(
             self._upload_problem_worker, problem=problem, problem_id=problem_id)
 

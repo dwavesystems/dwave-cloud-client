@@ -36,7 +36,7 @@ from dwave.cloud.client import Client
 from dwave.cloud.computation import Future
 from dwave.cloud.exceptions import (
     SolverFailureError, CanceledFutureError, SolverError,
-    InvalidAPIResponseError)
+    InvalidAPIResponseError, UseAfterCloseError)
 from dwave.cloud.solver import Solver
 from dwave.cloud.utils.qubo import evaluate_ising
 from dwave.cloud.utils.time import utcrel
@@ -1114,6 +1114,46 @@ class TestComputationSamplesetCaching(unittest.TestCase):
                 # verify gc
                 del sampleset
                 self.assertIsNone(response._sampleset())
+
+
+@mock.patch.object(Client, 'create_session', lambda _: mock.Mock())
+class TestClientClose(MockSubmissionBase, unittest.TestCase):
+    # exception is raised when client is used after it's been closed
+
+    def test_submit_fails(self):
+        with Client(**self.config) as client:
+            solver = Solver(client, self.sapi.solver.data)
+
+        with self.subTest('problem submit fails'):
+            with self.assertRaises(UseAfterCloseError):
+                solver.sample_ising(*self.sapi.problem)
+
+        with self.subTest('problem data multipart upload fails'):
+            with self.assertRaises(UseAfterCloseError):
+                client.upload_problem_encoded('mock')
+
+    def test_retrieve_fails(self):
+        with Client(**self.config) as client:
+            solver = Solver(client, self.sapi.solver.data)
+
+        with self.subTest('problem status poll fails'):
+            with self.assertRaises(UseAfterCloseError):
+                solver._retrieve_problem('mock-id')
+
+        with self.subTest('qpu answer load fails'):
+            with self.assertRaises(UseAfterCloseError):
+                client.retrieve_answer('problem-id')
+
+        with self.subTest('binary answer download fails'):
+            with self.assertRaises(UseAfterCloseError):
+                solver._download_binary_ref(auth_method='mock', url='mock')
+
+    def test_cancel_fails(self):
+        with Client(**self.config) as client:
+            ...
+
+        with self.assertRaises(UseAfterCloseError):
+            client._cancel('future-id', 'future')
 
 
 class TestThreadSafety(unittest.TestCase):
