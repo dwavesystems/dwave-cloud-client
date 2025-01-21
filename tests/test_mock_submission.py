@@ -17,6 +17,7 @@
 import threading
 import time
 import unittest
+import weakref
 import zlib
 from concurrent.futures import TimeoutError, ThreadPoolExecutor
 from typing import Any
@@ -873,6 +874,7 @@ class TestComputationID(unittest.TestCase):
         self.assertEqual(f.sampleset.wait_id(), submission_id)
         self.assertEqual(f.sampleset.wait_id(timeout=1), submission_id)
 
+
 @mock.patch('time.sleep', lambda *x: None)
 class TestOffsetHandling(_QueryTest):
 
@@ -1154,6 +1156,15 @@ class TestClientClose(MockSubmissionBase, unittest.TestCase):
 
         with self.assertRaises(UseAfterCloseError):
             client._cancel('future-id', 'future')
+
+    def test_ref_cleanup(self):
+        with Client(**self.config) as client:
+            ref = weakref.ref(client)
+            solver = Solver(client, self.sapi.solver.data)
+
+        del client
+
+        self.assertIsNone(ref())
 
 
 class TestThreadSafety(unittest.TestCase):
