@@ -86,6 +86,15 @@ __all__ = ['Client']
 logger = logging.getLogger(__name__)
 
 
+def _require_initialized(method):
+    def _method(obj, *args, **kwargs):
+        if not getattr(obj, '_initialized', False):
+            raise UseAfterCloseError(
+                f"{method.__name__} cannot be called after client has been closed")
+        return method(obj, *args, **kwargs)
+    return _method
+
+
 class Client(object):
     """Base client class for all D-Wave API clients. Used by QPU, software and
     hybrid :term:`sampler` classes.
@@ -1210,15 +1219,12 @@ class Client(object):
         except IndexError:
             raise SolverNotFoundError("Solver with the requested features not available")
 
+    @_require_initialized
     def _submit(self, body, future):
         """Enqueue a problem for submission to the server.
 
         This method is thread safe.
         """
-        if not self._initialized:
-            raise UseAfterCloseError(
-                "Problem submit not allowed after client has been closed")
-
         self._submission_queue.put(self._submit.Message(body, future))
 
     _submit.Message = namedtuple('Message', ['body', 'future'])
@@ -1422,15 +1428,12 @@ class Client(object):
             # lock in the future, otherwise deadlock occurs.
             future._set_exception(exc)
 
+    @_require_initialized
     def _cancel(self, id_, future):
         """Enqueue a problem to be canceled.
 
         This method is thread safe.
         """
-        if not self._initialized:
-            raise UseAfterCloseError(
-                "Problem cancel not allowed after client has been closed")
-
         self._cancel_queue.put((id_, future))
 
     def _do_cancel_problems(self):
@@ -1477,12 +1480,9 @@ class Client(object):
         finally:
             session.close()
 
+    @_require_initialized
     def _poll(self, future: Future) -> None:
         """Enqueue a problem to poll the server for status."""
-
-        if not self._initialized:
-            raise UseAfterCloseError(
-                "Problem status polling not allowed after client has been closed")
 
         # split for simplicity
         if self.config.polling_schedule.strategy == PollingStrategy.BACKOFF:
@@ -1657,6 +1657,7 @@ class Client(object):
         finally:
             session.close()
 
+    @_require_initialized
     def _load(self, future):
         """Enqueue a problem to download results from the server.
 
@@ -1666,10 +1667,6 @@ class Client(object):
 
         This method is thread-safe.
         """
-        if not self._initialized:
-            raise UseAfterCloseError(
-                "Problem answer download not allowed after client has been closed")
-
         self._load_queue.put(future)
 
     def _do_load_results(self):
@@ -1712,6 +1709,7 @@ class Client(object):
         finally:
             session.close()
 
+    @_require_initialized
     def _download_answer_binary_ref(self, *, auth_method: str, url: str,
                                     output: Optional[io.IOBase] = None) -> concurrent.futures.Future:
         """Initiate binary-ref answer download, returning the binary data in
@@ -1728,10 +1726,6 @@ class Client(object):
             :class:`concurrent.futures.Future`[bytes | io.IOBase]:
                 Answer data in a Future.
         """
-        if not self._initialized:
-            raise UseAfterCloseError(
-                "Problem answer download not allowed after client has been closed")
-
         return self._download_answer_executor.submit(
             self._download_answer_worker, auth_method=auth_method, url=url, output=output)
 
@@ -1755,6 +1749,7 @@ class Client(object):
 
         return output
 
+    @_require_initialized
     def upload_problem_encoded(self, problem, problem_id=None, **kwargs):
         """Initiate multipart problem upload, returning the Problem ID in a
         :class:`~concurrent.futures.Future`.
@@ -1775,10 +1770,6 @@ class Client(object):
         Note:
             For a higher-level interface, use upload/submit solver methods.
         """
-        if not self._initialized:
-            raise UseAfterCloseError(
-                "Problem data upload not allowed after client has been closed")
-
         return self._upload_problem_executor.submit(
             self._upload_problem_worker, problem=problem, problem_id=problem_id)
 
