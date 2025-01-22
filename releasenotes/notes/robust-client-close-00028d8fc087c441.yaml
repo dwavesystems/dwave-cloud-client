@@ -1,0 +1,13 @@
+---
+features:
+  - |
+    More robust ``Client.close()``.
+
+    Client use after close is now disabled. An attempt to submit a problem, poll
+    for a status, or download an answer will now result in an ``UseAfterCloseError``
+    exception.
+
+    Also, solvers and computations now only weakly reference the client, so they
+    don't block client resources cleanup.
+
+    See `#217 <https://github.com/dwavesystems/dwave-cloud-client/issues/217>`_.

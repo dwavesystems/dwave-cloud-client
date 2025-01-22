@@ -171,6 +171,16 @@ class MockSolverLoading(unittest.TestCase):
                 self.assertEqual(solver.data['status'], ref.data['status'])
                 self.assertEqual(solver.data['avg_load'], ref.data['avg_load'])
 
+    def test_client_ref(self):
+        with Client(endpoint=self.endpoint, token=self.token) as client:
+            solver = client.get_solver(self.solver1_name)
+            self.assertEqual(solver.client, client)
+
+        del client
+
+        with self.assertRaises(RuntimeError):
+            solver.client
+
     def test_load_all_solvers(self):
         refs = [solver_object(self.solver1_name), solver_object(self.solver2_name)]
 

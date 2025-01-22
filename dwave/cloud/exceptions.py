@@ -77,6 +77,10 @@ class ProblemUploadError(Exception):
     """Problem multipart upload failed."""
 
 
+class UseAfterCloseError(Exception):
+    """Use attempted after client/solver/connection was closed."""
+
+
 # for backward compatibility
 from dwave.cloud.api.exceptions import RequestTimeout
 

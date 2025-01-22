@@ -20,8 +20,11 @@ test_mock_solver_loading.py duplicates some of these tests against a mock server
 
 import importlib
 import json
+import sys
+import threading
 import time
 import unittest
+import weakref
 from collections import defaultdict
 from contextlib import contextmanager
 from unittest import mock
@@ -659,6 +662,25 @@ class VerifyLazyClientImport(unittest.TestCase):
         with self.assertWarns(DeprecationWarning):
             mod = importlib.import_module(f'dwave.cloud.{name}')
             self.assertTrue(issubclass(getattr(mod, 'Client'), Client))
+
+
+class VerifyClientCleanup(unittest.TestCase):
+
+    def test_client_close(self):
+        thread_cnt_base = threading.active_count()
+
+        client = Client(endpoint='endpoint', token='token')
+        ref = weakref.ref(client)
+
+        self.assertGreater(threading.active_count(), thread_cnt_base)
+        self.assertGreater(sys.getrefcount(client), 1)
+
+        client.close()
+        del client
+
+        # verify all threads closed and no client referrers
+        self.assertEqual(threading.active_count(), thread_cnt_base)
+        self.assertIsNone(ref())
 
 
 @mock.patch("dwave.cloud.regions.get_regions", get_default_regions)

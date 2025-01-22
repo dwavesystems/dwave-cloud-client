@@ -65,6 +65,7 @@ from plucky import pluck
 from dwave.cloud import api
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.exceptions import *    # TODO: fix
+from dwave.cloud.exceptions import UseAfterCloseError
 from dwave.cloud.computation import Future
 from dwave.cloud.config import load_config, update_config, validate_config_v1
 from dwave.cloud.config import constants as config_constants
@@ -83,6 +84,15 @@ from dwave.cloud.utils.time import datetime_to_timestamp, utcnow
 __all__ = ['Client']
 
 logger = logging.getLogger(__name__)
+
+
+def _require_initialized(method):
+    def _method(obj, *args, **kwargs):
+        if not getattr(obj, '_initialized', False):
+            raise UseAfterCloseError(
+                f"{method.__name__} cannot be called after client has been closed")
+        return method(obj, *args, **kwargs)
+    return _method
 
 
 class Client(object):
@@ -439,6 +449,8 @@ class Client(object):
     def __init__(self, **kwargs):
         logger.debug("Client init called with: %r", kwargs)
 
+        self._initialized = False
+
         # derive instance-level defaults from class defaults and init defaults
         self.defaults = copy.deepcopy(self.DEFAULTS)
         user_defaults = kwargs.pop('defaults', None)
@@ -519,6 +531,8 @@ class Client(object):
         self._download_answer_executor = \
             ThreadPoolExecutor(self._DOWNLOAD_ANSWER_THREAD_COUNT)
 
+        self._initialized = True
+
     def create_session(self):
         """Create a new requests session based on client's (self) params.
 
@@ -579,6 +593,9 @@ class Client(object):
             >>> client.close()    # doctest: +SKIP
 
         """
+        if not self._initialized:
+            return
+
         # Finish all the work that requires the connection
         logger.debug("Joining submission queue")
         self._submission_queue.join()
@@ -590,14 +607,13 @@ class Client(object):
         self._load_queue.join()
 
         logger.debug("Shutting down problem upload executor")
-        self._upload_problem_executor.shutdown()
+        self._upload_problem_executor.shutdown(wait=True)
         logger.debug("Shutting down problem part upload executor")
-        self._upload_part_executor.shutdown()
+        self._upload_part_executor.shutdown(wait=True)
         logger.debug("Shutting down problem encoder executor")
-        self._encode_problem_executor.shutdown()
-
+        self._encode_problem_executor.shutdown(wait=True)
         logger.debug("Shutting down answer download executor")
-        self._download_answer_executor.shutdown()
+        self._download_answer_executor.shutdown(wait=True)
 
         # Send kill-task to all worker threads
         # Note: threads can't be 'killed' in Python, they have to die by
@@ -622,6 +638,9 @@ class Client(object):
         solvers_session = getattr(self, '_solvers_session', None)
         if solvers_session:
             solvers_session.close()
+
+        # this client can't be used anymore
+        self._initialized = False
 
     def __enter__(self):
         """Let connections be used in with blocks."""
@@ -1200,12 +1219,14 @@ class Client(object):
         except IndexError:
             raise SolverNotFoundError("Solver with the requested features not available")
 
+    @_require_initialized
     def _submit(self, body, future):
         """Enqueue a problem for submission to the server.
 
         This method is thread safe.
         """
         self._submission_queue.put(self._submit.Message(body, future))
+
     _submit.Message = namedtuple('Message', ['body', 'future'])
 
     def _do_submit_problems(self):
@@ -1407,6 +1428,7 @@ class Client(object):
             # lock in the future, otherwise deadlock occurs.
             future._set_exception(exc)
 
+    @_require_initialized
     def _cancel(self, id_, future):
         """Enqueue a problem to be canceled.
 
@@ -1458,6 +1480,7 @@ class Client(object):
         finally:
             session.close()
 
+    @_require_initialized
     def _poll(self, future: Future) -> None:
         """Enqueue a problem to poll the server for status."""
 
@@ -1566,8 +1589,8 @@ class Client(object):
                         if not add(future):
                             return
                     else:
-                        task_done()
                         self._poll_queue.put(task)
+                        task_done()
                         break
 
                 # build a query string with ids of all futures in this frame
@@ -1634,6 +1657,7 @@ class Client(object):
         finally:
             session.close()
 
+    @_require_initialized
     def _load(self, future):
         """Enqueue a problem to download results from the server.
 
@@ -1685,6 +1709,7 @@ class Client(object):
         finally:
             session.close()
 
+    @_require_initialized
     def _download_answer_binary_ref(self, *, auth_method: str, url: str,
                                     output: Optional[io.IOBase] = None) -> concurrent.futures.Future:
         """Initiate binary-ref answer download, returning the binary data in
@@ -1724,6 +1749,7 @@ class Client(object):
 
         return output
 
+    @_require_initialized
     def upload_problem_encoded(self, problem, problem_id=None, **kwargs):
         """Initiate multipart problem upload, returning the Problem ID in a
         :class:`~concurrent.futures.Future`.
