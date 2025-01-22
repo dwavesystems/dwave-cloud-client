@@ -28,7 +28,6 @@ Documentation
 
   intro
   reference/index
-  bibliography
   release_notes
 
 .. sdk-end-marker
