@@ -86,9 +86,9 @@ __all__ = ['Client']
 logger = logging.getLogger(__name__)
 
 
-def _require_initialized(method):
+def _ensure_active(method):
     def _method(obj, *args, **kwargs):
-        if not getattr(obj, '_initialized', False):
+        if getattr(obj, '_closed', False):
             raise UseAfterCloseError(
                 f"{method.__name__} cannot be called after client has been closed")
         return method(obj, *args, **kwargs)
@@ -449,7 +449,7 @@ class Client(object):
     def __init__(self, **kwargs):
         logger.debug("Client init called with: %r", kwargs)
 
-        self._initialized = False
+        self._closed = False
 
         # derive instance-level defaults from class defaults and init defaults
         self.defaults = copy.deepcopy(self.DEFAULTS)
@@ -531,8 +531,6 @@ class Client(object):
         self._download_answer_executor = \
             ThreadPoolExecutor(self._DOWNLOAD_ANSWER_THREAD_COUNT)
 
-        self._initialized = True
-
     def create_session(self):
         """Create a new requests session based on client's (self) params.
 
@@ -593,8 +591,12 @@ class Client(object):
             >>> client.close()    # doctest: +SKIP
 
         """
-        if not self._initialized:
+        if self._closed:
             return
+
+        # this client can't be used anymore
+        # note: mark it closed early to prevent job submission while closing!
+        self._closed = True
 
         # Finish all the work that requires the connection
         logger.debug("Joining submission queue")
@@ -638,9 +640,6 @@ class Client(object):
         solvers_session = getattr(self, '_solvers_session', None)
         if solvers_session:
             solvers_session.close()
-
-        # this client can't be used anymore
-        self._initialized = False
 
     def __enter__(self):
         """Let connections be used in with blocks."""
@@ -1219,7 +1218,7 @@ class Client(object):
         except IndexError:
             raise SolverNotFoundError("Solver with the requested features not available")
 
-    @_require_initialized
+    @_ensure_active
     def _submit(self, body, future):
         """Enqueue a problem for submission to the server.
 
@@ -1428,7 +1427,7 @@ class Client(object):
             # lock in the future, otherwise deadlock occurs.
             future._set_exception(exc)
 
-    @_require_initialized
+    @_ensure_active
     def _cancel(self, id_, future):
         """Enqueue a problem to be canceled.
 
@@ -1480,7 +1479,7 @@ class Client(object):
         finally:
             session.close()
 
-    @_require_initialized
+    @_ensure_active
     def _poll(self, future: Future) -> None:
         """Enqueue a problem to poll the server for status."""
 
@@ -1657,7 +1656,7 @@ class Client(object):
         finally:
             session.close()
 
-    @_require_initialized
+    @_ensure_active
     def _load(self, future):
         """Enqueue a problem to download results from the server.
 
@@ -1709,7 +1708,7 @@ class Client(object):
         finally:
             session.close()
 
-    @_require_initialized
+    @_ensure_active
     def _download_answer_binary_ref(self, *, auth_method: str, url: str,
                                     output: Optional[io.IOBase] = None) -> concurrent.futures.Future:
         """Initiate binary-ref answer download, returning the binary data in
@@ -1749,7 +1748,7 @@ class Client(object):
 
         return output
 
-    @_require_initialized
+    @_ensure_active
     def upload_problem_encoded(self, problem, problem_id=None, **kwargs):
         """Initiate multipart problem upload, returning the Problem ID in a
         :class:`~concurrent.futures.Future`.
