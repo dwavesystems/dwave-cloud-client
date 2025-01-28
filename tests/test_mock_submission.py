@@ -1167,6 +1167,67 @@ class TestClientClose(MockSubmissionBase, unittest.TestCase):
         self.assertIsNone(ref())
 
 
+@mock.patch('time.sleep', lambda *x: None)
+class TestClientUseWhileClosing(MockSubmissionBase, unittest.TestCase):
+    # make sure client can't be used even while closing (not just after close)
+
+    poll_strategy = "long-polling"
+    poll_params = dict(timeout=Client.DEFAULTS['poll_wait_time'])
+
+    def test_submit_while_closing(self):
+        submission_id = 'test-id'
+        submission_status = 'PENDING'
+        release_status = threading.Event()
+
+        def create_mock_session(client):
+            reply_body = [self.sapi.continue_reply(id=submission_id, status=submission_status)]
+
+            session = mock.Mock()
+
+            # make sure polling for status stalls until we set `release_status`
+            def get(path, **kwargs):
+                release_status.wait()
+                return choose_reply(path, fix_status_paths({
+                    f'problems/?id={submission_id}': reply_body}, **self.poll_params))
+
+            session.get = get
+            session.post = lambda path, **kwargs: choose_reply(path, {
+                'problems/': reply_body})
+
+            return session
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client(**self.config) as client:
+                solver = Solver(client, self.sapi.solver.data)
+
+                future = solver.sample_ising(*self.sapi.problem)
+
+                # check the first job is in `pending`
+                future.wait_id()
+                self.assertEqual(future.id, submission_id)
+                self.assertEqual(future.remote_status, submission_status)
+
+                # now close the client, but since client.close() is blocking,
+                # do it in a background thread
+                t = threading.Thread(target=client.close)
+                t.start()
+
+                # try submitting another job while the client is closing
+                with self.assertRaises(UseAfterCloseError):
+                    solver.sample_ising(*self.sapi.problem)
+
+                # verify client.close is still running
+                t.join(timeout=0.1)
+                self.assertTrue(t.is_alive())
+
+                # release the first job
+                release_status.set()
+
+                # verify client is closed
+                t.join()
+                self.assertFalse(t.is_alive())
+
+
 class TestThreadSafety(unittest.TestCase):
 
     def test_result_loading(self):
