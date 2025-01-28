@@ -88,10 +88,11 @@ logger = logging.getLogger(__name__)
 
 def _ensure_active(method):
     def _method(obj, *args, **kwargs):
-        if getattr(obj, '_closed', False):
-            raise UseAfterCloseError(
-                f"{method.__name__} cannot be called after client has been closed")
-        return method(obj, *args, **kwargs)
+        with obj._closed_lock:
+            if obj._closed:
+                raise UseAfterCloseError(
+                    f"{method.__name__} cannot be called after client has been closed")
+            return method(obj, *args, **kwargs)
     return _method
 
 
@@ -450,6 +451,7 @@ class Client(object):
         logger.debug("Client init called with: %r", kwargs)
 
         self._closed = False
+        self._closed_lock = threading.Lock()
 
         # derive instance-level defaults from class defaults and init defaults
         self.defaults = copy.deepcopy(self.DEFAULTS)
@@ -570,34 +572,7 @@ class Client(object):
 
         return session
 
-    def close(self):
-        """Perform a clean shutdown.
-
-        Waits for all the currently scheduled work to finish, kills the workers,
-        and closes the connection pool.
-
-        .. note:: Ensure your code does not submit new work while the connection is closing.
-
-        Where possible, it is recommended you use a context manager (a :code:`with Client.from_config(...) as`
-        construct) to ensure your code properly closes all resources.
-
-        Examples:
-            This example creates a client (based on an auto-detected configuration file), executes
-            some code (represented by a placeholder comment), and then closes the client.
-
-            >>> from dwave.cloud import Client
-            >>> client = Client.from_config()    # doctest: +SKIP
-            >>> # code that uses client
-            >>> client.close()    # doctest: +SKIP
-
-        """
-        if self._closed:
-            return
-
-        # this client can't be used anymore
-        # note: mark it closed early to prevent job submission while closing!
-        self._closed = True
-
+    def _shutdown_threads(self, wait: bool = True):
         # Finish all the work that requires the connection
         logger.debug("Joining submission queue")
         self._submission_queue.join()
@@ -630,9 +605,40 @@ class Client(object):
             self._load_queue.put(None)
 
         # Wait for threads to die
-        for worker in chain(self._submission_workers, self._cancel_workers,
-                            self._poll_workers, self._load_workers):
-            worker.join()
+        if wait:
+            for worker in chain(self._submission_workers, self._cancel_workers,
+                                self._poll_workers, self._load_workers):
+                worker.join()
+
+    def close(self):
+        """Perform a clean shutdown.
+
+        Waits for all the currently scheduled work to finish, kills the workers,
+        and closes the connection pool.
+
+        Where possible, it is recommended you use a context manager
+        (a :code:`with Client.from_config(...) as` construct) to ensure your
+        code properly closes all resources.
+
+        Examples:
+            This example creates a client, executes some code (represented by
+            a placeholder comment), and then closes the client.
+
+            >>> from dwave.cloud import Client
+            >>> client = Client.from_config()    # doctest: +SKIP
+            >>> # code that uses client
+            >>> client.close()    # doctest: +SKIP
+
+        """
+        with self._closed_lock:
+            if self._closed:
+                return
+
+            # this client can't be used anymore
+            # note: mark it closed early to prevent job submission while closing!
+            self._closed = True
+
+        self._shutdown_threads(wait=True)
 
         # Close the main thread's sessions
         self.session.close()

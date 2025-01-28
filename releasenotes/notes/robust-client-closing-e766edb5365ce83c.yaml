@@ -2,6 +2,6 @@
 features:
   - |
     Disable client use while ``Client.close()`` is in progress by failing with
-    ``UseAfterCloseError``.
+    ``UseAfterCloseError``. Also, make sure the close operation is thread-safe.
 
     A follow-up to `#680 <https://github.com/dwavesystems/dwave-cloud-client/pull/680>`_.
