@@ -480,9 +480,6 @@ class Client(object):
         if not self.config.token:
             raise ValueError("API token not defined")
 
-        # Create session for main thread only
-        self.session = self.create_session()
-
         # Build the problem submission queue, start its workers
         self._submission_queue = queue.Queue()
         self._submission_workers = []
@@ -639,9 +636,6 @@ class Client(object):
             self._closed = True
 
         self._shutdown_threads(wait=True)
-
-        # Close the main thread's sessions
-        self.session.close()
 
         solvers_session = getattr(self, '_solvers_session', None)
         if solvers_session:

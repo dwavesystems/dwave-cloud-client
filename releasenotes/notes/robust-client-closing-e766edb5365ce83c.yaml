@@ -5,3 +5,7 @@ features:
     ``UseAfterCloseError``. Also, make sure the close operation is thread-safe.
 
     A follow-up to `#680 <https://github.com/dwavesystems/dwave-cloud-client/pull/680>`_.
+upgrade:
+  - |
+    Remove ``Client.session``, an undocumented and unused client attribute. If
+    still needed, can be replaced with ``Client.create_session()``.
