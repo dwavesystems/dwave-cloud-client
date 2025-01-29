@@ -1166,6 +1166,18 @@ class TestClientClose(MockSubmissionBase, unittest.TestCase):
 
         self.assertIsNone(ref())
 
+    def test_solvers_session_access_fails(self):
+        with Client(**self.config) as client:
+            self.assertIsNotNone(client.solvers_session)
+
+        # session is closed and disabled
+        with self.assertRaises(UseAfterCloseError):
+            client.solvers_session
+
+        # hence, get_solver fails as well
+        with self.assertRaises(UseAfterCloseError):
+            client.get_solver()
+
 
 @mock.patch('time.sleep', lambda *x: None)
 class TestClientUseWhileClosing(MockSubmissionBase, unittest.TestCase):

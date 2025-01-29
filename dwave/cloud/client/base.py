@@ -698,6 +698,7 @@ class Client(object):
         return {r.code: {"name": r.name, "endpoint": r.endpoint} for r in rs}
 
     @property
+    @_ensure_active
     def solvers_session(self) -> api.resources.Solvers:
         session = getattr(self, '_solvers_session', None)
 
