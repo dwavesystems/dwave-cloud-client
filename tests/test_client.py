@@ -620,7 +620,8 @@ class ClientConstruction(unittest.TestCase):
         # http retry params from config file propagated to client object
         with mock.patch("dwave.cloud.config.loaders.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config() as client:
-                retry = client.session.get_adapter('https://').max_retries
+                session = client.create_session()
+                retry = session.get_adapter('https://').max_retries
                 self._verify_retry_config(retry, retry_opts)
 
         # test defaults
@@ -645,7 +646,8 @@ class ClientConstruction(unittest.TestCase):
 
         with mock.patch("dwave.cloud.config.loaders.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config(**retry_kwargs) as client:
-                retry = client.session.get_adapter('https://').max_retries
+                session = client.create_session()
+                retry = session.get_adapter('https://').max_retries
                 self._verify_retry_config(retry, retry_kwargs)
 
 
@@ -704,7 +706,7 @@ class ClientConfigIntegration(unittest.TestCase):
         with mock.patch("dwave.cloud.config.loaders.open", iterable_mock_open(config_body)):
             with Client.from_config('config_file', profile='custom') as client:
                 # check permissive_ssl and timeouts custom params passed-thru
-                self.assertFalse(client.session.verify)
+                self.assertTrue(client.config.permissive_ssl)
                 self.assertEqual(client.config.request_timeout, request_timeout)
                 self.assertEqual(client.config.polling_timeout, polling_timeout)
 

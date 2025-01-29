@@ -86,12 +86,13 @@ __all__ = ['Client']
 logger = logging.getLogger(__name__)
 
 
-def _require_initialized(method):
+def _ensure_active(method):
     def _method(obj, *args, **kwargs):
-        if not getattr(obj, '_initialized', False):
-            raise UseAfterCloseError(
-                f"{method.__name__} cannot be called after client has been closed")
-        return method(obj, *args, **kwargs)
+        with obj._closed_lock:
+            if obj._closed:
+                raise UseAfterCloseError(
+                    f"{method.__name__} cannot be called after client has been closed")
+            return method(obj, *args, **kwargs)
     return _method
 
 
@@ -449,7 +450,8 @@ class Client(object):
     def __init__(self, **kwargs):
         logger.debug("Client init called with: %r", kwargs)
 
-        self._initialized = False
+        self._closed = False
+        self._closed_lock = threading.Lock()
 
         # derive instance-level defaults from class defaults and init defaults
         self.defaults = copy.deepcopy(self.DEFAULTS)
@@ -477,9 +479,6 @@ class Client(object):
 
         if not self.config.token:
             raise ValueError("API token not defined")
-
-        # Create session for main thread only
-        self.session = self.create_session()
 
         # Build the problem submission queue, start its workers
         self._submission_queue = queue.Queue()
@@ -531,8 +530,6 @@ class Client(object):
         self._download_answer_executor = \
             ThreadPoolExecutor(self._DOWNLOAD_ANSWER_THREAD_COUNT)
 
-        self._initialized = True
-
     def create_session(self):
         """Create a new requests session based on client's (self) params.
 
@@ -572,30 +569,7 @@ class Client(object):
 
         return session
 
-    def close(self):
-        """Perform a clean shutdown.
-
-        Waits for all the currently scheduled work to finish, kills the workers,
-        and closes the connection pool.
-
-        .. note:: Ensure your code does not submit new work while the connection is closing.
-
-        Where possible, it is recommended you use a context manager (a :code:`with Client.from_config(...) as`
-        construct) to ensure your code properly closes all resources.
-
-        Examples:
-            This example creates a client (based on an auto-detected configuration file), executes
-            some code (represented by a placeholder comment), and then closes the client.
-
-            >>> from dwave.cloud import Client
-            >>> client = Client.from_config()    # doctest: +SKIP
-            >>> # code that uses client
-            >>> client.close()    # doctest: +SKIP
-
-        """
-        if not self._initialized:
-            return
-
+    def _shutdown_threads(self, wait: bool = True):
         # Finish all the work that requires the connection
         logger.debug("Joining submission queue")
         self._submission_queue.join()
@@ -628,19 +602,44 @@ class Client(object):
             self._load_queue.put(None)
 
         # Wait for threads to die
-        for worker in chain(self._submission_workers, self._cancel_workers,
-                            self._poll_workers, self._load_workers):
-            worker.join()
+        if wait:
+            for worker in chain(self._submission_workers, self._cancel_workers,
+                                self._poll_workers, self._load_workers):
+                worker.join()
 
-        # Close the main thread's sessions
-        self.session.close()
+    def close(self):
+        """Perform a clean shutdown.
+
+        Waits for all the currently scheduled work to finish, kills the workers,
+        and closes the connection pool.
+
+        Where possible, it is recommended you use a context manager
+        (a :code:`with Client.from_config(...) as` construct) to ensure your
+        code properly closes all resources.
+
+        Examples:
+            This example creates a client, executes some code (represented by
+            a placeholder comment), and then closes the client.
+
+            >>> from dwave.cloud import Client
+            >>> client = Client.from_config()    # doctest: +SKIP
+            >>> # code that uses client
+            >>> client.close()    # doctest: +SKIP
+
+        """
+        with self._closed_lock:
+            if self._closed:
+                return
+
+            # this client can't be used anymore
+            # note: mark it closed early to prevent job submission while closing!
+            self._closed = True
+
+        self._shutdown_threads(wait=True)
 
         solvers_session = getattr(self, '_solvers_session', None)
         if solvers_session:
             solvers_session.close()
-
-        # this client can't be used anymore
-        self._initialized = False
 
     def __enter__(self):
         """Let connections be used in with blocks."""
@@ -699,6 +698,7 @@ class Client(object):
         return {r.code: {"name": r.name, "endpoint": r.endpoint} for r in rs}
 
     @property
+    @_ensure_active
     def solvers_session(self) -> api.resources.Solvers:
         session = getattr(self, '_solvers_session', None)
 
@@ -1219,7 +1219,7 @@ class Client(object):
         except IndexError:
             raise SolverNotFoundError("Solver with the requested features not available")
 
-    @_require_initialized
+    @_ensure_active
     def _submit(self, body, future):
         """Enqueue a problem for submission to the server.
 
@@ -1428,7 +1428,7 @@ class Client(object):
             # lock in the future, otherwise deadlock occurs.
             future._set_exception(exc)
 
-    @_require_initialized
+    @_ensure_active
     def _cancel(self, id_, future):
         """Enqueue a problem to be canceled.
 
@@ -1480,7 +1480,7 @@ class Client(object):
         finally:
             session.close()
 
-    @_require_initialized
+    @_ensure_active
     def _poll(self, future: Future) -> None:
         """Enqueue a problem to poll the server for status."""
 
@@ -1657,7 +1657,7 @@ class Client(object):
         finally:
             session.close()
 
-    @_require_initialized
+    @_ensure_active
     def _load(self, future):
         """Enqueue a problem to download results from the server.
 
@@ -1709,7 +1709,7 @@ class Client(object):
         finally:
             session.close()
 
-    @_require_initialized
+    @_ensure_active
     def _download_answer_binary_ref(self, *, auth_method: str, url: str,
                                     output: Optional[io.IOBase] = None) -> concurrent.futures.Future:
         """Initiate binary-ref answer download, returning the binary data in
@@ -1749,7 +1749,7 @@ class Client(object):
 
         return output
 
-    @_require_initialized
+    @_ensure_active
     def upload_problem_encoded(self, problem, problem_id=None, **kwargs):
         """Initiate multipart problem upload, returning the Problem ID in a
         :class:`~concurrent.futures.Future`.
