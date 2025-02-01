@@ -20,8 +20,10 @@ import logging
 import numbers
 import os
 import warnings
+import zlib
 from collections import deque, namedtuple, abc
-from typing import Optional, TypedDict, Union, TYPE_CHECKING
+from collections.abc import Iterable
+from typing import IO, Optional, TypedDict, Union, TYPE_CHECKING
 
 import orjson
 import requests
@@ -131,9 +133,81 @@ class LoggingSession(BaseUrlSession):
         return response
 
 
-class VersionedAPISession(LoggingSession):
+class PayloadCompressingSession(LoggingSession):
     """A `requests.Session` subclass (technically, further specialized
-    :class:`.LoggingSession`) that enforces conformance of API response
+    :class:`.LoggingSession`) that adds support for payload compression on the
+    fly.
+
+    Args:
+        compress (bool, default=False):
+            Preemptively compress all payloads sent, even on PUT and POST requests.
+
+    """
+
+    _compress: bool = False
+
+    def __init__(self, compress: bool = False, **kwargs):
+        self._compress = compress
+        super().__init__(**kwargs)
+
+    @staticmethod
+    def _iter_compressed(data: Union[bytes, IO, Iterable[bytes]],
+                         chunk_size: Optional[int] = None):
+        if chunk_size is None:
+            # match zlib window size
+            chunk_size = 2**15
+
+        if isinstance(data, bytes):
+            data = io.BytesIO(data)
+
+        if hasattr(data, 'read'):
+            def get_chunks(f, chunk_size):
+                while chunk := f.read(chunk_size):
+                    yield chunk
+            chunks = get_chunks(data, chunk_size)
+
+        else:
+            # assume data is iterable
+            chunks = data
+
+        zbuf = zlib.compressobj()
+
+        for chunk in chunks:
+            if isinstance(chunk, str):
+                chunk = chunk.encode("utf-8")
+            if c := zbuf.compress(chunk):
+                yield c
+
+        yield zbuf.flush()
+
+    def request(self, *args, **kwargs):
+        compress = kwargs.pop('compress', self._compress)
+
+        # enabled compression of current request (assumes Session is not thread-safe)
+        old = self._compress
+        try:
+            self._compress = compress
+            return super().request(*args, **kwargs)
+        finally:
+            self._compress = old
+
+    def send(self, request: requests.PreparedRequest, **kwargs) -> requests.Response:
+        # Note: compress body on `send()` (rather than on `request()`) as by now
+        # json, form, and multipart data are all converted to bytes. We only need
+        # to handle bytes, files and iterators at this point.
+        if self._compress and request.body:
+            request.body = self._iter_compressed(request.body)
+            # update the prepared request for chunked upload
+            request.headers['Content-Encoding'] = 'deflate'
+            request.headers['Transfer-Encoding'] = 'chunked'
+            request.headers.pop('Content-Length', None)
+
+        return super().send(request, **kwargs)
+
+
+class VersionedAPISession(PayloadCompressingSession):
+    """A `requests.Session` subclass (technically, further specialized
+    :class:`.PayloadCompressingSession`) that enforces conformance of API response
     version with supported version range(s).
 
     Response format version is requested via `Accept` header field, and
