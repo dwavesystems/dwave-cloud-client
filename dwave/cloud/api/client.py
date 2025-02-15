@@ -134,13 +134,23 @@ class LoggingSession(BaseUrlSession):
 
 
 class PayloadCompressingSession(LoggingSession):
-    """A `requests.Session` subclass (technically, further specialized
+    """A :class:`requests.Session` subclass (technically, a further specialized
     :class:`.LoggingSession`) that adds support for payload compression on the
     fly.
 
     Args:
         compress (bool, default=False):
-            Preemptively compress all payloads sent, even on PUT and POST requests.
+            Preemptively compress HTTP request body, even on PUT and POST requests.
+            When compression is enabled, the payload is always compressed in 32KiB
+            chunks and streamed to minimize memory overhead.
+
+    .. note::
+        With compression enabled, the request body is transferred using chunked
+        encoding (``Transfer-Encoding: chunked``) and content is compressed using
+        deflate compression algorithm (``Content-Encoding: deflate``).
+
+    .. versionadded:: 0.13.3
+        Preemptive payload compression support added to :class:`.DWaveAPIClient`.
 
     """
 

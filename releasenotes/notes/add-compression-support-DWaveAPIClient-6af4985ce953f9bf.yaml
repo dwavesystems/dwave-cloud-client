@@ -1,0 +1,7 @@
+---
+features:
+  - |
+    Add ``PayloadCompressingSession``, a ``requests.Session`` subclass that adds
+    support for payload compression on the fly to ``dwave.cloud.api.client.DWaveAPIClient``.
+
+    See `#654 <https://github.com/dwavesystems/dwave-cloud-client/issues/654>`_.
