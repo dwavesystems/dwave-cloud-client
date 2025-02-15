@@ -193,7 +193,7 @@ class PayloadCompressingSession(LoggingSession):
     def request(self, *args, **kwargs):
         compress = kwargs.pop('compress', self._compress)
 
-        # enabled compression of current request (assumes Session is not thread-safe)
+        # set compression for current request (assumes Session is not thread-safe)
         old = self._compress
         try:
             self._compress = compress
@@ -595,6 +595,9 @@ class DWaveAPIClient:
         # number of most recent request records to keep in :attr:`.session.history`
         'history_size': 0,
 
+        # preemptive payload compression on upload requests, see :class:`PayloadCompressingSession`
+        'compress': False,
+
         # response version strict mode validation, see :class:`VersionedAPISession`
         'version_strict_mode': True,
 
@@ -725,6 +728,7 @@ class DWaveAPIClient:
         session = CachingSession(
             base_url=endpoint,
             history_size=config['history_size'],
+            compress=config['compress'],
             strict_mode=config['version_strict_mode'],
             cache=config['cache'],
         )

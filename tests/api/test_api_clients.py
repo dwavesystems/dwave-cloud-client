@@ -204,9 +204,15 @@ class TestRequests(unittest.TestCase):
         m.get(requests_mock.ANY, status_code=404)
         m.post(baseurl, additional_matcher=match_data, text='ok')
 
-        with DWaveAPIClient(**config) as client:
-            resp = client.session.post('', data=data, compress=True)
-            self.assertEqual(resp.text, 'ok')
+        with self.subTest('compress all'):
+            with DWaveAPIClient(compress=True, **config) as client:
+                resp = client.session.post('', data=data)
+                self.assertEqual(resp.text, 'ok')
+
+        with self.subTest('compress request'):
+            with DWaveAPIClient(**config) as client:
+                resp = client.session.post('', data=data, compress=True)
+                self.assertEqual(resp.text, 'ok')
 
 
 class TestVersionValidation(unittest.TestCase):
