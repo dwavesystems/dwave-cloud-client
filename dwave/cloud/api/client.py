@@ -160,6 +160,23 @@ class PayloadCompressingSession(LoggingSession):
         self._compress = compress
         super().__init__(**kwargs)
 
+    def set_payload_compress(self, compress: bool = True) -> bool:
+        """Modify payload compression on upload for current session.
+
+        Args:
+            compress (bool, default=True):
+                Enable request body compression with ``deflate`` on upload
+                requests like ``POST`` and ``PUT``. Make sure the server supports
+                compression on inbound requests, as most server don't.
+
+        Returns:
+            bool:
+                Previous compression setting.
+        """
+        previous = self._compress
+        self._compress = compress
+        return previous
+
     @staticmethod
     def _iter_compressed(data: Union[bytes, IO, Iterable[bytes]],
                          chunk_size: Optional[int] = None):

@@ -17,7 +17,7 @@ from __future__ import annotations
 import io
 import orjson
 from collections import abc
-from typing import Union, Optional, get_type_hints, TYPE_CHECKING
+from typing import Callable, Union, Optional, get_type_hints, TYPE_CHECKING
 from functools import wraps
 
 from pydantic import TypeAdapter
@@ -54,6 +54,31 @@ class accepts:
 
             finally:
                 obj.session.unset_accept()
+
+        return wrapper
+
+
+class compress_if:
+    """Decorate :class:`ResourceBase` methods to enable compression on outbound
+    requests if predicate evaluates to truthy.
+    """
+
+    def __init__(self, compress: Union[bool, Callable] = True, **kwargs):
+        if not callable(compress):
+            compress = lambda *args, **kwargs: compress
+        self.compress = compress
+
+    def __call__(self, fn: abc.Callable):
+        @wraps(fn)
+        def wrapper(obj: 'ResourceBase', *args, **kwargs):
+            restore_to = False
+            try:
+                compress = self.compress(obj, *args, **kwargs)
+                restore_to = obj.session.set_payload_compress(compress=compress)
+                return fn(obj, *args, **kwargs)
+
+            finally:
+                obj.session.set_payload_compress(compress=restore_to)
 
         return wrapper
 
