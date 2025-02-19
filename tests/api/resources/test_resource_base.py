@@ -195,8 +195,10 @@ class TestMockResource(unittest.TestCase):
 
         def match_data(request):
             if request.headers.get('compress') == 'True':
+                self.assertEqual(request.headers.get('Content-Encoding'), 'deflate')
                 expected = data_compressed
             else:
+                self.assertNotIn('Content-Encoding', request.headers)
                 expected = data
 
             body = request.body
