@@ -293,6 +293,7 @@ class Problems(ResourceBase):
         return orjson.loads(response.content)
 
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
+    @compress_if(lambda obj, **_: obj.client.config.get('compress_qpu_problem_data'))
     def submit_problem(self, *,
                        data: models.ProblemData,
                        params: dict,
@@ -309,20 +310,21 @@ class Problems(ResourceBase):
         job_dict = dict(data=data.model_dump(), params=params, solver=solver,
                         type=type, label=label)
         data = orjson.dumps(job_dict, option=orjson.OPT_SERIALIZE_NUMPY)
-        response = self.session.post(
-            path, data=data, headers={'Content-Type': 'application/json'})
+        headers = {'Content-Type': 'application/json'}
+        response = self.session.post(path, data=data, headers=headers)
         rtype = get_type_hints(self.submit_problem)['return']
         return TypeAdapter(rtype).validate_python(orjson.loads(response.content))
 
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
+    @compress_if(lambda obj, *_, **__: obj.client.config.get('compress_qpu_problem_data'))
     def submit_problems(self, problems: list[models.ProblemJob]) -> \
             list[Union[models.ProblemInitialStatus, models.ProblemSubmitError]]:
         """Asynchronous multi-problem submit, returning initial statuses."""
         path = ''
         # note: TypeAdapter().dump_json() is 2ms vs 50us by orjson.dumps(model.model_dump())
         data = orjson.dumps([job.model_dump() for job in problems])
-        response = self.session.post(
-            path, data=data, headers={'Content-Type': 'application/json'})
+        headers = {'Content-Type': 'application/json'}
+        response = self.session.post(path, data=data, headers=headers)
         rtype = get_type_hints(self.submit_problems)['return']
         return TypeAdapter(rtype).validate_python(orjson.loads(response.content))
 

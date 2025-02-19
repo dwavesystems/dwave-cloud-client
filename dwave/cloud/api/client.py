@@ -833,7 +833,15 @@ class SolverAPIClient(DWaveAPIClient):
         self.DEFAULTS = super().DEFAULTS.copy()
         self.DEFAULTS.update(endpoint=dwave.cloud.config.constants.DEFAULT_SOLVER_API_ENDPOINT)
 
+        # add qpu data compression option
+        self.DEFAULTS.update(compress_qpu_problem_data=False)
+
         super().__init__(**config)
+
+    @classmethod
+    def from_config_model(cls, config: ClientConfig, **kwargs):
+        kwargs.setdefault('compress_qpu_problem_data', config.compress_qpu_problem_data)
+        return super().from_config_model(config, **kwargs)
 
 
 class MetadataAPIClient(DWaveAPIClient):
