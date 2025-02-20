@@ -23,7 +23,7 @@ import warnings
 import zlib
 from collections import deque, namedtuple, abc
 from collections.abc import Iterable
-from typing import IO, Optional, TypedDict, Union, TYPE_CHECKING
+from typing import IO, Optional, TypedDict, TYPE_CHECKING, Union
 
 import orjson
 import requests
@@ -140,14 +140,15 @@ class PayloadCompressingSession(LoggingSession):
 
     Args:
         compress (bool, default=False):
-            Preemptively compress HTTP request body, even on PUT and POST requests.
-            When compression is enabled, the payload is always compressed in 32KiB
-            chunks and streamed to minimize memory overhead.
+            Preemptively compress HTTP request body. When compression is enabled,
+            the payload is always compressed in 32KiB chunks and streamed to
+            minimize memory overhead.
 
     .. note::
         With compression enabled, the request body is transferred using chunked
         encoding (``Transfer-Encoding: chunked``) and content is compressed using
-        deflate compression algorithm (``Content-Encoding: deflate``).
+        the `DEFLATE <https://www.rfc-editor.org/rfc/rfc1951.txt>`_ compression
+        algorithm (``Content-Encoding: deflate``).
 
     .. versionadded:: 0.13.3
         Preemptive payload compression support added to :class:`.DWaveAPIClient`.
@@ -165,9 +166,9 @@ class PayloadCompressingSession(LoggingSession):
 
         Args:
             compress (bool, default=True):
-                Enable request body compression with ``deflate`` on upload
-                requests like ``POST`` and ``PUT``. Make sure the server supports
-                compression on inbound requests, as most server don't.
+                Enable request body compression with DEFLATE on upload requests.
+                Make sure the server supports compression on inbound requests,
+                as most servers don't.
 
         Returns:
             bool:
@@ -233,12 +234,12 @@ class PayloadCompressingSession(LoggingSession):
 
 
 class VersionedAPISession(PayloadCompressingSession):
-    """A `requests.Session` subclass (technically, further specialized
+    """A :class:`requests.Session` subclass (technically, further specialized
     :class:`.PayloadCompressingSession`) that enforces conformance of API response
     version with supported version range(s).
 
-    Response format version is requested via `Accept` header field, and
-    format/version of the response is checked via `Content-Type`.
+    Response format version is requested via ``Accept`` header field, and
+    format/version of the response is checked via ``Content-Type``.
 
     Args:
         strict_mode:
@@ -350,7 +351,7 @@ def _create_default_cache_store(**kwargs) -> abc.Mapping:
 
 
 class CachingSession(VersionedAPISession):
-    """A `requests.Session` subclass (technically, further specialized
+    """A :class:`requests.Session` subclass (technically, further specialized
     :class:`.VersionedAPISession`) that caches responses and uses conditional
     requests for smart cache updates.
 
@@ -585,8 +586,9 @@ class DWaveAPIClient:
         on demand, in each thread.
 
     Example:
-        with DWaveAPIClient(endpoint='...', timeout=(5, 600)) as client:
-            client.session.get('...')
+        >>> with DWaveAPIClient(endpoint='...', timeout=(5, 600)) as client:    # doctest: +SKIP
+        >>>     client.session.get('...')
+
     """
 
     DEFAULTS = {

@@ -106,6 +106,7 @@ intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
     'numpy': ('https://numpy.org/doc/stable/', None),
     'urllib3': ('https://urllib3.readthedocs.io/en/stable/', None),
+    'requests': ('https://requests.readthedocs.io/en/stable/', None),
     'oceandocs': ('https://docs.ocean.dwavesys.com/en/stable/', None),
     'sysdocs_gettingstarted': ('https://docs.dwavesys.com/docs/latest/', None),
 }
