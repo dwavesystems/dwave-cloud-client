@@ -155,6 +155,9 @@ class ClientConfig(BaseModel, GetterMixin):
                                      LongPollingSchedule]] = LongPollingSchedule()
     polling_timeout: Optional[float] = None
 
+    # [sapi client specific] preemptive compression on qpu problem upload
+    compress_qpu_problem_data: Optional[bool] = True
+
     # general http(s) connection params
     cert: Optional[Union[str, tuple[str, str]]] = None
     headers: Optional[abc.Mapping[str, str]] = None
@@ -163,7 +166,6 @@ class ClientConfig(BaseModel, GetterMixin):
     # specific connection options
     permissive_ssl: Optional[bool] = False
     connection_close: Optional[bool] = False
-    compress_qpu_problem_data: Optional[bool] = True
 
     # api request retry params
     request_retry: Optional[RequestRetryConfig] = RequestRetryConfig()

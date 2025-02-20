@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from tests.api.resources.test_resource_base import *
+from tests.api.resources.test_account import *
 from tests.api.resources.test_regions import *
 from tests.api.resources.test_solvers import *
 from tests.api.resources.test_problems import *

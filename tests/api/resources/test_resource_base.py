@@ -14,6 +14,7 @@
 
 import re
 import unittest
+import zlib
 from urllib.parse import urljoin
 
 import requests
@@ -21,7 +22,7 @@ import requests_mock
 from pydantic import TypeAdapter, BaseModel
 
 from dwave.cloud.api import exceptions, constants
-from dwave.cloud.api.resources import ResourceBase, accepts
+from dwave.cloud.api.resources import ResourceBase, accepts, compress_if
 
 
 class MathResource(ResourceBase):
@@ -57,6 +58,11 @@ class MathResource(ResourceBase):
     @accepts(media_type='application/vnd.dwave.api.mock+json', version='>0', strict_mode=False)
     def nonstrict(self) -> dict:
         return self.session.get(f'nonstrict/').json()
+
+    @compress_if(lambda _, __, compress: compress)
+    def zip(self, data: str, compress: bool = False) -> dict:
+        headers = dict(compress=str(compress))
+        return self.session.post('zip/', headers=headers, data=data).json()
 
 
 class TestMockResource(unittest.TestCase):
@@ -181,3 +187,33 @@ class TestMockResource(unittest.TestCase):
         # media_type is not enforced (because response lacks Content-Type)
         res = resource.nonstrict()
         self.assertEqual(res['works'], True)
+
+    @requests_mock.Mocker()
+    def test_compression(self, m):
+        data = b'test payload'
+        data_compressed = zlib.compress(data)
+
+        def match_data(request):
+            if request.headers.get('compress') == 'True':
+                self.assertEqual(request.headers.get('Content-Encoding'), 'deflate')
+                expected = data_compressed
+            else:
+                self.assertNotIn('Content-Encoding', request.headers)
+                expected = data
+
+            body = request.body
+            if not isinstance(body, bytes):
+                body = b''.join(request.body)
+
+            return body == expected
+
+        m.post(requests_mock.ANY, status_code=404)
+        m.post(urljoin(self.base_uri, 'zip/'), additional_matcher=match_data, json=dict(ok=True))
+
+        resource = MathResource(endpoint=self.endpoint)
+
+        res = resource.zip(data, compress=True)
+        self.assertTrue(res['ok'])
+
+        res = resource.zip(data, compress=False)
+        self.assertTrue(res['ok'])

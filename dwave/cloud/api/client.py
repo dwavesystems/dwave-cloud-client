@@ -20,8 +20,10 @@ import logging
 import numbers
 import os
 import warnings
+import zlib
 from collections import deque, namedtuple, abc
-from typing import Optional, TypedDict, Union, TYPE_CHECKING
+from collections.abc import Iterable
+from typing import IO, Optional, TypedDict, TYPE_CHECKING, Union
 
 import orjson
 import requests
@@ -131,13 +133,113 @@ class LoggingSession(BaseUrlSession):
         return response
 
 
-class VersionedAPISession(LoggingSession):
-    """A `requests.Session` subclass (technically, further specialized
-    :class:`.LoggingSession`) that enforces conformance of API response
+class PayloadCompressingSession(LoggingSession):
+    """A :class:`requests.Session` subclass (technically, a further specialized
+    :class:`.LoggingSession`) that adds support for payload compression on the
+    fly.
+
+    Args:
+        compress (bool, default=False):
+            Preemptively compress HTTP request body. When compression is enabled,
+            the payload is always compressed in 32KiB chunks and streamed to
+            minimize memory overhead.
+
+    .. note::
+        With compression enabled, the request body is transferred using chunked
+        encoding (``Transfer-Encoding: chunked``) and content is compressed using
+        the `DEFLATE <https://www.rfc-editor.org/rfc/rfc1951.txt>`_ compression
+        algorithm (``Content-Encoding: deflate``).
+
+    .. versionadded:: 0.13.3
+        Preemptive payload compression support added to :class:`.DWaveAPIClient`.
+
+    """
+
+    _compress: bool = False
+
+    def __init__(self, compress: bool = False, **kwargs):
+        self._compress = compress
+        super().__init__(**kwargs)
+
+    def set_payload_compress(self, compress: bool = True) -> bool:
+        """Modify payload compression on upload for current session.
+
+        Args:
+            compress (bool, default=True):
+                Enable request body compression with DEFLATE on upload requests.
+                Make sure the server supports compression on inbound requests,
+                as most servers don't.
+
+        Returns:
+            bool:
+                Previous compression setting.
+        """
+        previous = self._compress
+        self._compress = compress
+        return previous
+
+    @staticmethod
+    def _iter_compressed(data: Union[bytes, IO, Iterable[bytes]],
+                         chunk_size: Optional[int] = None):
+        if chunk_size is None:
+            # match zlib window size
+            chunk_size = 2**15
+
+        if isinstance(data, bytes):
+            data = io.BytesIO(data)
+
+        if hasattr(data, 'read'):
+            def get_chunks(f, chunk_size):
+                while chunk := f.read(chunk_size):
+                    yield chunk
+            chunks = get_chunks(data, chunk_size)
+
+        else:
+            # assume data is iterable
+            chunks = data
+
+        zbuf = zlib.compressobj()
+
+        for chunk in chunks:
+            if isinstance(chunk, str):
+                chunk = chunk.encode("utf-8")
+            if c := zbuf.compress(chunk):
+                yield c
+
+        yield zbuf.flush()
+
+    def request(self, *args, **kwargs):
+        compress = kwargs.pop('compress', self._compress)
+
+        # set compression for current request (assumes Session is not thread-safe)
+        old = self._compress
+        try:
+            self._compress = compress
+            return super().request(*args, **kwargs)
+        finally:
+            self._compress = old
+
+    def send(self, request: requests.PreparedRequest, **kwargs) -> requests.Response:
+        # Note: compress body on `send()` (rather than on `request()`) as by now
+        # json, form, and multipart data are all converted to bytes. We only need
+        # to handle bytes, files and iterators at this point.
+        if self._compress and request.body:
+            request.body = self._iter_compressed(request.body)
+            # update the prepared request for chunked upload
+            request.headers['Content-Encoding'] = 'deflate'
+            request.headers['Transfer-Encoding'] = 'chunked'
+            request.headers.pop('Content-Length', None)
+
+        return super().send(request, **kwargs)
+
+
+class VersionedAPISession(PayloadCompressingSession):
+    """A :class:`requests.Session` subclass (technically, further specialized
+    :class:`.PayloadCompressingSession`) that enforces conformance of API response
     version with supported version range(s).
 
-    Response format version is requested via `Accept` header field, and
-    format/version of the response is checked via `Content-Type`.
+    Response format version is requested via ``Accept`` header field, and
+    format/version of the response is checked via ``Content-Type``.
 
     Args:
         strict_mode:
@@ -249,7 +351,7 @@ def _create_default_cache_store(**kwargs) -> abc.Mapping:
 
 
 class CachingSession(VersionedAPISession):
-    """A `requests.Session` subclass (technically, further specialized
+    """A :class:`requests.Session` subclass (technically, further specialized
     :class:`.VersionedAPISession`) that caches responses and uses conditional
     requests for smart cache updates.
 
@@ -484,8 +586,9 @@ class DWaveAPIClient:
         on demand, in each thread.
 
     Example:
-        with DWaveAPIClient(endpoint='...', timeout=(5, 600)) as client:
-            client.session.get('...')
+        >>> with DWaveAPIClient(endpoint='...', timeout=(5, 600)) as client:    # doctest: +SKIP
+        >>>     client.session.get('...')
+
     """
 
     DEFAULTS = {
@@ -510,6 +613,9 @@ class DWaveAPIClient:
 
         # number of most recent request records to keep in :attr:`.session.history`
         'history_size': 0,
+
+        # preemptive payload compression on upload requests, see :class:`PayloadCompressingSession`
+        'compress': False,
 
         # response version strict mode validation, see :class:`VersionedAPISession`
         'version_strict_mode': True,
@@ -641,6 +747,7 @@ class DWaveAPIClient:
         session = CachingSession(
             base_url=endpoint,
             history_size=config['history_size'],
+            compress=config['compress'],
             strict_mode=config['version_strict_mode'],
             cache=config['cache'],
         )
@@ -728,7 +835,15 @@ class SolverAPIClient(DWaveAPIClient):
         self.DEFAULTS = super().DEFAULTS.copy()
         self.DEFAULTS.update(endpoint=dwave.cloud.config.constants.DEFAULT_SOLVER_API_ENDPOINT)
 
+        # add qpu data compression option
+        self.DEFAULTS.update(compress_qpu_problem_data=False)
+
         super().__init__(**config)
+
+    @classmethod
+    def from_config_model(cls, config: ClientConfig, **kwargs):
+        kwargs.setdefault('compress_qpu_problem_data', config.compress_qpu_problem_data)
+        return super().from_config_model(config, **kwargs)
 
 
 class MetadataAPIClient(DWaveAPIClient):

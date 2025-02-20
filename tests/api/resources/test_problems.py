@@ -13,13 +13,14 @@
 # limitations under the License.
 
 import abc
+import datetime
 import io
-import json
+import orjson
 import uuid
 import unittest
-import datetime
-from urllib.parse import urljoin, urlparse, parse_qs
+import zlib
 from itertools import chain
+from urllib.parse import urljoin, urlparse, parse_qs
 
 import numpy
 import requests_mock
@@ -42,6 +43,21 @@ from tests import config
 from tests.api.mocks import (
     StructuredSapiMockResponses, UnstructuredSapiMockResponses,
     UnstructuredSapiMockResponsesWithBinaryRefAnswer)
+
+
+def decode_request_body(request):
+    """Decode compressed JSON payload."""
+
+    # unwind body generator, but store it for reuse
+    if not isinstance(request.body, bytes):
+        request.body = b''.join(request.body)
+
+    # decompress before decoding json
+    body = request.body
+    if request.headers.get('Content-Encoding') == 'deflate':
+        body = zlib.decompress(body)
+
+    return orjson.loads(body)
 
 
 class AssertionSatisfied(Exception):
@@ -585,7 +601,8 @@ class ProblemResourcesMockerMixin:
         self.mocker.post(url('problems/'), json=p2_status, request_headers=headers)
 
         def match_invalid_problem_params(request):
-            return request.json()['params'] != self.params
+            data = decode_request_body(request)
+            return data['params'] != self.params
 
         self.mocker.post(
             url('problems/'),
@@ -594,7 +611,8 @@ class ProblemResourcesMockerMixin:
             request_headers=headers)
 
         def match_invalid_problem_solver(request):
-            return request.json()['solver'] != self.solver_id
+            data = decode_request_body(request)
+            return data['solver'] != self.solver_id
 
         self.mocker.post(
             url('problems/'),
@@ -604,7 +622,7 @@ class ProblemResourcesMockerMixin:
 
         # problem batch submit
         def match_batch_submit(request):
-            data = request.json()
+            data = decode_request_body(request)
             return isinstance(data, list) and len(data) == 3
 
         self.mocker.post(
@@ -615,7 +633,7 @@ class ProblemResourcesMockerMixin:
 
         # problem submitted just to be cancelled (list of len 2)
         def match_batch_submit(request):
-            data = request.json()
+            data = decode_request_body(request)
             return isinstance(data, list) and len(data) == 2
 
         self.mocker.post(
@@ -625,7 +643,7 @@ class ProblemResourcesMockerMixin:
             request_headers=headers)
 
         def match_invalid_batch_submit(request):
-            data = request.json()
+            data = decode_request_body(request)
             return isinstance(data, list) and len(data) == 1 and data[0]['params'] != self.params
 
         self.mocker.post(
@@ -681,6 +699,64 @@ class TestMockProblemsStructured(StructuredProblemTestsMixin,
 
         cls.params = dict(num_reads=100)
         cls.solver_id = cls.p1.solver.id
+
+
+class TestMockProblemsStructuredWithQPUCompression(TestMockProblemsStructured):
+    """Verify `dwave.cloud.api.resources.Problems` handle structured problems
+    using mocked SAPI responses, with compression of QPU data on upload.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.api.close()
+        self.api = Problems(
+            token=self.token, endpoint=self.endpoint,
+            version_strict_mode=False, compress_qpu_problem_data=True)
+
+    def test_config(self):
+        self.assertTrue(self.api.client.config.get('compress_qpu_problem_data'))
+
+
+class TestMockProblemsSubmitWithQPUCompression(unittest.TestCase):
+    """Verify `dwave.cloud.api.resources.Problems` handle structured problems
+    using mocked SAPI responses, with compression of QPU data on upload.
+    """
+
+    @requests_mock.Mocker()
+    def test_problem_submit(self, m):
+        p = StructuredSapiMockResponses()
+        problem_data = models.ProblemData.model_validate(p.problem_data())
+
+        baseurl = 'https://test.com'
+        config = dict(endpoint=baseurl, version_strict_mode=False,
+                      compress_qpu_problem_data=True)
+
+        def verify_compression(request):
+            data = decode_request_body(request)['data']
+            expected_data = problem_data.model_dump()
+
+            self.assertEqual(data, expected_data)
+            self.assertEqual(request.headers.get('Content-Encoding'), 'deflate')
+
+            return data == expected_data
+
+        m.post(requests_mock.ANY, status_code=404)
+        m.post(
+            urljoin(baseurl, 'problems/'),
+            json=p.continue_reply(id=p.problem_id),
+            request_headers={'Content-Encoding': 'deflate'},
+            additional_matcher=verify_compression
+        )
+
+        with Problems(**config) as api:
+            status = api.submit_problem(
+                data=problem_data,
+                params=dict(num_reads=10),
+                solver=p.solver.id,
+                type=p.problem_type,
+            )
+            self.assertIsInstance(status, models.ProblemStatusMaybeWithAnswer)
+            self.assertEqual(status.type, p.problem_type)
 
 
 @unittest.skipUnless(dimod, "dimod not installed")
@@ -743,10 +819,10 @@ class TestCloudProblemsStructured(StructuredProblemTestsMixin,
     """
 
     @classmethod
-    def setUpClass(cls):
+    def setup(cls, **extra_config):
         """Configure attributes required (used) by ProblemResourcesBaseTests."""
-
-        with Client(**config) as client:
+        cc = config | extra_config
+        with Client(**cc) as client:
             cls.token = client.config.token
             cls.api = Problems.from_config(client.config)
             cls.poll_wait_time = 2
@@ -770,8 +846,29 @@ class TestCloudProblemsStructured(StructuredProblemTestsMixin,
             assert future.remote_status == constants.ProblemStatus.COMPLETED.value
 
     @classmethod
+    def setUpClass(cls):
+        cls.setup(compress_qpu_problem_data=False)
+
+    @classmethod
     def tearDownClass(cls):
         cls.api.close()
+
+    def test_config(self):
+        self.assertFalse(self.api.client.config.get('compress_qpu_problem_data'))
+
+
+@unittest.skipUnless(config, "SAPI access not configured")
+class TestCloudProblemsStructuredWithQPUCompression(TestCloudProblemsStructured):
+    """Verify `dwave.cloud.api.resources.Problems` handle structured problems
+    as returned by SAPI, with compression of QPU data enabled.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.setup(compress_qpu_problem_data=True)
+
+    def test_config(self):
+        self.assertTrue(self.api.client.config.get('compress_qpu_problem_data'))
 
 
 @unittest.skipUnless(dimod, "dimod not installed")
@@ -855,7 +952,7 @@ class NumpyParamsSerialization(unittest.TestCase):
         expected_params = dict(num_reads=py_val)
 
         def verify_params(*args, **kwargs):
-            body = json.loads(kwargs.get('data'))
+            body = orjson.loads(kwargs.get('data'))
             params = body.get('params')
             if params != expected_params:
                 raise AssertionError("params don't match")
@@ -876,7 +973,7 @@ class NumpyParamsSerialization(unittest.TestCase):
         expected_params = dict(num_reads=py_val)
 
         def verify_params(*args, **kwargs):
-            body = json.loads(kwargs.get('data'))
+            body = orjson.loads(kwargs.get('data'))
             params = body[0].get('params')
             if params != expected_params:
                 raise AssertionError("params don't match")

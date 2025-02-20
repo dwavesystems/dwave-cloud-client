@@ -17,7 +17,7 @@ from __future__ import annotations
 import io
 import orjson
 from collections import abc
-from typing import Union, Optional, get_type_hints, TYPE_CHECKING
+from typing import Callable, Union, Optional, get_type_hints, TYPE_CHECKING
 from functools import wraps
 
 from pydantic import TypeAdapter
@@ -54,6 +54,31 @@ class accepts:
 
             finally:
                 obj.session.unset_accept()
+
+        return wrapper
+
+
+class compress_if:
+    """Decorate :class:`ResourceBase` methods to enable compression on outbound
+    requests if predicate evaluates to truthy.
+    """
+
+    def __init__(self, compress: Union[bool, Callable] = True, **kwargs):
+        if not callable(compress):
+            compress = lambda *args, **kwargs: compress
+        self.compress = compress
+
+    def __call__(self, fn: abc.Callable):
+        @wraps(fn)
+        def wrapper(obj: 'ResourceBase', *args, **kwargs):
+            restore_to = False
+            try:
+                compress = self.compress(obj, *args, **kwargs)
+                restore_to = obj.session.set_payload_compress(compress=compress)
+                return fn(obj, *args, **kwargs)
+
+            finally:
+                obj.session.set_payload_compress(compress=restore_to)
 
         return wrapper
 
@@ -268,6 +293,7 @@ class Problems(ResourceBase):
         return orjson.loads(response.content)
 
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
+    @compress_if(lambda obj, **_: obj.client.config.get('compress_qpu_problem_data'))
     def submit_problem(self, *,
                        data: models.ProblemData,
                        params: dict,
@@ -284,20 +310,21 @@ class Problems(ResourceBase):
         job_dict = dict(data=data.model_dump(), params=params, solver=solver,
                         type=type, label=label)
         data = orjson.dumps(job_dict, option=orjson.OPT_SERIALIZE_NUMPY)
-        response = self.session.post(
-            path, data=data, headers={'Content-Type': 'application/json'})
+        headers = {'Content-Type': 'application/json'}
+        response = self.session.post(path, data=data, headers=headers)
         rtype = get_type_hints(self.submit_problem)['return']
         return TypeAdapter(rtype).validate_python(orjson.loads(response.content))
 
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
+    @compress_if(lambda obj, *_, **__: obj.client.config.get('compress_qpu_problem_data'))
     def submit_problems(self, problems: list[models.ProblemJob]) -> \
             list[Union[models.ProblemInitialStatus, models.ProblemSubmitError]]:
         """Asynchronous multi-problem submit, returning initial statuses."""
         path = ''
         # note: TypeAdapter().dump_json() is 2ms vs 50us by orjson.dumps(model.model_dump())
         data = orjson.dumps([job.model_dump() for job in problems])
-        response = self.session.post(
-            path, data=data, headers={'Content-Type': 'application/json'})
+        headers = {'Content-Type': 'application/json'}
+        response = self.session.post(path, data=data, headers=headers)
         rtype = get_type_hints(self.submit_problems)['return']
         return TypeAdapter(rtype).validate_python(orjson.loads(response.content))
 
