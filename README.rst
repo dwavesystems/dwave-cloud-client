@@ -16,6 +16,8 @@
 dwave-cloud-client
 ==================
 
+.. start_cloud_about
+
 D-Wave Cloud Client is a minimal implementation of the REST interface used to
 communicate with D-Wave Sampler API (SAPI) servers.
 
@@ -24,9 +26,9 @@ and scheduling for quantum annealing resources at D-Wave Systems.
 This package provides a minimal Python interface to that layer without
 compromising the quality of interactions and workflow.
 
-The example below instantiates a D-Wave Cloud Client and solver based on the local
-system's auto-detected default configuration file and samples a random Ising problem
-tailored to fit the solver's graph.
+The example below instantiates a D-Wave Cloud Client and solver based on the
+local system's auto-detected default configuration file and samples a random
+Ising problem tailored to fit the solver's graph.
 
 .. code-block:: python
 
@@ -49,13 +51,11 @@ tailored to fit the solver's graph.
         # Print the first sample out of a hundred
         print(computation.samples[0])
 
-.. index-end-marker
+.. end_cloud_about
 
 
 Installation
-------------
-
-.. installation-start-marker
+============
 
 Requires Python 3.8+:
 
@@ -63,7 +63,8 @@ Requires Python 3.8+:
 
     pip install dwave-cloud-client
 
-To install from source (available on GitHub in `dwavesystems/dwave-cloud-client`_ repo):
+To install from source (available on GitHub in
+`dwavesystems/dwave-cloud-client`_ repo):
 
 .. code-block:: bash
 
@@ -72,23 +73,23 @@ To install from source (available on GitHub in `dwavesystems/dwave-cloud-client`
 
 .. _`dwavesystems/dwave-cloud-client`: https://github.com/dwavesystems/dwave-cloud-client
 
-.. installation-end-marker
-
 
 License
--------
+=======
 
 Released under the Apache License 2.0. See `<LICENSE>`_ file.
 
 
 Contributing
-------------
+============
+
+.. todo:: update this link
 
 Ocean's `contributing guide <https://docs.ocean.dwavesys.com/en/stable/contributing.html>`_
 has guidelines for contributing to Ocean packages.
 
 Release Notes
-~~~~~~~~~~~~~
+-------------
 
 D-Wave Cloud Client uses `reno <https://docs.openstack.org/reno/>`_ to manage
 its release notes.

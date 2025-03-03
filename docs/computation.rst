@@ -1,4 +1,4 @@
-.. _computation:
+.. _cloud_computation:
 
 ===========
 Computation

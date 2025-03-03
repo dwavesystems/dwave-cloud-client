@@ -1,4 +1,4 @@
-.. _resources_cloud:
+.. _cloud_resources:
 
 =======
 Clients
@@ -103,3 +103,38 @@ Class
 ~~~~~
 
 .. autoclass:: dwave.cloud.sw.Client
+
+
+
+
+
+
+
+PayloadCompressingSession
+=========================
+
+.. currentmodule:: dwave.cloud.api.client
+
+Class
+-----
+
+.. autoclass:: PayloadCompressingSession
+
+.. autoclass:: VersionedAPISession
+
+Methods
+-------
+
+.. autosummary::
+   :toctree: generated
+
+   PayloadCompressingSession.set_payload_compress
+
+
+
+.. currentmodule:: dwave.cloud.api.resources
+
+Class
+-----
+
+.. autoclass:: compress_if

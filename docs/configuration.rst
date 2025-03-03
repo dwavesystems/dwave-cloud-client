@@ -1,4 +1,4 @@
-.. _configuration_cloud:
+.. _cloud_configuration:
 
 =============
 Configuration
