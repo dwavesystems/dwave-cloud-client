@@ -25,7 +25,7 @@ Usage Information
 .. todo:: add the intersphinx prefix to enable these links for self builds
 
 *   :ref:`index_concepts` for terminology
-*   :ref:`qpu_intro_quantum_solvers` for an introduction to sampling with a
+*   :ref:`qpu_quantum_solvers_intro` for an introduction to sampling with a
     quantum computer.
 *   :ref:`opt_index_hybrid` for an introduction to using :term:`hybrid`
     :term:`solvers <solver>`
