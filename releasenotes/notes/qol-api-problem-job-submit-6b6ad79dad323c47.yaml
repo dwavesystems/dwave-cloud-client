@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Add ``dwave.cloud.api.models.ProblemJob.from_info()`` helper factory method
+    that constructs a problem job model from problem info model.
+

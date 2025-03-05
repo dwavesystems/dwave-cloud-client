@@ -53,3 +53,12 @@ class TestModels(unittest.TestCase):
 
         with self.subTest('ProblemInfo'):
             info = models.ProblemInfo(**self.sapi.problem_info())
+
+        with self.subTest('ProblemJob'):
+            job = models.ProblemJob.from_info(info)
+
+            self.assertEqual(job.data, data)
+            self.assertEqual(job.params, info.params)
+            self.assertEqual(job.solver, status.solver)
+            self.assertEqual(job.type, status.type)
+            self.assertEqual(job.label, status.label)
