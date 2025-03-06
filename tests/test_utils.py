@@ -1102,7 +1102,7 @@ class TestLogging(unittest.TestCase):
 
     @capture_stderr
     def test_multiple_handlers(self, output):
-        structured_stream = io.BytesIO()
+        structured_stream = io.StringIO()
 
         configure_logging(
             logger, handler_level=logging.ERROR)
@@ -1119,7 +1119,7 @@ class TestLogging(unittest.TestCase):
         self.assertEqual(len(error), 1)
         self.assertIn('error', error[0])
 
-        debug = list(map(json.loads, structured_stream.getvalue().decode('utf8').splitlines()))
+        debug = list(map(json.loads, structured_stream.getvalue().splitlines()))
         self.assertEqual(len(debug), 2)
         self.assertEqual(debug[0].get('message'), 'debug')
         self.assertEqual(debug[1].get('message'), 'error')

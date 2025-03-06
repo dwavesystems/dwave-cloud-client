@@ -67,7 +67,7 @@ class FilteredSecretsFormatter(logging.Formatter):
 
 
 class JSONFormatter(ISOFormatter):
-    """Encode record dict as JSON (bytes)."""
+    """Encode record dict as JSON (str)."""
 
     def format(self, record: logging.LogRecord) -> str:
         super().format(record)
@@ -75,7 +75,7 @@ class JSONFormatter(ISOFormatter):
         rec = record.__dict__.copy()
         del rec['args']
         del rec['msg']
-        return orjson.dumps(rec)
+        return orjson.dumps(rec).decode('utf-8')
 
 
 class BinaryFormatter(logging.Formatter):
@@ -179,7 +179,7 @@ def configure_logging(logger: Optional[logging.Logger] = None,
     if logger is None:
         logger = logging.getLogger('dwave.cloud')
     if output_stream is None:
-        output_stream = sys.stderr.buffer
+        output_stream = sys.stderr
     if handler_level is None:
         handler_level = level
 
@@ -191,14 +191,13 @@ def configure_logging(logger: Optional[logging.Logger] = None,
     if structured_output:
         output_formatter = JSONFormatter
     else:
-        output_formatter = BinaryFormatter
+        output_formatter = ISOFormatter
 
     if filter_secrets:
-        class Formatter(output_formatter, FilteredSecretsFormatter, ISOFormatter):
+        class Formatter(output_formatter, FilteredSecretsFormatter):
             pass
     else:
-        class Formatter(output_formatter, ISOFormatter):
-            pass
+        Formatter = output_formatter
 
     if not additive:
         # make sure handlers are not accumulated
@@ -206,7 +205,7 @@ def configure_logging(logger: Optional[logging.Logger] = None,
             logger.removeHandler(logger.handlers[-1])
 
     formatter = Formatter(**format)
-    handler = BinaryStreamHandler(stream=output_stream)
+    handler = logging.StreamHandler(stream=output_stream)
     handler.setFormatter(formatter)
     handler.setLevel(handler_level)
 
