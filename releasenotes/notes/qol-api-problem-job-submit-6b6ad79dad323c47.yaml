@@ -1,0 +1,9 @@
+---
+features:
+  - |
+    Add ``dwave.cloud.api.models.ProblemJob.from_info()`` helper factory method
+    that constructs a problem job model from problem info model.
+  - |
+    Allow ``dwave.cloud.api.resources.Problems.submit_problem()`` to accept a
+    problem described by a ``ProblemJob`` model, with individual attributes
+    optionally modified by keyword arguments.

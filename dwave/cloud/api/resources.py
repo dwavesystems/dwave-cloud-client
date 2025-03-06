@@ -293,22 +293,26 @@ class Problems(ResourceBase):
         return orjson.loads(response.content)
 
     @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
-    @compress_if(lambda obj, **_: obj.client.config.get('compress_qpu_problem_data'))
-    def submit_problem(self, *,
-                       data: models.ProblemData,
-                       params: dict,
-                       solver: str,
-                       type: constants.ProblemType,
+    @compress_if(lambda obj, *_, **__: obj.client.config.get('compress_qpu_problem_data'))
+    def submit_problem(self,
+                       problem: Optional[models.ProblemJob] = None,
+                       *,
+                       data: Optional[models.ProblemData] = None,
+                       params: Optional[dict] = None,
+                       solver: Optional[str] = None,
+                       type: Optional[constants.ProblemType] = None,
                        label: Optional[str] = None) -> \
             Union[models.ProblemStatusMaybeWithAnswer, models.ProblemSubmitError]:
         """Blocking problem submit with timeout, returning final status and
         answer, if problem is solved within the (undisclosed) time limit.
         """
         path = ''
+        job_dict = problem.model_dump() if problem is not None else {}
+        updates = dict(data=data.model_dump() if data is not None else None,
+                       params=params, solver=solver, type=type, label=label)
+        job_dict.update((k, v) for k, v in updates.items() if v is not None)
         # note: orjson.dumps(model.model_dump()) is about 6-7x faster then
         # model.model_dump_json() - 45us vs 300us (including model construction)
-        job_dict = dict(data=data.model_dump(), params=params, solver=solver,
-                        type=type, label=label)
         data = orjson.dumps(job_dict, option=orjson.OPT_SERIALIZE_NUMPY)
         headers = {'Content-Type': 'application/json'}
         response = self.session.post(path, data=data, headers=headers)

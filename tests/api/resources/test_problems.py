@@ -302,6 +302,27 @@ class ProblemResourcesBaseTests(abc.ABC):
             self.assertIsInstance(status.answer, models.ProblemAnswer)
             self.verify_problem_answer(status.answer)
 
+    def test_problem_job_submit(self):
+        """ProblemJob submitted."""
+
+        job = models.ProblemJob(
+            data=self.problem_data,
+            params=self.params,
+            solver=self.solver_id,
+            type=self.problem_type,
+        )
+
+        status = self.api.submit_problem(job)
+
+        self.assertIsInstance(status, models.ProblemStatusMaybeWithAnswer)
+        self.assertEqual(status.type, self.problem_type)
+        self.assertEqual(status.solver, self.solver_id)
+        self.assertIsNotNone(status.submitted_on)
+
+        if status.status is constants.ProblemStatus.COMPLETED:
+            self.assertIsInstance(status.answer, models.ProblemAnswer)
+            self.verify_problem_answer(status.answer)
+
     def test_problem_submit_errors(self):
         """Problem submit fails due to invalid parameters."""
 

@@ -164,6 +164,14 @@ class ProblemJob(BaseModel):
     type: constants.ProblemType
     label: Optional[str] = None
 
+    @classmethod
+    def from_info(cls, info: ProblemInfo):
+        return cls(data=info.data,
+                   params=info.params,
+                   solver=info.metadata.solver,
+                   type=info.metadata.type,
+                   label=info.metadata.label)
+
 
 class BatchItemError(BaseModel):
     error_code: int
