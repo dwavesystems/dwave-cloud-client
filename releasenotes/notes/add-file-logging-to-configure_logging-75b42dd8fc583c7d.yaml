@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Add ``output_file`` parameter to ``dwave.cloud.utils.logging.configure_logging()``
+    to simplify logging to a file.

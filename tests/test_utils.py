@@ -1124,6 +1124,23 @@ class TestLogging(unittest.TestCase):
         self.assertEqual(debug[0].get('message'), 'debug')
         self.assertEqual(debug[1].get('message'), 'error')
 
+    @capture_stderr
+    def test_file_logging(self, output):
+        with tempfile.TemporaryDirectory() as dir:
+            logfile = os.path.join(dir, "out.log")
+
+            configure_logging(logger, output_file=logfile)
+
+            logger.error('test-msg')
+
+            # log msg is in the log file
+            with open(logfile, "r") as fp:
+                self.assertIn('test-msg', fp.read())
+
+            # there're no logs on stderr
+            output.seek(0)
+            self.assertEqual(output.read(), '')
+
 
 class TestLoggingHelpers(unittest.TestCase):
 

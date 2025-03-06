@@ -156,6 +156,7 @@ def configure_logging(logger: Optional[logging.Logger] = None,
                       level: Union[str, int] = logging.WARNING,
                       filter_secrets: bool = True,
                       output_stream: Optional[io.BytesIO] = None,
+                      output_file: Optional[Union[str, bytes, os.PathLike]] = None,
                       in_utc: bool = False,
                       structured_output: bool = False,
                       handler_level: Optional[int] = None,
@@ -172,21 +173,17 @@ def configure_logging(logger: Optional[logging.Logger] = None,
     .. versionadded:: 0.12.0
        Explicit optional logging configuration. Previously, logger was minimally
        configured by default.
+
+    .. versionadded:: 0.13.4
+       ``output_file`` parameter to simplify logging to a file.
     """
 
     level = parse_loglevel(level)
 
     if logger is None:
         logger = logging.getLogger('dwave.cloud')
-    if output_stream is None:
-        output_stream = sys.stderr
     if handler_level is None:
         handler_level = level
-
-    format = dict(
-        fmt='%(asctime)s %(name)s %(levelname)s %(threadName)s [%(funcName)s] %(message)s',
-        as_tz=datetime.timezone.utc if in_utc else None,
-    )
 
     if structured_output:
         output_formatter = JSONFormatter
@@ -199,17 +196,34 @@ def configure_logging(logger: Optional[logging.Logger] = None,
     else:
         Formatter = output_formatter
 
+    format = dict(
+        fmt='%(asctime)s %(name)s %(levelname)s %(threadName)s [%(funcName)s] %(message)s',
+        as_tz=datetime.timezone.utc if in_utc else None,
+    )
+    formatter = Formatter(**format)
+
     if not additive:
         # make sure handlers are not accumulated
         while len(logger.handlers):
             logger.removeHandler(logger.handlers[-1])
 
-    formatter = Formatter(**format)
-    handler = logging.StreamHandler(stream=output_stream)
-    handler.setFormatter(formatter)
-    handler.setLevel(handler_level)
+    if output_file is None:
+        file_handler = None
+    else:
+        file_handler = logging.FileHandler(output_file)
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(handler_level)
+        logger.addHandler(file_handler)
 
-    logger.addHandler(handler)
+    if output_stream is None and file_handler is None:
+        output_stream = sys.stderr
+
+    if output_stream:
+        stream_handler = logging.StreamHandler(stream=output_stream)
+        stream_handler.setFormatter(formatter)
+        stream_handler.setLevel(handler_level)
+        logger.addHandler(stream_handler)
+
     logger.setLevel(level)
 
     return logger
