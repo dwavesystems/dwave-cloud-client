@@ -1074,7 +1074,7 @@ def capture_stderr(fn):
 class TestLogging(unittest.TestCase):
 
     def tearDown(self):
-        configure_logging()
+        configure_logging(logger)
 
     @capture_stderr
     def test_default_configure(self, output):
@@ -1143,6 +1143,9 @@ class TestLogging(unittest.TestCase):
             # there're no logs on stderr
             output.seek(0)
             self.assertEqual(output.read(), '')
+
+            # reset log config to enable temp dir cleanup
+            configure_logging(logger)
 
 
 class TestLoggingHelpers(unittest.TestCase):
