@@ -205,7 +205,10 @@ def configure_logging(logger: Optional[logging.Logger] = None,
     if not additive:
         # make sure handlers are not accumulated
         while len(logger.handlers):
-            logger.removeHandler(logger.handlers[-1])
+            handler = logger.handlers[-1]
+            # release handler resources before disposing it
+            handler.close()
+            logger.removeHandler(handler)
 
     if output_file is None:
         file_handler = None

@@ -1073,6 +1073,9 @@ def capture_stderr(fn):
 
 class TestLogging(unittest.TestCase):
 
+    def tearDown(self):
+        configure_logging()
+
     @capture_stderr
     def test_default_configure(self, output):
         configure_logging(logger)
