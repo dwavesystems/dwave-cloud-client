@@ -185,6 +185,8 @@ def configure_logging(logger: Optional[logging.Logger] = None,
     if handler_level is None:
         handler_level = level
 
+    handler_level = parse_loglevel(handler_level)
+
     if structured_output:
         output_formatter = JSONFormatter
     else:
