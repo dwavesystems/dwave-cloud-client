@@ -1073,6 +1073,9 @@ def capture_stderr(fn):
 
 class TestLogging(unittest.TestCase):
 
+    def tearDown(self):
+        configure_logging(logger)
+
     @capture_stderr
     def test_default_configure(self, output):
         configure_logging(logger)
@@ -1102,7 +1105,7 @@ class TestLogging(unittest.TestCase):
 
     @capture_stderr
     def test_multiple_handlers(self, output):
-        structured_stream = io.BytesIO()
+        structured_stream = io.StringIO()
 
         configure_logging(
             logger, handler_level=logging.ERROR)
@@ -1119,10 +1122,30 @@ class TestLogging(unittest.TestCase):
         self.assertEqual(len(error), 1)
         self.assertIn('error', error[0])
 
-        debug = list(map(json.loads, structured_stream.getvalue().decode('utf8').splitlines()))
+        debug = list(map(json.loads, structured_stream.getvalue().splitlines()))
         self.assertEqual(len(debug), 2)
         self.assertEqual(debug[0].get('message'), 'debug')
         self.assertEqual(debug[1].get('message'), 'error')
+
+    @capture_stderr
+    def test_file_logging(self, output):
+        with tempfile.TemporaryDirectory() as dir:
+            logfile = os.path.join(dir, "out.log")
+
+            configure_logging(logger, output_file=logfile)
+
+            logger.error('test-msg')
+
+            # log msg is in the log file
+            with open(logfile, "r") as fp:
+                self.assertIn('test-msg', fp.read())
+
+            # there're no logs on stderr
+            output.seek(0)
+            self.assertEqual(output.read(), '')
+
+            # reset log config to enable temp dir cleanup
+            configure_logging(logger)
 
 
 class TestLoggingHelpers(unittest.TestCase):
