@@ -66,7 +66,7 @@ class FilteredSecretsFormatter(logging.Formatter):
         return output
 
 
-class JSONFormatter(ISOFormatter):
+class JSONFormatter(logging.Formatter):
     """Encode record dict as JSON (str)."""
 
     def format(self, record: logging.LogRecord) -> str:
@@ -187,16 +187,15 @@ def configure_logging(logger: Optional[logging.Logger] = None,
 
     handler_level = parse_loglevel(handler_level)
 
+    Formatter = ISOFormatter
+
     if structured_output:
-        output_formatter = JSONFormatter
-    else:
-        output_formatter = ISOFormatter
+        class Formatter(Formatter, JSONFormatter):
+            pass
 
     if filter_secrets:
-        class Formatter(output_formatter, FilteredSecretsFormatter):
+        class Formatter(Formatter, FilteredSecretsFormatter):
             pass
-    else:
-        Formatter = output_formatter
 
     format = dict(
         fmt='%(asctime)s %(name)s %(levelname)s %(threadName)s [%(funcName)s] %(message)s',
