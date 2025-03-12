@@ -66,7 +66,7 @@ Methods
 Specialized Clients
 ===================
 
-Typically you use the :class:`~dwave.cloud.client.Client` class. You can also 
+Typically you use the :class:`~dwave.cloud.client.Client` class. You can also
 instantiate a QPU, hybrid, or CPU client directly.
 
 QPU Client
@@ -108,33 +108,33 @@ Class
 
 
 
+.. as yet undocumented and should be under API
+
+    PayloadCompressingSession
+    =========================
+
+    .. currentmodule:: dwave.cloud.api.client
+
+    Class
+    -----
+
+    .. autoclass:: PayloadCompressingSession
+
+    .. autoclass:: VersionedAPISession
+
+    Methods
+    -------
+
+    .. autosummary::
+        :toctree: generated
+
+        PayloadCompressingSession.set_payload_compress
 
 
-PayloadCompressingSession
-=========================
 
-.. currentmodule:: dwave.cloud.api.client
+    .. currentmodule:: dwave.cloud.api.resources
 
-Class
------
+    Class
+    -----
 
-.. autoclass:: PayloadCompressingSession
-
-.. autoclass:: VersionedAPISession
-
-Methods
--------
-
-.. autosummary::
-   :toctree: generated
-
-   PayloadCompressingSession.set_payload_compress
-
-
-
-.. currentmodule:: dwave.cloud.api.resources
-
-Class
------
-
-.. autoclass:: compress_if
+    .. autoclass:: compress_if
