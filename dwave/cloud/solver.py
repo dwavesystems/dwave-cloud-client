@@ -1373,10 +1373,9 @@ class StructuredSolver(BaseSolver):
 
         Estimates a problem’s quantum processing unit (QPU) access time from the
         parameter values you specify, timing data provided in the ``problem_timing_data``
-        `solver property <https://docs.dwavesys.com/docs/latest/c_solver_properties.html>`_,
+        :ref:`solver property <qpu_solver_properties_all>`,
         and the number of qubits used to embed the problem on the selected QPU, as
-        described in the
-        `system documentation <https://docs.dwavesys.com/docs/latest/c_qpu_timing.html>`_.
+        described in the :ref:`qpu_runtime_estimating` section.
 
         Requires that you provide the number of qubits to be used for your
         problem submission. :term:`Embedding` is typically heuristic and the number

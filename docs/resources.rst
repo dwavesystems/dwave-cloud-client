@@ -1,4 +1,4 @@
-.. _resources_cloud:
+.. _cloud_resources:
 
 =======
 Clients
@@ -66,7 +66,7 @@ Methods
 Specialized Clients
 ===================
 
-Typically you use the :class:`~dwave.cloud.client.Client` class. You can also 
+Typically you use the :class:`~dwave.cloud.client.Client` class. You can also
 instantiate a QPU, hybrid, or CPU client directly.
 
 QPU Client
