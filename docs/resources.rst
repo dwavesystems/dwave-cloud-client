@@ -103,38 +103,3 @@ Class
 ~~~~~
 
 .. autoclass:: dwave.cloud.sw.Client
-
-
-
-
-
-.. as yet undocumented and should be under API
-
-    PayloadCompressingSession
-    =========================
-
-    .. currentmodule:: dwave.cloud.api.client
-
-    Class
-    -----
-
-    .. autoclass:: PayloadCompressingSession
-
-    .. autoclass:: VersionedAPISession
-
-    Methods
-    -------
-
-    .. autosummary::
-        :toctree: generated
-
-        PayloadCompressingSession.set_payload_compress
-
-
-
-    .. currentmodule:: dwave.cloud.api.resources
-
-    Class
-    -----
-
-    .. autoclass:: compress_if
