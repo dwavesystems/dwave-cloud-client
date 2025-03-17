@@ -22,8 +22,6 @@ About dwave-cloud-client
 Usage Information
 =================
 
-.. todo:: add the intersphinx prefix to enable these links for self builds
-
 *   :ref:`index_concepts` for terminology
 *   :ref:`qpu_quantum_solvers_intro` for an introduction to sampling with a
     quantum computer.

@@ -20,7 +20,6 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
     'sphinx.ext.ifconfig',
-    'reno.sphinxext',
 ]
 
 autosummary_generate = True
@@ -37,7 +36,7 @@ author = package_info.__author__
 version = package_info.__version__
 release = package_info.__version__
 
-# exclude_patterns = ['']
+exclude_patterns = ['README.rst']
 
 linkcheck_retries = 2
 linkcheck_anchors = False
@@ -55,7 +54,6 @@ html_theme_options = {
 }
 html_sidebars = {"**": ["search-field", "sidebar-nav-bs"]}  # remove ads
 
-# TODO: verify the link to dwave docs
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
     'numpy': ('https://numpy.org/doc/stable/', None),

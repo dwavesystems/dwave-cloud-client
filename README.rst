@@ -83,7 +83,7 @@ Released under the Apache License 2.0. See `<LICENSE>`_ file.
 Contributing
 ============
 
-Ocean's `contributing guide <https://docs.dwavequantum.com/en/latest/ocean/index_ocean_sdk.html>`_
+Ocean's `contributing guide <https://docs.dwavequantum.com/en/latest/ocean/ocean_contribute.html>`_
 has guidelines for contributing to Ocean packages.
 
 Release Notes
