@@ -1,7 +1,8 @@
-.. _exceptions_cloud:
+.. _cloud_exceptions:
 
+==========
 Exceptions
-**********
+==========
 
 .. automodule:: dwave.cloud.exceptions
    :members:

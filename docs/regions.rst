@@ -1,4 +1,4 @@
-.. _regions:
+.. _cloud_regions:
 
 =======
 Regions
