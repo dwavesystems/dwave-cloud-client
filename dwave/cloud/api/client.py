@@ -477,8 +477,11 @@ class CachingSession(VersionedAPISession):
         if use_cache:
             meta = dict(created=epochnow(), maxage=maxage, etag=etag)
             self._store[key_meta] = meta
+            logger.debug("cache_write (meta): %r = %r", key_meta, meta)
             if not only_meta:
-                self._store[key_data] = response.content
+                content = self._store[key_data] = response.content
+                logger.debug("cache_write (data): %r <- (%d bytes)",
+                             key_data, len(content))
 
             logger.debug("response cached for maxage=%r", maxage)
             return True
@@ -531,6 +534,7 @@ class CachingSession(VersionedAPISession):
             return res
 
         if not refresh and (meta := self._store.get(key_meta)):
+            logger.debug("cache_read (meta): %r = %r", key_meta, meta)
             # respect max-age from response cache-control
             maxage = meta.get('maxage')
             if maxage is None:
@@ -540,6 +544,7 @@ class CachingSession(VersionedAPISession):
             # note: by deferring this lookup, we could save a few ms in case
             # when upstream content was modified (but that doesn't happen often)
             content = self._store.get(key_data)
+            logger.debug("cache_read (data): %r -> (%d bytes)", key_data, len(content))
 
             if epochnow() - meta['created'] < maxage:
                 logger.debug('cache hit within maxage')
