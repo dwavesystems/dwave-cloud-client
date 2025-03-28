@@ -432,7 +432,7 @@ class BaseUnstructuredSolver(BaseSolver):
 
     def _encode_problem_for_submission(self, *, problem, problem_type,
                                        upload_params=None, sample_params=None,
-                                       label=None):
+                                       label=None, on_uploaded=None):
         """Encode `problem` for submitting in `ref` format. Upload the
         problem if it's not already uploaded.
 
@@ -452,6 +452,9 @@ class BaseUnstructuredSolver(BaseSolver):
             label (str, optional):
                 Problem label.
 
+            on_uploaded (callable, optional):
+                Callback that's called when problem is uploaded.
+
         Returns:
             str:
                 JSON-encoded problem submit body
@@ -468,6 +471,9 @@ class BaseUnstructuredSolver(BaseSolver):
             logger.debug("To encode the problem for submit in the 'ref' format, "
                          "we need to upload it first.")
             problem_id = self.upload_problem(problem, **upload_params).result()
+
+        if on_uploaded is not None:
+            on_uploaded(problem_data_id=problem_id)
 
         body = {
             'solver': self.id,
@@ -515,15 +521,16 @@ class BaseUnstructuredSolver(BaseSolver):
         if problem_type is None:
             problem_type = next(iter(self._handled_problem_types))
 
+        # computation future holds a reference to the remote job
+        computation = Future(
+            solver=self, id_=None, return_matrix=self.return_matrix)
+
         # encode the request (body as future)
         body = self.client._encode_problem_executor.submit(
             self._encode_problem_for_submission,
             problem=problem, problem_type=problem_type, label=label,
-            upload_params=upload_params, sample_params=sample_params)
-
-        # computation future holds a reference to the remote job
-        computation = Future(
-            solver=self, id_=None, return_matrix=self.return_matrix)
+            upload_params=upload_params, sample_params=sample_params,
+            on_uploaded=computation._notify_uploaded)
 
         logger.debug("Submitting new problem to: %s", self.id)
         self.client._submit(body, computation)

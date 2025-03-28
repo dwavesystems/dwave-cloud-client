@@ -115,6 +115,9 @@ class Future(object):
         #: The id the server will use to identify this problem, None until the id is actually known
         self.id = id_
 
+        #: Problem data ID, if problem is uploaded using multipart upload interface.
+        self._data_id = None
+
         #: Problem label, as (optionally) set on submission. None until parsed from a response.
         self.label = None
 
@@ -227,6 +230,13 @@ class Future(object):
         except:
             server_time = 0
         self.clock_diff = abs(server_time - localtime_of_response)
+
+    def _notify_uploaded(self, **metadata):
+        self._data_id = metadata.get('problem_data_id')
+
+    @property
+    def data_id(self):
+        return self._data_id
 
     @staticmethod
     def wait_multiple(futures, min_done=None, timeout=None):
@@ -943,6 +953,8 @@ class Future(object):
             problem_info.update(problem_id=self.id)
         if self.label is not None:
             problem_info.update(problem_label=self.label)
+        if (data_id := self.data_id) is not None:
+            problem_info.update(problem_data_id=data_id)
         return problem_info
 
     def _patch_offset(self):

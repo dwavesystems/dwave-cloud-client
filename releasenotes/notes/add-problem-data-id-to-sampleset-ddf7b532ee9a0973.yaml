@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Return uploaded problem data id as part of ``Sampleset.info`` (the
+    ``problem_data_id`` key).
+    See `#466 <https://github.com/dwavesystems/dwave-cloud-client/issues/466>`_.
