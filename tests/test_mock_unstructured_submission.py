@@ -42,13 +42,13 @@ except ImportError:
     NLModel = None
 
 
-def unstructured_solver_data(problem_type='bqm'):
+def unstructured_solver_data(problem_type='bqm', solver_id='test-unstructured-solver'):
     return {
         "properties": {
             "supported_problem_types": [problem_type],
             "parameters": {"num_reads": "Number of samples to return."}
         },
-        "id": "test-unstructured-solver",
+        "id": solver_id,
         "description": "A test unstructured solver"
     }
 
@@ -107,10 +107,13 @@ class TestUnstructuredSolver(unittest.TestCase):
         session = mock.Mock()
 
         # upload is now part of submit, so we need to mock it
+        mock_problem_data_id = 'mock-data-id'
         mock_problem_id = 'mock-problem-id'
+        problem_info = dict(problem_id=mock_problem_id, problem_data_id=mock_problem_data_id)
+
         def mock_upload(self, bqm_file):
             bqm_file.close()
-            return Present(result=mock_problem_id)
+            return Present(result=mock_problem_data_id)
 
         # construct a functional solver by mocking client and api response data
         with mock.patch.multiple(Client, create_session=lambda self: session,
@@ -123,7 +126,7 @@ class TestUnstructuredSolver(unittest.TestCase):
 
                 # direct bqm sampling
                 ss = dimod.ExactSolver().sample(bqm)
-                ss.info.update(problem_id=mock_problem_id)
+                ss.info.update(problem_info)
                 session.post = lambda path, **kwargs: choose_reply(
                     path, {'problems/': complete_reply_bq(ss, id_=mock_problem_id)})
 
@@ -134,7 +137,7 @@ class TestUnstructuredSolver(unittest.TestCase):
                 numpy.testing.assert_array_equal(fut.num_occurrences, ss.record.num_occurrences)
 
                 # submit of pre-uploaded bqm problem
-                fut = solver.sample_bqm(mock_problem_id)
+                fut = solver.sample_bqm(mock_problem_data_id)
                 numpy.testing.assert_array_equal(fut.sampleset, ss)
                 numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
                 numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
@@ -143,7 +146,7 @@ class TestUnstructuredSolver(unittest.TestCase):
                 # ising sampling
                 lin, quad, _ = bqm.to_ising()
                 ss = dimod.ExactSolver().sample_ising(lin, quad)
-                ss.info.update(problem_id=mock_problem_id)
+                ss.info.update(problem_info)
                 session.post = lambda path, **kwargs: choose_reply(
                     path, {'problems/': complete_reply_bq(ss, id_=mock_problem_id)})
 
@@ -156,7 +159,7 @@ class TestUnstructuredSolver(unittest.TestCase):
                 # qubo sampling
                 qubo, _ = bqm.to_qubo()
                 ss = dimod.ExactSolver().sample_qubo(qubo)
-                ss.info.update(problem_id=mock_problem_id)
+                ss.info.update(problem_info)
                 session.post = lambda path, **kwargs: choose_reply(
                     path, {'problems/': complete_reply_bq(ss, id_=mock_problem_id)})
 
@@ -190,10 +193,13 @@ class TestUnstructuredSolver(unittest.TestCase):
         session = mock.Mock()
 
         # upload is now part of submit, so we need to mock it
+        mock_problem_data_id = 'mock-data-id'
         mock_problem_id = 'mock-problem-id'
-        def mock_upload(self, bqm_file):
-            bqm_file.close()
-            return Present(result=mock_problem_id)
+        problem_info = dict(problem_id=mock_problem_id, problem_data_id=mock_problem_data_id)
+
+        def mock_upload(self, cqm_file):
+            cqm_file.close()
+            return Present(result=mock_problem_data_id)
 
         # construct a functional solver by mocking client and api response data
         with mock.patch.multiple(Client, create_session=lambda self: session,
@@ -203,7 +209,7 @@ class TestUnstructuredSolver(unittest.TestCase):
 
                 # use bqm for mock response (for now)
                 ss = dimod.ExactSolver().sample(dimod.BQM.empty('SPIN'))
-                ss.info.update(problem_id=mock_problem_id)
+                ss.info.update(problem_info)
                 session.post = lambda path, **kwargs: choose_reply(
                     path, {'problems/': complete_reply_bq(ss, id_=mock_problem_id, type_=problem_type)})
 
@@ -233,10 +239,13 @@ class TestUnstructuredSolver(unittest.TestCase):
         session = mock.Mock()
 
         # upload is now part of submit, so we need to mock it
+        mock_problem_data_id = 'mock-data-id'
         mock_problem_id = 'mock-problem-id'
-        def mock_upload(self, bqm_file):
-            bqm_file.close()
-            return Present(result=mock_problem_id)
+        problem_info = dict(problem_id=mock_problem_id, problem_data_id=mock_problem_data_id)
+
+        def mock_upload(self, dqm_file):
+            dqm_file.close()
+            return Present(result=mock_problem_data_id)
 
         # construct a functional solver by mocking client and api response data
         with mock.patch.multiple(Client, create_session=lambda self: session,
@@ -246,7 +255,7 @@ class TestUnstructuredSolver(unittest.TestCase):
 
                 # use bqm for mock response (for now)
                 ss = dimod.ExactSolver().sample(dimod.BQM.empty('SPIN'))
-                ss.info.update(problem_id=mock_problem_id)
+                ss.info.update(problem_info)
                 session.post = lambda path, **kwargs: choose_reply(
                     path, {'problems/': complete_reply_bq(ss, id_=mock_problem_id, type_=problem_type)})
 
