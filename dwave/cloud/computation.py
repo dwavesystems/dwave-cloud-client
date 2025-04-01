@@ -29,6 +29,7 @@ Some :class:`Future` methods are blocking.
 import io
 import time
 import threading
+import typing
 import functools
 import weakref
 
@@ -235,7 +236,13 @@ class Future(object):
         self._data_id = metadata.get('problem_data_id')
 
     @property
-    def data_id(self):
+    def data_id(self) -> typing.Union[str, None]:
+        """Uploaded problem data id.
+
+        Note: only hybrid problems are currently uploaded separately from submit,
+        hence only they will have a data id associated. For QPU problems,
+        :meth:`.data_id` returns ``None``.
+        """
         return self._data_id
 
     @staticmethod
