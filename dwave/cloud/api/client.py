@@ -533,18 +533,18 @@ class CachingSession(VersionedAPISession):
             res.raw = io.BytesIO(content)
             return res
 
-        if not refresh and (meta := self._store.get(key_meta)):
+        meta = self._store.get(key_meta)
+        content = self._store.get(key_data)
+
+        if not refresh and meta and content:
             logger.debug("cache_read (meta): %r = %r", key_meta, meta)
+            logger.debug("cache_read (data): %r -> (%d bytes)", key_data, len(content))
+
             # respect max-age from response cache-control
             maxage = meta.get('maxage')
             if maxage is None:
                 # but if cache-control was absent, client gets do decide
                 maxage = default_maxage
-
-            # note: by deferring this lookup, we could save a few ms in case
-            # when upstream content was modified (but that doesn't happen often)
-            content = self._store.get(key_data)
-            logger.debug("cache_read (data): %r -> (%d bytes)", key_data, len(content))
 
             if epochnow() - meta['created'] < maxage:
                 logger.debug('cache hit within maxage')
