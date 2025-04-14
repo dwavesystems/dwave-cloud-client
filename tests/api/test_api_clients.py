@@ -545,6 +545,67 @@ class TestResponseCaching(unittest.TestCase):
                 self.assertEqual(client.session.history[-1].response.status_code, 304)
 
     @requests_mock.Mocker()
+    def test_inconsistent_cache_handling(self, m):
+        endpoint = 'https://mock'
+
+        path = 'path'
+        etag = 'etag'
+        data = {"a": 1}
+        headers = {'ETag': etag, 'Cache-Control': f'private, max-age=3600'}
+
+        m.get(f"{endpoint}/{path}", json=data, headers=headers)
+        m.get(f"{endpoint}/{path}",
+              request_headers={'If-None-Match': etag},
+              status_code=304, headers=headers)
+
+        store = {}
+
+        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store), history_size=1) as client:
+
+            with self.subTest("cache populate"):
+                self.assertEqual(len(store), 0)
+
+                r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+
+                self.assertTrue(m.called)
+                self.assertEqual(len(store), 2)     # data + meta
+
+            with self.subTest("degrade cache by dropping metadata"):
+                m.reset_mock()
+
+                # delete metadata
+                for key in list(store):
+                    if key.endswith(':meta'):
+                        del store[key]
+
+                self.assertEqual(len(store), 1)
+
+                r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+
+                self.assertTrue(m.called)
+                self.assertEqual(client.session.history[-1].response.status_code, 200)
+                self.assertEqual(len(store), 2)
+
+            with self.subTest("degrade cache by dropping content"):
+                m.reset_mock()
+
+                # delete content
+                for key in list(store):
+                    if not key.endswith(':meta'):
+                        del store[key]
+
+                self.assertEqual(len(store), 1)
+
+                r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+
+                self.assertTrue(m.called)
+                self.assertEqual(client.session.history[-1].response.status_code, 200)
+                self.assertEqual(len(store), 2)
+
+    @requests_mock.Mocker()
     def test_cache_control_no_store(self, m):
         # verify we don't cache when server forbids caching
 

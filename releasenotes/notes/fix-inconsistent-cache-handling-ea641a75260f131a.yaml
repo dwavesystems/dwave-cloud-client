@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Handle inconsistent cache in ``CachingSession`` (partial eviction edge case).
+
+    See `#691 <https://github.com/dwavesystems/dwave-cloud-client/issues/691>`_.
