@@ -1,0 +1,6 @@
+---
+upgrade:
+  - |
+    Switch from pkgutil-style namespace package to native namespace package (PEP 420).
+    While native namespace packages and pkgutil-style namespace packages are
+    largely compatible, we recommend using only native ones going forward.
