@@ -6,6 +6,7 @@ omit =
     dwave/cloud/package_info.py
 
 [report]
+include_namespace_packages = True
 exclude_lines =
     pragma: no cover
     raise NotImplementedError

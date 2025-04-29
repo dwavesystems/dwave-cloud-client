@@ -1,4 +1,4 @@
 requests_mock>=1.8
-coverage
+coverage>=7.0.0     # native namespace package support added in 7.0.0
 parameterized
 dwave-networkx
