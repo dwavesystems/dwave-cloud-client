@@ -63,7 +63,7 @@ jobs:
 
       - run: &install-package
           name: Install package
-          command: env/bin/pip install .
+          command: env/bin/pip install -e .
 
       - run: &run-python-tests
           name: Run Python tests
@@ -176,7 +176,7 @@ jobs:
           name: Install package
           command: |
             env\Scripts\activate.ps1
-            pip install .
+            pip install -e .
 
       - run:
           name: Run tests
