@@ -1,6 +1,6 @@
 import os
 from io import open
-from setuptools import setup, find_packages
+from setuptools import setup, find_namespace_packages
 
 
 # Load package info, without importing the package
@@ -44,7 +44,7 @@ extras_require = {
 
 # Packages provided. Only include packages under the 'dwave' namespace.
 # Do not include tests, benchmarks, etc.
-packages = [package for package in find_packages() if package.startswith('dwave')]
+packages = find_namespace_packages(include=['dwave.*'])
 
 classifiers = [
     'License :: OSI Approved :: Apache Software License',

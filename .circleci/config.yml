@@ -61,10 +61,6 @@ jobs:
               pip uninstall dimod -y
             fi
 
-      - run: &install-package
-          name: Install package
-          command: env/bin/pip install .
-
       - run: &run-python-tests
           name: Run Python tests
           command: |
@@ -128,8 +124,6 @@ jobs:
 
       - save_cache: *save-cache-env
 
-      - run: *install-package
-
       - run: *run-python-tests
 
   test-windows:
@@ -173,12 +167,6 @@ jobs:
             pip install -U -r requirements.txt -r tests\requirements.txt
 
       - run:
-          name: Install package
-          command: |
-            env\Scripts\activate.ps1
-            pip install .
-
-      - run:
           name: Run tests
           command: |
             env\Scripts\activate.ps1
@@ -198,8 +186,6 @@ jobs:
       - run:
           name: Install docs requirements
           command: env/bin/pip install -U -r docs/requirements.txt
-
-      - run: *install-package
 
       - run:
           name: Build docs

@@ -749,14 +749,14 @@ class TestLogging(unittest.TestCase):
             'DWAVE_LOG_FORMAT': 'json',
         }
 
-        with isolated_environ(add=env):
-            ret = subprocess.run('dwave ping', capture_output=True, shell=True)
+        runner = CliRunner(env=env, mix_stderr=False)
+        result = runner.invoke(cli, ['ping'])
 
         # ping will fail because API token is undefined
-        self.assertEqual(ret.returncode, 1)
+        self.assertEqual(result.exit_code, 1)
 
         # but stderr should still contain one json log record per line
-        for line in ret.stderr.splitlines():
+        for line in result.stderr.splitlines():
             rec = json.loads(line)
             self.assertIsInstance(rec, dict)
             self.assertIn('message', rec)
