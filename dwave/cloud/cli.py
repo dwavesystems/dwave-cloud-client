@@ -487,7 +487,10 @@ def standardized_output(fn):
 def ping(*, config_file, profile, endpoint, region, client_type, solver_def,
          sampling_params, request_timeout, polling_timeout, label, json_output,
          output):
-    """Ping the QPU by submitting a single-qubit problem."""
+    """Ping a solver by submitting a single-qubit problem.
+
+    If solver is not specified, a QPU solver is selected by default.
+    """
 
     # parse params (TODO: move to click validator)
     params = {}
