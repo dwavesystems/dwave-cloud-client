@@ -26,6 +26,7 @@ from urllib.parse import urlencode
 
 import numpy
 import orjson
+import requests_mock
 from parameterized import parameterized
 
 try:
@@ -461,6 +462,88 @@ class MockSubmissionBaseTests(MockSubmissionBase):
                 with self.assertRaises(SolverFailureError):
                     self._check(results1, linear, quadratic, **params)
                 self._check(results2, linear, quadratic, **params)
+
+
+class TestAPIVersionCheck(MockSubmissionBase, unittest.TestCase):
+
+    def setUp(self):
+        self.endpoint = 'http://test.com/path'
+        self.problem_type = 'application/vnd.dwave.sapi.problem+json'
+        self.problems_type = 'application/vnd.dwave.sapi.problems+json'
+        self.right_version = '2.5.0'
+        self.wrong_version = '1.0.0'
+
+        self.pid = '123'
+        self.sapi = StructuredSapiMockResponses(problem_id=self.pid)
+        self.config = dict(
+            endpoint=self.endpoint,
+            token='token',
+        )
+
+        self.mocker = requests_mock.Mocker()
+        self.mocker.get(requests_mock.ANY, status_code=404)
+        self.mocker.start()
+
+    def tearDown(self):
+        self.mocker.stop()
+
+    def test_submit(self):
+        # problem submit endpoint returns unsupported version
+        self.mocker.post(f"{self.endpoint}/problems/", json=[self.sapi.complete_no_answer_reply(id=self.pid)],
+                         headers={'Content-Type': f'{self.problems_type}; version={self.wrong_version}'})
+
+        with Client(**self.config) as client:
+            solver = Solver(client, self.sapi.solver.data)
+
+            with self.assertRaisesRegex(InvalidAPIResponseError, "Try upgrading"):
+                response = solver.sample_ising(*self.sapi.problem)
+                response.result()
+
+    def test_cancel(self):
+        # problem cancel endpoint returns unsupported version
+        self.mocker.post(f"{self.endpoint}/problems/", json=[self.sapi.continue_reply()],
+                         headers={'Content-Type': f'{self.problems_type}; version={self.right_version}'})
+        self.mocker.get(f"{self.endpoint}/problems/?id={self.pid}", json=[self.sapi.continue_reply()],
+                        headers={'Content-Type': f'{self.problems_type}; version={self.right_version}'})
+        self.mocker.delete(f"{self.endpoint}/problems/", json=[self.sapi.cancel_reply()],
+                           headers={'Content-Type': f'{self.problems_type}; version={self.wrong_version}'})
+
+        with Client(**self.config) as client:
+            solver = Solver(client, self.sapi.solver.data)
+
+            with self.assertRaisesRegex(InvalidAPIResponseError, "Try upgrading"):
+                response = solver.sample_ising(*self.sapi.problem)
+                response.wait_id()      # without id, sapi cancel is not called
+                response.cancel()
+                response.result()
+
+    def test_poll(self):
+        # problem status endpoint returns unsupported version
+        self.mocker.post(f"{self.endpoint}/problems/", json=[self.sapi.continue_reply(id=self.pid)],
+                         headers={'Content-Type': f'{self.problems_type}; version={self.right_version}'})
+        self.mocker.get(f"{self.endpoint}/problems/?id={self.pid}", json=[self.sapi.complete_no_answer_reply(id=self.pid)],
+                        headers={'Content-Type': f'{self.problems_type}; version={self.wrong_version}'})
+
+        with Client(**self.config) as client:
+            solver = Solver(client, self.sapi.solver.data)
+
+            with self.assertRaisesRegex(InvalidAPIResponseError, "Try upgrading"):
+                response = solver.sample_ising(*self.sapi.problem)
+                response.result()
+
+    def test_answer_load(self):
+        # problem answer endpoint returns unsupported version
+        self.mocker.post(f"{self.endpoint}/problems/", json=[self.sapi.complete_no_answer_reply(id=self.pid)],
+                         headers={'Content-Type': f'{self.problems_type}; version={self.right_version}'})
+        self.mocker.get(f"{self.endpoint}/problems/{self.pid}/", json=[self.sapi.complete_reply(id=self.pid)],
+                        headers={'Content-Type': f'{self.problem_type}; version={self.wrong_version}'})
+
+        with Client(**self.config) as client:
+            solver = Solver(client, self.sapi.solver.data)
+
+            with self.assertRaisesRegex(InvalidAPIResponseError, "Try upgrading"):
+                response = solver.sample_ising(*self.sapi.problem)
+                response.result()
 
 
 class TestUploadCompression(MockSubmissionBase, unittest.TestCase):
