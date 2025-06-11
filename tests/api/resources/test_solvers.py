@@ -25,7 +25,7 @@ import requests
 import requests_mock
 
 from dwave.cloud.api import exceptions, models
-from dwave.cloud.api.client import CachingSession
+from dwave.cloud.api.client import CachingSessionMixin
 from dwave.cloud.api.resources import Solvers
 from dwave.cloud.config import validate_config_v1
 from dwave.cloud.testing.mocks import qpu_clique_solver_data
@@ -262,7 +262,7 @@ class TestLiveSolversCaching(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmpdir = tempfile.TemporaryDirectory()
-        cls.store = partial(CachingSession._default_cache_config['store'],
+        cls.store = partial(CachingSessionMixin._default_cache_config['store'],
                             directory=cls.tmpdir.name)
 
     @classmethod

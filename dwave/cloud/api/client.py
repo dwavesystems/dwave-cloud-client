@@ -34,7 +34,7 @@ from packaging.specifiers import SpecifierSet
 import dwave.cloud.config
 from dwave.cloud.api import exceptions
 from dwave.cloud.utils.exception import is_caused_by
-from dwave.cloud.utils.http import PretimedHTTPAdapter, BaseUrlSession, default_user_agent
+from dwave.cloud.utils.http import PretimedHTTPAdapter, BaseUrlSessionMixin, default_user_agent
 from dwave.cloud.utils.time import epochnow
 
 if TYPE_CHECKING:
@@ -45,7 +45,7 @@ __all__ = ['DWaveAPIClient', 'SolverAPIClient', 'MetadataAPIClient', 'LeapAPICli
 logger = logging.getLogger(__name__)
 
 
-class LoggingSession(BaseUrlSession):
+class LoggingSessionMixin:
     """:class:`.BaseUrlSession` extended to unify timeout exceptions and to log
     all requests (and responses).
 
@@ -133,7 +133,19 @@ class LoggingSession(BaseUrlSession):
         return response
 
 
-class PayloadCompressingSession(LoggingSession):
+class LoggingSession(LoggingSessionMixin, BaseUrlSessionMixin, requests.Session):
+    def __init__(self, *args, **kwargs):
+        # note: this deprecation warning is raised by all subclasses, up to and
+        # including `CachingSession`. The message adapts accordingly.
+        cls = type(self).__name__
+        warnings.warn(
+            f"`{cls}` is deprecated in favor of `{cls}Mixin` since "
+            f"dwave-cloud-client 0.13.6, and will be removed in 0.15.0.",
+            DeprecationWarning, stacklevel=2)
+        super().__init__(*args, **kwargs)
+
+
+class PayloadCompressingSessionMixin:
     """A :class:`requests.Session` subclass (technically, a further specialized
     :class:`.LoggingSession`) that adds support for payload compression on the
     fly.
@@ -233,7 +245,11 @@ class PayloadCompressingSession(LoggingSession):
         return super().send(request, **kwargs)
 
 
-class VersionedAPISession(PayloadCompressingSession):
+class PayloadCompressingSession(PayloadCompressingSessionMixin, LoggingSession):
+    pass
+
+
+class VersionedAPISessionMixin:
     """A :class:`requests.Session` subclass (technically, further specialized
     :class:`.PayloadCompressingSession`) that enforces conformance of API response
     version with supported version range(s).
@@ -350,7 +366,11 @@ def _create_default_cache_store(**kwargs) -> abc.Mapping:
     return diskcache.Cache(directory=directory)
 
 
-class CachingSession(VersionedAPISession):
+class VersionedAPISession(VersionedAPISessionMixin, PayloadCompressingSession):
+    pass
+
+
+class CachingSessionMixin:
     """A :class:`requests.Session` subclass (technically, further specialized
     :class:`.VersionedAPISession`) that caches responses and uses conditional
     requests for smart cache updates.
@@ -576,6 +596,10 @@ class CachingSession(VersionedAPISession):
             return res
 
 
+class CachingSession(CachingSessionMixin, VersionedAPISession):
+    pass
+
+
 class DWaveAPIClient:
     """Low-level client for D-Wave APIs. A thin wrapper around
     `requests.Session` that handles API specifics such as authentication,
@@ -596,7 +620,19 @@ class DWaveAPIClient:
 
     """
 
+    class DefaultSession(CachingSessionMixin,
+                         VersionedAPISessionMixin,
+                         PayloadCompressingSessionMixin,
+                         LoggingSessionMixin,
+                         BaseUrlSessionMixin,
+                         requests.Session):
+        """Default session class is based on `requests.Session` extended with
+        base url, logging, compressing, API versioning and caching mixins.
+        """
+
     DEFAULTS = {
+        'session_class': DefaultSession,
+
         'endpoint': None,
         'token': None,
         'cert': None,
@@ -748,14 +784,25 @@ class DWaveAPIClient:
         if not endpoint.endswith('/'):
             endpoint += '/'
 
+        session_class = config['session_class']
+
+        # build kwargs from mixins used
+        # note: we could automate param extraction with a metaclass, but let's kiss
+        session_kwargs = {}
+        if issubclass(session_class, BaseUrlSessionMixin):
+            session_kwargs.update(base_url=endpoint)
+        if issubclass(session_class, LoggingSessionMixin):
+            session_kwargs.update(history_size=config['history_size'])
+        if issubclass(session_class, PayloadCompressingSessionMixin):
+            session_kwargs.update(compress=config['compress'])
+        if issubclass(session_class, VersionedAPISessionMixin):
+            session_kwargs.update(strict_mode=config['version_strict_mode'])
+        if issubclass(session_class, CachingSessionMixin):
+            session_kwargs.update(cache=config['cache'])
+
+        session = session_class(**session_kwargs)
+
         # configure request timeout and retries
-        session = CachingSession(
-            base_url=endpoint,
-            history_size=config['history_size'],
-            compress=config['compress'],
-            strict_mode=config['version_strict_mode'],
-            cache=config['cache'],
-        )
         timeout = config['timeout']
         retry = config['retry']
         session.mount('http://', PretimedHTTPAdapter(

@@ -1,0 +1,14 @@
+---
+features:
+  - |
+    Convert ``requests.Session`` subclasses in ``dwave.cloud.api.client`` to
+    mixins. ``BaseUrlSessionMixin``, ``LoggingSessionMixin``,
+    ``PayloadCompressingSessionMixin``, ``VersionedAPISessionMixin`` and
+    ``CachingSessionMixin`` can now be combined and used independently of each
+    other.
+deprecations:
+  - |
+    The following ``requests.Session`` subclasses are deprecated in favor of their
+    mixin variants: ``LoggingSession``, ``PayloadCompressingSession``,
+    ``VersionedAPISession``, ``CachingSession``. They'll be removed in
+    dwave-cloud-client 0.15.0.

@@ -69,9 +69,7 @@ class TimeoutingHTTPAdapter(PretimedHTTPAdapter):
 # If we later decide to use additional features from `requests-toolbelt`,
 # remove it from here.
 
-class BaseUrlSession(requests.Session):
-    """A Session with a URL that all requests will use as a base."""
-
+class BaseUrlSessionMixin:
     base_url = None
 
     def __init__(self, base_url=None):
@@ -87,6 +85,9 @@ class BaseUrlSession(requests.Session):
     def create_url(self, url):
         """Create the URL based off this partial path."""
         return urljoin(self.base_url, url)
+
+class BaseUrlSession(BaseUrlSessionMixin, requests.Session):
+    """A Session with a URL that all requests will use as a base."""
 
 
 def user_agent(name: Optional[str] = None,
