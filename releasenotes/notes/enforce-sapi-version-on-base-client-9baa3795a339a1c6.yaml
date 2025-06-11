@@ -6,6 +6,10 @@ features:
     ``PayloadCompressingSessionMixin``, ``VersionedAPISessionMixin`` and
     ``CachingSessionMixin`` can now be combined and used independently of each
     other.
+  - |
+    Enforce supported API response version on base client methods (problem submit,
+    status poll, problem cancel, answer download). In case of unsupported API
+    response, an ``InvalidAPIResponseError`` exception is raised.
 deprecations:
   - |
     The following ``requests.Session`` subclasses are deprecated in favor of their
