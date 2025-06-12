@@ -15,7 +15,7 @@
 import os
 import json
 import unittest
-import subprocess
+import importlib.metadata
 from unittest import mock
 
 from click.testing import CliRunner
@@ -48,11 +48,11 @@ class TestConfigCreate(unittest.TestCase):
         config_file = 'path/to/dwave.conf'
         profile = 'profile'
 
-        runner = CliRunner(mix_stderr=False)
+        runner = CliRunner()
         with runner.isolated_filesystem():
             result = runner.invoke(cli, [
                 'config', 'create', '--config-file', config_file, '--profile', profile
-            ] + extra_opts, input='\n'.join('' if v is None else v for v in inputs.values()))
+            ] + extra_opts, input=''.join(f"{'' if v is None else v}\n" for v in inputs.values()))
             self.assertEqual(result.exit_code, 0)
 
             # load and verify config
@@ -67,13 +67,13 @@ class TestConfigCreate(unittest.TestCase):
                                   endpoint="endpoint", token="token", client=None, solver=None)),
     ])
     def test_default_flows(self, name, extra_opts, inputs):
-        runner = CliRunner(mix_stderr=False)
+        runner = CliRunner()
         with runner.isolated_filesystem():
             with mock.patch("dwave.cloud.config.loaders.get_configfile_paths", lambda: ['dwave.conf']):
                 with mock.patch("dwave.cloud.utils.cli.input", side_effect=inputs):
                     result = runner.invoke(cli, [
                         'config', 'create'
-                    ] + extra_opts, input='\n'.join('' if v is None else v for v in inputs.values()))
+                    ] + extra_opts, input=''.join(f"{'' if v is None else v}\n" for v in inputs.values()))
                     self.assertEqual(result.exit_code, 0)
 
                 # load and verify config
@@ -87,7 +87,7 @@ class TestConfigCreate(unittest.TestCase):
     @mock.patch('dwave.cloud.cli._get_sapi_token_for_leap_project',
                 return_value=(LeapProject(id=1, name='Project', code='PRJ'), 'auto-token'))
     def test_auto_create(self, mock_fetch_sapi_token):
-        runner = CliRunner(mix_stderr=False)
+        runner = CliRunner()
         with runner.isolated_filesystem():
             local_config_file = './dwave.conf'
             result = runner.invoke(cli, [
@@ -108,7 +108,7 @@ class TestConfigCreate(unittest.TestCase):
         config_file = 'dwave.conf'
         profile = 'profile'
 
-        runner = CliRunner(mix_stderr=False)
+        runner = CliRunner()
         with runner.isolated_filesystem():
             # create config
             config_body = '\n'.join(f"{k} = old-{v}" for k,v in inputs.items())
@@ -137,7 +137,7 @@ class TestConfigCreate(unittest.TestCase):
 class TestCli(unittest.TestCase):
 
     def test_config_ls(self):
-        runner = CliRunner(mix_stderr=False)
+        runner = CliRunner()
         with runner.isolated_filesystem():
             touch('dwave.conf')
             with mock.patch('dwave.cloud.config.loaders.homebase.site_config_dir_list',
@@ -222,7 +222,7 @@ class TestCli(unittest.TestCase):
                                          os.path.join('.', 'dwave.conf'))
 
     def test_configure_inspect(self):
-        runner = CliRunner(mix_stderr=False)
+        runner = CliRunner()
         with runner.isolated_filesystem():
             config_file = 'dwave.conf'
             with open(config_file, 'w') as f:
@@ -271,7 +271,7 @@ class TestCli(unittest.TestCase):
             client = m.from_config.return_value
             client.get_solver.return_value.nodes = [5, 7, 3]
 
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 touch(config_file)
                 result = runner.invoke(cli, ['ping',
@@ -322,7 +322,7 @@ class TestCli(unittest.TestCase):
 
         with mock.patch('dwave.cloud.cli.Client') as m:
 
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 touch(config_file)
                 result = runner.invoke(cli, ['sample',
@@ -371,7 +371,7 @@ class TestCli(unittest.TestCase):
             client = m.from_config.return_value.__enter__.return_value
             client.get_solvers.return_value = solvers
 
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 touch(config_file)
                 result = runner.invoke(cli, ['solvers',
@@ -409,7 +409,7 @@ class TestCli(unittest.TestCase):
 
         with mock.patch('dwave.cloud.cli.Client') as m:
 
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 touch(config_file)
                 touch(filename)
@@ -438,7 +438,7 @@ class TestCli(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
 
     def test_platform(self):
-        runner = CliRunner(mix_stderr=False)
+        runner = CliRunner()
         result = runner.invoke(cli, ['--platform'])
 
         # verify exit code and stdout printout
@@ -466,7 +466,7 @@ class TestAuthCli(unittest.TestCase):
 
         with self.subTest('dwave auth login'):
             flow.reset_mock()
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['auth', 'login'])
 
@@ -476,7 +476,7 @@ class TestAuthCli(unittest.TestCase):
         with self.subTest('dwave auth login --skip-valid'):
             flow.reset_mock()
             flow.ensure_active_token.return_value = True
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['auth', 'login', '--skip-valid'])
 
@@ -486,7 +486,7 @@ class TestAuthCli(unittest.TestCase):
 
         with self.subTest('dwave auth login --oob'):
             flow.reset_mock()
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['auth', 'login', '--oob'])
 
@@ -500,7 +500,7 @@ class TestAuthCli(unittest.TestCase):
             config_lines = [f'[{profile}]', f'leap_api_endpoint = {leap_api_endpoint}']
 
             flow_factory.reset_mock()
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 # create config
                 with open(config_file, 'w') as fp:
@@ -522,7 +522,7 @@ class TestAuthCli(unittest.TestCase):
 
         with self.subTest('dwave auth get access-token'):
             flow.reset_mock()
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['auth', 'get', 'access-token'])
 
@@ -531,7 +531,7 @@ class TestAuthCli(unittest.TestCase):
 
         with self.subTest('dwave auth get access-token --raw'):
             flow.reset_mock()
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['auth', 'get', 'access-token', '--raw'])
 
@@ -540,7 +540,7 @@ class TestAuthCli(unittest.TestCase):
 
         with self.subTest('dwave auth get refresh-token'):
             flow.reset_mock()
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['auth', 'get', 'refresh-token'])
 
@@ -553,7 +553,7 @@ class TestAuthCli(unittest.TestCase):
         type(flow).token = mock.PropertyMock(return_value=dict(refresh_token='123'))
 
         with self.subTest('dwave auth refresh'):
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['auth', 'refresh'])
 
@@ -564,7 +564,7 @@ class TestAuthCli(unittest.TestCase):
         type(flow).token = mock.PropertyMock(return_value=dict())
 
         with self.subTest('dwave auth refresh (no token)'):
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['auth', 'refresh'])
 
@@ -577,7 +577,7 @@ class TestAuthCli(unittest.TestCase):
         type(flow).token = mock.PropertyMock(return_value=token)
 
         with self.subTest('dwave auth revoke (default: access-token)'):
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['auth', 'revoke'])
 
@@ -586,7 +586,7 @@ class TestAuthCli(unittest.TestCase):
                 token=token['access_token'], token_type_hint='access_token')
 
         with self.subTest('dwave auth revoke access-token'):
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['auth', 'revoke', 'access-token'])
 
@@ -595,7 +595,7 @@ class TestAuthCli(unittest.TestCase):
                 token=token['access_token'], token_type_hint='access_token')
 
         with self.subTest('dwave auth revoke refresh-token'):
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['auth', 'revoke', 'refresh-token'])
 
@@ -609,7 +609,7 @@ class TestAuthCli(unittest.TestCase):
         type(flow).token = mock.PropertyMock(return_value={})
 
         with self.subTest('dwave auth revoke: token missing'):
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['auth', 'revoke'])
 
@@ -620,7 +620,7 @@ class TestAuthCli(unittest.TestCase):
         type(flow).token = mock.PropertyMock(return_value=dict(access_token='123'))
 
         with self.subTest('dwave auth revoke: server-side failure'):
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['auth', 'revoke', 'access-token'])
 
@@ -636,7 +636,7 @@ class TestAuthCli(unittest.TestCase):
         flow.token_expires_soon.return_value = False
 
         with self.subTest('dwave leap project ls'):
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, ['leap', 'project', 'ls'])
 
@@ -663,7 +663,7 @@ class TestAuthCli(unittest.TestCase):
         account.get_project_token.return_value = token
 
         with self.subTest('dwave leap project token'):
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, [
                     'leap', 'project', 'token', '--project', project])
@@ -673,7 +673,7 @@ class TestAuthCli(unittest.TestCase):
             account.get_project_token.assert_called_with(project=projects[1])
 
         with self.subTest('dwave leap project token --raw'):
-            runner = CliRunner(mix_stderr=False)
+            runner = CliRunner()
             with runner.isolated_filesystem():
                 result = runner.invoke(cli, [
                     'leap', 'project', 'token', '--project', project, '--raw'])
@@ -686,14 +686,14 @@ class TestAuthCli(unittest.TestCase):
 class TestCliLive(unittest.TestCase):
 
     def test_ping(self):
-        runner = CliRunner(mix_stderr=False)
+        runner = CliRunner()
         result = runner.invoke(cli, ['ping',
                                      '--config-file', test_config_path,
                                      '--profile', test_config_profile])
         self.assertEqual(result.exit_code, 0)
 
     def test_ping_json(self):
-        runner = CliRunner(mix_stderr=False)
+        runner = CliRunner()
         result = runner.invoke(cli, ['ping',
                                      '--config-file', test_config_path,
                                      '--profile', test_config_profile,
@@ -707,7 +707,7 @@ class TestCliLive(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
 
     def test_ping_json_timeout_error(self):
-        runner = CliRunner(mix_stderr=False)
+        runner = CliRunner()
         result = runner.invoke(cli, ['ping',
                                      '--config-file', test_config_path,
                                      '--profile', test_config_profile,
@@ -730,7 +730,7 @@ class TestCliLive(unittest.TestCase):
     def test_ping_unstructured_solver(self, problem_type, time_limit):
         solver = json.dumps({"supported_problem_types__contains": problem_type})
         params = json.dumps({"time_limit": time_limit})
-        runner = CliRunner(mix_stderr=False)
+        runner = CliRunner()
         result = runner.invoke(cli, ['ping',
                                      '--config-file', test_config_path,
                                      '--profile', test_config_profile,
@@ -741,6 +741,16 @@ class TestCliLive(unittest.TestCase):
 
 class TestLogging(unittest.TestCase):
 
+    # TODO: simplify the logic by requiring click>8.2 once we drop py39
+    @classmethod
+    def setUpClass(cls):
+        cls.clirunner_kwargs = {}
+        # in click<8.2 we need to use `mix_stderr=False` to split streams
+        # (`mix_stderr` is removed in click 8.2, and split streams are now the default)
+        click_version = tuple(map(int, importlib.metadata.version('click').split('.')))
+        if click_version < (8, 2, 0):
+            cls.clirunner_kwargs.update(mix_stderr=False)
+
     @isolated_environ(remove_dwave=True)
     def test_json_logs(self):
         env = {
@@ -749,7 +759,7 @@ class TestLogging(unittest.TestCase):
             'DWAVE_LOG_FORMAT': 'json',
         }
 
-        runner = CliRunner(env=env, mix_stderr=False)
+        runner = CliRunner(env=env, **self.clirunner_kwargs)
         result = runner.invoke(cli, ['ping'])
 
         # ping will fail because API token is undefined
