@@ -530,6 +530,9 @@ class Client(object):
         self._download_answer_executor = \
             ThreadPoolExecutor(self._DOWNLOAD_ANSWER_THREAD_COUNT)
 
+    class _Session(api.client.VersionedAPISessionMixin, BaseUrlSession):
+        pass
+
     def create_session(self):
         """Create a new requests session based on client's (self) params.
 
@@ -542,7 +545,7 @@ class Client(object):
         if not endpoint.endswith('/'):
             endpoint += '/'
 
-        session = BaseUrlSession(base_url=endpoint)
+        session = self._Session(base_url=endpoint, strict_mode=True)
         session.mount('http://', PretimedHTTPAdapter(
             timeout=self.config.request_timeout,
             max_retries=self.config.request_retry.to_urllib3_retry()))
@@ -1268,6 +1271,8 @@ class Client(object):
             return []
 
         session = self.create_session()
+        session.set_accept(media_type='application/vnd.dwave.sapi.problems+json',
+                           accept_version='>=2.1,<3')
         try:
             while True:
                 # Pull as many problems as we can, block on the first one,
@@ -1443,6 +1448,8 @@ class Client(object):
             This method is always run inside of a daemon thread.
         """
         session = self.create_session()
+        session.set_accept(media_type='application/vnd.dwave.sapi.problems+json',
+                           accept_version='>=2.1,<3')
         try:
             while True:
                 # Pull as many problems as we can, block when none are available.
@@ -1541,6 +1548,8 @@ class Client(object):
             This method is always run inside of a daemon thread.
         """
         session = self.create_session()
+        session.set_accept(media_type='application/vnd.dwave.sapi.problems+json',
+                           accept_version='>=2.1,<3')
         try:
             # grouped futures (all scheduled within _POLL_GROUP_TIMEFRAME)
             # and/or up to _STATUS_QUERY_SIZE (depending on strategy)
@@ -1622,7 +1631,7 @@ class Client(object):
 
                     except SAPIError as exc:
                         # assume 5xx errors are transient, and don't abort polling
-                        if 500 <= exc.error_code < 600:
+                        if exc.error_code and 500 <= exc.error_code < 600:
                             logger.warning(
                                 "Received an internal server error response on "
                                 "problem status polling request (%s). Assuming "
@@ -1678,6 +1687,8 @@ class Client(object):
             This method is always run inside of a daemon thread.
         """
         session = self.create_session()
+        session.set_accept(media_type='application/vnd.dwave.sapi.problem+json',
+                           accept_version='>=2.1,<3')
         try:
             while True:
                 # Select a problem
@@ -1807,6 +1818,9 @@ class Client(object):
         # execute request
         try:
             response = meth(*args, **kwargs)
+        except api.exceptions.ResourceBadResponseError as e:
+            # returned by VersionedAPISessionMixin; wrap for backwards-compatibility
+            raise InvalidAPIResponseError(e) from e
         except Exception as exc:
             if is_caused_by(exc, (requests.exceptions.Timeout,
                                   urllib3.exceptions.TimeoutError)):

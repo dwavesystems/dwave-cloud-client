@@ -374,8 +374,8 @@ def _get_client_solver(config, output=None):
         raise CLIError("Authentication error. Check credentials in your configuration file.", 2)
     except SolverNotFoundError:
         raise CLIError("Solver not available.", 6)
-    except (InvalidAPIResponseError, UnsupportedSolverError):
-        raise CLIError("Invalid or unexpected API response.", 3)
+    except (InvalidAPIResponseError, UnsupportedSolverError) as e:
+        raise CLIError(f"Invalid or unexpected API response: {e!s}", 3)
     except RequestTimeout:
         raise CLIError("API connection timed out.", 4)
     except requests.exceptions.SSLError as e:
@@ -408,8 +408,10 @@ def _sample(solver, problem, params, output):
         raise CLIError("API connection timed out.", 8)
     except PollingTimeout:
         raise CLIError("Polling timeout exceeded.", 9)
+    except InvalidAPIResponseError as e:
+        raise CLIError(f"Invalid or unexpected API response: {e!s}", 3)
     except Exception as e:
-        raise CLIError("Sampling error: {!r}".format(e), 10)
+        raise CLIError(f"Sampling error: {e!s}", 10)
 
     return response
 
@@ -487,7 +489,10 @@ def standardized_output(fn):
 def ping(*, config_file, profile, endpoint, region, client_type, solver_def,
          sampling_params, request_timeout, polling_timeout, label, json_output,
          output):
-    """Ping the QPU by submitting a single-qubit problem."""
+    """Ping a solver by submitting a single-qubit problem.
+
+    If solver is not specified, a QPU solver is selected by default.
+    """
 
     # parse params (TODO: move to click validator)
     params = {}

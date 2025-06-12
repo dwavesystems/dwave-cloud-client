@@ -13,8 +13,10 @@
 # limitations under the License.
 
 import collections
+import datetime
 import io
 import uuid
+from collections.abc import Iterable
 from typing import Any, Optional, Union
 from unittest import mock
 
@@ -29,7 +31,12 @@ from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
 from dwave.cloud.testing.mocks import qpu_clique_solver_data, hybrid_bqm_solver_data
 
 
-def choose_reply(path, replies, statuses=None, date=None):
+def choose_reply(path: str,
+                 replies: dict[str, Union[str, bytes, Any]],
+                 statuses: Optional[dict[str, Iterable[int]]] = None,
+                 date: Optional[datetime.date] = None,
+                 headers: Optional[dict[str, str]] = None,
+                 ) -> mock.Mock:
     """Choose the right response based on the path and make a mock response."""
 
     if statuses is None:
@@ -37,6 +44,11 @@ def choose_reply(path, replies, statuses=None, date=None):
 
     if date is None:
         date = utcrel(0)
+
+    if headers is None:
+        headers = {}
+
+    headers = CaseInsensitiveDict(headers | {'Date': date.isoformat()})
 
     if path in replies:
         response = mock.Mock(['content', 'text', 'json', 'raise_for_status', 'headers'])
@@ -49,7 +61,7 @@ def choose_reply(path, replies, statuses=None, date=None):
         response.content = content
         response.text = content.decode('utf8')
         response.json.side_effect = lambda: replies[path]
-        response.headers = CaseInsensitiveDict({'Date': date.isoformat()})
+        response.headers = headers
 
         def raise_for_status():
             if not 200 <= response.status_code < 400:

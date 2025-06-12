@@ -21,13 +21,20 @@ import zlib
 import diskcache
 import requests
 import requests_mock
-from parameterized import parameterized
+from parameterized import parameterized, parameterized_class
 
 from dwave.cloud.api import exceptions
 from dwave.cloud.api.client import (
-    DWaveAPIClient, SolverAPIClient, MetadataAPIClient, LeapAPIClient)
+    DWaveAPIClient, SolverAPIClient, MetadataAPIClient, LeapAPIClient,
+    LoggingSessionMixin, PayloadCompressingSessionMixin,
+    VersionedAPISessionMixin, CachingSessionMixin)
 from dwave.cloud.config import ClientConfig, constants
 from dwave.cloud.package_info import __packagename__, __version__
+from dwave.cloud.utils.http import BaseUrlSession
+
+
+def make_session_class(*bases):
+    return type('TestSession', bases, {})
 
 
 class TestConfig(unittest.TestCase):
@@ -164,8 +171,12 @@ class TestRequests(unittest.TestCase):
             self.assertEqual(client.session.get(path_a).json(), data_a)
             self.assertEqual(client.session.get(path_b).json(), data_b)
 
+    @parameterized.expand([
+        ("mixin", make_session_class(LoggingSessionMixin, BaseUrlSession)),
+        ("default", DWaveAPIClient.DefaultSession),
+    ])
     @requests_mock.Mocker()
-    def test_session_history(self, m):
+    def test_session_history(self, name, session_class, m):
         """Session history is available."""
 
         baseurl = 'https://test.com'
@@ -174,7 +185,7 @@ class TestRequests(unittest.TestCase):
         m.get(requests_mock.ANY, status_code=404)
         m.get(f"{baseurl}/path", json=dict(data=True))
 
-        with DWaveAPIClient(**config) as client:
+        with DWaveAPIClient(session_class=session_class, **config) as client:
             client.session.get('path')
             self.assertEqual(client.session.history[-1].request.path_url, '/path')
 
@@ -185,8 +196,12 @@ class TestRequests(unittest.TestCase):
             client.session.get('/path')
             self.assertEqual(client.session.history[-1].request.path_url, '/path')
 
+    @parameterized.expand([
+        ("mixin", make_session_class(PayloadCompressingSessionMixin, BaseUrlSession)),
+        ("default", DWaveAPIClient.DefaultSession),
+    ])
     @requests_mock.Mocker()
-    def test_payload_compression(self, m):
+    def test_payload_compression(self, name, session_class, m):
         """Payload compression on upload is supported."""
 
         baseurl = 'https://test.com'
@@ -205,19 +220,25 @@ class TestRequests(unittest.TestCase):
         m.post(baseurl, additional_matcher=match_data, text='ok')
 
         with self.subTest('compress all'):
-            with DWaveAPIClient(compress=True, **config) as client:
+            with DWaveAPIClient(session_class=session_class, compress=True, **config) as client:
                 resp = client.session.post('', data=data)
                 self.assertEqual(resp.text, 'ok')
 
         with self.subTest('compress request'):
-            with DWaveAPIClient(**config) as client:
+            with DWaveAPIClient(session_class=session_class, **config) as client:
                 resp = client.session.post('', data=data, compress=True)
                 self.assertEqual(resp.text, 'ok')
 
 
+@parameterized_class(("version_strict_mode", "session_class"), [
+    (True, make_session_class(VersionedAPISessionMixin, BaseUrlSession)),
+    (True, DWaveAPIClient.DefaultSession),
+    (False, make_session_class(VersionedAPISessionMixin, BaseUrlSession)),
+    (False, DWaveAPIClient.DefaultSession),
+])
 class TestVersionValidation(unittest.TestCase):
-
-    version_strict_mode = True
+    version_strict_mode = None
+    session_class = None
 
     def setUp(self):
         self.mocker = requests_mock.Mocker()
@@ -238,7 +259,8 @@ class TestVersionValidation(unittest.TestCase):
         self.mocker.start()
 
         self.client = DWaveAPIClient(
-            endpoint=endpoint, version_strict_mode=self.version_strict_mode)
+            endpoint=endpoint, version_strict_mode=self.version_strict_mode,
+            session_class=self.session_class)
 
     def tearDown(self):
         self.client.close()
@@ -249,7 +271,11 @@ class TestVersionValidation(unittest.TestCase):
         self.assertEqual(self.client.session.get('version').json(), self.data)
 
     def test_no_type(self):
-        with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'^Media type not present'):
+        if self.version_strict_mode:
+            with self.assertRaisesRegex(exceptions.ResourceBadResponseError, r'^Media type not present'):
+                self.client.session.set_accept(media_type=self.media_type, accept_version='~=1.2.0')
+                self.assertEqual(self.client.session.get('no-type').json(), self.data)
+        else:
             self.client.session.set_accept(media_type=self.media_type, accept_version='~=1.2.0')
             self.assertEqual(self.client.session.get('no-type').json(), self.data)
 
@@ -273,16 +299,12 @@ class TestVersionValidation(unittest.TestCase):
             self.assertEqual(self.client.session.get('version').json(), self.data)
 
 
-class TestNonStrictVersionValidation(TestVersionValidation):
-
-    version_strict_mode = False
-
-    def test_no_type(self):
-        self.client.session.set_accept(media_type=self.media_type, accept_version='~=1.2.0')
-        self.assertEqual(self.client.session.get('no-type').json(), self.data)
-
-
+@parameterized_class(("session_class", ), [
+    (make_session_class(VersionedAPISessionMixin, BaseUrlSession), ),
+    (DWaveAPIClient.DefaultSession, ),
+])
 class TestResponseParsing(unittest.TestCase):
+    session_class = None
 
     @requests_mock.Mocker()
     def test_json(self, m):
@@ -293,7 +315,7 @@ class TestResponseParsing(unittest.TestCase):
         m.get(requests_mock.ANY, content=json.dumps(mock_response).encode('ascii'),
               status_code=200, headers={'Content-Type': 'application/octet-stream'})
 
-        with DWaveAPIClient(endpoint='https://mock') as client:
+        with DWaveAPIClient(endpoint='https://mock', session_class=self.session_class) as client:
 
             with self.subTest("binary response when expecting json"):
                 client.session.set_accept(media_type="application/json")
@@ -318,7 +340,7 @@ class TestResponseParsing(unittest.TestCase):
 
         m.get(requests_mock.ANY, json=error, status_code=error_code)
 
-        with DWaveAPIClient(endpoint='https://mock') as client:
+        with DWaveAPIClient(endpoint='https://mock', session_class=self.session_class) as client:
 
             with self.assertRaisesRegex(exceptions.ResourceNotFoundError, error_msg) as exc:
                 client.session.get('test')
@@ -335,7 +357,7 @@ class TestResponseParsing(unittest.TestCase):
 
         m.get(requests_mock.ANY, text=error_msg, status_code=error_code)
 
-        with DWaveAPIClient(endpoint='https://mock') as client:
+        with DWaveAPIClient(endpoint='https://mock', session_class=self.session_class) as client:
 
             with self.assertRaisesRegex(exceptions.ResourceNotFoundError, error_msg) as exc:
                 client.session.get('test')
@@ -352,7 +374,7 @@ class TestResponseParsing(unittest.TestCase):
 
         m.get(requests_mock.ANY, text=error_msg, status_code=error_code)
 
-        with DWaveAPIClient(endpoint='https://mock') as client:
+        with DWaveAPIClient(endpoint='https://mock', session_class=self.session_class) as client:
 
             with self.assertRaisesRegex(exceptions.RequestError, error_msg) as exc:
                 client.session.get('test')
@@ -361,26 +383,35 @@ class TestResponseParsing(unittest.TestCase):
                 self.assertEqual(exc.error_code, error_code)
 
 
+@parameterized_class(("session_class", ), [
+    (make_session_class(CachingSessionMixin, LoggingSessionMixin, BaseUrlSession), ),
+    (DWaveAPIClient.DefaultSession, ),
+])
 class TestResponseCaching(unittest.TestCase):
+    session_class = None
 
     def test_config(self):
         with self.subTest("cache disabled by default"):
-            with DWaveAPIClient(endpoint='https://mock') as client:
+            with DWaveAPIClient(endpoint='https://mock',
+                                session_class=self.session_class) as client:
                 self.assertFalse(client.session._cache_enabled)
 
         with self.subTest("cache disabled with config"):
-            with DWaveAPIClient(endpoint='https://mock', cache=False) as client:
+            with DWaveAPIClient(endpoint='https://mock', cache=False,
+                                session_class=self.session_class) as client:
                 self.assertFalse(client.session._cache_enabled)
 
         with self.subTest("cache enabled with config"):
-            with DWaveAPIClient(endpoint='https://mock', cache=True) as client:
+            with DWaveAPIClient(endpoint='https://mock', cache=True,
+                                session_class=self.session_class) as client:
                 self.assertTrue(client.session._cache_enabled)
                 self.assertIsNotNone(client.session._maxage)
                 self.assertIsInstance(client.session._store, diskcache.Cache)
 
         with self.subTest("cache configured"):
             with DWaveAPIClient(endpoint='https://mock',
-                                cache=dict(maxage=5, store={})) as client:
+                                cache=dict(maxage=5, store={}),
+                                session_class=self.session_class) as client:
                 self.assertTrue(client.session._cache_enabled)
                 self.assertEqual(client.session._maxage, 5)
                 self.assertIsInstance(client.session._store, dict)
@@ -392,8 +423,9 @@ class TestResponseCaching(unittest.TestCase):
     ])
     def test_invalid_maxage(self, maxage):
         with self.assertRaises(ValueError):
-            DWaveAPIClient(
-                endpoint='https://mock', cache=dict(maxage=maxage, store={}))
+            DWaveAPIClient(endpoint='https://mock',
+                           cache=dict(maxage=maxage, store={}),
+                           session_class=self.session_class)
 
     @parameterized.expand([
         (0, ),
@@ -402,7 +434,8 @@ class TestResponseCaching(unittest.TestCase):
     ])
     def test_valid_maxage(self, maxage):
         with DWaveAPIClient(endpoint='https://mock',
-                            cache=dict(maxage=maxage, store={})) as client:
+                            cache=dict(maxage=maxage, store={}),
+                            session_class=self.session_class) as client:
             self.assertEqual(client.session._maxage, maxage)
 
     @requests_mock.Mocker()
@@ -433,7 +466,8 @@ class TestResponseCaching(unittest.TestCase):
 
         store = {}
 
-        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store), history_size=1) as client:
+        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store),
+                            history_size=1, session_class=self.session_class) as client:
 
             with self.subTest("cache miss"):
                 self.assertEqual(len(store), 0)
@@ -511,7 +545,8 @@ class TestResponseCaching(unittest.TestCase):
 
         store = {}
 
-        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store), history_size=1) as client:
+        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store),
+                            history_size=1, session_class=self.session_class) as client:
 
             with self.subTest("cache miss"):
                 self.assertEqual(len(store), 0)
@@ -560,7 +595,8 @@ class TestResponseCaching(unittest.TestCase):
 
         store = {}
 
-        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store), history_size=1) as client:
+        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store),
+                            history_size=1, session_class=self.session_class) as client:
 
             with self.subTest("cache populate"):
                 self.assertEqual(len(store), 0)
@@ -620,7 +656,8 @@ class TestResponseCaching(unittest.TestCase):
 
         store = {}
 
-        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store)) as client:
+        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store),
+                            session_class=self.session_class) as client:
 
             with self.subTest("cache miss"):
                 self.assertEqual(len(store), 0)
@@ -649,7 +686,8 @@ class TestResponseCaching(unittest.TestCase):
 
         store = {}
 
-        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store), history_size=1) as client:
+        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store),
+                            history_size=1, session_class=self.session_class) as client:
 
             with self.subTest("cache miss"):
                 self.assertEqual(len(store), 0)
@@ -683,7 +721,8 @@ class TestResponseCaching(unittest.TestCase):
         maxage = 10
 
         with DWaveAPIClient(endpoint=endpoint,
-                            cache=dict(store=store, maxage=maxage)) as client:
+                            cache=dict(store=store, maxage=maxage),
+                            session_class=self.session_class) as client:
 
             with self.subTest("cache miss"):
                 self.assertEqual(len(store), 0)
