@@ -13,8 +13,10 @@
 # limitations under the License.
 
 import collections
+import datetime
 import io
 import uuid
+from collections.abc import Iterable
 from typing import Any, Optional, Union
 from unittest import mock
 
@@ -29,7 +31,12 @@ from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
 from dwave.cloud.testing.mocks import qpu_clique_solver_data, hybrid_bqm_solver_data
 
 
-def choose_reply(path, replies, statuses=None, date=None, headers=None):
+def choose_reply(path: str,
+                 replies: dict[str, Union[str, bytes, Any]],
+                 statuses: Optional[dict[str, Iterable[int]]] = None,
+                 date: Optional[datetime.date] = None,
+                 headers: Optional[dict[str, str]] = None,
+                 ) -> mock.Mock:
     """Choose the right response based on the path and make a mock response."""
 
     if statuses is None:

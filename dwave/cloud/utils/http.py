@@ -70,24 +70,44 @@ class TimeoutingHTTPAdapter(PretimedHTTPAdapter):
 # remove it from here.
 
 class BaseUrlSessionMixin:
+    """A :class:`~requests.Session` mixin that allows setting of a base URL for
+    all session requests.
+
+    See also :class:`.BaseUrlSession`.
+
+    Args:
+        base_url:
+            Base URL.
+
+    """
     base_url = None
 
-    def __init__(self, base_url=None):
+    def __init__(self, base_url: Optional[str] = None):
         if base_url:
             self.base_url = base_url
         super().__init__()
 
-    def request(self, method, url, *args, **kwargs):
+    def request(self, method: str, url: str, *args, **kwargs) -> requests.Response:
         """Send the request after generating the complete URL."""
         url = self.create_url(url)
         return super().request(method, url, *args, **kwargs)
 
-    def create_url(self, url):
+    def create_url(self, url: str) -> str:
         """Create the URL based off this partial path."""
         return urljoin(self.base_url, url)
 
+
 class BaseUrlSession(BaseUrlSessionMixin, requests.Session):
-    """A Session with a URL that all requests will use as a base."""
+    """A Session with a URL that all requests will use as a base.
+
+    See also :class:`.BaseUrlSessionMixin`.
+
+    Example::
+
+        session = BaseUrlSession(base_url='http://example.com/api/')
+        session.get('version')
+
+    """
 
 
 def user_agent(name: Optional[str] = None,

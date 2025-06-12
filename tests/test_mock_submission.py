@@ -46,7 +46,7 @@ from dwave.cloud.utils.time import utcrel
 from tests.api.mocks import StructuredSapiMockResponses, choose_reply
 
 
-def fix_status_paths(replies: dict[str, Any], **params):
+def fix_status_paths(replies: dict[str, Any], **params) -> dict[str, Any]:
     """Append URL params to problem status paths."""
 
     def fix(path, **params):
