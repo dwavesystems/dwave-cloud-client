@@ -15,7 +15,7 @@
 from datetime import datetime
 from typing import Annotated, Any, Optional, Union
 
-from pydantic import BaseModel, RootModel, ConfigDict
+from pydantic import BaseModel, RootModel, ConfigDict, Field
 from pydantic.functional_validators import AfterValidator
 
 from dwave.cloud.api import constants
@@ -52,8 +52,21 @@ class _RootSetterMixin:
         return setattr(self.root, name, value)
 
 
+class SolverVersion(BaseModel):
+    graph_id: str
+
+
+class SolverIdentity(BaseModel):
+    name: str
+    version: Optional[SolverVersion] = None     # only QPU solvers have `version` structure
+
+
 class SolverCompleteConfiguration(BaseModel):
-    id: str
+    # maintain SAPI names on output
+    model_config = ConfigDict(
+        validate_by_name=True, validate_by_alias=True, serialize_by_alias=True)
+
+    identity: SolverIdentity = Field(alias='solver')
     status: str
     description: str
     properties: dict
@@ -75,7 +88,7 @@ class SolverConfiguration(_RootGetterMixin, _RootSetterMixin, RootModel):
 class ProblemInitialStatus(BaseModel):
     id: str
     type: constants.ProblemType
-    solver: str
+    solver: SolverIdentity
     label: Optional[str] = None
     status: constants.ProblemStatus
     submitted_on: datetime
@@ -139,7 +152,7 @@ class ProblemData(_RootGetterMixin, RootModel):
 
 
 class ProblemMetadata(BaseModel):
-    solver: str
+    solver: SolverIdentity
     type: constants.ProblemType
     label: Optional[str] = None
     status: constants.ProblemStatus
@@ -160,7 +173,7 @@ class ProblemInfo(BaseModel):
 class ProblemJob(BaseModel):
     data: ProblemData
     params: dict[str, AnyIncludingNumpy]
-    solver: str
+    solver: SolverIdentity
     type: constants.ProblemType
     label: Optional[str] = None
 
