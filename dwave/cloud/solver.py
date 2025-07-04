@@ -252,22 +252,32 @@ class BaseSolver:
     # Derived properties
 
     @property
-    def name(self):
+    def name(self) -> str:
         """Solver name/ID."""
-        return self.id
+        return self.identity['name']
 
     @property
-    def online(self):
+    def version(self) -> dict:
+        """QPU solver version dict (contains at least ``graph_id``)."""
+        return self.data.get('solver', {}).get('version', {})
+
+    @property
+    def graph_id(self) -> Optional[str]:
+        """QPU solver working graph id."""
+        return self.version.get('graph_id')
+
+    @property
+    def online(self) -> bool:
         "Is this solver online (or offline)?"
         return self.data.get('status', 'online').lower() == 'online'
 
     @property
-    def avg_load(self):
+    def avg_load(self) -> Optional[float]:
         "Solver's average load, at the time of description fetch."
         return self.data.get('avg_load')
 
     @property
-    def qpu(self):
+    def qpu(self) -> bool:
         "Is this a QPU-based solver?"
         category = self.properties.get('category', '').lower()
         if category:
@@ -278,7 +288,7 @@ class BaseSolver:
             return not (self.software or self.hybrid)
 
     @property
-    def software(self):
+    def software(self) -> bool:
         "Is this a software-based solver?"
         category = self.properties.get('category', '').lower()
         if category:
@@ -286,10 +296,10 @@ class BaseSolver:
         else:
             # fallback for legacy solvers without the `category` property
             # TODO: remove when all production solvers are updated
-            return self.id.startswith('c4-sw_')
+            return self.name.startswith('c4-sw_')
 
     @property
-    def hybrid(self):
+    def hybrid(self) -> bool:
         "Is this a hybrid quantum-classical solver?"
         category = self.properties.get('category', '').lower()
         if category:
@@ -297,7 +307,7 @@ class BaseSolver:
         else:
             # fallback for legacy solvers without the `category` property
             # TODO: remove when all production solvers are updated
-            return self.id.startswith('hybrid')
+            return self.name.startswith('hybrid')
 
 
 class BaseUnstructuredSolver(BaseSolver):
@@ -963,7 +973,7 @@ class StructuredSolver(BaseSolver):
         self._params = {}
 
         # Add derived properties specific for this solver
-        self.derived_properties.update({'lower_noise', 'num_active_qubits'})
+        self.derived_properties.update({'lower_noise', 'num_active_qubits', 'version', 'graph_id'})
 
     # Derived properties
 

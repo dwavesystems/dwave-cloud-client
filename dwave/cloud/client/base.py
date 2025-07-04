@@ -928,10 +928,13 @@ class Client(object):
 
         * `name` (str): Solver name/id.
         * `qpu` (bool): Solver is a QPU?
+        * `hybrid` (bool): Solver is a hybrid quantum-classical solver?
         * `software` (bool): Solver is a software solver?
         * `online` (bool, default=True): Is solver online?
         * `num_active_qubits` (int): Number of active qubits. Less then or equal to `num_qubits`.
         * `avg_load` (float): Solver's average load (similar to Unix load average).
+        * `version` (dict): QPU solver version dict (contains at least `graph_id`)
+        * `graph_id` (str): QPU solver working graph id
 
         Common solver parameters are:
 
@@ -972,8 +975,9 @@ class Client(object):
                 qubits__issuperset={30, 31, 32},    # qubits 30, 31 and 32 must exist
                 supported_problem_types__issubset={'ising', 'qubo'},
                                                     # require Ising, QUBO or both to be supported
-                name='Advantage_system4.1',         # full solver name/ID match
+                name='Advantage_system4.1',         # solver name match
                 name__regex='Advantage.*',          # partial/regex-based solver name match
+                graph_id='01abcd1234',              # QPU solver working graph id match
                 chip_id__regex='Advantage_.*',      # chip ID prefix must be Advantage_
                 topology__type__eq="pegasus"        # topology.type must be Pegasus
                 topology__type="pegasus"            # same as above, `eq` implied even for nested properties
