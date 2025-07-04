@@ -496,7 +496,7 @@ class BaseUnstructuredSolver(BaseSolver):
             on_uploaded(problem_data_id=problem_id)
 
         body = {
-            'solver': self.id,
+            'solver': self.identity,
             'data': encode_problem_as_ref(problem_id),
             'type': problem_type,
             'params': sample_params
@@ -552,7 +552,7 @@ class BaseUnstructuredSolver(BaseSolver):
             upload_params=upload_params, sample_params=sample_params,
             on_uploaded=computation._notify_uploaded)
 
-        logger.debug("Submitting new problem to: %s", self.id)
+        logger.debug("Submitting new problem to: %r", self.identity)
         self.client._submit(body, computation)
 
         return computation
@@ -975,6 +975,9 @@ class StructuredSolver(BaseSolver):
         # Add derived properties specific for this solver
         self.derived_properties.update({'lower_noise', 'num_active_qubits', 'version', 'graph_id'})
 
+    def __repr__(self):
+        return f"{type(self).__name__}(name={self.name!r}, graph_id={self.graph_id!r})"
+
     # Derived properties
 
     @property
@@ -1258,7 +1261,7 @@ class StructuredSolver(BaseSolver):
         # Check the problem
         if not self.check_problem(linear, quadratic):
             raise ProblemStructureError(
-                f"Problem graph incompatible with {self.id} solver")
+                f"Problem graph incompatible with {self!r}")
 
         # Mix the new parameters with the default parameters
         combined_params = dict(self._params)
@@ -1273,7 +1276,7 @@ class StructuredSolver(BaseSolver):
         self._format_params(type_, combined_params)
 
         body_dict = {
-            'solver': self.id,
+            'solver': self.identity,
             'data': encode_problem_as_qp(self, linear, quadratic, offset,
                                          undirected_biases=undirected_biases),
             'type': type_,
@@ -1290,7 +1293,7 @@ class StructuredSolver(BaseSolver):
         # XXX: offset is carried on Future until implemented in SAPI
         computation._offset = offset
 
-        logger.debug("Submitting new problem to: %s", self.id)
+        logger.debug("Submitting new problem to: %f", self.identity)
         self.client._submit(body, computation)
 
         return computation

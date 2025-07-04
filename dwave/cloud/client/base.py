@@ -728,9 +728,9 @@ class Client(object):
 
             try:
                 solver = self.solvers_session.get_solver(
-                    solver_id=name, filter=static_fields, refresh_=refresh_)
+                    solver_name=name, filter=static_fields, refresh_=refresh_)
                 status = self.solvers_session.get_solver(
-                    solver_id=name, filter=dynamic_fields, refresh_=refresh_,
+                    solver_name=name, filter=dynamic_fields, refresh_=refresh_,
                     maxage_=self._DEFAULT_SOLVERS_DYNAMIC_PART_MAXAGE)
 
                 # merge static and dynamic properties
@@ -1276,7 +1276,7 @@ class Client(object):
 
         session = self.create_session()
         session.set_accept(media_type='application/vnd.dwave.sapi.problems+json',
-                           accept_version='>=2.1,<3')
+                           accept_version='~=3.0', ask_version='3.0.0')
         try:
             while True:
                 # Pull as many problems as we can, block on the first one,
@@ -1453,7 +1453,7 @@ class Client(object):
         """
         session = self.create_session()
         session.set_accept(media_type='application/vnd.dwave.sapi.problems+json',
-                           accept_version='>=2.1,<3')
+                           accept_version='~=3.0', ask_version='3.0.0')
         try:
             while True:
                 # Pull as many problems as we can, block when none are available.
@@ -1553,7 +1553,7 @@ class Client(object):
         """
         session = self.create_session()
         session.set_accept(media_type='application/vnd.dwave.sapi.problems+json',
-                           accept_version='>=2.1,<3')
+                           accept_version='~=3.0', ask_version='3.0.0')
         try:
             # grouped futures (all scheduled within _POLL_GROUP_TIMEFRAME)
             # and/or up to _STATUS_QUERY_SIZE (depending on strategy)
@@ -1692,7 +1692,7 @@ class Client(object):
         """
         session = self.create_session()
         session.set_accept(media_type='application/vnd.dwave.sapi.problem+json',
-                           accept_version='>=2.1,<3')
+                           accept_version='~=3.0', ask_version='3.0.0')
         try:
             while True:
                 # Select a problem
