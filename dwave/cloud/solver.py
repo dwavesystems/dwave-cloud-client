@@ -33,6 +33,7 @@ import concurrent.futures
 import copy
 import logging
 import orjson
+import warnings
 import weakref
 from collections import abc
 from functools import partial, cached_property
@@ -84,7 +85,7 @@ if TYPE_CHECKING:
         _Vartype = _Type
 
 
-class BaseSolver(object):
+class BaseSolver:
     """Base class for a general D-Wave solver.
 
     This class provides :term:`Ising`, :term:`QUBO` and :term:`BQM` sampling
@@ -105,8 +106,8 @@ class BaseSolver(object):
         >>> from dwave.cloud import Client
         >>> with Client.from_config() as client:
         ...     solver = client.get_solver()
-        ...     solver.id       # doctest: +SKIP
-        'Advantage_system4.1'
+        ...     solver.name     # doctest: +SKIP
+        'Advantage_system4'
     """
 
     # Classes of problems the remote solver has to support (at least one of these)
@@ -138,11 +139,11 @@ class BaseSolver(object):
         # status and avg_load
         self.data = data
 
-        # Each solver has an ID field
+        # in SAPI v3, solver `id` str has been replaced with `solver` dict
         try:
-            self.id = data['id']
+            self.identity = data['solver']
         except KeyError:
-            raise InvalidAPIResponseError("Missing solver property: 'id'")
+            raise InvalidAPIResponseError("Missing solver property: 'solver'")
 
         # Properties of this solver the server presents: dict
         try:
@@ -162,9 +163,9 @@ class BaseSolver(object):
 
         if self.supported_problem_types.isdisjoint(self._handled_problem_types):
             raise UnsupportedSolverError(
-                ("Remote solver {id!r} supports {supports} problems, "
+                ("Remote solver {name!r} supports {supports} problems, "
                  "but {cls!r} class of solvers handles only {handled}").format(
-                    id=self.id,
+                    name=self.name,
                     supports=list(self.supported_problem_types),
                     cls=type(self).__name__,
                     handled=list(self._handled_problem_types)))
@@ -178,8 +179,17 @@ class BaseSolver(object):
             'qpu', 'hybrid', 'software', 'online', 'avg_load', 'name'
         }
 
+    @property
+    def id(self):
+        # keep `Solver.id` for backwards-compat
+        warnings.warn(
+            "`Solver.id` attribute is deprecated since dwave-cloud-client 0.14.0 "
+            "and will be removed in 0.15.0. Use `Solver.identity` dict instead.",
+            DeprecationWarning, stacklevel=2)
+        return self.identity['name']
+
     def __repr__(self):
-        return "{}(id={!r})".format(type(self).__name__, self.id)
+        return f"{type(self).__name__}(name={self.name!r})"
 
     def _retrieve_problem(self, id_):
         """Resume polling for a problem previously submitted.
