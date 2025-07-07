@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Pass-through unused keyword arguments in ``dwave.cloud.utils.http.BaseUrlSessionMixin``
+    constructor. This enables mixing with session mixins from ``dwave.cloud.api.client``
+    in any order.

@@ -34,8 +34,11 @@ from functools import partial, wraps
 from itertools import count
 from typing import Union
 from unittest import mock
+from urllib.parse import urljoin
 
 import numpy
+import requests
+import requests_mock
 from parameterized import parameterized
 
 from dwave.cloud.utils.coders import NumpyEncoder, coerce_numpy_to_python
@@ -44,7 +47,8 @@ from dwave.cloud.utils.decorators import aliasdict, cached, deprecated, retried
 from dwave.cloud.utils.dist import (
     get_contrib_packages, get_distribution, PackageNotFoundError, VersionNotFoundError)
 from dwave.cloud.utils.exception import hasinstance, exception_chain, is_caused_by
-from dwave.cloud.utils.http import user_agent, default_user_agent, platform_tags
+from dwave.cloud.utils.http import (
+    user_agent, default_user_agent, platform_tags, BaseUrlSessionMixin)
 from dwave.cloud.utils.logging import (
     FilteredSecretsFormatter, configure_logging, parse_loglevel,
     fast_stack, get_caller_name)
@@ -193,6 +197,39 @@ class TestSimpleUtils(unittest.TestCase):
         ref = user_agent(
             name=__packagename__, version=__version__, include_platform_tags=False)
         self.assertEqual(ua, ref)
+
+    @requests_mock.Mocker()
+    def test_base_url_session_mixin(self, m):
+        m.get(requests_mock.ANY, status_code=200)
+
+        class BaseSession(requests.Session):
+            def __init__(self, *args, **kwargs):
+                self._init_kwargs = kwargs.copy()
+                passed = {k: v for k, v in kwargs.items() if not k.startswith('test_')}
+                return super().__init__(*args, **passed)
+
+            def request(self, *args, **kwargs):
+                self._request_kwargs = kwargs.copy()
+                passed = {k: v for k, v in kwargs.items() if not k.startswith('test_')}
+                return super().request(*args, **passed)
+
+        class Session(BaseUrlSessionMixin, BaseSession):
+            pass
+
+        base_url = "http://mock"
+        path = 'test/path'
+
+        with self.subTest('URL composition'):
+            s = Session(base_url=base_url)
+            resp = s.get(path)
+            self.assertEqual(resp.request.url, urljoin(base_url, path))
+
+        with self.subTest('additional kwargs passed through'):
+            s = Session(base_url=base_url, test_init='extra')
+            resp = s.get(path, test_request='extra')
+            self.assertEqual(resp.request.url, urljoin(base_url, path))
+            self.assertEqual(s._init_kwargs.get('test_init'), 'extra')
+            self.assertEqual(s._request_kwargs.get('test_request'), 'extra')
 
 
 # initially copied from dwave-hybrid/NumpyEncoder tests, but expanded to cover
