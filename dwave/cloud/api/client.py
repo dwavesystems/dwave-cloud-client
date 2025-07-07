@@ -89,11 +89,11 @@ class LoggingSessionMixin:
     def request(self, method: str, *args, **kwargs):
         callee = type(self).__name__
         if logger.getEffectiveLevel() >= logging.DEBUG:
-            logger.debug("[%s] request(%r, %r, *%r, ...)",
-                         callee, method, self.base_url, args)
+            logger.debug("[%s] request(%r, *%r, ...)",
+                         callee, method, args)
         else:   # pragma: no cover
-            logger.trace("[%s] request(%r, %r, *%r, **%r)",
-                         callee, method, self.base_url, args, kwargs)
+            logger.trace("[%s] request(%r, *%r, **%r)",
+                         callee, method, args, kwargs)
 
         try:
             response = self._request_unified(method, *args, **kwargs)
@@ -538,8 +538,7 @@ class CachingSessionMixin:
                UserWarning, stacklevel=2)
            default_maxage = self._maxage
 
-        key = (method,
-               self.base_url, url,
+        key = (method, url,
                self.params, params,
                self.headers, headers)
 
@@ -622,9 +621,9 @@ class DWaveAPIClient:
 
     class DefaultSession(VersionedAPISessionMixin,
                          PayloadCompressingSessionMixin,
-                         LoggingSessionMixin,
                          BaseUrlSessionMixin,
                          CachingSessionMixin,
+                         LoggingSessionMixin,
                          requests.Session):
         """Default session class is based on `requests.Session` extended with
         base url, logging, compressing, API versioning and caching mixins.
