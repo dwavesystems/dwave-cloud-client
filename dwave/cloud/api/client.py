@@ -620,11 +620,11 @@ class DWaveAPIClient:
 
     """
 
-    class DefaultSession(CachingSessionMixin,
-                         VersionedAPISessionMixin,
+    class DefaultSession(VersionedAPISessionMixin,
                          PayloadCompressingSessionMixin,
                          LoggingSessionMixin,
                          BaseUrlSessionMixin,
+                         CachingSessionMixin,
                          requests.Session):
         """Default session class is based on `requests.Session` extended with
         base url, logging, compressing, API versioning and caching mixins.
