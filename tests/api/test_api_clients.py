@@ -445,24 +445,29 @@ class TestResponseCaching(unittest.TestCase):
         path_a = 'path-a'
         etag_a = 'etag-a'
         data_a = {"a": 1}
+        ct_a = 'application/json; version=a'
 
         path_b = 'path-b'
         etag_b = 'etag-b'
         data_b = {"b": 1}
+        ct_b = 'application/json; version=b'
         etag_bb = 'etag-bb'
         data_bb = {"bb": 1}
+        ct_bb = 'application/json; version=bb'
 
         # mock: resource not modified
-        m.get(f"{endpoint}/{path_a}", json=data_a, headers={'ETag': etag_a})
+        m.get(f"{endpoint}/{path_a}", json=data_a,
+              headers={'ETag': etag_a, 'Content-Type': ct_a})
         m.get(f"{endpoint}/{path_a}",
               request_headers={'If-None-Match': etag_a}, status_code=304,
-              headers={'ETag': etag_a})
+              headers={'ETag': etag_a, 'Content-Type': ct_a})
 
         # mock: resource modified between requests
-        m.get(f"{endpoint}/{path_b}", json=data_b, headers={'ETag': etag_b})
+        m.get(f"{endpoint}/{path_b}", json=data_b,
+              headers={'ETag': etag_b, 'Content-Type': ct_b})
         m.get(f"{endpoint}/{path_b}",
               request_headers={'If-None-Match': etag_b}, json=data_bb,
-              headers={'ETag': etag_bb})
+              headers={'ETag': etag_bb, 'Content-Type': ct_bb})
 
         store = {}
 
@@ -474,6 +479,7 @@ class TestResponseCaching(unittest.TestCase):
 
                 r = client.session.get(path_a)
                 self.assertEqual(r.json(), data_a)
+                self.assertEqual(r.headers.get('content-type'), ct_a)
 
                 self.assertTrue(m.called)
                 self.assertEqual(len(store), 2)     # data + meta
@@ -483,6 +489,7 @@ class TestResponseCaching(unittest.TestCase):
 
                 r = client.session.get(path_a, maxage_=10)
                 self.assertEqual(r.json(), data_a)
+                self.assertEqual(r.headers.get('content-type'), ct_a)
 
                 # if mock not called, data came from cache
                 self.assertFalse(m.called)
@@ -492,6 +499,7 @@ class TestResponseCaching(unittest.TestCase):
 
                 r = client.session.get(path_a)
                 self.assertEqual(r.json(), data_a)
+                self.assertEqual(r.headers.get('content-type'), ct_a)
 
                 self.assertTrue(m.called)
                 self.assertEqual(client.session.history[-1].response.status_code, 304)
@@ -501,9 +509,11 @@ class TestResponseCaching(unittest.TestCase):
 
                 r = client.session.get(path_b)
                 self.assertEqual(r.json(), data_b)
+                self.assertEqual(r.headers.get('content-type'), ct_b)
 
                 r = client.session.get(path_b)
                 self.assertEqual(r.json(), data_bb)
+                self.assertEqual(r.headers.get('content-type'), ct_bb)
 
                 self.assertEqual(m.call_count, 2)
                 self.assertEqual(client.session.history[-1].response.status_code, 200)
@@ -513,6 +523,7 @@ class TestResponseCaching(unittest.TestCase):
 
                 r = client.session.get(path_a, no_cache_=True)
                 self.assertEqual(r.json(), data_a)
+                self.assertEqual(r.headers.get('content-type'), ct_a)
 
                 self.assertTrue(m.called)
 
@@ -521,6 +532,7 @@ class TestResponseCaching(unittest.TestCase):
 
                 r = client.session.get(path_a, maxage_=10, refresh_=True)
                 self.assertEqual(r.json(), data_a)
+                self.assertEqual(r.headers.get('content-type'), ct_a)
 
                 self.assertTrue(m.called)
 

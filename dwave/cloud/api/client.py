@@ -89,11 +89,11 @@ class LoggingSessionMixin:
     def request(self, method: str, *args, **kwargs):
         callee = type(self).__name__
         if logger.getEffectiveLevel() >= logging.DEBUG:
-            logger.debug("[%s] request(%r, %r, *%r, ...)",
-                         callee, method, self.base_url, args)
+            logger.debug("[%s] request(%r, *%r, ...)",
+                         callee, method, args)
         else:   # pragma: no cover
-            logger.trace("[%s] request(%r, %r, *%r, **%r)",
-                         callee, method, self.base_url, args, kwargs)
+            logger.trace("[%s] request(%r, *%r, **%r)",
+                         callee, method, args, kwargs)
 
         try:
             response = self._request_unified(method, *args, **kwargs)
@@ -491,11 +491,12 @@ class CachingSessionMixin:
         # etag and cache-control are present in 304 if they're in 200 response
         # see: https://datatracker.ietf.org/doc/html/rfc9110#name-304-not-modified
         etag = response.headers.get('ETag')
+        content_type = response.headers.get('Content-Type')
         cache_control = response.headers.get('Cache-Control')
 
         use_cache, maxage = self._parse_cache_control(cache_control)
         if use_cache:
-            meta = dict(created=epochnow(), maxage=maxage, etag=etag)
+            meta = dict(created=epochnow(), maxage=maxage, etag=etag, content_type=content_type)
             self._store[key_meta] = meta
             logger.debug("cache_write (meta): %r = %r", key_meta, meta)
             if not only_meta:
@@ -538,8 +539,7 @@ class CachingSessionMixin:
                UserWarning, stacklevel=2)
            default_maxage = self._maxage
 
-        key = (method,
-               self.base_url, url,
+        key = (method, url,
                self.params, params,
                self.headers, headers)
 
@@ -547,10 +547,11 @@ class CachingSessionMixin:
         key_data = hashlib.sha256(repr(key).encode('utf8')).hexdigest()
         key_meta = f"{key_data}:meta"
 
-        def make_response(content):
+        def make_response(meta, content):
             res = requests.Response()
             res.status_code = 200
             res.raw = io.BytesIO(content)
+            res.headers['content-type'] = meta.get('content_type')
             return res
 
         meta = self._store.get(key_meta)
@@ -568,7 +569,7 @@ class CachingSessionMixin:
 
             if epochnow() - meta['created'] < maxage:
                 logger.debug('cache hit within maxage')
-                return make_response(content)
+                return make_response(meta, content)
 
             # validate with conditional request if possible
             if etag := meta.get('etag'):
@@ -582,7 +583,7 @@ class CachingSessionMixin:
                 # we know SAPI only uses weak validators
                 logger.debug('resource "not modified", using cached value')
                 self._update_cache(res, key_meta=key_meta, only_meta=True)
-                return make_response(content)
+                return make_response(meta, content)
 
             else:
                 logger.debug('resource modified, updating cache')
@@ -620,11 +621,11 @@ class DWaveAPIClient:
 
     """
 
-    class DefaultSession(CachingSessionMixin,
-                         VersionedAPISessionMixin,
+    class DefaultSession(VersionedAPISessionMixin,
                          PayloadCompressingSessionMixin,
-                         LoggingSessionMixin,
                          BaseUrlSessionMixin,
+                         CachingSessionMixin,
+                         LoggingSessionMixin,
                          requests.Session):
         """Default session class is based on `requests.Session` extended with
         base url, logging, compressing, API versioning and caching mixins.

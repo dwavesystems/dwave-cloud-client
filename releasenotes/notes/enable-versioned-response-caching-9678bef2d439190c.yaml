@@ -1,0 +1,13 @@
+---
+features:
+  - |
+    Pass-through unused keyword arguments in ``dwave.cloud.utils.http.BaseUrlSessionMixin``
+    constructor. This enables mixing with session mixins from ``dwave.cloud.api.client``
+    in any order.
+  - |
+    Enable ``DWaveAPIClient`` to properly cache different API response representation
+    versions by reordering session mixins. Caching layer is now below the API version
+    handling, hence capturing changes from the versioning layer.
+  - |
+    Facilitate cached content validation and parsing by caching the response content
+    type as part of metadata in ``dwave.cloud.api.client.CachingSessionMixin``.

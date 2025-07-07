@@ -82,10 +82,10 @@ class BaseUrlSessionMixin:
     """
     base_url = None
 
-    def __init__(self, base_url: Optional[str] = None):
+    def __init__(self, base_url: Optional[str] = None, **kwargs):
         if base_url:
             self.base_url = base_url
-        super().__init__()
+        super().__init__(**kwargs)
 
     def request(self, method: str, url: str, *args, **kwargs) -> requests.Response:
         """Send the request after generating the complete URL."""
