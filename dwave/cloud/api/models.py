@@ -75,7 +75,10 @@ class SolverCompleteConfiguration(BaseModel):
 
 class SolverFilteredConfiguration(BaseModel):
     # no required fields, and no ignored fields
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra='allow',
+        validate_by_name=True, validate_by_alias=True, serialize_by_alias=True)
+
+    identity: Optional[SolverIdentity] = Field(default=None, alias='solver')
 
 
 # NOTE: we implement getitem interface so that `SolverConfiguration` can be
