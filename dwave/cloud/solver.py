@@ -40,9 +40,10 @@ from functools import partial, cached_property
 from tempfile import SpooledTemporaryFile
 from typing import Any, Literal, Optional, Union, TYPE_CHECKING
 
+from dwave.cloud.api.models import (
+    SolverConfiguration, SolverIdentity, SolverVersion)
 from dwave.cloud.exceptions import (
-    InvalidAPIResponseError, SolverPropertyMissingError,
-    UnsupportedSolverError, ProblemStructureError)
+    SolverPropertyMissingError, UnsupportedSolverError, ProblemStructureError)
 from dwave.cloud.coders import (
     encode_problem_as_qp, encode_problem_as_ref, decode_binary_ref,
     decode_qp_numpy, decode_qp, decode_bq)
@@ -117,6 +118,12 @@ class BaseSolver:
 
     _client_ref = None
 
+    #: Parsed solver configuration
+    data: SolverConfiguration
+
+    #: Solver identity/specification (name, version, etc)
+    identity: SolverIdentity
+
     @property
     def client(self):
         """Returns a reference to client if it still exists, or None otherwise."""
@@ -129,26 +136,26 @@ class BaseSolver:
 
         return client
 
-    def __init__(self, client: Optional['dwave.cloud.Client'], data: dict):
+    def __init__(self, client: Optional['dwave.cloud.Client'],
+                 data: Union[dict, SolverConfiguration]):
         # note: we use a weakref so that client can be closed and gc'ed
         #       while keeping solver instances alive
         # dev note: allow None value for testing
         self._client_ref = weakref.ref(client) if client is not None else None
 
-        # data for each solver includes at least: id, description, properties,
-        # status and avg_load
+        # note: conversion to `SolverConfiguration` is cheap (order of ~10us)
+        if not isinstance(data, SolverConfiguration):
+            data = SolverConfiguration.model_validate(data)
         self.data = data
 
-        # in SAPI v3, solver `id` str has been replaced with `solver` dict
-        try:
-            self.identity = data['solver']
-        except KeyError:
-            raise InvalidAPIResponseError("Missing solver property: 'solver'")
+        self.identity = data.identity
+        if self.identity is None:
+            raise ValueError("Missing solver identity field")
 
         # Properties of this solver the server presents: dict
         try:
-            self.properties = data['properties']
-        except KeyError:
+            self.properties = data.properties
+        except AttributeError:
             raise SolverPropertyMissingError("Missing solver property: 'properties'")
 
         # The set of extra parameters this solver will accept in sample_ising or sample_qubo: dict
@@ -184,9 +191,9 @@ class BaseSolver:
         # keep `Solver.id` for backwards-compat
         warnings.warn(
             "`Solver.id` attribute is deprecated since dwave-cloud-client 0.14.0 "
-            "and will be removed in 0.15.0. Use `Solver.identity` dict instead.",
+            "and will be removed in 0.15.0. Use `Solver.identity` instead.",
             DeprecationWarning, stacklevel=2)
-        return self.identity['name']
+        return self.identity.name
 
     def __repr__(self):
         return f"{type(self).__name__}(name={self.name!r})"
@@ -254,16 +261,17 @@ class BaseSolver:
     @property
     def name(self) -> str:
         """Solver name/ID."""
-        return self.identity['name']
+        return self.identity.name
 
     @property
     def version(self) -> dict:
-        """QPU solver version dict (contains at least ``graph_id``)."""
-        return self.data.get('solver', {}).get('version', {})
+        """QPU solver version dict (contains at least ``graph_id``). Returns
+        an empty dict for non-QPU solvers."""
+        return v.model_dump() if (v := self.identity.version) else {}
 
     @property
     def graph_id(self) -> Optional[str]:
-        """QPU solver working graph id."""
+        """QPU solver working graph id. Returns ``None`` for non-QPU solvers."""
         return self.version.get('graph_id')
 
     @property
@@ -496,7 +504,7 @@ class BaseUnstructuredSolver(BaseSolver):
             on_uploaded(problem_data_id=problem_id)
 
         body = {
-            'solver': self.identity,
+            'solver': self.identity.model_dump(exclude_unset=True),
             'data': encode_problem_as_ref(problem_id),
             'type': problem_type,
             'params': sample_params
@@ -1276,7 +1284,7 @@ class StructuredSolver(BaseSolver):
         self._format_params(type_, combined_params)
 
         body_dict = {
-            'solver': self.identity,
+            'solver': self.identity.model_dump(exclude_unset=True),
             'data': encode_problem_as_qp(self, linear, quadratic, offset,
                                          undirected_biases=undirected_biases),
             'type': type_,
@@ -1293,7 +1301,7 @@ class StructuredSolver(BaseSolver):
         # XXX: offset is carried on Future until implemented in SAPI
         computation._offset = offset
 
-        logger.debug("Submitting new problem to: %f", self.identity)
+        logger.debug("Submitting new problem to: %r", self.identity)
         self.client._submit(body, computation)
 
         return computation
