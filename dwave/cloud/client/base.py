@@ -721,7 +721,7 @@ class Client(object):
                        ) -> list[Union[StructuredSolver, UnstructuredSolver]]:
 
         static_fields = 'all,-status,-avg_load'
-        dynamic_fields = 'none,+id,+status,+avg_load'
+        dynamic_fields = 'none,+solver,+status,+avg_load'
 
         if name is not None:
             logger.info("Fetching definition of a solver with name=%r", name)
@@ -734,8 +734,8 @@ class Client(object):
                     maxage_=self._DEFAULT_SOLVERS_DYNAMIC_PART_MAXAGE)
 
                 # merge static and dynamic properties
-                solver.status = status.get('status')
-                solver.avg_load = status.get('avg_load')
+                solver.status = status.get('status', 'offline')
+                solver.avg_load = status.get('avg_load', 0)
 
                 solvers = [solver]
 
@@ -753,10 +753,10 @@ class Client(object):
 
             # add dynamic properties to static solvers
             # note: allow solver list mismatch
-            statuses = {solver.id: solver for solver in dynamic}
+            statuses = {solver.identity.name: solver for solver in dynamic}
             for solver in solvers:
-                solver.status = statuses.get(solver.id, {}).get('status', 'offline')
-                solver.avg_load = statuses.get(solver.id, {}).get('avg_load', 0)
+                solver.status = statuses.get(solver.identity.name, {}).get('status', 'offline')
+                solver.avg_load = statuses.get(solver.identity.name, {}).get('avg_load', 0)
 
         logger.info("Received solver data for %d solver(s).", len(solvers))
         if logger.isEnabledFor(logging.TRACE):
