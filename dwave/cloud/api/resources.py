@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import io
 import orjson
+import warnings
 from collections import abc
 from typing import Callable, Union, Optional, get_type_hints, TYPE_CHECKING
 from functools import wraps
@@ -165,6 +166,14 @@ class Solvers(ResourceBase):
     @accepts(media_type='application/vnd.dwave.sapi.solver-definition+json',
              version='~=3.0', ask_version='3.0.0')
     def get_solver(self, solver_name: str, filter: Optional[str] = None, **kwargs) -> models.SolverConfiguration:
+        # backwards-compat
+        if 'solver_id' in kwargs:
+            solver_name = kwargs.pop('solver_id')
+            warnings.warn(
+                "`solver_id` parameter is deprecated since dwave-cloud-client 0.14.0, "
+                "and will be removed in 0.16.0. Use `solver_name` parameter instead.",
+                DeprecationWarning, stacklevel=2)
+
         path = 'remote/{}'.format(solver_name)
         params = {'filter': filter} if filter is not None else None
         response = self.session.get(path, params=params, **kwargs)
