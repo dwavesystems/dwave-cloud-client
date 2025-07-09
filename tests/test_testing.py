@@ -175,7 +175,7 @@ class TestSolverDataMocks(unittest.TestCase):
 
     def test_solver_configuration_data(self):
         data = mocks.solver_configuration_data()
-        self.assertGreater(len(data['id']), 1)
+        self.assertGreater(len(data['identity']['name']), 1)
         self.assertGreater(len(data['status']), 1)
         self.assertGreater(len(data['description']), 1)
         self.assertIsInstance(data['properties'], dict)
@@ -185,6 +185,9 @@ class TestSolverDataMocks(unittest.TestCase):
         data = mocks.structured_solver_data()
         self.assertEqual(data['properties']['category'], 'qpu')
         self.assertIn('topology', data['properties'])
+        self.assertIn('name', data['identity'])
+        self.assertIn('version', data['identity'])
+        self.assertIn('graph_id', data['identity']['version'])
         self.assertIsInstance(data['properties']['qubits'], list)
         self.assertIsInstance(data['properties']['qubits'], list)
         self.assertGreater(len(data['properties']['qubits']), 0)
@@ -192,7 +195,7 @@ class TestSolverDataMocks(unittest.TestCase):
     def test_qpu_clique_solver_data(self):
         n = 3
         data = mocks.qpu_clique_solver_data(n)
-        self.assertEqual(data['id'], 'clique_{}q_mock'.format(n))
+        self.assertEqual(data['identity']['name'], 'clique_{}q_mock'.format(n))
         self.assertEqual(data['properties']['num_qubits'], n)
         self.assertEqual(data['properties']['qubits'], list(range(n)))
 
@@ -206,7 +209,7 @@ class TestSolverDataMocks(unittest.TestCase):
         nodes = data['properties']['qubits']
         edges = data['properties']['couplers']
 
-        self.assertEqual(data['id'], f'chimera_{num_qubits}q_mock')
+        self.assertEqual(data['identity']['name'], f'chimera_{num_qubits}q_mock')
         self.assertEqual(data['properties']['num_qubits'], num_qubits)
         self.assertEqual(set(nodes), set(range(num_qubits)))
         self.assertEqual(len(nx.find_cycle(nx.Graph(edges))), num_qubits)
@@ -225,7 +228,7 @@ class TestSolverDataMocks(unittest.TestCase):
         nodes = data['properties']['qubits']
         edges = data['properties']['couplers']
 
-        self.assertEqual(data['id'], f'pegasus_{num_qubits}q_mock')
+        self.assertEqual(data['identity']['name'], f'pegasus_{num_qubits}q_mock')
         self.assertEqual(data['properties']['num_qubits'], num_qubits)
         self.assertLessEqual(len(nodes), num_qubits)
         self.assertLessEqual(len(edges), num_edges)
@@ -244,7 +247,7 @@ class TestSolverDataMocks(unittest.TestCase):
         nodes = data['properties']['qubits']
         edges = data['properties']['couplers']
 
-        self.assertEqual(data['id'], f'zephyr_{num_qubits}q_mock')
+        self.assertEqual(data['identity']['name'], f'zephyr_{num_qubits}q_mock')
         self.assertEqual(data['properties']['num_qubits'], num_qubits)
         self.assertLessEqual(len(nodes), num_qubits)
         self.assertLessEqual(len(edges), num_edges)
@@ -255,6 +258,8 @@ class TestSolverDataMocks(unittest.TestCase):
 
     def test_unstructured_solver_data(self):
         data = mocks.unstructured_solver_data()
+        self.assertIn('name', data['identity'])
+        self.assertNotIn('version', data['identity'])
         self.assertEqual(data['properties']['category'], 'hybrid')
         self.assertListEqual(data['properties']['supported_problem_types'], ['bqm'])
 
