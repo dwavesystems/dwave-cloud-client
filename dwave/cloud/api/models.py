@@ -60,6 +60,15 @@ class SolverIdentity(BaseModel):
     name: str
     version: Optional[SolverVersion] = None     # only QPU solvers have `version` structure
 
+    def __str__(self):
+        s = self.name
+        if self.version:
+            s = f"{s}:{self.version.graph_id}"
+        return s
+
+    def dict(self):
+        return self.model_dump(exclude_unset=True)
+
 
 class SolverCompleteConfiguration(BaseModel):
     # maintain SAPI names on output

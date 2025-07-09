@@ -260,7 +260,7 @@ class BaseSolver:
 
     @property
     def name(self) -> str:
-        """Solver name/ID."""
+        """Solver name."""
         return self.identity.name
 
     @property
@@ -504,7 +504,7 @@ class BaseUnstructuredSolver(BaseSolver):
             on_uploaded(problem_data_id=problem_id)
 
         body = {
-            'solver': self.identity.model_dump(exclude_unset=True),
+            'solver': self.identity.dict(),
             'data': encode_problem_as_ref(problem_id),
             'type': problem_type,
             'params': sample_params
@@ -1284,7 +1284,7 @@ class StructuredSolver(BaseSolver):
         self._format_params(type_, combined_params)
 
         body_dict = {
-            'solver': self.identity.model_dump(exclude_unset=True),
+            'solver': self.identity.dict(),
             'data': encode_problem_as_qp(self, linear, quadratic, offset,
                                          undirected_biases=undirected_biases),
             'type': type_,
