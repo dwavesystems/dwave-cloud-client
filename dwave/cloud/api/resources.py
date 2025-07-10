@@ -333,7 +333,8 @@ class Problems(ResourceBase):
         path = ''
         job_dict = problem.model_dump() if problem is not None else {}
         updates = dict(data=data.model_dump() if data is not None else None,
-                       params=params, solver=solver, type=type, label=label)
+                       solver=solver.dict() if solver is not None else None,
+                       params=params, type=type, label=label)
         job_dict.update((k, v) for k, v in updates.items() if v is not None)
         # note: orjson.dumps(model.model_dump()) is about 6-7x faster then
         # model.model_dump_json() - 45us vs 300us (including model construction)
