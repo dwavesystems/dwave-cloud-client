@@ -99,7 +99,6 @@ class SapiMockResponses:
         self.problem = problem
         self.answer = answer
 
-        self.solver_id = solver.id
         self.problem_type = problem_type
         self.problem_id = str(uuid.uuid4()) if problem_id is None else problem_id
         self.problem_label = str(uuid.uuid4()) if problem_label is None else problem_label
@@ -119,7 +118,7 @@ class SapiMockResponses:
     def problem_metadata(self, **kwargs) -> dict:
         metadata = {
             "submitted_by":  str(uuid.uuid4()),
-            "solver": self.solver_id,
+            "solver": self.solver.identity.dict(),
             "type": self.problem_type,
             "submitted_on": utcrel(-20).isoformat(),
             "solved_on": utcrel(-10).isoformat(),
@@ -158,7 +157,7 @@ class SapiMockResponses:
         response = {
             "status": "COMPLETED",
             "solved_on": utcrel(-10).isoformat(),
-            "solver": self.solver_id,
+            "solver": self.solver.identity.dict(),
             "submitted_on": utcrel(-20).isoformat(),
             "answer": self.answer.copy(),
             "type": self.problem_type,
@@ -181,7 +180,7 @@ class SapiMockResponses:
         response = {
             "status": "COMPLETED",
             "solved_on": utcrel(-10).isoformat(),
-            "solver": self.solver_id,
+            "solver": self.solver.identity.dict(),
             "submitted_on": utcrel(-20).isoformat(),
             "type": self.problem_type,
             "id": self.problem_id,
@@ -196,7 +195,7 @@ class SapiMockResponses:
         response = {
             "status": "FAILED",
             "solved_on": utcrel(-10).isoformat(),
-            "solver": self.solver_id,
+            "solver": self.solver.identity.dict(),
             "submitted_on": utcrel(-20).isoformat(),
             "type": self.problem_type,
             "id": self.problem_id,
@@ -220,7 +219,7 @@ class SapiMockResponses:
         response = {
             "status": "CANCELLED",
             "solved_on": utcrel(-10).isoformat(),
-            "solver": self.solver_id,
+            "solver": self.solver.identity.dict(),
             "submitted_on": utcrel(-20).isoformat(),
             "type": self.problem_type,
             "id": self.problem_id,
@@ -235,7 +234,7 @@ class SapiMockResponses:
         response = {
             "status": "PENDING",
             "solved_on": None,
-            "solver": self.solver_id,
+            "solver": self.solver.identity.dict(),
             "submitted_on": utcrel(0).isoformat(),
             "type": self.problem_type,
             "id": self.problem_id,
@@ -243,7 +242,6 @@ class SapiMockResponses:
         }
         response.update(**kwargs)
         return response
-
 
 
 class StructuredSapiMockResponses(SapiMockResponses):

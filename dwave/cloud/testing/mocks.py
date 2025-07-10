@@ -26,15 +26,19 @@ __all__ = [
 ]
 
 
-def solver_configuration_data(id: str = None,
+def uuid_name():
+    return str(uuid.uuid4())
+
+
+def solver_configuration_data(identity: dict = None,
                               status: str = None,
                               description: str = None,
                               properties: dict = None,
                               avg_load: float = None) -> dict:
     """Return data dict describing a solver, as returned by SAPI."""
 
-    if id is None:
-        id = str(uuid.uuid4())
+    if identity is None:
+        identity = dict(name=uuid_name())
 
     if status is None:
         status = "ONLINE"
@@ -49,7 +53,7 @@ def solver_configuration_data(id: str = None,
         avg_load = random.random()
 
     return {
-        "id": id,
+        "identity": identity,
         "status": status,
         "description": description,
         "properties": properties,
@@ -57,7 +61,8 @@ def solver_configuration_data(id: str = None,
     }
 
 
-def structured_solver_data(id: str = None,
+def structured_solver_data(name: str = None,
+                           graph_id: str = None,
                            status: str = None,
                            avg_load: float = None,
                            description: str = None,
@@ -69,6 +74,14 @@ def structured_solver_data(id: str = None,
     """Return data dict describing a structured solver. By default, solver has
     only one qubit.
     """
+
+    if name is None:
+        name = uuid_name()
+
+    if graph_id is None:
+        graph_id = uuid_name()[:10]
+
+    identity = dict(name=name, version=dict(graph_id=graph_id))
 
     if properties is None:
         # TODO: add more default properties?
@@ -105,7 +118,7 @@ def structured_solver_data(id: str = None,
 
     properties.update(kwargs)
 
-    return solver_configuration_data(id=id,
+    return solver_configuration_data(identity=identity,
                                      status=status,
                                      description=description,
                                      properties=properties,
@@ -126,7 +139,8 @@ def qpu_clique_solver_data(size: int, **kwargs) -> dict:
     couplers = list(itertools.combinations(range(len(qubits)), 2))
 
     params = dict(
-        id=f"clique_{size}q_mock",
+        name=f"clique_{size}q_mock",
+        graph_id=f"clique_{size}",
         description=f"A {size}-qubit mock QPU solver with clique topology",
         qubits=qubits,
         couplers=couplers,
@@ -170,7 +184,8 @@ def qpu_chimera_solver_data(m: int,
     num_qubits = len(qubits)
 
     params = dict(
-        id=f"chimera_{num_qubits}q_mock",
+        name=f"chimera_{num_qubits}q_mock",
+        graph_id=f"chimera_{num_qubits}",
         description=f"A {num_qubits}-qubit mock QPU solver with chimera topology",
         qubits=qubits,
         couplers=couplers,
@@ -212,7 +227,8 @@ def qpu_pegasus_solver_data(m: int,
     num_qubits = 24 * m * (m-1)     # includes non-fabric qubits
 
     params = dict(
-        id=f"pegasus_{num_qubits}q_mock",
+        name=f"pegasus_{num_qubits}q_mock",
+        graph_id=f"pegasus_{num_qubits}",
         description=f"A {num_qubits}-qubit mock QPU solver with pegasus topology",
         qubits=qubits,
         couplers=couplers,
@@ -249,7 +265,8 @@ def qpu_zephyr_solver_data(m: int,
     num_qubits = len(qubits)
 
     params = dict(
-        id=f"zephyr_{num_qubits}q_mock",
+        name=f"zephyr_{num_qubits}q_mock",
+        graph_id=f"zephyr_{num_qubits}",
         description=f"A {num_qubits}-qubit mock QPU solver with zephyr topology",
         qubits=qubits,
         couplers=couplers,
@@ -312,7 +329,7 @@ def qpu_problem_timing_data(qpu: str = 'advantage') -> dict:
     return name_dict[qpu]
 
 
-def unstructured_solver_data(id: str = None,
+def unstructured_solver_data(name: str = None,
                              status: str = None,
                              avg_load: float = None,
                              description: str = None,
@@ -321,6 +338,9 @@ def unstructured_solver_data(id: str = None,
                              supported_problem_types: list[str] = None,
                              **kwargs) -> dict:
     """Return data dict describing an unstructured solver."""
+
+    if name is None:
+        name = uuid_name()
 
     if properties is None:
         properties = {
@@ -341,7 +361,7 @@ def unstructured_solver_data(id: str = None,
 
     properties.update(kwargs)
 
-    return solver_configuration_data(id=id,
+    return solver_configuration_data(identity=dict(name=name),
                                      status=status,
                                      description=description,
                                      properties=properties,
@@ -350,7 +370,7 @@ def unstructured_solver_data(id: str = None,
 
 def hybrid_bqm_solver_data(**kwargs) -> dict:
     params = dict(
-        id="hybrid_bqm_solver",
+        name="hybrid_bqm_solver",
         description="Hybrid unstructured BQM mock solver",
         supported_problem_types=["bqm"],
         # solver-specific properties (mock values)
@@ -365,7 +385,7 @@ def hybrid_bqm_solver_data(**kwargs) -> dict:
 
 def hybrid_cqm_solver_data(**kwargs) -> dict:
     params = dict(
-        id="hybrid_cqm_solver",
+        name="hybrid_cqm_solver",
         description="Hybrid unstructured CQM mock solver",
         supported_problem_types=["cqm"],
         # solver-specific properties (mock values)
@@ -387,7 +407,7 @@ def hybrid_cqm_solver_data(**kwargs) -> dict:
 
 def hybrid_dqm_solver_data(**kwargs) -> dict:
     params = dict(
-        id="hybrid_dqm_solver",
+        name="hybrid_dqm_solver",
         description="Hybrid unstructured DQM mock solver",
         supported_problem_types=["dqm"],
         # solver-specific properties (mock values)
@@ -403,7 +423,7 @@ def hybrid_dqm_solver_data(**kwargs) -> dict:
 
 def hybrid_nl_solver_data(**kwargs) -> dict:
     params = dict(
-        id="hybrid_nl_solver",
+        name="hybrid_nl_solver",
         description="Hybrid unstructured NL mock solver",
         supported_problem_types=["nl"],
         # solver-specific properties (mock values)

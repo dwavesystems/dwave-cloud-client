@@ -721,21 +721,21 @@ class Client(object):
                        ) -> list[Union[StructuredSolver, UnstructuredSolver]]:
 
         static_fields = 'all,-status,-avg_load'
-        dynamic_fields = 'none,+id,+status,+avg_load'
+        dynamic_fields = 'none,+solver,+status,+avg_load'
 
         if name is not None:
             logger.info("Fetching definition of a solver with name=%r", name)
 
             try:
                 solver = self.solvers_session.get_solver(
-                    solver_id=name, filter=static_fields, refresh_=refresh_)
+                    solver_name=name, filter=static_fields, refresh_=refresh_)
                 status = self.solvers_session.get_solver(
-                    solver_id=name, filter=dynamic_fields, refresh_=refresh_,
+                    solver_name=name, filter=dynamic_fields, refresh_=refresh_,
                     maxage_=self._DEFAULT_SOLVERS_DYNAMIC_PART_MAXAGE)
 
                 # merge static and dynamic properties
-                solver.status = status.get('status')
-                solver.avg_load = status.get('avg_load')
+                solver.status = status.get('status', 'offline')
+                solver.avg_load = status.get('avg_load', 0)
 
                 solvers = [solver]
 
@@ -753,10 +753,10 @@ class Client(object):
 
             # add dynamic properties to static solvers
             # note: allow solver list mismatch
-            statuses = {solver.id: solver for solver in dynamic}
+            statuses = {solver.identity.name: solver for solver in dynamic}
             for solver in solvers:
-                solver.status = statuses.get(solver.id, {}).get('status', 'offline')
-                solver.avg_load = statuses.get(solver.id, {}).get('avg_load', 0)
+                solver.status = statuses.get(solver.identity.name, {}).get('status', 'offline')
+                solver.avg_load = statuses.get(solver.identity.name, {}).get('avg_load', 0)
 
         logger.info("Received solver data for %d solver(s).", len(solvers))
         if logger.isEnabledFor(logging.TRACE):
@@ -928,10 +928,13 @@ class Client(object):
 
         * `name` (str): Solver name/id.
         * `qpu` (bool): Solver is a QPU?
+        * `hybrid` (bool): Solver is a hybrid quantum-classical solver?
         * `software` (bool): Solver is a software solver?
         * `online` (bool, default=True): Is solver online?
         * `num_active_qubits` (int): Number of active qubits. Less then or equal to `num_qubits`.
         * `avg_load` (float): Solver's average load (similar to Unix load average).
+        * `version` (dict): QPU solver version dict (contains at least `graph_id`)
+        * `graph_id` (str): QPU solver working graph id
 
         Common solver parameters are:
 
@@ -972,8 +975,9 @@ class Client(object):
                 qubits__issuperset={30, 31, 32},    # qubits 30, 31 and 32 must exist
                 supported_problem_types__issubset={'ising', 'qubo'},
                                                     # require Ising, QUBO or both to be supported
-                name='Advantage_system4.1',         # full solver name/ID match
+                name='Advantage_system4.1',         # solver name match
                 name__regex='Advantage.*',          # partial/regex-based solver name match
+                graph_id='01abcd1234',              # QPU solver working graph id match
                 chip_id__regex='Advantage_.*',      # chip ID prefix must be Advantage_
                 topology__type__eq="pegasus"        # topology.type must be Pegasus
                 topology__type="pegasus"            # same as above, `eq` implied even for nested properties
@@ -1272,7 +1276,7 @@ class Client(object):
 
         session = self.create_session()
         session.set_accept(media_type='application/vnd.dwave.sapi.problems+json',
-                           accept_version='>=2.1,<3')
+                           accept_version='~=3.0', ask_version='3.0.0')
         try:
             while True:
                 # Pull as many problems as we can, block on the first one,
@@ -1449,7 +1453,7 @@ class Client(object):
         """
         session = self.create_session()
         session.set_accept(media_type='application/vnd.dwave.sapi.problems+json',
-                           accept_version='>=2.1,<3')
+                           accept_version='~=3.0', ask_version='3.0.0')
         try:
             while True:
                 # Pull as many problems as we can, block when none are available.
@@ -1549,7 +1553,7 @@ class Client(object):
         """
         session = self.create_session()
         session.set_accept(media_type='application/vnd.dwave.sapi.problems+json',
-                           accept_version='>=2.1,<3')
+                           accept_version='~=3.0', ask_version='3.0.0')
         try:
             # grouped futures (all scheduled within _POLL_GROUP_TIMEFRAME)
             # and/or up to _STATUS_QUERY_SIZE (depending on strategy)
@@ -1688,7 +1692,7 @@ class Client(object):
         """
         session = self.create_session()
         session.set_accept(media_type='application/vnd.dwave.sapi.problem+json',
-                           accept_version='>=2.1,<3')
+                           accept_version='~=3.0', ask_version='3.0.0')
         try:
             while True:
                 # Select a problem
