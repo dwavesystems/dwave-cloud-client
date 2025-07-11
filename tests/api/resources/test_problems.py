@@ -946,7 +946,7 @@ class TestCloudProblemsUnstructured(UnstructuredProblemTestsMixin,
             cls.poll_wait_time = 2
 
             # submit and solve an Ising problem as a fixture
-            solver = client.get_solver(hybrid=True)
+            solver = client.get_solver(supported_problem_types__contains="bqm")
             cls.solver = solver.identity
             cls.bqm = dimod.BQM.from_ising({}, {'ab': 1.0})
             problem_data_id = solver.upload_problem(cls.bqm).result()
