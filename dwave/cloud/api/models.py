@@ -53,7 +53,10 @@ class _RootSetterMixin:
 
 
 class SolverVersion(BaseModel):
-    graph_id: str
+    # allow additional version specifiers in the future
+    model_config = ConfigDict(extra='allow')
+
+    graph_id: Optional[str] = None              # QPU solvers require graph_id
 
 
 class SolverIdentity(BaseModel):
@@ -62,12 +65,14 @@ class SolverIdentity(BaseModel):
 
     def __str__(self):
         s = self.name
-        if self.version:
-            s = f"{s}:{self.version.graph_id}"
+        d = self.dict()
+        if v := d.get('version'):
+            v = ":".join(map(str, v.values()))
+            s = f"{s}:{v}"
         return s
 
     def dict(self):
-        return self.model_dump(exclude_unset=True)
+        return self.model_dump(exclude_unset=True, exclude_none=True)
 
 
 class SolverCompleteConfiguration(BaseModel):
