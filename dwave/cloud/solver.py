@@ -679,10 +679,14 @@ class DQMSolver(BaseUnstructuredSolver):
         return dqm.to_file()
 
     def sample_bqm(self, bqm, label=None, **params):
-        """Use for testing."""
+        """Use for testing only."""
 
         # to sample BQM problems, we need to convert them to DQM
-        dqm = self._bqm_to_dqm(bqm)
+        if isinstance(bqm, str):
+            # unless bqm already uploaded
+            dqm = bqm
+        else:
+            dqm = self._bqm_to_dqm(bqm)
 
         # TODO: convert sampleset back
         return self.sample_dqm(dqm, label=label, **params)
