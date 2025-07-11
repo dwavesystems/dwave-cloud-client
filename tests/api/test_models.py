@@ -14,6 +14,8 @@
 
 import unittest
 
+from pydantic import ValidationError
+
 from dwave.cloud.api import models
 from dwave.cloud.testing.mocks import structured_solver_data, unstructured_solver_data
 
@@ -53,6 +55,38 @@ class TestModels(unittest.TestCase):
             self.assertEqual(solver.identity.name, name)
             self.assertEqual(solver.identity.version.graph_id, graph_id)
             self.assertIsNone(solver.get('properties'))
+
+    def test_solver_identity_model(self):
+        # test validation, construction and serialization with `.dict()`/`str()`
+        name = 'qpu-solver'
+        graph_id = '01abcd1234'
+
+        # name required
+        with self.assertRaises(ValidationError):
+            models.SolverIdentity()
+
+        with self.subTest('minimal solver identity'):
+            self.assertEqual(models.SolverIdentity(name=name).dict(), dict(name=name))
+            self.assertEqual(models.SolverIdentity(name=name, version=None).dict(), dict(name=name))
+
+        with self.subTest('allow empty version'):
+            data = {"name": name, "version": {}}
+            solver = models.SolverIdentity.model_validate(data)
+            self.assertEqual(solver.dict(), data)
+            self.assertEqual(str(solver), f"{name}")
+
+        with self.subTest('minimal qpu solver identity'):
+            data = {"name": name, "version": {"graph_id": graph_id}}
+            solver = models.SolverIdentity.model_validate(data)
+            self.assertEqual(solver.dict(), data)
+            self.assertEqual(str(solver), f"{name}:{graph_id}")
+
+        with self.subTest('allow additional version specs'):
+            extra = "1.0"
+            data = {"name": name, "version": {"graph_id": graph_id, "param_id": extra}}
+            solver = models.SolverIdentity.model_validate(data)
+            self.assertEqual(solver.dict(), data)
+            self.assertEqual(str(solver), f"{name}:{graph_id}:{extra}")
 
     def test_problem_models(self):
         with self.subTest('ProblemStatus'):
