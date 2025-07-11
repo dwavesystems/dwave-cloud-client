@@ -144,7 +144,7 @@ class ProblemResourcesBaseTests(abc.ABC):
         self.assertGreater(len(ps), 0)
 
         # extract one completed problem for further tests
-        problem = ps.pop()
+        problem = ps.pop(0)
 
         # filter by exact id
         ps = self.api.list_problems(id=problem.id)
