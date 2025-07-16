@@ -76,11 +76,7 @@ class SolverIdentity(BaseModel):
 
 
 class SolverCompleteConfiguration(BaseModel):
-    # maintain SAPI names on output
-    model_config = ConfigDict(
-        validate_by_name=True, validate_by_alias=True, serialize_by_alias=True)
-
-    identity: SolverIdentity = Field(alias='solver')
+    identity: SolverIdentity
     status: str
     description: str
     properties: dict
@@ -89,10 +85,9 @@ class SolverCompleteConfiguration(BaseModel):
 
 class SolverFilteredConfiguration(BaseModel):
     # no required fields, and no ignored fields
-    model_config = ConfigDict(extra='allow',
-        validate_by_name=True, validate_by_alias=True, serialize_by_alias=True)
+    model_config = ConfigDict(extra='allow')
 
-    identity: Optional[SolverIdentity] = Field(default=None, alias='solver')
+    identity: Optional[SolverIdentity] = None
 
 
 # NOTE: we implement getitem interface so that `SolverConfiguration` can be

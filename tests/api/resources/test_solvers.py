@@ -109,8 +109,7 @@ class TestMockSolvers(unittest.TestCase):
 
 
 class FilteringTestsMixin:
-    # XXX: solver=identity
-    additive_filter = 'none,+solver'
+    additive_filter = 'none,+identity'
     subtractive_filter = 'all,-properties.couplers'
 
     # assume self.api is initialized
@@ -120,7 +119,7 @@ class FilteringTestsMixin:
             solvers = self.api.list_solvers(filter=self.additive_filter)
             for item in solvers:
                 self.assertIsInstance(item.root, models.SolverFilteredConfiguration)
-                self.assertEqual(item.model_dump().keys(), {'solver'})
+                self.assertEqual(item.model_dump().keys(), {'identity'})
 
         with self.subTest('SAPI subtractive filtering'):
             solvers = self.api.list_solvers(filter=self.subtractive_filter)
@@ -181,8 +180,7 @@ class TestFiltering(FilteringTestsMixin, unittest.TestCase):
         self.solver_uri = urljoin(self.endpoint, 'solvers/remote/{}'.format(self.solver_name))
         self.list_uri = urljoin(self.endpoint, 'solvers/remote/')
 
-        # XXX: solver=identity
-        self.additive_filter_data = {"solver": self.solver_data['identity']}
+        self.additive_filter_data = {"identity": self.solver_data['identity']}
 
         self.subtractive_filter_data = self.solver_data.copy()
         del self.subtractive_filter_data['properties']['couplers']
@@ -250,7 +248,7 @@ class TestLiveSolvers(FilteringTestsMixin, unittest.TestCase):
 
         # don't assume solver availability, instead try fetching one from the list
         solvers = self.api.list_solvers()
-        solver_name = solvers.pop().identity.name
+        solver_name = solvers.pop(0).identity.name
 
         solver = self.api.get_solver(solver_name)
         self.assertIsInstance(solver, models.SolverConfiguration)
@@ -271,8 +269,7 @@ class TestLiveSolversCaching(unittest.TestCase):
         cls.tmpdir = tempfile.TemporaryDirectory()
         cls.store = partial(CachingSessionMixin._default_cache_config['store'],
                             directory=cls.tmpdir.name)
-        # XXX: solver=identity
-        cls.filter_ids = 'none,+solver'
+        cls.filter_ids = 'none,+identity'
 
     @classmethod
     def tearDownClass(cls):
