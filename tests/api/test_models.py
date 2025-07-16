@@ -53,6 +53,7 @@ class TestModels(unittest.TestCase):
 
         with self.subTest('ProblemInfo'):
             info = models.ProblemInfo(**self.sapi.problem_info())
+            info = models.ProblemInfo(**self.sapi.problem_info(answer=None))
 
         with self.subTest('ProblemJob'):
             job = models.ProblemJob.from_info(info)

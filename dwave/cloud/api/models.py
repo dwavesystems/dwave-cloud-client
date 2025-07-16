@@ -154,7 +154,7 @@ class ProblemInfo(BaseModel):
     data: ProblemData
     params: dict[str, AnyIncludingNumpy]
     metadata: ProblemMetadata
-    answer: ProblemAnswer
+    answer: Optional[ProblemAnswer] = None          # missing unless problem status is COMPLETED
 
 
 class ProblemJob(BaseModel):

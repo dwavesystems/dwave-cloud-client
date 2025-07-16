@@ -251,6 +251,15 @@ class ProblemResourcesBaseTests(abc.ABC):
         self.assertIsInstance(info.answer, models.ProblemAnswer)
         self.verify_problem_answer(info.answer)
 
+    def test_get_pending_problem_info(self):
+        if not hasattr(self, 'pending_problem_id'):
+            self.skipTest('pending problem id required')
+
+        info = self.api.get_problem_info(self.pending_problem_id)
+
+        # answer
+        self.assertIsNone(info.answer)
+
     def test_get_problem_answer(self):
         """Problem answer retrieved by problem id."""
 
@@ -488,6 +497,9 @@ class ProblemResourcesMockerMixin:
         # p2 is submitted (and pending)
         p2_id = self.p2.problem_id
         p2_status = self.p2.continue_reply(id=p2_id)
+        p2_params = p1_params
+        p2_metadata = self.p1.problem_metadata(status=constants.ProblemStatus.PENDING.value)
+        p2_info = self.p2.problem_info(params=p2_params, metadata=p2_metadata, answer=None)
 
         # p3 is cancelled
         p3_id = self.p3.problem_id
@@ -535,6 +547,11 @@ class ProblemResourcesMockerMixin:
             url(f'problems/{p1_id}/info'),
             complete_qs=True,
             json=p1_info,
+            request_headers=headers)
+        self.mocker.get(
+            url(f'problems/{p2_id}/info'),
+            complete_qs=True,
+            json=p2_info,
             request_headers=headers)
         self.mocker.get(
             url(f'problems/{p1_id}/answer'),
@@ -721,6 +738,8 @@ class TestMockProblemsStructured(StructuredProblemTestsMixin,
         cls.params = dict(num_reads=100)
         cls.solver_id = cls.p1.solver.id
 
+        cls.pending_problem_id = cls.p2.problem_id
+
 
 class TestMockProblemsStructuredWithQPUCompression(TestMockProblemsStructured):
     """Verify `dwave.cloud.api.resources.Problems` handle structured problems
@@ -806,6 +825,8 @@ class TestMockProblemsUnstructured(UnstructuredProblemTestsMixin,
         cls.params = dict(time_limit=3)
         cls.solver_id = cls.p1.solver.id
 
+        cls.pending_problem_id = cls.p2.problem_id
+
 
 @unittest.skipUnless(dimod, "dimod not installed")
 class TestMockProblemsUnstructuredWithBinaryRefAnswer(TestMockProblemsUnstructured):
@@ -829,6 +850,8 @@ class TestMockProblemsUnstructuredWithBinaryRefAnswer(TestMockProblemsUnstructur
 
         cls.params = dict(time_limit=3)
         cls.solver_id = cls.p1.solver.id
+
+        cls.pending_problem_id = cls.p2.problem_id
 
 
 @unittest.skipUnless(config, "SAPI access not configured")

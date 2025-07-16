@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Make answer field optional on the ``dwave.cloud.api.models.ProblemInfo``
+    model in order to support problems not completed (e.g. pending or failed).
+    See `#703 <https://github.com/dwavesystems/dwave-cloud-client/issues/703>`_.
