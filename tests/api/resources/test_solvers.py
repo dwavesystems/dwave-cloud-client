@@ -45,16 +45,16 @@ class TestMockSolvers(unittest.TestCase):
         self.mocker = requests_mock.Mocker()
 
         solver1_data = qpu_clique_solver_data(3)
-        solver1_id = solver1_data['id']
-        solver1_uri = urljoin(self.endpoint, 'solvers/remote/{}'.format(solver1_id))
+        solver1_name = solver1_data['identity']['name']
+        solver1_uri = urljoin(self.endpoint, 'solvers/remote/{}'.format(solver1_name))
 
         solver2_data = qpu_clique_solver_data(5)
-        solver2_id = solver2_data['id']
-        solver2_uri = urljoin(self.endpoint, 'solvers/remote/{}'.format(solver2_id))
+        solver2_name = solver2_data['identity']['name']
+        solver2_uri = urljoin(self.endpoint, 'solvers/remote/{}'.format(solver2_name))
 
         all_solver_data = [solver1_data, solver2_data]
         all_solver_data_uri = urljoin(self.endpoint, 'solvers/remote/')
-        self.solver_ids = [solver1_id, solver2_id]
+        self.solver_names = [solver1_name, solver2_name]
         self.solver_sizes = [3, 5]
 
         headers = {'X-Auth-Token': self.token}
@@ -86,12 +86,12 @@ class TestMockSolvers(unittest.TestCase):
     def test_get_solver(self):
         """Specific solver config retrieved (by id)."""
 
-        solver_id = self.solver_ids[0]
+        solver_name = self.solver_names[0]
         num_qubits = self.solver_sizes[0]
 
-        solver = self.api.get_solver(solver_id)
+        solver = self.api.get_solver(solver_name)
 
-        self.assertEqual(solver.id, solver_id)
+        self.assertEqual(solver.identity.name, solver_name)
         self.assertEqual(solver.properties['num_qubits'], num_qubits)
 
     def test_nonexisting_solver(self):
@@ -109,7 +109,7 @@ class TestMockSolvers(unittest.TestCase):
 
 
 class FilteringTestsMixin:
-    additive_filter = 'none,+id'
+    additive_filter = 'none,+identity'
     subtractive_filter = 'all,-properties.couplers'
 
     # assume self.api is initialized
@@ -119,7 +119,7 @@ class FilteringTestsMixin:
             solvers = self.api.list_solvers(filter=self.additive_filter)
             for item in solvers:
                 self.assertIsInstance(item.root, models.SolverFilteredConfiguration)
-                self.assertEqual(item.model_dump().keys(), {'id'})
+                self.assertEqual(item.model_dump().keys(), {'identity'})
 
         with self.subTest('SAPI subtractive filtering'):
             solvers = self.api.list_solvers(filter=self.subtractive_filter)
@@ -131,27 +131,32 @@ class FilteringTestsMixin:
 
     def test_solver_property_filtering(self):
         # find a QPU solver to query
-        qpu = [solver.id for solver in self.api.list_solvers()
-               if solver.properties.get('category') == 'qpu']
-        solver_id = qpu.pop()
+        qpu = next(iter(solver for solver in self.api.list_solvers()
+                        if solver.properties.get('category') == 'qpu'))
+        name = qpu.identity.name
+        graph_id = qpu.identity.version.graph_id
 
         with self.subTest('SAPI additive filtering'):
-            solver = self.api.get_solver(solver_id=solver_id, filter=self.additive_filter)
+            solver = self.api.get_solver(solver_name=name, filter=self.additive_filter)
             self.assertIsInstance(solver.root, models.SolverFilteredConfiguration)
-            self.assertEqual(solver.model_dump().keys(), {'id'})
+            self.assertEqual(solver.identity.name, name)
+            self.assertEqual(solver.identity.version.graph_id, graph_id)
 
         with self.subTest('SAPI subtractive filtering'):
-            solver = self.api.get_solver(solver_id=solver_id, filter=self.subtractive_filter)
+            solver = self.api.get_solver(solver_name=name, filter=self.subtractive_filter)
             self.assertIsInstance(solver.root, models.SolverCompleteConfiguration)
+            self.assertEqual(solver.identity.name, name)
+            self.assertEqual(solver.identity.version.graph_id, graph_id)
             self.assertNotIn('couplers', solver.properties)
             self.assertIn('qubits', solver.properties)
 
-    def test_solver_model_is_drop_in_for_dict(self):
-        solver = models.SolverConfiguration(id='id')
+    def test_solver_config_model_is_drop_in_for_dict(self):
+        solver = models.SolverConfiguration(
+            identity=dict(name='name', version=dict(graph_id='gid')))
 
         # getters
-        self.assertEqual(solver['id'], solver.id)
-        self.assertEqual(solver.get('id'), solver.id)
+        self.assertEqual(solver['identity'], solver.identity)
+        self.assertEqual(solver.get('identity'), solver.identity)
         self.assertEqual(solver.get('nonexisting', 'x'), 'x')
 
         # setters
@@ -170,12 +175,12 @@ class TestFiltering(FilteringTestsMixin, unittest.TestCase):
         self.mocker = requests_mock.Mocker()
 
         self.solver_data = qpu_clique_solver_data(3)
-        self.solver_id = self.solver_data['id']
+        self.solver_name = self.solver_data['identity']['name']
 
-        self.solver_uri = urljoin(self.endpoint, 'solvers/remote/{}'.format(self.solver_id))
+        self.solver_uri = urljoin(self.endpoint, 'solvers/remote/{}'.format(self.solver_name))
         self.list_uri = urljoin(self.endpoint, 'solvers/remote/')
 
-        self.additive_filter_data = {"id": self.solver_id}
+        self.additive_filter_data = {"identity": self.solver_data['identity']}
 
         self.subtractive_filter_data = self.solver_data.copy()
         del self.subtractive_filter_data['properties']['couplers']
@@ -243,11 +248,11 @@ class TestLiveSolvers(FilteringTestsMixin, unittest.TestCase):
 
         # don't assume solver availability, instead try fetching one from the list
         solvers = self.api.list_solvers()
-        solver_id = solvers.pop().id
+        solver_name = solvers.pop(0).identity.name
 
-        solver = self.api.get_solver(solver_id)
+        solver = self.api.get_solver(solver_name)
         self.assertIsInstance(solver, models.SolverConfiguration)
-        self.assertEqual(solver.id, solver_id)
+        self.assertEqual(solver.identity.name, solver_name)
 
     def test_nonexisting_solver(self):
         """Not found error is raised when trying to fetch a non-existing solver."""
@@ -264,6 +269,7 @@ class TestLiveSolversCaching(unittest.TestCase):
         cls.tmpdir = tempfile.TemporaryDirectory()
         cls.store = partial(CachingSessionMixin._default_cache_config['store'],
                             directory=cls.tmpdir.name)
+        cls.filter_ids = 'none,+identity'
 
     @classmethod
     def tearDownClass(cls):
@@ -274,11 +280,11 @@ class TestLiveSolversCaching(unittest.TestCase):
         # caching is disabled by default
         # sapi is queried every time
         with Solvers.from_config(validate_config_v1(config), history_size=2) as resource:
-            resource.list_solvers(filter='none,+id')
+            resource.list_solvers(filter=self.filter_ids)
             self.assertEqual(len(resource.session.history), 1)
             self.assertEqual(resource.session.history[-1].response.status_code, 200)
 
-            resource.list_solvers(filter='none,+id')
+            resource.list_solvers(filter=self.filter_ids)
             self.assertEqual(len(resource.session.history), 2)
             self.assertEqual(resource.session.history[-1].response.status_code, 200)
 
@@ -289,12 +295,12 @@ class TestLiveSolversCaching(unittest.TestCase):
                                  ) as resource:
 
             with self.subTest("cache miss, solvers fetched from sapi"):
-                solvers1 = resource.list_solvers(filter='none,+id')
+                solvers1 = resource.list_solvers(filter=self.filter_ids)
                 self.assertGreater(len(solvers1), 0)
                 self.assertEqual(len(resource.session.history), 1)
                 self.assertEqual(resource.session.history[-1].response.status_code, 200)
 
             with self.subTest("cache hit"):
-                solvers2 = resource.list_solvers(filter='none,+id')
+                solvers2 = resource.list_solvers(filter=self.filter_ids)
                 self.assertEqual(solvers1, solvers2)
                 self.assertEqual(len(resource.session.history), 1)

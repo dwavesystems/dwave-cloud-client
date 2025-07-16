@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import io
 import orjson
+import warnings
 from collections import abc
 from typing import Callable, Union, Optional, get_type_hints, TYPE_CHECKING
 from functools import wraps
@@ -150,7 +151,8 @@ class Solvers(ResourceBase):
     resource_path = 'solvers/'
     client_class = SolverAPIClient
 
-    @accepts(media_type='application/vnd.dwave.sapi.solver-definition-list+json', version='~=2.0')
+    @accepts(media_type='application/vnd.dwave.sapi.solver-definition-list+json',
+             version='~=3.0', ask_version='3.0.0')
     def list_solvers(self, filter: Optional[str] = None, **kwargs) -> list[models.SolverConfiguration]:
         path = 'remote/'
         params = {'filter': filter} if filter is not None else None
@@ -161,9 +163,18 @@ class Solvers(ResourceBase):
         solvers = orjson.loads(response.content)
         return TypeAdapter(list[models.SolverConfiguration]).validate_python(solvers)
 
-    @accepts(media_type='application/vnd.dwave.sapi.solver-definition+json', version='~=2.0')
-    def get_solver(self, solver_id: str, filter: Optional[str] = None, **kwargs) -> models.SolverConfiguration:
-        path = 'remote/{}'.format(solver_id)
+    @accepts(media_type='application/vnd.dwave.sapi.solver-definition+json',
+             version='~=3.0', ask_version='3.0.0')
+    def get_solver(self, solver_name: str, filter: Optional[str] = None, **kwargs) -> models.SolverConfiguration:
+        # backwards-compat
+        if 'solver_id' in kwargs:
+            solver_name = kwargs.pop('solver_id')
+            warnings.warn(
+                "`solver_id` parameter is deprecated since dwave-cloud-client 0.14.0, "
+                "and will be removed in 0.16.0. Use `solver_name` parameter instead.",
+                DeprecationWarning, stacklevel=2)
+
+        path = 'remote/{}'.format(solver_name)
         params = {'filter': filter} if filter is not None else None
         response = self.session.get(path, params=params, **kwargs)
         solver = orjson.loads(response.content)
@@ -175,13 +186,14 @@ class Problems(ResourceBase):
     resource_path = 'problems/'
     client_class = SolverAPIClient
 
-    @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problems+json',
+             version='~=3.0', ask_version='3.0.0')
     def list_problems(self, *,
-                      id: str = None,
-                      label: str = None,
-                      max_results: int = None,
-                      status: Union[str, constants.ProblemStatus] = None,
-                      solver: str = None,
+                      id: Optional[str] = None,
+                      label: Optional[str] = None,
+                      max_results: Optional[int] = None,
+                      status: Optional[Union[str, constants.ProblemStatus]] = None,
+                      solver: Optional[Union[str, models.SolverIdentity]] = None,
                       **params) -> list[models.ProblemStatus]:
         """Retrieve a filtered list of submitted problems."""
 
@@ -192,11 +204,14 @@ class Problems(ResourceBase):
             params.setdefault('label', label)
         if max_results is not None:
             params.setdefault('max_results', max_results)
-        if isinstance(status, constants.ProblemStatus):
-            params.setdefault('status', status.value)
-        elif status is not None:
+        if status is not None:
+            if isinstance(status, constants.ProblemStatus):
+                status = status.value
             params.setdefault('status', status)
         if solver is not None:
+            if isinstance(solver, models.SolverIdentity):
+                # TODO: check if we can use graph_id
+                solver = solver.name
             params.setdefault('solver', solver)
 
         path = ''
@@ -204,7 +219,8 @@ class Problems(ResourceBase):
         statuses = orjson.loads(response.content)
         return TypeAdapter(list[models.ProblemStatus]).validate_python(statuses)
 
-    @accepts(media_type='application/vnd.dwave.sapi.problem+json', version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problem+json',
+             version='~=3.0', ask_version='3.0.0')
     def get_problem(self,
                     problem_id: str,
                     timeout: Optional[int] = None,
@@ -218,7 +234,8 @@ class Problems(ResourceBase):
         status = orjson.loads(response.content)
         return models.ProblemStatusMaybeWithAnswer.model_validate(status)
 
-    @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problems+json',
+             version='~=3.0', ask_version='3.0.0')
     def get_problem_status(self,
                            problem_id: str,
                            timeout: Optional[int] = None,
@@ -233,7 +250,8 @@ class Problems(ResourceBase):
         return models.ProblemStatus.model_validate(status)
 
     # XXX: @pydantic.validate_arguments
-    @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problems+json',
+             version='~=3.0', ask_version='3.0.0')
     def get_problem_statuses(self,
                              problem_ids: list[str],
                              timeout: Optional[int] = None,
@@ -252,7 +270,8 @@ class Problems(ResourceBase):
         statuses = orjson.loads(response.content)
         return TypeAdapter(list[models.ProblemStatus]).validate_python(statuses)
 
-    @accepts(media_type='application/vnd.dwave.sapi.problem-data+json', version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problem-data+json',
+             version='~=3.0', ask_version='3.0.0')
     def get_problem_info(self, problem_id: str) -> models.ProblemInfo:
         """Retrieve complete problem info."""
         path = '{}/info'.format(problem_id)
@@ -260,7 +279,8 @@ class Problems(ResourceBase):
         info = orjson.loads(response.content)
         return models.ProblemInfo.model_validate(info)
 
-    @accepts(media_type='application/vnd.dwave.sapi.problem-answer+json', version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problem-answer+json',
+             version='>=2.1,<4', ask_version='3.0.0')
     def get_problem_answer(self, problem_id: str) -> models.ProblemAnswer:
         """Retrieve problem answer."""
         path = '{}/answer'.format(problem_id)
@@ -269,8 +289,10 @@ class Problems(ResourceBase):
         return models.ProblemAnswer.model_validate(answer)
 
     @accepts(media_type='application/octet-stream')
-    def get_answer_data(self, answer: models.UnstructuredProblemAnswerBinaryRef,
-                        output: Optional[io.IOBase] = None) -> io.IOBase:
+    def get_answer_data(self,
+                        answer: models.UnstructuredProblemAnswerBinaryRef,
+                        output: Optional[io.IOBase] = None,
+                        ) -> io.IOBase:
         """Retrieve binary-ref answer data."""
         if answer.auth_method != constants.BinaryRefAuthMethod.SAPI_TOKEN:
             raise ValueError(f"Authentication method {answer.auth_method!r} not supported.")
@@ -285,21 +307,23 @@ class Problems(ResourceBase):
 
         return output
 
-    @accepts(media_type='application/vnd.dwave.sapi.problem-message+json', version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problem-message+json',
+             version='>=2.1,<4', ask_version='3.0.0')
     def get_problem_messages(self, problem_id: str) -> list[dict]:
         """Retrieve list of problem messages."""
         path = '{}/messages'.format(problem_id)
         response = self.session.get(path)
         return orjson.loads(response.content)
 
-    @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problems+json',
+             version='~=3.0', ask_version='3.0.0')
     @compress_if(lambda obj, *_, **__: obj.client.config.get('compress_qpu_problem_data'))
     def submit_problem(self,
                        problem: Optional[models.ProblemJob] = None,
                        *,
                        data: Optional[models.ProblemData] = None,
                        params: Optional[dict] = None,
-                       solver: Optional[str] = None,
+                       solver: Optional[models.SolverIdentity] = None,
                        type: Optional[constants.ProblemType] = None,
                        label: Optional[str] = None) -> \
             Union[models.ProblemStatusMaybeWithAnswer, models.ProblemSubmitError]:
@@ -309,7 +333,8 @@ class Problems(ResourceBase):
         path = ''
         job_dict = problem.model_dump() if problem is not None else {}
         updates = dict(data=data.model_dump() if data is not None else None,
-                       params=params, solver=solver, type=type, label=label)
+                       solver=solver.dict() if solver is not None else None,
+                       params=params, type=type, label=label)
         job_dict.update((k, v) for k, v in updates.items() if v is not None)
         # note: orjson.dumps(model.model_dump()) is about 6-7x faster then
         # model.model_dump_json() - 45us vs 300us (including model construction)
@@ -319,7 +344,8 @@ class Problems(ResourceBase):
         rtype = get_type_hints(self.submit_problem)['return']
         return TypeAdapter(rtype).validate_python(orjson.loads(response.content))
 
-    @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problems+json',
+             version='~=3.0', ask_version='3.0.0')
     @compress_if(lambda obj, *_, **__: obj.client.config.get('compress_qpu_problem_data'))
     def submit_problems(self, problems: list[models.ProblemJob]) -> \
             list[Union[models.ProblemInitialStatus, models.ProblemSubmitError]]:
@@ -332,7 +358,8 @@ class Problems(ResourceBase):
         rtype = get_type_hints(self.submit_problems)['return']
         return TypeAdapter(rtype).validate_python(orjson.loads(response.content))
 
-    @accepts(media_type='application/vnd.dwave.sapi.problem+json', version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problem+json',
+             version='~=3.0', ask_version='3.0.0')
     def cancel_problem(self, problem_id: str) -> \
             Union[models.ProblemStatus, models.ProblemCancelError]:
         """Initiate problem cancel by problem id."""
@@ -341,7 +368,8 @@ class Problems(ResourceBase):
         rtype = get_type_hints(self.cancel_problem)['return']
         return TypeAdapter(rtype).validate_python(orjson.loads(response.content))
 
-    @accepts(media_type='application/vnd.dwave.sapi.problems+json', version='>=2.1,<3')
+    @accepts(media_type='application/vnd.dwave.sapi.problems+json',
+             version='~=3.0', ask_version='3.0.0')
     def cancel_problems(self, problem_ids: list[str]) -> \
             list[Union[models.ProblemStatus, models.ProblemCancelError]]:
         """Initiate problem cancel for a list of problems."""
