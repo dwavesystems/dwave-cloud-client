@@ -721,7 +721,7 @@ class Client(object):
                        ) -> list[Union[StructuredSolver, UnstructuredSolver]]:
 
         static_fields = 'all,-status,-avg_load'
-        dynamic_fields = 'none,+solver,+status,+avg_load'
+        dynamic_fields = 'none,+identity,+status,+avg_load'
 
         if name is not None:
             logger.info("Fetching definition of a solver with name=%r", name)
@@ -760,7 +760,7 @@ class Client(object):
 
         logger.info("Received solver data for %d solver(s).", len(solvers))
         if logger.isEnabledFor(logging.TRACE):
-            logger.trace("Solver data received for solver name=%r: %r", name, solvers)
+            logger.trace("Solver data received for solver %r: %r", name, solvers)
 
         instantiated_solvers = []
         for solver_desc in solvers:
