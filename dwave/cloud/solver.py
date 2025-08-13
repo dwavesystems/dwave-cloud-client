@@ -183,17 +183,8 @@ class BaseSolver:
 
         # Derived solver properties (not present in solver data properties dict)
         self.derived_properties = {
-            'qpu', 'hybrid', 'software', 'online', 'avg_load', 'name'
+            'id', 'name', 'online', 'avg_load', 'qpu', 'hybrid', 'software',
         }
-
-    @property
-    def id(self):
-        # keep `Solver.id` for backwards-compat
-        warnings.warn(
-            "`Solver.id` attribute is deprecated since dwave-cloud-client 0.14.0 "
-            "and will be removed in 0.15.0. Use `Solver.identity` instead.",
-            DeprecationWarning, stacklevel=2)
-        return self.identity.name
 
     def __repr__(self):
         return f"{type(self).__name__}(name={self.name!r})"
@@ -259,20 +250,19 @@ class BaseSolver:
     # Derived properties
 
     @property
+    def id(self) -> str:
+        """Unique solver string identifier, derived from :attr:`.identity`."""
+        # keep `Solver.id` for backwards-compat, but derive it from `Solver.identity`
+        warnings.warn(
+            "`Solver.id` attribute meaning has changed in dwave-cloud-client 0.14.0, "
+            "due to upstream API changes. Use of `Solver.identity` is now preferred.",
+            DeprecationWarning, stacklevel=2)
+        return str(self.identity)
+
+    @property
     def name(self) -> str:
         """Solver name."""
         return self.identity.name
-
-    @property
-    def version(self) -> dict:
-        """QPU solver version dict (contains at least ``graph_id``). Returns
-        an empty dict for non-QPU solvers."""
-        return v.model_dump() if (v := self.identity.version) else {}
-
-    @property
-    def graph_id(self) -> Optional[str]:
-        """QPU solver working graph id. Returns ``None`` for non-QPU solvers."""
-        return self.version.get('graph_id')
 
     @property
     def online(self) -> bool:
@@ -991,6 +981,17 @@ class StructuredSolver(BaseSolver):
         return f"{type(self).__name__}(name={self.name!r}, graph_id={self.graph_id!r})"
 
     # Derived properties
+
+    @property
+    def version(self) -> dict:
+        """QPU solver version dict (contains at least ``graph_id``). Returns
+        an empty dict for non-QPU solvers."""
+        return v.model_dump() if (v := self.identity.version) else {}
+
+    @property
+    def graph_id(self) -> Optional[str]:
+        """QPU solver working graph id. Returns ``None`` for non-QPU solvers."""
+        return self.version.get('graph_id')
 
     @property
     def num_active_qubits(self):
