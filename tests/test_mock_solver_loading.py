@@ -321,11 +321,17 @@ class MockSolverLoading(unittest.TestCase):
         self.assertFalse(solver_object('solver').has_flux_biases)
 
         # identity and derived properties
-        self.assertEqual(solver_object('solver').name, 'solver')
-        self.assertEqual(solver_object('solver', graph_id='a').id, 'solver:a')
-        self.assertEqual(solver_object('solver', graph_id='a').version, {'graph_id': 'a'})
-        self.assertEqual(solver_object('solver', graph_id='a').identity.dict(),
-                         {'name': 'solver', 'version': {'graph_id': 'a'}})
+        name, graph_id = 'solver', '1234'
+        version = {'graph_id': graph_id}
+        identity = {'name': name, 'version': version}
+        self.assertEqual(solver_object(name).name, name)
+        self.assertEqual(solver_object(name, graph_id=graph_id).id, f'{name}:{graph_id}')
+        self.assertEqual(solver_object(name, graph_id=graph_id).graph_id, graph_id)
+        self.assertEqual(solver_object(name, graph_id=graph_id).version, version)
+        self.assertEqual(solver_object(name, graph_id=graph_id).identity, identity)
+        self.assertEqual(solver_object(name, graph_id=graph_id).identity.dict(), identity)
+        self.assertEqual(solver_object(name, graph_id=graph_id).identity.version, version)
+        self.assertEqual(solver_object(name, graph_id=graph_id).identity.version.dict(), version)
 
         # test .num_qubits vs .num_actual_qubits
         data = solver_data('test')

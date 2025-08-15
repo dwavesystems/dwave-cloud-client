@@ -52,14 +52,30 @@ class _RootSetterMixin:
         return setattr(self.root, name, value)
 
 
-class SolverVersion(BaseModel):
+class _DictMixin:
+    """Add `.dict()` method."""
+
+    def dict(self):
+        return self.model_dump(exclude_unset=True, exclude_none=True)
+
+
+class _DictEqualityMixin:
+    """Enable equality testing against a dict. Requires `.dict` method."""
+
+    def __eq__(self, other):
+        if isinstance(other, dict):
+            return self.dict() == other
+        return super().__eq__(other)
+
+
+class SolverVersion(_DictMixin, _DictEqualityMixin, BaseModel):
     # allow additional version specifiers in the future
     model_config = ConfigDict(extra='allow')
 
     graph_id: Optional[str] = None              # QPU solvers require graph_id
 
 
-class SolverIdentity(BaseModel):
+class SolverIdentity(_DictMixin, _DictEqualityMixin, BaseModel):
     name: str
     version: Optional[SolverVersion] = None     # only QPU solvers have `version` structure
 
@@ -70,9 +86,6 @@ class SolverIdentity(BaseModel):
             v = ":".join(map(str, v.values()))
             s = f"{s}:{v}"
         return s
-
-    def dict(self):
-        return self.model_dump(exclude_unset=True, exclude_none=True)
 
 
 class SolverCompleteConfiguration(BaseModel):

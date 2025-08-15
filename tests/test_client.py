@@ -1050,6 +1050,15 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.get_solvers(version=dict(graph_id='q1')), [self.qpu1])
         self.assertSolvers(self.client.get_solvers(graph_id__eq=None), [self.hybrid])
 
+    def test_identity_search(self):
+        identity = self.qpu1.identity
+        # model to model and model to dict equality
+        self.assertSolvers(self.client.get_solvers(identity=identity), [self.qpu1])
+        self.assertSolvers(self.client.get_solvers(identity=identity.dict()), [self.qpu1])
+        # mix
+        self.assertSolvers(self.client.get_solvers(name='qpu2', graph_id='q2'), [self.qpu2])
+        self.assertSolvers(self.client.get_solvers(name='qpu2', graph_id='q1'), [])
+
     def test_num_qubits(self):
         self.assertSolvers(self.client.get_solvers(num_qubits=5), [self.qpu2])
         self.assertSolvers(self.client.get_solvers(num_active_qubits=2), [self.software])

@@ -71,22 +71,48 @@ class TestModels(unittest.TestCase):
 
         with self.subTest('allow empty version'):
             data = {"name": name, "version": {}}
-            solver = models.SolverIdentity.model_validate(data)
-            self.assertEqual(solver.dict(), data)
-            self.assertEqual(str(solver), f"{name}")
+            identity = models.SolverIdentity.model_validate(data)
+            self.assertEqual(identity.dict(), data)
+            self.assertEqual(str(identity), f"{name}")
 
         with self.subTest('minimal qpu solver identity'):
             data = {"name": name, "version": {"graph_id": graph_id}}
-            solver = models.SolverIdentity.model_validate(data)
-            self.assertEqual(solver.dict(), data)
-            self.assertEqual(str(solver), f"{name}:{graph_id}")
+            identity = models.SolverIdentity.model_validate(data)
+            self.assertEqual(identity.dict(), data)
+            self.assertEqual(str(identity), f"{name}:{graph_id}")
 
         with self.subTest('allow additional version specs'):
             extra = "1.0"
             data = {"name": name, "version": {"graph_id": graph_id, "param_id": extra}}
-            solver = models.SolverIdentity.model_validate(data)
-            self.assertEqual(solver.dict(), data)
-            self.assertEqual(str(solver), f"{name}:{graph_id}:{extra}")
+            identity = models.SolverIdentity.model_validate(data)
+            self.assertEqual(identity.dict(), data)
+            self.assertEqual(str(identity), f"{name}:{graph_id}:{extra}")
+
+        with self.subTest('identity equality'):
+            # compares to dict
+            data = {"name": name, "version": {"graph_id": graph_id}}
+            identity = models.SolverIdentity.model_validate(data)
+            self.assertEqual(identity, data)
+
+            # compares to SolverIdentity
+            identity2 = models.SolverIdentity.model_validate(data)
+            self.assertEqual(identity, identity2)
+
+            # compares with empty version as well
+            data = {"name": name}
+            identity = models.SolverIdentity.model_validate(data)
+            self.assertEqual(identity, data)
+
+        with self.subTest('version equality'):
+            # compares to dict
+            data = {"name": name, "version": {"graph_id": graph_id}}
+            identity = models.SolverIdentity.model_validate(data)
+            self.assertEqual(identity.version.dict(), data['version'])
+            self.assertEqual(identity.version, data['version'])
+
+            # compares to SolverVersion
+            version = models.SolverVersion.model_validate(data['version'])
+            self.assertEqual(identity.version, version)
 
     def test_problem_models(self):
         with self.subTest('ProblemStatus'):

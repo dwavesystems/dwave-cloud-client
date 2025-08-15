@@ -926,15 +926,16 @@ class Client(object):
 
         Derived properies are:
 
-        * `name` (str): Solver name/id.
+        * `identity` (str): Solver identity dict. Includes a name, and possibly version(s).
+        * `name` (str): Solver name.
+        * `version` (dict): QPU solver version dict (contains at least `graph_id`)
+        * `graph_id` (str): QPU solver working graph id
         * `qpu` (bool): Solver is a QPU?
         * `hybrid` (bool): Solver is a hybrid quantum-classical solver?
         * `software` (bool): Solver is a software solver?
         * `online` (bool, default=True): Is solver online?
         * `num_active_qubits` (int): Number of active qubits. Less then or equal to `num_qubits`.
         * `avg_load` (float): Solver's average load (similar to Unix load average).
-        * `version` (dict): QPU solver version dict (contains at least `graph_id`)
-        * `graph_id` (str): QPU solver working graph id
 
         Common solver parameters are:
 
