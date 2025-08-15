@@ -37,6 +37,18 @@ from dwave.cloud.utils.qubo import generate_random_ising_problem, active_qubits
 from dwave.cloud.utils.logging import get_caller_name
 
 
+def generate_mock_solver_metadata():
+    return [
+        mocks.hybrid_bqm_solver_data(),
+        mocks.hybrid_cqm_solver_data(),
+        mocks.hybrid_dqm_solver_data(),
+        mocks.hybrid_nl_solver_data(),
+        mocks.qpu_chimera_solver_data(16),
+        mocks.qpu_pegasus_solver_data(16),
+        mocks.qpu_zephyr_solver_data(12),
+    ]
+
+
 # note: looks like timeraw benchmarks can't be parameterized
 class ImportDeps:
     version = "1"
@@ -184,10 +196,10 @@ class RegionsMetadata:
 
 
 class SolverMetadataJSONDecode:
-    version = "1"
+    version = "2"
 
     def setup(self):
-        self.data = (Path(__file__).parent / 'fixtures/solvers.json').read_bytes()
+        self.data = orjson.dumps(generate_mock_solver_metadata())
 
     def time_json_loads(self):
         # match the decoder used by requests (Response.json())
@@ -195,11 +207,11 @@ class SolverMetadataJSONDecode:
 
 
 class SolverSelection:
-    version = "3"
+    version = "4"
 
     def setup(self):
         self.client = Client(token='mock')
-        solvers_data = orjson.loads((Path(__file__).parent / 'fixtures/solvers.json').read_bytes())
+        solvers_data = generate_mock_solver_metadata()
 
         static_data = deepcopy(solvers_data)
         for solver in static_data:
@@ -207,7 +219,7 @@ class SolverSelection:
             del solver['avg_load']
 
         dynamic_data = [{
-            "id": s['id'],
+            "identity": s['identity'],
             "status": s['status'],
             "avg_load": s['avg_load']
         } for s in solvers_data]
@@ -217,7 +229,7 @@ class SolverSelection:
 
         class mock_session:
             def list_solvers(self, filter=None, **kwargs):
-                if filter == 'none,+id,+status,+avg_load':
+                if filter == 'none,+identity,+status,+avg_load':
                     return dynamic_conf
                 elif filter == 'all,-status,-avg_load':
                     return static_conf
@@ -243,18 +255,18 @@ class SolverSelection:
             num_qubits__within=(5000, 6000),
             order_by='-num_active_qubits')
 
-    def time_get_solver_zephyr_small(self):
+    def time_get_solver_zephyr(self):
         self.client.get_solver(
             topology__type='zephyr',
-            num_qubits__within=(1000, 2000),
+            num_qubits__within=(4000, 5000),
             order_by='-num_active_qubits')
 
 
 class JSONResponseDecode:
-    version = "1"
+    version = "2"
 
     def setup(self):
-        self.data = (Path(__file__).parent / 'fixtures/solvers.json').read_bytes()
+        self.data = orjson.dumps(generate_mock_solver_metadata())
         self.mocker = requests_mock.Mocker()
         self.mocker.get(
             requests_mock.ANY,
