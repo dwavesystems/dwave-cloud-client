@@ -23,49 +23,24 @@ from dwave.cloud.client import Client
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
 from dwave.cloud.events import add_handler, dispatches_events
 from dwave.cloud.concurrency import Present
+from dwave.cloud.testing import mocks
 
 
 class TestEventDispatch(unittest.TestCase):
 
     def setUp(self):
         # mock client
-        self.client = Client(endpoint='e', token='t', solver=dict(name__contains='test'))
+        self.client = Client(endpoint='e', token='t', solver=dict(name__contains='test', order_by='-name'))
         self.client._fetch_solvers = lambda **kw: self.solvers
         self.client._submit = lambda *pa, **kw: None
-        self.client.upload_problem_encoded = lambda *pa, **kw: Present(result=mock_problem_id)
+        self.client.upload_problem_encoded = lambda *pa, **kw: Present(result='mock_problem_id')
 
         # mock solvers
-        self.structured_solver = StructuredSolver(client=self.client, data={
-            "properties": {
-                "supported_problem_types": ["qubo", "ising"],
-                "qubits": [0, 1, 2],
-                "couplers": [[0, 1], [0, 2], [1, 2]],
-                "num_qubits": 3,
-                "num_reads_range": [0, 100],
-                "parameters": {
-                    "num_reads": "Number of samples to return.",
-                    "postprocess": "either 'sampling' or 'optimization'"
-                },
-                "topology": {
-                    "type": "chimera",
-                    "shape": [16, 16, 4]
-                },
-                "category": "qpu",
-                "tags": ["lower_noise"]
-            },
-            "id": "test-qpu-solver",
-            "description": "A test solver 1",
-            "status": "online"
-        })
-        self.unstructured_solver = UnstructuredSolver(client=self.client, data={
-            "properties": {
-                "supported_problem_types": ["bqm"],
-                "parameters": {"num_reads": "Number of samples to return."},
-                "category": "hybrid",
-            },
-            "id": "test-unstructured-solver",
-            "description": "A test unstructured solver"
-        })
+        self.structured_solver = StructuredSolver(
+            client=self.client, data=mocks.qpu_clique_solver_data(name="test_qpu", size=3))
+        self.unstructured_solver = UnstructuredSolver(
+            client=self.client, data=mocks.hybrid_bqm_solver_data(name="test_hss"))
+
         self.solvers = [self.structured_solver]
         # we can't use unstructured solvers without dimod installed,
         # so don't even try testing it
@@ -187,7 +162,7 @@ class TestEventDispatch(unittest.TestCase):
         """Before/After solver sample events are dispatched with correct signatures."""
 
         for solver in self.solvers:
-            with self.subTest("solver=%r" % solver.id):
+            with self.subTest("solver=%r" % solver):
                 self.subtest_sample(solver)
 
 

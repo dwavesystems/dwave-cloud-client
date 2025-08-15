@@ -36,29 +36,9 @@ from dwave.cloud.utils.qubo import generate_const_ising_problem, generate_random
 
 
 def get_structured_solver():
-    data = {
-        "properties": {
-            "supported_problem_types": ["qubo", "ising"],
-            "qubits": [0, 1, 2, 3],
-            "couplers": [(0, 1), (1, 2), (2, 3), (3, 0)],
-            "num_qubits": 4,
-            "parameters": {"num_reads": "Number of samples to return."}
-        },
-        "id": "test-structured-solver",
-        "description": "A test structured solver"
-    }
+    data = mocks.structured_solver_data(
+        qubits=[0, 1, 2, 3], couplers=[(0, 1), (1, 2), (2, 3), (3, 0)])
     return StructuredSolver(client=None, data=data)
-
-def get_unstructured_solver():
-    data = {
-        "properties": {
-            "supported_problem_types": ["bqm"],
-            "parameters": {"num_reads": "Number of samples to return."}
-        },
-        "id": "test-unstructured-solver",
-        "description": "A test unstructured solver"
-    }
-    return UnstructuredSolver(client=None, data=data)
 
 
 class CodersTestBase(unittest.TestCase):
