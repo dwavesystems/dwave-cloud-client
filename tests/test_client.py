@@ -723,9 +723,9 @@ class ClientConfigIntegration(unittest.TestCase):
                     client.get_solvers()
 
 
-@isolated_environ(empty=True)
 class MultiRegionSupport(unittest.TestCase):
 
+    @isolated_environ(empty=True)
     def test_region_selection_mocked_end_to_end(self):
         """Given `metadata_api_endpoint` and `region` in a config file,
         when Client is initialized from config,
@@ -764,7 +764,7 @@ class MultiRegionSupport(unittest.TestCase):
             def get(url, **kwargs):
                 response = mock.Mock(['text', 'json'])
                 response.status_code = 200
-                response.json.side_effect = lambda: regions_response
+                response.content = json.dumps(regions_response).encode('utf8')
                 return response
             session.get = get
 
@@ -796,6 +796,7 @@ class MultiRegionSupport(unittest.TestCase):
                         self.assertEqual(client.config.region, selected_region)
                         self.assertEqual(client.config.endpoint, selected_endpoint)
 
+    @isolated_environ(empty=True)
     def test_region_endpoint_fallback_when_no_metadata_api(self):
         """Given region in config, and endpoint omitted,
         when Client is initialized from config and MetadataAPI is down,
@@ -812,6 +813,7 @@ class MultiRegionSupport(unittest.TestCase):
                 self.assertEqual(client.config.endpoint, Client.DEFAULT_API_ENDPOINT)
 
     @mock.patch("dwave.cloud.regions.get_regions", get_default_regions)
+    @isolated_environ(empty=True)
     def test_region_endpoint_fallback_when_region_unknown(self):
         """Given invalid region in config, and endpoint omitted,
         when Client is initialized from config,
@@ -827,6 +829,7 @@ class MultiRegionSupport(unittest.TestCase):
                 Client.from_config(region=region)
 
     @mock.patch("dwave.cloud.regions.get_regions", get_default_regions)
+    @isolated_environ(empty=True)
     def test_region_endpoint_null_case(self):
         """Given region as None, and endpoint as None,
         when Client is initialized from config,
@@ -842,12 +845,20 @@ class MultiRegionSupport(unittest.TestCase):
                 self.assertEqual(client.config.endpoint, Client.DEFAULT_API_ENDPOINT)
 
     @unittest.skipUnless(config, "No live server configuration available.")
-    @cached.disabled()
-    def test_region_selection_live_end_to_end(self):
+    @isolated_environ(empty=True)
+    def test_region_selection_default(self):
         with Client(**config) as client:
             self.assertEqual(client.config.region, constants.DEFAULT_REGION)
-            self.assertIn(constants.DEFAULT_REGION, client.config.endpoint)
+            self.assertIn(constants.DEFAULT_SOLVER_API_ENDPOINT, client.config.endpoint)
             self.assertGreater(len(client.get_regions()), 0)
+
+    @unittest.skipUnless(config, "No live server configuration available.")
+    @isolated_environ(empty=True)
+    def test_region_selection_default(self):
+        region = 'eu-central-1'
+        with Client(region=region, **config) as client:
+            self.assertEqual(client.config.region, region)
+            self.assertIn(region, client.config.endpoint)
 
 
 class FeatureBasedSolverSelection(unittest.TestCase):
