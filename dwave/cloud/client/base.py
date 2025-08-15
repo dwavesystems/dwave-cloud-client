@@ -1077,7 +1077,7 @@ class Client(object):
                 return op(pluck(solver.properties, path), val)
             else:
                 op = ops[op_name or 'eq']
-                return op(None, val)
+                return op(pluck(solver, path), val)
 
         # param validation
         sort_reverse = False

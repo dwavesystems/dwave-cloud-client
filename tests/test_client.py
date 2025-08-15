@@ -148,7 +148,7 @@ class SolverLoading(unittest.TestCase):
         """List and retrieve all the solvers."""
         with Client(**config) as client:
             for solver in client.get_solvers():
-                self.assertEqual(client.get_solver(name=solver.id).id, solver.id)
+                self.assertEqual(client.get_solver(name=solver.name).name, solver.name)
 
     def test_load_bad_solvers(self):
         """Try to load a nonexistent solver."""
@@ -171,23 +171,23 @@ class SolverLoading(unittest.TestCase):
         with Client(**conf) as base_client:
 
             with qpu.Client(**conf) as client:
-                solvers = {s.id for s in base_client.get_solvers(qpu=True)}
+                solvers = {s.name for s in base_client.get_solvers(qpu=True)}
                 if solvers:
-                    self.assertIn(client.get_solver().id, solvers)
+                    self.assertIn(client.get_solver().name, solvers)
                 else:
                     self.assertRaises(SolverError, client.get_solver)
 
             with sw.Client(**conf) as client:
-                solvers = {s.id for s in base_client.get_solvers(software=True)}
+                solvers = {s.name for s in base_client.get_solvers(software=True)}
                 if solvers:
-                    self.assertIn(client.get_solver().id, solvers)
+                    self.assertIn(client.get_solver().name, solvers)
                 else:
                     self.assertRaises(SolverError, client.get_solver)
 
             with hybrid.Client(**conf) as client:
-                solvers = {s.id for s in base_client.get_solvers(hybrid=True)}
+                solvers = {s.name for s in base_client.get_solvers(hybrid=True)}
                 if solvers:
-                    self.assertIn(client.get_solver().id, solvers)
+                    self.assertIn(client.get_solver().name, solvers)
                 else:
                     self.assertRaises(SolverError, client.get_solver)
 
@@ -716,7 +716,7 @@ class ClientConfigIntegration(unittest.TestCase):
                     response = requests.Response()
                     response.status_code = 200
                     response._content = b'[]'
-                    response.headers = {'Content-Type': 'application/vnd.dwave.sapi.solver-definition-list+json; version=2.0'}
+                    response.headers = {'Content-Type': 'application/vnd.dwave.sapi.solver-definition-list+json; version=3.0'}
                     return response
 
                 with mock.patch("requests.adapters.HTTPAdapter.send", mock_send):
@@ -873,7 +873,12 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "category": "qpu",
                 "tags": ["lower_noise"]
             },
-            "id": "qpu1",
+            "identity": {
+                "name": "qpu1",
+                "version": {
+                    "graph_id": "q1",
+                },
+            },
             "description": "QPU Chimera solver",
             "status": "online",
             "avg_load": 0.1
@@ -897,7 +902,12 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "category": "qpu",
                 "vfyc": True
             },
-            "id": "qpu2",
+            "identity": {
+                "name": "qpu2",
+                "version": {
+                    "graph_id": "q2",
+                },
+            },
             "description": "QPU Pegasus solver",
             "avg_load": 0.2
         })
@@ -921,7 +931,12 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 "some_string": "x",
                 "tags": ["tag"]
             },
-            "id": "sw_solver1",
+            "identity": {
+                "name": "sw_solver1",
+                "version": {
+                    "graph_id": "sw1",
+                },
+            },
             "description": "Software solver",
             "avg_load": 0.7
         })
@@ -937,7 +952,9 @@ class FeatureBasedSolverSelection(unittest.TestCase):
                 },
                 "category": "hybrid",
             },
-            "id": "hybrid_v1",
+            "identity": {
+                "name": "hybrid_v1",
+            },
             "description": "Hybrid solver"
         })
 
@@ -989,7 +1006,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             finally:
                 return (p.stop() for p in patchers)
 
-        with mock.patch.object(self.software, 'id', 'c4-sw_solver3'):
+        with mock.patch.object(self.software.identity, 'name', 'c4-sw_solver3'):
             # patch categories and re-run the category-based filtering test
             with multi_solver_properties_patch(self.solvers, {'category': ''}):
                 self.test_derived_category_properties()
@@ -1014,6 +1031,13 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.get_solvers(name__regex='.*[12].*'), self.solvers)
         self.assertSolvers(self.client.get_solvers(name__regex='qpu[12]'), [self.qpu1, self.qpu2])
         self.assertSolvers(self.client.get_solvers(name__regex='^qpu(1|2)$'), [self.qpu1, self.qpu2])
+
+    def test_graph_id(self):
+        self.assertSolvers(self.client.get_solvers(graph_id='q1'), [self.qpu1])
+        self.assertSolvers(self.client.get_solvers(graph_id='sw1'), [self.software])
+        self.assertSolvers(self.client.get_solvers(version__graph_id='q2'), [self.qpu2])
+        self.assertSolvers(self.client.get_solvers(version=dict(graph_id='q1')), [self.qpu1])
+        self.assertSolvers(self.client.get_solvers(graph_id__eq=None), [self.hybrid])
 
     def test_num_qubits(self):
         self.assertSolvers(self.client.get_solvers(num_qubits=5), [self.qpu2])
@@ -1208,7 +1232,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             self.assertEqual(client.get_solver(), self.qpu2)
 
             # the default solver should not change when we add order_by
-            self.assertEqual(client.get_solver(order_by='id'), self.qpu2)
+            self.assertEqual(client.get_solver(order_by='name'), self.qpu2)
 
         with Client(endpoint='endpoint', token='token', solver=dict(category='qpu')) as client:
             # mock the network call to fetch all solvers
@@ -1231,7 +1255,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             self.assertEqual(client.get_solver(), self.hybrid)
 
             # the default solver can be overridden
-            self.assertEqual(client.get_solver(order_by='-id'), self.software)
+            self.assertEqual(client.get_solver(order_by='-name'), self.software)
 
         with Client(endpoint='endpoint', token='token', solver=dict(qpu=True, order_by='-num_active_qubits')) as client:
             # mock the network call to fetch all solvers
@@ -1267,7 +1291,9 @@ class FeatureBasedSolverSelection(unittest.TestCase):
 
     def test_order_by_callable(self):
         # sort by Solver inferred properties
-        self.assertEqual(self.client.get_solvers(order_by=lambda solver: solver.id), [self.hybrid, self.qpu1, self.qpu2, self.software])
+        by_name = [self.hybrid, self.qpu1, self.qpu2, self.software]
+        self.assertEqual(self.client.get_solvers(order_by=lambda solver: solver.id), by_name)
+        self.assertEqual(self.client.get_solvers(order_by=lambda solver: solver.name), by_name)
         self.assertEqual(self.client.get_solvers(order_by=lambda solver: solver.avg_load), [self.qpu1, self.qpu2, self.software, self.hybrid])
 
         # sort by solver property
