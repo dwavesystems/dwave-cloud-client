@@ -1412,7 +1412,7 @@ class Client(object):
                     # An alternative to making this call here would be to pass
                     # self in with the message
                     if future.solver is None:
-                        future.solver = self.get_solver(name=message['solver'])
+                        future.solver = self.get_solver(identity=message['solver'])
 
                     future._set_message(message)
                 # If the problem is complete, but we don't have the result data
