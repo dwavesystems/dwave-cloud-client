@@ -1,0 +1,59 @@
+---
+prelude: >
+    Solver identification has changed with SAPI solver representation v3. Instead
+    of a unique string ``id``, each solver is now uniquely referenced by a more
+    descriptive ``identity`` dictionary.
+
+    Each solver still has a ``name``, but to uniquely identify a specific working
+    graph of a structured solver (QPU), ``graph_id`` has to be used.
+
+    Hybrid (unstructured) solvers are still uniquely identified by their ``name``.
+
+features:
+  - |
+    Implement support for SAPI v3 solver representation format. Use it by default.
+
+    Use ``Solver.identity`` instead of ``Solver.id`` to uniquely reference a
+    specific solver and its version.
+
+    See `#696 <https://github.com/dwavesystems/dwave-cloud-client/issues/696>`_.
+  - |
+    Feature-based solver filtering via ``Client.get_solver()`` and ``Client.get_solvers()``
+    has been extended to support the new ``identity`` field (dict), ``version`` (dict) and
+    ``graph_id`` (string). For example::
+
+      client.get_solvers(name='Advantage_system6.4', graph_id='01dae5a273')
+      client.get_solvers(graph_id='01dae5a273')
+      client.get_solvers(version__graph_id='01dae5a273')
+      client.get_solvers(identity__version={'graph_id': '01dae5a273'})
+      client.get_solvers(category='qpu', order_by='graph_id')
+      client.get_solver(id='Advantage_system6.4:01dae5a273')
+  - |
+    Add ``SolverVersion`` and ``SolverIdentity`` to ``dwave.cloud.api.models``.
+    They both compare with a ``dict``, and serialize with ``.dict()`` for convenience.
+
+fixes:
+  - |
+    Preserve ``Content-Type`` of a response cached with ``CachingSessionMixin``.
+
+upgrade:
+  - |
+    Switch to using solver's ``identity`` structure in place of the legacy
+    string ``id``.
+  - |
+    ``Solver.data`` type changed from a raw dict (as returned by SAPI) to
+    the ``dwave.cloud.api.models.SolverConfiguration`` model. This is mostly a
+    backwards-compatible change, since getter/setter interface is supported.
+  - |
+    The type of ``solver`` argument to ``dwave.cloud.api.resources.Problems``
+    methods (``submit_problem`` and ``list_problems``) changed from a string,
+    to a ``SolverIdentity`` model.
+
+deprecations:
+  - |
+    ``Solver.id`` is deprecated in favor of ``Solver.identity``. Solver "ID" is
+    not available anymore, so it's constructed on the fly from the ``identity``
+    field, with the uniqueness assumption preserved.
+  - |
+    ``solver_id`` argument in ``dwave.cloud.api.resources.Solvers.get_solver()``
+    is deprecated in favor of ``solver_name``.

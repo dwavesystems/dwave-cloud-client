@@ -572,7 +572,7 @@ class CachingSessionMixin:
                 maxage = default_maxage
 
             if epochnow() - meta['created'] < maxage:
-                logger.debug('cache hit within maxage')
+                logger.debug(f'cache hit within maxage ({maxage} seconds)')
                 return make_response(meta, content)
 
             # validate with conditional request if possible
