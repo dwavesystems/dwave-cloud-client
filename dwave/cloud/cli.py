@@ -392,6 +392,8 @@ def _get_client_solver(config, output=None):
         raise CLIError("Unexpected error while fetching solver: {!r}".format(e), 5)
 
     output("Using solver: {solver_name}", solver_name=solver.name)
+    if solver.identity.version:
+        output("Working graph version: {graph_id}", graph_id=solver.graph_id)
 
     return (client, solver)
 

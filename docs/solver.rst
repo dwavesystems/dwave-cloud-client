@@ -48,12 +48,16 @@ Methods
    DQMSolver.sample_dqm
    DQMSolver.upload_dqm
 
+   NLSolver.sample_nlm
+   NLSolver.upload_nlm
+
 Properties
 ----------
 
 .. autosummary::
    :toctree: generated
 
+   BaseSolver.identity
    BaseSolver.name
    BaseSolver.avg_load
    BaseSolver.online
@@ -67,6 +71,8 @@ Properties
    StructuredSolver.couplers
    StructuredSolver.undirected_edges
 
+   StructuredSolver.graph_id
+   StructuredSolver.version
    StructuredSolver.num_active_qubits
    StructuredSolver.num_qubits
    StructuredSolver.is_vfyc
