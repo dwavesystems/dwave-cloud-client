@@ -496,7 +496,7 @@ class TestAuthCli(unittest.TestCase):
         with self.subTest('dwave auth login --config-file <file> --profile <profile>'):
             config_file = 'dwave.conf'
             profile = 'profile'
-            leap_api_endpoint = 'https://example.com/leap/api'
+            leap_api_endpoint = 'https://mock.dwavesys.com/leap/api'
             config_lines = [f'[{profile}]', f'leap_api_endpoint = {leap_api_endpoint}']
 
             flow_factory.reset_mock()

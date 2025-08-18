@@ -35,12 +35,12 @@ class TestAuthFlow(unittest.TestCase):
         self.client_id = '123'
         self.scopes = ('scope-a', 'scope-b')
         self.redirect_uri_oob = 'oob'
-        self.authorization_endpoint = 'https://example.com/authorize'
-        self.token_endpoint = 'https://example.com/token'
-        self.revocation_endpoint = 'https://example.com/revoke'
+        self.authorization_endpoint = 'https://mock.dwavesys.com/authorize'
+        self.token_endpoint = 'https://mock.dwavesys.com/token'
+        self.revocation_endpoint = 'https://mock.dwavesys.com/revoke'
         self.token = dict(access_token='123', refresh_token='456', id_token='789')
         self.creds = Credentials(create=False)
-        self.leap_api_endpoint = 'https://example.com/leap/api'
+        self.leap_api_endpoint = 'https://mock.dwavesys.com/leap/api'
 
         self.test_args = dict(
             client_id=self.client_id,
@@ -270,6 +270,8 @@ class TestAuthFlow(unittest.TestCase):
 
 class TestLeapAuthFlow(unittest.TestCase):
 
+    mock_leap_api_endpoint = 'https://mock.dwavesys.com/leap'
+
     def test_from_default_config(self):
         config = ClientConfig()
 
@@ -281,7 +283,7 @@ class TestLeapAuthFlow(unittest.TestCase):
         self.assertTrue(flow.token_endpoint.startswith(prefix))
 
     def test_from_minimal_config(self):
-        config = ClientConfig(leap_api_endpoint='https://example.com/leap')
+        config = ClientConfig(leap_api_endpoint=self.mock_leap_api_endpoint)
 
         flow = LeapAuthFlow.from_config_model(config)
 
@@ -299,10 +301,10 @@ class TestLeapAuthFlow(unittest.TestCase):
         self.assertIsNotNone(flow.creds)
 
     def test_from_minimal_config_with_overrides(self):
-        config = ClientConfig(leap_api_endpoint='https://example.com/leap')
+        config = ClientConfig(leap_api_endpoint=self.mock_leap_api_endpoint)
         client_id = '123'
         scopes = ['email']
-        redirect_uri = 'https://example.com/callback'
+        redirect_uri = f'{self.mock_leap_api_endpoint}/callback'
 
         flow = LeapAuthFlow.from_config_model(
             config=config, client_id=client_id,
@@ -313,7 +315,7 @@ class TestLeapAuthFlow(unittest.TestCase):
         self.assertEqual(flow.redirect_uri, redirect_uri)
 
     def test_from_common_config(self):
-        config = ClientConfig(leap_api_endpoint='https://example.com/leap',
+        config = ClientConfig(leap_api_endpoint=self.mock_leap_api_endpoint,
                               headers=dict(injected='value'), request_timeout=10)
 
         flow = LeapAuthFlow.from_config_model(config)
@@ -323,7 +325,7 @@ class TestLeapAuthFlow(unittest.TestCase):
 
     def test_client_id_from_config(self):
         client_id = '123'
-        config = ClientConfig(leap_api_endpoint='https://example.com/leap',
+        config = ClientConfig(leap_api_endpoint=self.mock_leap_api_endpoint,
                               leap_client_id=client_id)
 
         flow = LeapAuthFlow.from_config_model(config)
@@ -335,7 +337,7 @@ class TestLeapAuthFlowOOB(unittest.TestCase):
 
     @mock.patch('click.echo', return_value=None)
     def test_oob(self, m):
-        config = ClientConfig(leap_api_endpoint='https://example.com/leap')
+        config = ClientConfig(leap_api_endpoint='https://mock.dwavesys.com/leap')
         flow = LeapAuthFlow.from_config_model(config)
 
         mock_code = '1234'
