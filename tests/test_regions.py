@@ -28,7 +28,7 @@ from dwave.cloud.regions import get_regions, resolve_endpoints
 
 class GetRegionsInit(unittest.TestCase):
 
-    mock_endpoint = "https://example.com/metadata/api/"
+    mock_endpoint = "https://mock.dwavesys.com/metadata/api/"
 
     @parameterized.expand([
         ("string-endpoint", mock_endpoint),
@@ -115,8 +115,8 @@ class ResolveEndpointsMocked(unittest.TestCase):
 
     def setUp(self):
         self.mock_regions = [
-            Region(code='A', name='Region A', endpoint='https://a.example.com/path'),
-            Region(code='B', name='Region B', endpoint='https://b.example.com/path'),
+            Region(code='A', name='Region A', endpoint='https://a.mock.dwavesys.com/path'),
+            Region(code='B', name='Region B', endpoint='https://b.mock.dwavesys.com/path'),
         ]
 
         self.mocker = mock.patch('dwave.cloud.regions.get_regions',
@@ -140,7 +140,7 @@ class ResolveEndpointsMocked(unittest.TestCase):
         self.assertEqual(config.leap_api_endpoint, self.mock_regions[0].leap_api_endpoint)
 
     def test_endpoint_override(self):
-        endpoint = 'https://example.com/sapi'
+        endpoint = 'https://mock.dwavesys.com/sapi'
         config = ClientConfig(endpoint=endpoint)
 
         resolve_endpoints(config, inplace=True)
@@ -151,7 +151,7 @@ class ResolveEndpointsMocked(unittest.TestCase):
         self.assertIsNotNone(config.leap_api_endpoint)
 
     def test_leap_api_endpoint_override(self):
-        leap_api_endpoint = 'https://example.com/leap'
+        leap_api_endpoint = 'https://mock.dwavesys.com/leap'
         config = ClientConfig(leap_api_endpoint=leap_api_endpoint)
 
         resolve_endpoints(config, inplace=True)
