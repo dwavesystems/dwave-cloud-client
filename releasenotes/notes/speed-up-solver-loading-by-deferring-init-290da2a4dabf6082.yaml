@@ -1,0 +1,7 @@
+---
+features:
+  - |
+    Speed-up ``StructuredSolver`` construction by deferring initialization of
+    large data members. ``nodes``, ``edges`` and ``undirected_edges`` are now
+    cached properties, constructed on first access.
+    See `#706 <https://github.com/dwavesystems/dwave-cloud-client/issues/706>`_.
