@@ -345,12 +345,15 @@ class TestLeapAuthFlowOOB(unittest.TestCase):
                 flow.run_oob_flow()
                 fetch_token.assert_called_once_with(code=mock_code)
 
+
 class TestLeapAuthFlowRedirect(unittest.TestCase):
+
+    mock_leap_api_endpoint = 'https://mock.dwavesys.com/leap'
 
     @mock.patch('click.echo', return_value=None)
     def test_success(self, m):
         # success case: access authorized, token fetched
-        config = ClientConfig(leap_api_endpoint='https://example.com/leap')
+        config = ClientConfig(leap_api_endpoint=self.mock_leap_api_endpoint)
         flow = LeapAuthFlow.from_config_model(config)
 
         mock_code = '1234'
@@ -368,10 +371,10 @@ class TestLeapAuthFlowRedirect(unittest.TestCase):
 
             ready.wait()
             response = requests.get(ctx['redirect_uri'],
-                                    params=dict(code=mock_code, state=ctx['state']))
-            self.assertEqual(len(response.history), 1)
-            self.assertEqual(response.history[0].status_code, 302)
-            location = response.history[0].headers.get('Location')
+                                    params=dict(code=mock_code, state=ctx['state']),
+                                    allow_redirects=False)
+            self.assertEqual(response.status_code, 302)
+            location = response.headers.get('Location')
             self.assertTrue(location.startswith(config.leap_api_endpoint))
             self.assertIn('/success', location)
             self.assertEqual(urlsplit(location).query, '')
@@ -401,7 +404,10 @@ class TestLeapAuthFlowRedirect(unittest.TestCase):
 
             query = dict(state=self.authorize_query['state'])
             query.update(self.authorize_response_params)
-            return requests.get(self.authorize_query['redirect_uri'], params=query)
+            # we prevent redirects to avoid requests to mock-leap endpoint
+            # which we don't control, nor we mock
+            return requests.get(self.authorize_query['redirect_uri'], params=query,
+                                allow_redirects=False)
 
         def run(self):
             try:
@@ -419,21 +425,20 @@ class TestLeapAuthFlowRedirect(unittest.TestCase):
     def assert_redirect_to_error_page(self, response, flow):
         # check that `response` is a 302 redirect with redirect location pointing to leap error page
         error_uri = flow._infer_leap_error_uri(flow.leap_api_endpoint)
-        self.assertEqual(len(response.history), 1)
-        self.assertEqual(response.history[0].status_code, 302)
-        location = response.history[0].headers.get('Location')
+        self.assertEqual(response.status_code, 302)
+        location = response.headers.get('Location')
         self.assertTrue(location.startswith(error_uri))
 
     def assert_redirect_params(self, response, expected_params):
         # check that redirect location params match `expected params`
-        location = response.history[0].headers.get('Location')
+        location = response.headers.get('Location')
         location_params = dict(parse_qsl(urlsplit(location).query))
         self.assertEqual(location_params, expected_params)
 
     @mock.patch('click.echo', return_value=None)
     def test_auth_denied(self, m):
         # error case: access not authorized (e.g. user clicks "Decline")
-        config = ClientConfig(leap_api_endpoint='https://example.com/leap')
+        config = ClientConfig(leap_api_endpoint=self.mock_leap_api_endpoint)
         flow = LeapAuthFlow.from_config_model(config)
 
         error = 'access_denied'
@@ -451,7 +456,7 @@ class TestLeapAuthFlowRedirect(unittest.TestCase):
             self.assert_redirect_to_error_page(response, flow)
 
             # and all request query params are propagated
-            request = response.history[0].request.url
+            request = response.request.url
             request_params = dict(parse_qsl(urlsplit(request).query))
             self.assert_redirect_params(response, request_params)
 
@@ -466,7 +471,7 @@ class TestLeapAuthFlowRedirect(unittest.TestCase):
     @mock.patch('click.echo', return_value=None)
     def test_exchange_fails(self, m):
         # error case: access authorized, but code exchange fails with oauth error
-        config = ClientConfig(leap_api_endpoint='https://example.com/leap')
+        config = ClientConfig(leap_api_endpoint=self.mock_leap_api_endpoint)
         flow = LeapAuthFlow.from_config_model(config)
 
         code = '1234'
@@ -505,7 +510,7 @@ class TestLeapAuthFlowRedirect(unittest.TestCase):
     @mock.patch('click.echo', return_value=None)
     def test_non_auth_failure_during_code_exchange(self, m):
         # error case: access authorized, but code exchange fails with unexpected non-auth error
-        config = ClientConfig(leap_api_endpoint='https://example.com/leap')
+        config = ClientConfig(leap_api_endpoint=self.mock_leap_api_endpoint)
         flow = LeapAuthFlow.from_config_model(config)
 
         code = '1234'
@@ -543,7 +548,7 @@ class TestLeapAuthFlowRedirect(unittest.TestCase):
     @mock.patch('click.echo', return_value=None)
     def test_csrf_failure_during_code_exchange(self, m):
         # error case: access authorized, but code exchange fails due to state mismatch
-        config = ClientConfig(leap_api_endpoint='https://example.com/leap')
+        config = ClientConfig(leap_api_endpoint=self.mock_leap_api_endpoint)
         flow = LeapAuthFlow.from_config_model(config)
 
         code = '1234'

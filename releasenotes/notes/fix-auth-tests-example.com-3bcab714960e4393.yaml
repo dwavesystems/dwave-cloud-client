@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Fix tests to never (accidentally) contact 3rd-party mock sites nor depend on
+    their functionality.
+    See `#707 <https://github.com/dwavesystems/dwave-cloud-client/issues/707>`_.
