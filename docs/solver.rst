@@ -32,8 +32,6 @@ Methods
    StructuredSolver.sample_ising
    StructuredSolver.sample_qubo
 
-
-
    UnstructuredSolver.sample_ising
    UnstructuredSolver.sample_qubo
    UnstructuredSolver.sample_bqm
@@ -62,6 +60,12 @@ Properties
    BaseSolver.qpu
    BaseSolver.hybrid
    BaseSolver.software
+
+   StructuredSolver.nodes
+   StructuredSolver.variables
+   StructuredSolver.edges
+   StructuredSolver.couplers
+   StructuredSolver.undirected_edges
 
    StructuredSolver.num_active_qubits
    StructuredSolver.num_qubits

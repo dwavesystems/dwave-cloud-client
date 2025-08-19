@@ -35,7 +35,7 @@ import logging
 import orjson
 import weakref
 from collections import abc
-from functools import partial
+from functools import partial, cached_property
 from tempfile import SpooledTemporaryFile
 from typing import Any, Literal, Optional, Union, TYPE_CHECKING
 
@@ -946,20 +946,8 @@ class StructuredSolver(BaseSolver):
         except KeyError:
             raise SolverPropertyMissingError("Missing solver property: 'properties.qubits'")
 
-        try:
-            self._encoding_couplers = [tuple(edge) for edge in self.properties['couplers']]
-        except KeyError:
+        if 'couplers' not in self.properties:
             raise SolverPropertyMissingError("Missing solver property: 'properties.couplers'")
-
-        # The nodes in this solver's graph: set(int)
-        self.nodes = self.variables = set(self._encoding_qubits)
-
-        # The edges in this solver's graph, every edge will be present as (a, b) and (b, a): set(tuple(int, int))
-        self.edges = self.couplers = set(tuple(edge) for edge in self._encoding_couplers) | \
-            set((edge[1], edge[0]) for edge in self._encoding_couplers)
-
-        # The edges in this solver's graph, each edge will only be represented once: set(tuple(int, int))
-        self.undirected_edges = {edge for edge in self.edges if edge[0] < edge[1]}
 
         # Create a set of default parameters for the queries
         self._params = {}
@@ -997,6 +985,38 @@ class StructuredSolver(BaseSolver):
     @property
     def lower_noise(self):
         return "lower_noise" in self.properties.get("tags", [])
+
+    # lazy-loaded solver attributes
+    @cached_property
+    def nodes(self) -> set[int]:
+        """The nodes in this solver's graph."""
+        return set(self._encoding_qubits)
+
+    @property
+    def variables(self) -> set[int]:
+        """Alias for :attr:`.nodes`."""
+        return self.nodes
+
+    @cached_property
+    def _encoding_couplers(self) -> list[tuple[int, int]]:
+        # solver couplers converted to list of tuples
+        return [tuple(edge) for edge in self.properties['couplers']]
+
+    @cached_property
+    def edges(self) -> set[tuple[int, int]]:
+        """The edges in this solver's graph, including both directions: (a,b) and (b,a)."""
+        return set(self._encoding_couplers) | \
+            set((edge[1], edge[0]) for edge in self._encoding_couplers)
+
+    @property
+    def couplers(self) -> set[tuple[int, int]]:
+        """Alias for :attr:`.edges`."""
+        return self.edges
+
+    @cached_property
+    def undirected_edges(self) -> set[tuple[int, int]]:
+        """The edges in this solver's graph, with each edge represented only once."""
+        return {edge for edge in self.edges if edge[0] < edge[1]}
 
     def max_num_reads(self, **params):
         """Returns the maximum number of reads for the given solver parameters.
