@@ -1,0 +1,6 @@
+---
+upgrade:
+  - |
+    ``dwave.cloud.utils.coders.NumpyEncoder`` is now removed in favor of
+    ``orjson.dumps()`` used with the ``OPT_SERIALIZE_NUMPY`` flag. We first
+    deprecated ``NumpyEncoder`` in dwave-cloud-client 0.12.2.

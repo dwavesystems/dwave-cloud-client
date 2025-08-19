@@ -16,17 +16,17 @@
 
 .. versionchanged:: 0.12.0
    These functions previously lived under ``dwave.cloud.utils``.
-"""
 
-import json
-import warnings
+.. versionremoved:: 0.14.0
+   ``NumpyEncoder`` replaced with ``orjson.dumps(..., option=OPT_SERIALIZE_NUMPY)``.
+"""
 
 try:
     import numpy
 except ImportError: # pragma: no cover
     pass    # numpy not required for all cloud-client functionality
 
-__all__ = ['NumpyEncoder', 'coerce_numpy_to_python']
+__all__ = ['coerce_numpy_to_python']
 
 
 def coerce_numpy_to_python(obj):
@@ -45,33 +45,3 @@ def coerce_numpy_to_python(obj):
     elif isinstance(obj, dict):
         return {coerce_numpy_to_python(k): coerce_numpy_to_python(v) for k, v in obj.items()}
     return obj
-
-
-# copied from dwave-hybrid utils
-# (https://github.com/dwavesystems/dwave-hybrid/blob/b9025b5bb3d88dce98ec70e28cfdb25400a10e4a/hybrid/utils.py#L43-L61)
-# TODO: switch to `dwave.common` if and when we create it
-class NumpyEncoder(json.JSONEncoder):
-    """JSON encoder for numpy types.
-
-    Supported types:
-     - basic numeric types: booleans, integers, floats
-     - arrays: ndarray, recarray
-    """
-
-    def default(self, obj):
-        warnings.warn(
-            f"`dwave.cloud.utils.coders.NumpyEncoder` is deprecated since "
-            f"dwave-cloud-client 0.12.2, and will be removed in 0.14.0. "
-            f"Use `orjson.dumps()` with `OPT_SERIALIZE_NUMPY` option instead.",
-            DeprecationWarning, stacklevel=2)
-
-        if isinstance(obj, numpy.integer):
-            return int(obj)
-        elif isinstance(obj, numpy.floating):
-            return float(obj)
-        elif isinstance(obj, numpy.bool_):
-            return bool(obj)
-        elif isinstance(obj, numpy.ndarray):
-            return obj.tolist()
-
-        return super().default(obj)
