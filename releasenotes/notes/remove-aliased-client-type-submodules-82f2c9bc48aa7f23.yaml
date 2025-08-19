@@ -1,0 +1,8 @@
+---
+upgrade:
+  - |
+    We removed (previously deprecated) aliases for client types.
+
+    Replace your ``Client`` imports from ``dwave.cloud.{type}`` with imports
+    from ``dwave.cloud.client.{type}`` (``type`` being ``qpu``, ``sw`` or
+    ``hybrid``).

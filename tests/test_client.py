@@ -211,9 +211,9 @@ class ClientConstruction(unittest.TestCase):
                 self.assertEqual(client.config.endpoint, 'endpoint')
                 self.assertEqual(client.config.token, 'token')
                 self.assertIsInstance(client, dwave.cloud.client.Client)
-                self.assertNotIsInstance(client, dwave.cloud.sw.Client)
-                self.assertNotIsInstance(client, dwave.cloud.qpu.Client)
-                self.assertNotIsInstance(client, dwave.cloud.hybrid.Client)
+                self.assertNotIsInstance(client, dwave.cloud.client.sw.Client)
+                self.assertNotIsInstance(client, dwave.cloud.client.qpu.Client)
+                self.assertNotIsInstance(client, dwave.cloud.client.hybrid.Client)
 
     def test_region_default(self):
         conf = {k: k for k in 'token'.split()}
@@ -225,9 +225,9 @@ class ClientConstruction(unittest.TestCase):
                 self.assertEqual(client.config.metadata_api_endpoint, constants.DEFAULT_METADATA_API_ENDPOINT)
                 self.assertEqual(client.config.token, 'token')
                 self.assertIsInstance(client, dwave.cloud.client.Client)
-                self.assertNotIsInstance(client, dwave.cloud.sw.Client)
-                self.assertNotIsInstance(client, dwave.cloud.qpu.Client)
-                self.assertNotIsInstance(client, dwave.cloud.hybrid.Client)
+                self.assertNotIsInstance(client, dwave.cloud.client.sw.Client)
+                self.assertNotIsInstance(client, dwave.cloud.client.qpu.Client)
+                self.assertNotIsInstance(client, dwave.cloud.client.hybrid.Client)
 
     def test_region_selection_over_defaults(self):
         conf = {k: k for k in 'token'.split()}
@@ -303,26 +303,26 @@ class ClientConstruction(unittest.TestCase):
             with dwave.cloud.client.Client.from_config() as client:
                 self.assertIsInstance(client, dwave.cloud.client.Client)
 
-            with dwave.cloud.qpu.Client.from_config() as client:
-                self.assertIsInstance(client, dwave.cloud.qpu.Client)
+            with dwave.cloud.client.qpu.Client.from_config() as client:
+                self.assertIsInstance(client, dwave.cloud.client.qpu.Client)
 
-            with dwave.cloud.sw.Client.from_config() as client:
-                self.assertIsInstance(client, dwave.cloud.sw.Client)
+            with dwave.cloud.client.sw.Client.from_config() as client:
+                self.assertIsInstance(client, dwave.cloud.client.sw.Client)
 
-            with dwave.cloud.hybrid.Client.from_config() as client:
-                self.assertIsInstance(client, dwave.cloud.hybrid.Client)
+            with dwave.cloud.client.hybrid.Client.from_config() as client:
+                self.assertIsInstance(client, dwave.cloud.client.hybrid.Client)
 
-            with dwave.cloud.qpu.Client.from_config(client='base') as client:
+            with dwave.cloud.client.qpu.Client.from_config(client='base') as client:
                 self.assertIsInstance(client, dwave.cloud.client.Client)
 
             with dwave.cloud.Client.from_config(client='qpu') as client:
-                self.assertIsInstance(client, dwave.cloud.qpu.Client)
+                self.assertIsInstance(client, dwave.cloud.client.qpu.Client)
 
             with dwave.cloud.Client.from_config(client='sw') as client:
-                self.assertIsInstance(client, dwave.cloud.sw.Client)
+                self.assertIsInstance(client, dwave.cloud.client.sw.Client)
 
             with dwave.cloud.Client.from_config(client='hybrid') as client:
-                self.assertIsInstance(client, dwave.cloud.hybrid.Client)
+                self.assertIsInstance(client, dwave.cloud.client.hybrid.Client)
 
     def test_custom_kwargs(self):
         conf = {k: k for k in 'endpoint token'.split()}
@@ -659,12 +659,6 @@ class VerifyLazyClientImport(unittest.TestCase):
         import dwave.cloud.client
 
         self.assertEqual(dwave.cloud.client.Client, dwave.cloud.Client)
-
-    @parameterized.expand([("qpu", ), ("sw", ), ("hybrid", )])
-    def test_deprecation(self, name):
-        with self.assertWarns(DeprecationWarning):
-            mod = importlib.import_module(f'dwave.cloud.{name}')
-            self.assertTrue(issubclass(getattr(mod, 'Client'), Client))
 
 
 class VerifyClientCleanup(unittest.TestCase):

@@ -71,34 +71,34 @@ instantiate a QPU, hybrid, or CPU client directly.
 QPU Client
 ----------
 
-.. automodule:: dwave.cloud.qpu
-.. currentmodule:: dwave.cloud.qpu
+.. automodule:: dwave.cloud.client.qpu
+.. currentmodule:: dwave.cloud.client.qpu
 
 Class
 ~~~~~
 
-.. autoclass:: dwave.cloud.qpu.Client
+.. autoclass:: dwave.cloud.client.qpu.Client
 
 
 Hybrid Client
 -------------
 
-.. automodule:: dwave.cloud.hybrid
-.. currentmodule:: dwave.cloud.hybrid
+.. automodule:: dwave.cloud.client.hybrid
+.. currentmodule:: dwave.cloud.client.hybrid
 
 Class
 ~~~~~
 
-.. autoclass:: dwave.cloud.hybrid.Client
+.. autoclass:: dwave.cloud.client.hybrid.Client
 
 
 Software Client
 ---------------
 
-.. automodule:: dwave.cloud.sw
-.. currentmodule:: dwave.cloud.sw
+.. automodule:: dwave.cloud.client.sw
+.. currentmodule:: dwave.cloud.client.sw
 
 Class
 ~~~~~
 
-.. autoclass:: dwave.cloud.sw.Client
+.. autoclass:: dwave.cloud.client.sw.Client
