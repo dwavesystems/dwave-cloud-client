@@ -992,7 +992,7 @@ class StructuredSolver(BaseSolver):
         """The nodes in this solver's graph."""
         return set(self._encoding_qubits)
 
-    @cached_property
+    @property
     def variables(self) -> set[int]:
         """Alias for :attr:`.nodes`."""
         return self.nodes
@@ -1008,7 +1008,7 @@ class StructuredSolver(BaseSolver):
         return set(self._encoding_couplers) | \
             set((edge[1], edge[0]) for edge in self._encoding_couplers)
 
-    @cached_property
+    @property
     def couplers(self) -> set[tuple[int, int]]:
         """Alias for :attr:`.edges`."""
         return self.edges
