@@ -72,7 +72,7 @@ from dwave.cloud.config import constants as config_constants
 from dwave.cloud.config.models import ClientConfig, PollingStrategy
 from dwave.cloud.solver import available_solvers, StructuredSolver, UnstructuredSolver
 from dwave.cloud.concurrency import PriorityThreadPoolExecutor
-from dwave.cloud.regions import get_regions, resolve_endpoints
+from dwave.cloud.regions import resolve_endpoints
 from dwave.cloud.upload import ChunkedData
 from dwave.cloud.events import dispatches_events
 from dwave.cloud.utils.decorators import retried
@@ -672,33 +672,6 @@ class Client(object):
 
         """
         return True
-
-    def get_regions(self, refresh: bool = False) -> dict[str, dict[str, str]]:
-        """Retrieve available API regions.
-
-        Args:
-            refresh:
-                Force cache refresh.
-
-        Returns:
-            Mapping of region details (name and endpoint) over region codes.
-
-        .. deprecated:: 0.11.0
-            :meth:`.Client.get_regions` method is deprecated in favor of
-            :func:`dwave.cloud.regions.get_regions` function and will be
-            removed in 0.14.0.
-
-        """
-        warnings.warn(
-            f"`Client.get_regions` method is deprecated since "
-            f"dwave-cloud-client 0.11.0, and will be removed in 0.14.0. "
-            f"Use `dwave.cloud.regions.get_regions` for greater flexibility instead.",
-            DeprecationWarning, stacklevel=2)
-
-        rs = get_regions(config=self.config, refresh=refresh,
-                         maxage=self._REGIONS_CACHE_MAXAGE)
-
-        return {r.code: {"name": r.name, "endpoint": r.endpoint} for r in rs}
 
     @property
     @_ensure_active

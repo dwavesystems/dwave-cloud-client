@@ -55,7 +55,6 @@ Methods
    :toctree: generated
 
    Client.from_config
-   Client.get_regions
    Client.get_solver
    Client.get_solvers
    Client.is_solver_handled

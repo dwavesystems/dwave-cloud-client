@@ -33,12 +33,13 @@ import requests
 from parameterized import parameterized
 from plucky import merge
 
-from dwave.cloud.api import models, Regions
+from dwave.cloud.api import models
 from dwave.cloud.client import Client
 from dwave.cloud.config import constants
 from dwave.cloud.config.models import dump_config_v1, PollingStrategy
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, SolverError, SolverNotFoundError)
+from dwave.cloud.regions import get_regions
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
 from dwave.cloud.testing import iterable_mock_open, isolated_environ
 from dwave.cloud.utils.decorators import cached
@@ -751,10 +752,9 @@ class MultiRegionSupport(unittest.TestCase):
             permissive_ssl = {permissive_ssl}
         """
 
-        expected_get_regions_return = {
-            r['code']: {"name": r['name'], "endpoint": r['endpoint']}
-            for r in regions_response
-        }
+        expected_get_regions_return = [
+            models.Region(**region) for region in regions_response
+        ]
 
         def _mocked_session():
             session = mock.Mock()
@@ -776,7 +776,7 @@ class MultiRegionSupport(unittest.TestCase):
             self.assertEqual(config.permissive_ssl, permissive_ssl)
             self.assertEqual(config.proxy, proxy)
 
-            regions = Regions()
+            regions = models.Regions()
             regions._session = _mocked_session()
             return regions
 
@@ -788,7 +788,7 @@ class MultiRegionSupport(unittest.TestCase):
                     # (i.e. config open mock above fails on CI)
                     with Client.from_config(config_file='config_file') as client:
                         # verify get_regions() returns data from metadata_api_endpoint
-                        regions = client.get_regions()
+                        regions = get_regions()
                         self.assertEqual(regions, expected_get_regions_return)
 
                         # check region endpoint initialized from custom metadata_api_endpoint

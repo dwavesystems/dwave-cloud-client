@@ -1,0 +1,11 @@
+---
+upgrade:
+  - |
+    ``dwave.cloud.Client.get_regions()`` which has been deprecated since
+    cloud-client 0.11.0, is now removed in favor of
+    ``dwave.cloud.regions.get_regions()``. Usage example available in the
+    `docs <https://docs.dwavequantum.com/en/latest/ocean/api_ref_cloud/generated/dwave.cloud.regions.get_regions.html>`_.
+
+    The main benefit of ``get_regions`` as a stand-alone function is that ``Client``
+    doesn't have to be instantiated (and configured to use the default region),
+    just to be able to fetch the list of regions.
