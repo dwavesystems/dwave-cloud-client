@@ -702,7 +702,7 @@ class TestCliLive(unittest.TestCase):
         res = json.loads(result.output)
         self.assertIn('timestamp', res)
         self.assertIn('datetime', res)
-        self.assertIn('solver_id', res)
+        self.assertIn('solver_name', res)
         self.assertIn('code', res)
         self.assertEqual(result.exit_code, 0)
 

@@ -42,13 +42,15 @@ except ImportError:
     NLModel = None
 
 
-def unstructured_solver_data(problem_type='bqm', solver_id='test-unstructured-solver'):
+def unstructured_solver_data(problem_type='bqm', solver_name='test-unstructured-solver'):
     return {
         "properties": {
             "supported_problem_types": [problem_type],
             "parameters": {"num_reads": "Number of samples to return."}
         },
-        "id": solver_id,
+        "identity": {
+            "name": solver_name,
+        },
         "description": "A test unstructured solver"
     }
 
@@ -57,7 +59,9 @@ def complete_reply_bq(sampleset, id_="problem-id", type_='bqm', label=None):
 
     return orjson.dumps([{
         "status": "COMPLETED",
-        "solver": "solver-name",
+        "solver": {
+            "name": "solver-name",
+        },
         "solved_on": "2019-07-31T12:34:56Z",
         "submitted_on": "2019-07-31T12:34:56Z",
         "answer": {
@@ -77,7 +81,9 @@ def complete_reply_binary_ref(answer_data_uri, id_="problem-id", type_='cqm', la
 
     return orjson.dumps([{
         "status": "COMPLETED",
-        "solver": "solver-name",
+        "solver": {
+            "name": "solver-name",
+        },
         "solved_on": "2019-07-31T12:34:56Z",
         "submitted_on": "2019-07-31T12:34:56Z",
         "answer": {

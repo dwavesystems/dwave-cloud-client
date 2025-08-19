@@ -14,7 +14,10 @@
 
 import unittest
 
+from pydantic import ValidationError
+
 from dwave.cloud.api import models
+from dwave.cloud.testing.mocks import structured_solver_data, unstructured_solver_data
 
 from tests.api.mocks import StructuredSapiMockResponses
 
@@ -25,7 +28,93 @@ class TestModels(unittest.TestCase):
     def setUpClass(cls):
         cls.sapi = StructuredSapiMockResponses()
 
-    def test_construction(self):
+    def test_solver_models(self):
+        with self.subTest('structured solver'):
+            name = 'qpu-solver'
+            graph_id = '01abcd1234'
+            solver = models.SolverConfiguration(**structured_solver_data(name, graph_id))
+            self.assertIsNotNone(solver.get('identity'))
+            self.assertEqual(solver.identity.name, name)
+            self.assertEqual(solver.identity.version.graph_id, graph_id)
+            self.assertIsNotNone(solver.get('properties'))
+            self.assertEqual(solver.properties['category'], 'qpu')
+
+        with self.subTest('unstructured solver'):
+            name = 'hybrid-solver'
+            solver = models.SolverConfiguration(**unstructured_solver_data(name))
+            self.assertEqual(solver.identity.name, name)
+            self.assertIsNone(solver.identity.version)
+            self.assertEqual(solver.properties['category'], 'hybrid')
+
+        with self.subTest('filtered configuration contains identity'):
+            name = 'qpu-solver'
+            graph_id = '01abcd1234'
+            data = structured_solver_data(name, graph_id)
+            filtered_data = dict(identity=data['identity'])
+            solver = models.SolverConfiguration(**filtered_data)
+            self.assertEqual(solver.identity.name, name)
+            self.assertEqual(solver.identity.version.graph_id, graph_id)
+            self.assertIsNone(solver.get('properties'))
+
+    def test_solver_identity_model(self):
+        # test validation, construction and serialization with `.dict()`/`str()`
+        name = 'qpu-solver'
+        graph_id = '01abcd1234'
+
+        # name required
+        with self.assertRaises(ValidationError):
+            models.SolverIdentity()
+
+        with self.subTest('minimal solver identity'):
+            self.assertEqual(models.SolverIdentity(name=name).dict(), dict(name=name))
+            self.assertEqual(models.SolverIdentity(name=name, version=None).dict(), dict(name=name))
+
+        with self.subTest('allow empty version'):
+            data = {"name": name, "version": {}}
+            identity = models.SolverIdentity.model_validate(data)
+            self.assertEqual(identity.dict(), data)
+            self.assertEqual(str(identity), f"{name}")
+
+        with self.subTest('minimal qpu solver identity'):
+            data = {"name": name, "version": {"graph_id": graph_id}}
+            identity = models.SolverIdentity.model_validate(data)
+            self.assertEqual(identity.dict(), data)
+            self.assertEqual(str(identity), f"{name}:{graph_id}")
+
+        with self.subTest('allow additional version specs'):
+            extra = "1.0"
+            data = {"name": name, "version": {"graph_id": graph_id, "param_id": extra}}
+            identity = models.SolverIdentity.model_validate(data)
+            self.assertEqual(identity.dict(), data)
+            self.assertEqual(str(identity), f"{name}:{graph_id}:{extra}")
+
+        with self.subTest('identity equality'):
+            # compares to dict
+            data = {"name": name, "version": {"graph_id": graph_id}}
+            identity = models.SolverIdentity.model_validate(data)
+            self.assertEqual(identity, data)
+
+            # compares to SolverIdentity
+            identity2 = models.SolverIdentity.model_validate(data)
+            self.assertEqual(identity, identity2)
+
+            # compares with empty version as well
+            data = {"name": name}
+            identity = models.SolverIdentity.model_validate(data)
+            self.assertEqual(identity, data)
+
+        with self.subTest('version equality'):
+            # compares to dict
+            data = {"name": name, "version": {"graph_id": graph_id}}
+            identity = models.SolverIdentity.model_validate(data)
+            self.assertEqual(identity.version.dict(), data['version'])
+            self.assertEqual(identity.version, data['version'])
+
+            # compares to SolverVersion
+            version = models.SolverVersion.model_validate(data['version'])
+            self.assertEqual(identity.version, version)
+
+    def test_problem_models(self):
         with self.subTest('ProblemStatus'):
             status = models.ProblemStatus(**self.sapi.complete_no_answer_reply())
 

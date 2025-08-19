@@ -391,7 +391,9 @@ def _get_client_solver(config, output=None):
     except Exception as e:
         raise CLIError("Unexpected error while fetching solver: {!r}".format(e), 5)
 
-    output("Using solver: {solver_id}", solver_id=solver.id)
+    output("Using solver: {solver_name}", solver_name=solver.name)
+    if solver.identity.version:
+        output("Working graph version: {graph_id}", graph_id=solver.graph_id)
 
     return (client, solver)
 
@@ -581,12 +583,12 @@ def solvers(config_file, profile, endpoint, region, client_type, solver_def,
 
         if list_solvers:
             for solver in solvers:
-                click.echo(solver.id)
+                click.echo(solver.name)
             return
 
         # ~YAML output
         for solver in solvers:
-            click.echo("Solver: {}".format(solver.id))
+            click.echo("Solver: {}".format(solver.name))
             click.echo("  Parameters:")
             for name, val in sorted(solver.parameters.items()):
                 click.echo("    {}: {}".format(name, strtrunc(val) if val else '?'))

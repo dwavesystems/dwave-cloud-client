@@ -496,9 +496,13 @@ class CachingSessionMixin:
 
         use_cache, maxage = self._parse_cache_control(cache_control)
         if use_cache:
-            meta = dict(created=epochnow(), maxage=maxage, etag=etag, content_type=content_type)
+            meta = self._store.get(key_meta, {})
+            meta.update(created=epochnow(), maxage=maxage, etag=etag)
+            if content_type is not None:
+                meta.update(content_type=content_type)
             self._store[key_meta] = meta
             logger.debug("cache_write (meta): %r = %r", key_meta, meta)
+
             if not only_meta:
                 content = self._store[key_data] = response.content
                 logger.debug("cache_write (data): %r <- (%d bytes)",
@@ -568,7 +572,7 @@ class CachingSessionMixin:
                 maxage = default_maxage
 
             if epochnow() - meta['created'] < maxage:
-                logger.debug('cache hit within maxage')
+                logger.debug(f'cache hit within maxage ({maxage} seconds)')
                 return make_response(meta, content)
 
             # validate with conditional request if possible

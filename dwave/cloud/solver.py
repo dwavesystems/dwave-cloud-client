@@ -33,15 +33,17 @@ import concurrent.futures
 import copy
 import logging
 import orjson
+import warnings
 import weakref
 from collections import abc
 from functools import partial, cached_property
 from tempfile import SpooledTemporaryFile
 from typing import Any, Literal, Optional, Union, TYPE_CHECKING
 
+from dwave.cloud.api.models import (
+    SolverConfiguration, SolverIdentity, SolverVersion)
 from dwave.cloud.exceptions import (
-    InvalidAPIResponseError, SolverPropertyMissingError,
-    UnsupportedSolverError, ProblemStructureError)
+    SolverPropertyMissingError, UnsupportedSolverError, ProblemStructureError)
 from dwave.cloud.coders import (
     encode_problem_as_qp, encode_problem_as_ref, decode_binary_ref,
     decode_qp_numpy, decode_qp, decode_bq)
@@ -84,7 +86,7 @@ if TYPE_CHECKING:
         _Vartype = _Type
 
 
-class BaseSolver(object):
+class BaseSolver:
     """Base class for a general D-Wave solver.
 
     This class provides :term:`Ising`, :term:`QUBO` and :term:`BQM` sampling
@@ -105,8 +107,8 @@ class BaseSolver(object):
         >>> from dwave.cloud import Client
         >>> with Client.from_config() as client:
         ...     solver = client.get_solver()
-        ...     solver.id       # doctest: +SKIP
-        'Advantage_system4.1'
+        ...     solver.name     # doctest: +SKIP
+        'Advantage_system4'
     """
 
     # Classes of problems the remote solver has to support (at least one of these)
@@ -115,6 +117,12 @@ class BaseSolver(object):
     _handled_encoding_formats = {}
 
     _client_ref = None
+
+    #: Parsed solver configuration
+    data: SolverConfiguration
+
+    #: Solver identity/specification (name, version, etc)
+    identity: SolverIdentity
 
     @property
     def client(self):
@@ -128,26 +136,26 @@ class BaseSolver(object):
 
         return client
 
-    def __init__(self, client: Optional['dwave.cloud.Client'], data: dict):
+    def __init__(self, client: Optional['dwave.cloud.Client'],
+                 data: Union[dict, SolverConfiguration]):
         # note: we use a weakref so that client can be closed and gc'ed
         #       while keeping solver instances alive
         # dev note: allow None value for testing
         self._client_ref = weakref.ref(client) if client is not None else None
 
-        # data for each solver includes at least: id, description, properties,
-        # status and avg_load
+        # note: conversion to `SolverConfiguration` is cheap (order of ~10us)
+        if not isinstance(data, SolverConfiguration):
+            data = SolverConfiguration.model_validate(data)
         self.data = data
 
-        # Each solver has an ID field
-        try:
-            self.id = data['id']
-        except KeyError:
-            raise InvalidAPIResponseError("Missing solver property: 'id'")
+        self.identity = data.identity
+        if self.identity is None:
+            raise ValueError("Missing solver identity field")
 
         # Properties of this solver the server presents: dict
         try:
-            self.properties = data['properties']
-        except KeyError:
+            self.properties = data.properties
+        except AttributeError:
             raise SolverPropertyMissingError("Missing solver property: 'properties'")
 
         # The set of extra parameters this solver will accept in sample_ising or sample_qubo: dict
@@ -162,9 +170,9 @@ class BaseSolver(object):
 
         if self.supported_problem_types.isdisjoint(self._handled_problem_types):
             raise UnsupportedSolverError(
-                ("Remote solver {id!r} supports {supports} problems, "
+                ("Remote solver {name!r} supports {supports} problems, "
                  "but {cls!r} class of solvers handles only {handled}").format(
-                    id=self.id,
+                    name=self.name,
                     supports=list(self.supported_problem_types),
                     cls=type(self).__name__,
                     handled=list(self._handled_problem_types)))
@@ -175,11 +183,11 @@ class BaseSolver(object):
 
         # Derived solver properties (not present in solver data properties dict)
         self.derived_properties = {
-            'qpu', 'hybrid', 'software', 'online', 'avg_load', 'name'
+            'id', 'name', 'online', 'avg_load', 'qpu', 'hybrid', 'software',
         }
 
     def __repr__(self):
-        return "{}(id={!r})".format(type(self).__name__, self.id)
+        return f"{type(self).__name__}(name={self.name!r})"
 
     def _retrieve_problem(self, id_):
         """Resume polling for a problem previously submitted.
@@ -242,22 +250,32 @@ class BaseSolver(object):
     # Derived properties
 
     @property
-    def name(self):
-        """Solver name/ID."""
-        return self.id
+    def id(self) -> str:
+        """Unique solver string identifier, derived from :attr:`.identity`."""
+        # keep `Solver.id` for backwards-compat, but derive it from `Solver.identity`
+        warnings.warn(
+            "`Solver.id` attribute meaning has changed in dwave-cloud-client 0.14.0, "
+            "due to upstream API changes. Use of `Solver.identity` is now preferred.",
+            DeprecationWarning, stacklevel=2)
+        return str(self.identity)
 
     @property
-    def online(self):
+    def name(self) -> str:
+        """Solver name."""
+        return self.identity.name
+
+    @property
+    def online(self) -> bool:
         "Is this solver online (or offline)?"
         return self.data.get('status', 'online').lower() == 'online'
 
     @property
-    def avg_load(self):
+    def avg_load(self) -> Optional[float]:
         "Solver's average load, at the time of description fetch."
         return self.data.get('avg_load')
 
     @property
-    def qpu(self):
+    def qpu(self) -> bool:
         "Is this a QPU-based solver?"
         category = self.properties.get('category', '').lower()
         if category:
@@ -268,7 +286,7 @@ class BaseSolver(object):
             return not (self.software or self.hybrid)
 
     @property
-    def software(self):
+    def software(self) -> bool:
         "Is this a software-based solver?"
         category = self.properties.get('category', '').lower()
         if category:
@@ -276,10 +294,10 @@ class BaseSolver(object):
         else:
             # fallback for legacy solvers without the `category` property
             # TODO: remove when all production solvers are updated
-            return self.id.startswith('c4-sw_')
+            return self.name.startswith('c4-sw_')
 
     @property
-    def hybrid(self):
+    def hybrid(self) -> bool:
         "Is this a hybrid quantum-classical solver?"
         category = self.properties.get('category', '').lower()
         if category:
@@ -287,7 +305,7 @@ class BaseSolver(object):
         else:
             # fallback for legacy solvers without the `category` property
             # TODO: remove when all production solvers are updated
-            return self.id.startswith('hybrid')
+            return self.name.startswith('hybrid')
 
 
 class BaseUnstructuredSolver(BaseSolver):
@@ -476,7 +494,7 @@ class BaseUnstructuredSolver(BaseSolver):
             on_uploaded(problem_data_id=problem_id)
 
         body = {
-            'solver': self.id,
+            'solver': self.identity.dict(),
             'data': encode_problem_as_ref(problem_id),
             'type': problem_type,
             'params': sample_params
@@ -532,7 +550,7 @@ class BaseUnstructuredSolver(BaseSolver):
             upload_params=upload_params, sample_params=sample_params,
             on_uploaded=computation._notify_uploaded)
 
-        logger.debug("Submitting new problem to: %s", self.id)
+        logger.debug("Submitting new problem to: %r", self.identity)
         self.client._submit(body, computation)
 
         return computation
@@ -651,10 +669,14 @@ class DQMSolver(BaseUnstructuredSolver):
         return dqm.to_file()
 
     def sample_bqm(self, bqm, label=None, **params):
-        """Use for testing."""
+        """Use for testing only."""
 
         # to sample BQM problems, we need to convert them to DQM
-        dqm = self._bqm_to_dqm(bqm)
+        if isinstance(bqm, str):
+            # unless bqm already uploaded
+            dqm = bqm
+        else:
+            dqm = self._bqm_to_dqm(bqm)
 
         # TODO: convert sampleset back
         return self.sample_dqm(dqm, label=label, **params)
@@ -953,9 +975,23 @@ class StructuredSolver(BaseSolver):
         self._params = {}
 
         # Add derived properties specific for this solver
-        self.derived_properties.update({'lower_noise', 'num_active_qubits'})
+        self.derived_properties.update({'lower_noise', 'num_active_qubits', 'version', 'graph_id'})
+
+    def __repr__(self):
+        return f"{type(self).__name__}(name={self.name!r}, graph_id={self.graph_id!r})"
 
     # Derived properties
+
+    @property
+    def version(self) -> dict:
+        """QPU solver version dict (contains at least ``graph_id``). Returns
+        an empty dict for non-QPU solvers."""
+        return v.model_dump() if (v := self.identity.version) else {}
+
+    @property
+    def graph_id(self) -> Optional[str]:
+        """QPU solver working graph id. Returns ``None`` for non-QPU solvers."""
+        return self.version.get('graph_id')
 
     @property
     def num_active_qubits(self):
@@ -1238,7 +1274,7 @@ class StructuredSolver(BaseSolver):
         # Check the problem
         if not self.check_problem(linear, quadratic):
             raise ProblemStructureError(
-                f"Problem graph incompatible with {self.id} solver")
+                f"Problem graph incompatible with {self!r}")
 
         # Mix the new parameters with the default parameters
         combined_params = dict(self._params)
@@ -1253,7 +1289,7 @@ class StructuredSolver(BaseSolver):
         self._format_params(type_, combined_params)
 
         body_dict = {
-            'solver': self.id,
+            'solver': self.identity.dict(),
             'data': encode_problem_as_qp(self, linear, quadratic, offset,
                                          undirected_biases=undirected_biases),
             'type': type_,
@@ -1270,7 +1306,7 @@ class StructuredSolver(BaseSolver):
         # XXX: offset is carried on Future until implemented in SAPI
         computation._offset = offset
 
-        logger.debug("Submitting new problem to: %s", self.id)
+        logger.debug("Submitting new problem to: %r", self.identity)
         self.client._submit(body, computation)
 
         return computation

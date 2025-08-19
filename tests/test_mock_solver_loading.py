@@ -29,8 +29,14 @@ from dwave.cloud.solver import Solver
 from dwave.cloud.exceptions import *
 
 
-def solver_data(id_, status="ONLINE", avg_load=0.1, cat='qpu', incomplete=False, subset='all'):
+def solver_data(name, status="ONLINE", avg_load=0.1, cat='qpu', incomplete=False, subset='all', graph_id='1'):
     """Return data dict describing a single solver."""
+
+    # solver identity format depends on solver category now
+    identity = dict(name=name)
+    if cat.lower() in ('qpu', 'software'):
+        identity.update(version=dict(graph_id=graph_id))
+
     obj = {
         "properties": {
             "supported_problem_types": ["qubo", "ising"],
@@ -40,7 +46,7 @@ def solver_data(id_, status="ONLINE", avg_load=0.1, cat='qpu', incomplete=False,
             "category": cat,
             "parameters": {"num_reads": "Number of samples to return."}
         },
-        "id": id_,
+        "identity": identity,
         "description": "A test solver",
         "status": status,
         "avg_load": avg_load,
@@ -55,7 +61,7 @@ def solver_data(id_, status="ONLINE", avg_load=0.1, cat='qpu', incomplete=False,
 
     elif subset == 'dynamic':
         obj = {
-            "id": id_,
+            "identity": identity,
             "status": status,
             "avg_load": avg_load
         }
@@ -66,8 +72,8 @@ def solver_data(id_, status="ONLINE", avg_load=0.1, cat='qpu', incomplete=False,
     return obj
 
 
-def solver_object(id_, **kwargs):
-    return Solver(client=None, data=solver_data(id_, **kwargs))
+def solver_object(name, **kwargs):
+    return Solver(client=None, data=solver_data(name, **kwargs))
 
 
 class MockSolverLoading(unittest.TestCase):
@@ -98,9 +104,9 @@ class MockSolverLoading(unittest.TestCase):
         invalid_token_headers = {'X-Auth-Token': self.bad_token}
 
         solver_content_type = {
-            'Content-Type': 'application/vnd.dwave.sapi.solver-definition+json; version=2.0'}
+            'Content-Type': 'application/vnd.dwave.sapi.solver-definition+json; version=3.0.0'}
         solvers_content_type = {
-            'Content-Type': 'application/vnd.dwave.sapi.solver-definition-list+json; version=2.0'}
+            'Content-Type': 'application/vnd.dwave.sapi.solver-definition-list+json; version=3.0.0'}
 
         m.get(requests_mock.ANY, status_code=404)
         m.get(requests_mock.ANY, status_code=401, request_headers=invalid_token_headers)
@@ -111,7 +117,7 @@ class MockSolverLoading(unittest.TestCase):
             m.get(f"{url}?{urlencode(dict(filter='all,-status,-avg_load'))}",
                   json=solver_data(name, subset='static', incomplete=incomplete),
                   request_headers=valid_token_headers, headers=solver_content_type)
-            m.get(f"{url}?{urlencode(dict(filter='none,+id,+status,+avg_load'))}",
+            m.get(f"{url}?{urlencode(dict(filter='none,+identity,+status,+avg_load'))}",
                   json=solver_data(name, subset='dynamic', incomplete=incomplete),
                   request_headers=valid_token_headers, headers=solver_content_type)
 
@@ -164,7 +170,7 @@ class MockSolverLoading(unittest.TestCase):
             solver = client.get_solver(self.solver1_name)
 
             with self.subTest("static properties initialized"):
-                self.assertEqual(solver.id, ref.id)
+                self.assertEqual(solver.identity, ref.identity)
                 self.assertEqual(solver.properties, ref.properties)
 
             with self.subTest("dynamic properties initialized"):
@@ -192,6 +198,7 @@ class MockSolverLoading(unittest.TestCase):
             _f = lambda attr, solvers: [getattr(s, attr) for s in solvers]
             with self.subTest("static properties initialized"):
                 self.assertEqual(_f('id', solvers), _f('id', refs))
+                self.assertEqual(_f('identity', solvers), _f('identity', refs))
                 self.assertEqual(_f('properties', solvers), _f('properties', refs))
 
             _f = lambda key, solvers: [s.data[key] for s in solvers]
@@ -262,14 +269,14 @@ class MockSolverLoading(unittest.TestCase):
 
     def test_get_solver_reproducible(self):
         # prefer solvers with longer name: that's our second solver
-        defaults = dict(solver=dict(order_by=lambda s: -len(s.id)))
+        defaults = dict(solver=dict(order_by=lambda s: -len(s.name)))
 
         with Client(endpoint=self.endpoint, token=self.token, defaults=defaults) as client:
             solver = client.get_solver()
-            self.assertEqual(solver.id, self.solver2_name)
+            self.assertEqual(solver.name, self.solver2_name)
 
             solver = client.get_solver(refresh=True)
-            self.assertEqual(solver.id, self.solver2_name)
+            self.assertEqual(solver.name, self.solver2_name)
 
     def test_solver_filtering_in_client(self):
         # base client
@@ -312,6 +319,19 @@ class MockSolverLoading(unittest.TestCase):
         self.assertFalse(solver_object('solver').is_vfyc)
         self.assertEqual(solver_object('solver').num_qubits, 3)
         self.assertFalse(solver_object('solver').has_flux_biases)
+
+        # identity and derived properties
+        name, graph_id = 'solver', '1234'
+        version = {'graph_id': graph_id}
+        identity = {'name': name, 'version': version}
+        self.assertEqual(solver_object(name).name, name)
+        self.assertEqual(solver_object(name, graph_id=graph_id).id, f'{name}:{graph_id}')
+        self.assertEqual(solver_object(name, graph_id=graph_id).graph_id, graph_id)
+        self.assertEqual(solver_object(name, graph_id=graph_id).version, version)
+        self.assertEqual(solver_object(name, graph_id=graph_id).identity, identity)
+        self.assertEqual(solver_object(name, graph_id=graph_id).identity.dict(), identity)
+        self.assertEqual(solver_object(name, graph_id=graph_id).identity.version, version)
+        self.assertEqual(solver_object(name, graph_id=graph_id).identity.version.dict(), version)
 
         # test .num_qubits vs .num_actual_qubits
         data = solver_data('test')

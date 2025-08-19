@@ -67,6 +67,18 @@ class AssertionSatisfied(Exception):
 class ProblemResourcesBaseTests(abc.ABC):
     """Basic tests for `dwave.cloud.api.resources.Problems`."""
 
+    linear: dict
+    quadratic: dict
+    bqm: 'dimod.BQM'
+
+    problem_data: models.ProblemData
+    problem_type: constants.ProblemType
+    problem_id: str
+    problem_label: str
+
+    params: dict
+    solver: models.SolverIdentity
+
     @classmethod
     def setUpClass(cls):
         """Create and submit one problem.
@@ -74,8 +86,8 @@ class ProblemResourcesBaseTests(abc.ABC):
         Set the following attributes:
         - `linear`/`quadratic` (or `bqm`), `problem_data`
         - `problem_type`, `problem_id`, `problem_label`
-        - `params`
-        - `solver_id`
+        - `params` (as dict)
+        - `solver` (in `SolverIdentity` sense)
 
         Written to work with:
         - both mock data and live api
@@ -86,7 +98,7 @@ class ProblemResourcesBaseTests(abc.ABC):
         """Verify `status` consistent with the submitted problem."""
         self.assertEqual(status.id, self.problem_id)
         self.assertEqual(status.type, self.problem_type)
-        self.assertEqual(status.solver, self.solver_id)
+        self.assertEqual(status.solver, self.solver)
         self.assertEqual(status.label, self.problem_label)
         self.assertEqual(status.status, constants.ProblemStatus.COMPLETED)
         self.assertIsNotNone(status.submitted_on)
@@ -124,7 +136,7 @@ class ProblemResourcesBaseTests(abc.ABC):
             self.api.list_problems(status='nonexisting-status-id')
 
         # empty result for non-existing solver
-        ps = self.api.list_problems(solver='nonexisting-solver-id')
+        ps = self.api.list_problems(solver='nonexisting-solver-name')
         self.assertEqual(len(ps), 0)
 
         # filtering by valid status
@@ -132,7 +144,7 @@ class ProblemResourcesBaseTests(abc.ABC):
         self.assertGreater(len(ps), 0)
 
         # extract one completed problem for further tests
-        problem = ps.pop()
+        problem = ps.pop(0)
 
         # filter by exact id
         ps = self.api.list_problems(id=problem.id)
@@ -239,7 +251,7 @@ class ProblemResourcesBaseTests(abc.ABC):
 
         # metadata
         self.assertIsInstance(info.metadata, models.ProblemMetadata)
-        self.assertEqual(info.metadata.solver, self.solver_id)
+        self.assertEqual(info.metadata.solver, self.solver)
         self.assertEqual(info.metadata.type, self.problem_type)
         self.assertEqual(info.metadata.label, self.problem_label)
         self.assertEqual(info.metadata.status, constants.ProblemStatus.COMPLETED)
@@ -298,13 +310,13 @@ class ProblemResourcesBaseTests(abc.ABC):
         status = self.api.submit_problem(
             data=self.problem_data,
             params=self.params,
-            solver=self.solver_id,
+            solver=self.solver,
             type=self.problem_type,
         )
 
         self.assertIsInstance(status, models.ProblemStatusMaybeWithAnswer)
         self.assertEqual(status.type, self.problem_type)
-        self.assertEqual(status.solver, self.solver_id)
+        self.assertEqual(status.solver, self.solver)
         self.assertIsNotNone(status.submitted_on)
 
         if status.status is constants.ProblemStatus.COMPLETED:
@@ -317,7 +329,7 @@ class ProblemResourcesBaseTests(abc.ABC):
         job = models.ProblemJob(
             data=self.problem_data,
             params=self.params,
-            solver=self.solver_id,
+            solver=self.solver,
             type=self.problem_type,
         )
 
@@ -325,7 +337,7 @@ class ProblemResourcesBaseTests(abc.ABC):
 
         self.assertIsInstance(status, models.ProblemStatusMaybeWithAnswer)
         self.assertEqual(status.type, self.problem_type)
-        self.assertEqual(status.solver, self.solver_id)
+        self.assertEqual(status.solver, self.solver)
         self.assertIsNotNone(status.submitted_on)
 
         if status.status is constants.ProblemStatus.COMPLETED:
@@ -339,7 +351,7 @@ class ProblemResourcesBaseTests(abc.ABC):
             self.api.submit_problem(
                 data=self.problem_data,
                 params=dict(non_existing_param=1),
-                solver=self.solver_id,
+                solver=self.solver,
                 type=self.problem_type,
             )
 
@@ -347,7 +359,7 @@ class ProblemResourcesBaseTests(abc.ABC):
             self.api.submit_problem(
                 data=self.problem_data,
                 params=self.params,
-                solver='non-existing-solver',
+                solver=models.SolverIdentity(name='non-existing-solver'),
                 type=self.problem_type,
             )
 
@@ -357,7 +369,7 @@ class ProblemResourcesBaseTests(abc.ABC):
         job = models.ProblemJob(
             data=self.problem_data,
             params=self.params,
-            solver=self.solver_id,
+            solver=self.solver,
             type=self.problem_type,
         )
 
@@ -375,7 +387,7 @@ class ProblemResourcesBaseTests(abc.ABC):
         job = models.ProblemJob(
             data=self.problem_data,
             params=dict(non_existing_param=1),
-            solver=self.solver_id,
+            solver=self.solver,
             type=self.problem_type,
         )
 
@@ -395,7 +407,7 @@ class ProblemResourcesBaseTests(abc.ABC):
         job = models.ProblemJob(
             data=self.problem_data,
             params=self.params,
-            solver=self.solver_id,
+            solver=self.solver,
             type=self.problem_type,
         )
         submitted = self.api.submit_problems(problems=[job]*2)
@@ -506,7 +518,7 @@ class ProblemResourcesMockerMixin:
         p3_status = self.p3.cancel_reply(id=p3_id)
 
         all_problem_ids = {p1_id, p2_id, p3_id}
-        all_solvers = [self.solver_id]
+        all_solver_names = [self.solver.name]
         all_statuses = {s.value for s in constants.ProblemStatus}
 
         # long polling param
@@ -615,7 +627,7 @@ class ProblemResourcesMockerMixin:
         def match_invalid_solver(request):
             query = parse_qs(urlparse(request.url).query)
             solver = query.get('solver')
-            return solver is not None and solver[0] not in all_solvers
+            return solver is not None and solver[0] not in all_solver_names
 
         self.mocker.get(
             url('problems/'),
@@ -650,7 +662,7 @@ class ProblemResourcesMockerMixin:
 
         def match_invalid_problem_solver(request):
             data = decode_request_body(request)
-            return data['solver'] != self.solver_id
+            return data['solver'].get('name') != self.solver.name
 
         self.mocker.post(
             url('problems/'),
@@ -736,7 +748,7 @@ class TestMockProblemsStructured(StructuredProblemTestsMixin,
         cls.problem_label = cls.p1.problem_label
 
         cls.params = dict(num_reads=100)
-        cls.solver_id = cls.p1.solver.id
+        cls.solver = cls.p1.solver.identity
 
         cls.pending_problem_id = cls.p2.problem_id
 
@@ -792,7 +804,7 @@ class TestMockProblemsSubmitWithQPUCompression(unittest.TestCase):
             status = api.submit_problem(
                 data=problem_data,
                 params=dict(num_reads=10),
-                solver=p.solver.id,
+                solver=p.solver.identity,
                 type=p.problem_type,
             )
             self.assertIsInstance(status, models.ProblemStatusMaybeWithAnswer)
@@ -823,7 +835,7 @@ class TestMockProblemsUnstructured(UnstructuredProblemTestsMixin,
         cls.problem_label = cls.p1.problem_label
 
         cls.params = dict(time_limit=3)
-        cls.solver_id = cls.p1.solver.id
+        cls.solver = cls.p1.solver.identity
 
         cls.pending_problem_id = cls.p2.problem_id
 
@@ -849,7 +861,7 @@ class TestMockProblemsUnstructuredWithBinaryRefAnswer(TestMockProblemsUnstructur
         cls.problem_label = cls.p1.problem_label
 
         cls.params = dict(time_limit=3)
-        cls.solver_id = cls.p1.solver.id
+        cls.solver = cls.p1.solver.identity
 
         cls.pending_problem_id = cls.p2.problem_id
 
@@ -873,7 +885,7 @@ class TestCloudProblemsStructured(StructuredProblemTestsMixin,
 
             # submit and solve an Ising problem as a fixture
             solver = client.get_solver(qpu=True)
-            cls.solver_id = solver.id
+            cls.solver = solver.identity
             edge = next(iter(solver.edges))
             cls.linear = {}
             cls.quadratic = {edge: 1.0}
@@ -934,8 +946,8 @@ class TestCloudProblemsUnstructured(UnstructuredProblemTestsMixin,
             cls.poll_wait_time = 2
 
             # submit and solve an Ising problem as a fixture
-            solver = client.get_solver(hybrid=True)
-            cls.solver_id = solver.id
+            solver = client.get_solver(supported_problem_types__contains="bqm")
+            cls.solver = solver.identity
             cls.bqm = dimod.BQM.from_ising({}, {'ab': 1.0})
             problem_data_id = solver.upload_problem(cls.bqm).result()
             problem_data_ref = encode_problem_as_ref(problem_data_id)
@@ -987,7 +999,7 @@ class NumpyParamsSerialization(unittest.TestCase):
         cls.problem_id = _p.problem_id
         cls.problem_label = _p.problem_label
         cls.params = {}
-        cls.solver_id = _p.solver.id
+        cls.solver = _p.solver.identity
         cls.api = Problems(token='token', endpoint='http://end.point/')
 
     @parameterized.expand(NUMPY_TYPES_AS_PYTHON)
@@ -1007,7 +1019,7 @@ class NumpyParamsSerialization(unittest.TestCase):
                 self.api.submit_problem(
                     data=self.problem_data,
                     params=user_params,
-                    solver=self.solver_id,
+                    solver=self.solver,
                     type=self.problem_type,
                 )
 
@@ -1026,7 +1038,7 @@ class NumpyParamsSerialization(unittest.TestCase):
         job = models.ProblemJob(
             data=self.problem_data,
             params=user_params,
-            solver=self.solver_id,
+            solver=self.solver,
             type=self.problem_type,
         )
 

@@ -15,7 +15,7 @@
 from datetime import datetime
 from typing import Annotated, Any, Optional, Union
 
-from pydantic import BaseModel, RootModel, ConfigDict
+from pydantic import BaseModel, RootModel, ConfigDict, Field
 from pydantic.functional_validators import AfterValidator
 
 from dwave.cloud.api import constants
@@ -52,8 +52,44 @@ class _RootSetterMixin:
         return setattr(self.root, name, value)
 
 
+class _DictMixin:
+    """Add `.dict()` method."""
+
+    def dict(self):
+        return self.model_dump(exclude_unset=True, exclude_none=True)
+
+
+class _DictEqualityMixin:
+    """Enable equality testing against a dict. Requires `.dict` method."""
+
+    def __eq__(self, other):
+        if isinstance(other, dict):
+            return self.dict() == other
+        return super().__eq__(other)
+
+
+class SolverVersion(_DictMixin, _DictEqualityMixin, BaseModel):
+    # allow additional version specifiers in the future
+    model_config = ConfigDict(extra='allow')
+
+    graph_id: Optional[str] = None              # QPU solvers require graph_id
+
+
+class SolverIdentity(_DictMixin, _DictEqualityMixin, BaseModel):
+    name: str
+    version: Optional[SolverVersion] = None     # only QPU solvers have `version` structure
+
+    def __str__(self):
+        s = self.name
+        d = self.dict()
+        if v := d.get('version'):
+            v = ":".join(map(str, v.values()))
+            s = f"{s}:{v}"
+        return s
+
+
 class SolverCompleteConfiguration(BaseModel):
-    id: str
+    identity: SolverIdentity
     status: str
     description: str
     properties: dict
@@ -63,6 +99,8 @@ class SolverCompleteConfiguration(BaseModel):
 class SolverFilteredConfiguration(BaseModel):
     # no required fields, and no ignored fields
     model_config = ConfigDict(extra='allow')
+
+    identity: Optional[SolverIdentity] = None
 
 
 # NOTE: we implement getitem interface so that `SolverConfiguration` can be
@@ -75,7 +113,7 @@ class SolverConfiguration(_RootGetterMixin, _RootSetterMixin, RootModel):
 class ProblemInitialStatus(BaseModel):
     id: str
     type: constants.ProblemType
-    solver: str
+    solver: SolverIdentity
     label: Optional[str] = None
     status: constants.ProblemStatus
     submitted_on: datetime
@@ -139,7 +177,7 @@ class ProblemData(_RootGetterMixin, RootModel):
 
 
 class ProblemMetadata(BaseModel):
-    solver: str
+    solver: SolverIdentity
     type: constants.ProblemType
     label: Optional[str] = None
     status: constants.ProblemStatus
@@ -160,7 +198,7 @@ class ProblemInfo(BaseModel):
 class ProblemJob(BaseModel):
     data: ProblemData
     params: dict[str, AnyIncludingNumpy]
-    solver: str
+    solver: SolverIdentity
     type: constants.ProblemType
     label: Optional[str] = None
 
