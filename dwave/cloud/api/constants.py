@@ -14,12 +14,6 @@
 
 import enum
 
-# note: for backwards compatibility in 0.13.1+
-# TODO: remove in 0.14.0
-from dwave.cloud.config.constants import (
-    DEFAULT_METADATA_API_ENDPOINT, DEFAULT_REGION,
-    DEFAULT_SOLVER_API_ENDPOINT, DEFAULT_LEAP_API_ENDPOINT)
-
 
 # Default API version
 DEFAULT_API_MEDIA_TYPE = 'application/vnd.dwave+json'
