@@ -621,7 +621,7 @@ class DWaveAPIClient:
 
     Example:
         >>> with DWaveAPIClient(endpoint='...', timeout=(5, 600)) as client:    # doctest: +SKIP
-        >>>     client.session.get('...')
+        ...     client.session.get('...')
 
     """
 

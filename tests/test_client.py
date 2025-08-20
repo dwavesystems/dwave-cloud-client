@@ -33,12 +33,13 @@ import requests
 from parameterized import parameterized
 from plucky import merge
 
-from dwave.cloud.api import models, Regions
+from dwave.cloud.api import models
 from dwave.cloud.client import Client
 from dwave.cloud.config import constants
 from dwave.cloud.config.models import dump_config_v1, PollingStrategy
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, SolverError, SolverNotFoundError)
+from dwave.cloud.regions import get_regions
 from dwave.cloud.solver import StructuredSolver, UnstructuredSolver
 from dwave.cloud.testing import iterable_mock_open, isolated_environ
 from dwave.cloud.utils.decorators import cached
@@ -210,9 +211,9 @@ class ClientConstruction(unittest.TestCase):
                 self.assertEqual(client.config.endpoint, 'endpoint')
                 self.assertEqual(client.config.token, 'token')
                 self.assertIsInstance(client, dwave.cloud.client.Client)
-                self.assertNotIsInstance(client, dwave.cloud.sw.Client)
-                self.assertNotIsInstance(client, dwave.cloud.qpu.Client)
-                self.assertNotIsInstance(client, dwave.cloud.hybrid.Client)
+                self.assertNotIsInstance(client, dwave.cloud.client.sw.Client)
+                self.assertNotIsInstance(client, dwave.cloud.client.qpu.Client)
+                self.assertNotIsInstance(client, dwave.cloud.client.hybrid.Client)
 
     def test_region_default(self):
         conf = {k: k for k in 'token'.split()}
@@ -224,9 +225,9 @@ class ClientConstruction(unittest.TestCase):
                 self.assertEqual(client.config.metadata_api_endpoint, constants.DEFAULT_METADATA_API_ENDPOINT)
                 self.assertEqual(client.config.token, 'token')
                 self.assertIsInstance(client, dwave.cloud.client.Client)
-                self.assertNotIsInstance(client, dwave.cloud.sw.Client)
-                self.assertNotIsInstance(client, dwave.cloud.qpu.Client)
-                self.assertNotIsInstance(client, dwave.cloud.hybrid.Client)
+                self.assertNotIsInstance(client, dwave.cloud.client.sw.Client)
+                self.assertNotIsInstance(client, dwave.cloud.client.qpu.Client)
+                self.assertNotIsInstance(client, dwave.cloud.client.hybrid.Client)
 
     def test_region_selection_over_defaults(self):
         conf = {k: k for k in 'token'.split()}
@@ -302,26 +303,26 @@ class ClientConstruction(unittest.TestCase):
             with dwave.cloud.client.Client.from_config() as client:
                 self.assertIsInstance(client, dwave.cloud.client.Client)
 
-            with dwave.cloud.qpu.Client.from_config() as client:
-                self.assertIsInstance(client, dwave.cloud.qpu.Client)
+            with dwave.cloud.client.qpu.Client.from_config() as client:
+                self.assertIsInstance(client, dwave.cloud.client.qpu.Client)
 
-            with dwave.cloud.sw.Client.from_config() as client:
-                self.assertIsInstance(client, dwave.cloud.sw.Client)
+            with dwave.cloud.client.sw.Client.from_config() as client:
+                self.assertIsInstance(client, dwave.cloud.client.sw.Client)
 
-            with dwave.cloud.hybrid.Client.from_config() as client:
-                self.assertIsInstance(client, dwave.cloud.hybrid.Client)
+            with dwave.cloud.client.hybrid.Client.from_config() as client:
+                self.assertIsInstance(client, dwave.cloud.client.hybrid.Client)
 
-            with dwave.cloud.qpu.Client.from_config(client='base') as client:
+            with dwave.cloud.client.qpu.Client.from_config(client='base') as client:
                 self.assertIsInstance(client, dwave.cloud.client.Client)
 
             with dwave.cloud.Client.from_config(client='qpu') as client:
-                self.assertIsInstance(client, dwave.cloud.qpu.Client)
+                self.assertIsInstance(client, dwave.cloud.client.qpu.Client)
 
             with dwave.cloud.Client.from_config(client='sw') as client:
-                self.assertIsInstance(client, dwave.cloud.sw.Client)
+                self.assertIsInstance(client, dwave.cloud.client.sw.Client)
 
             with dwave.cloud.Client.from_config(client='hybrid') as client:
-                self.assertIsInstance(client, dwave.cloud.hybrid.Client)
+                self.assertIsInstance(client, dwave.cloud.client.hybrid.Client)
 
     def test_custom_kwargs(self):
         conf = {k: k for k in 'endpoint token'.split()}
@@ -659,12 +660,6 @@ class VerifyLazyClientImport(unittest.TestCase):
 
         self.assertEqual(dwave.cloud.client.Client, dwave.cloud.Client)
 
-    @parameterized.expand([("qpu", ), ("sw", ), ("hybrid", )])
-    def test_deprecation(self, name):
-        with self.assertWarns(DeprecationWarning):
-            mod = importlib.import_module(f'dwave.cloud.{name}')
-            self.assertTrue(issubclass(getattr(mod, 'Client'), Client))
-
 
 class VerifyClientCleanup(unittest.TestCase):
 
@@ -751,10 +746,9 @@ class MultiRegionSupport(unittest.TestCase):
             permissive_ssl = {permissive_ssl}
         """
 
-        expected_get_regions_return = {
-            r['code']: {"name": r['name'], "endpoint": r['endpoint']}
-            for r in regions_response
-        }
+        expected_get_regions_return = [
+            models.Region(**region) for region in regions_response
+        ]
 
         def _mocked_session():
             session = mock.Mock()
@@ -776,7 +770,7 @@ class MultiRegionSupport(unittest.TestCase):
             self.assertEqual(config.permissive_ssl, permissive_ssl)
             self.assertEqual(config.proxy, proxy)
 
-            regions = Regions()
+            regions = models.Regions()
             regions._session = _mocked_session()
             return regions
 
@@ -788,7 +782,7 @@ class MultiRegionSupport(unittest.TestCase):
                     # (i.e. config open mock above fails on CI)
                     with Client.from_config(config_file='config_file') as client:
                         # verify get_regions() returns data from metadata_api_endpoint
-                        regions = client.get_regions()
+                        regions = get_regions()
                         self.assertEqual(regions, expected_get_regions_return)
 
                         # check region endpoint initialized from custom metadata_api_endpoint

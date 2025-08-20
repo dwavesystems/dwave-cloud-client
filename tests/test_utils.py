@@ -18,6 +18,7 @@ import inspect
 import io
 import json
 import logging
+import orjson
 import os
 import sqlite3
 import subprocess
@@ -41,7 +42,7 @@ import requests
 import requests_mock
 from parameterized import parameterized
 
-from dwave.cloud.utils.coders import NumpyEncoder, coerce_numpy_to_python
+from dwave.cloud.utils.coders import coerce_numpy_to_python
 from dwave.cloud.utils.cli import default_text_input
 from dwave.cloud.utils.decorators import aliasdict, cached, deprecated, retried
 from dwave.cloud.utils.dist import (
@@ -242,18 +243,21 @@ class TestNumpyTypesEncoding(unittest.TestCase):
         (numpy.ubyte(1), 1), (numpy.uint8(1), 1),
         (numpy.short(1), 1), (numpy.int16(1), 1),
         (numpy.ushort(1), 1), (numpy.uint16(1), 1),
-        (numpy.intc(1), 1), (numpy.int32(1), 1),
-        (numpy.uintc(1), 1), (numpy.uint32(1), 1),
         (numpy.int_(1), 1), (numpy.int32(1), 1),
         (numpy.uint(1), 1), (numpy.uint32(1), 1),
-        (numpy.longlong(1), 1), (numpy.int64(1), 1),
-        (numpy.ulonglong(1), 1), (numpy.uint64(1), 1),
+        (numpy.int64(1), 1), (numpy.uint64(1), 1),
         (numpy.half(1.0), 1.0), (numpy.float16(1.0), 1.0),
         (numpy.single(1.0), 1.0), (numpy.float32(1.0), 1.0),
         (numpy.double(1.0), 1.0), (numpy.float64(1.0), 1.0),
-        (numpy.longdouble(1.0), 1.0)
+    ]
+
+    # unsupported by orjson
+    NUMPY_SCALARS_EXTRA = [
+        (numpy.longlong(1), 1), (numpy.ulonglong(1), 1),
+        (numpy.longdouble(1.0), 1.0),
     ] + ([
-        (numpy.float128(1.0), 1.0)      # unavailable on windows
+        (numpy.intc(1), 1), (numpy.uintc(1), 1),    # unsupported by orjson on windows
+        (numpy.float128(1.0), 1.0),                 # unavailable in numpy on windows
     ] if hasattr(numpy, 'float128') else [
     ])
 
@@ -261,6 +265,9 @@ class TestNumpyTypesEncoding(unittest.TestCase):
         (numpy.array([1, 2, 3], dtype=int), [1, 2, 3]),
         (numpy.array([[1], [2], [3]], dtype=float), [[1.0], [2.0], [3.0]]),
         (numpy.zeros((2, 2), dtype=bool), [[False, False], [False, False]]),
+    ]
+
+    NUMPY_RECARRAYS = [
         (numpy.array([('Rex', 9, 81.0), ('Fido', 3, 27.0)],
                      dtype=[('name', 'U10'), ('age', 'i4'), ('weight', 'f4')]),
          [('Rex', 9, 81.0), ('Fido', 3, 27.0)]),
@@ -278,11 +285,12 @@ class TestNumpyTypesEncoding(unittest.TestCase):
     @parameterized.expand(NUMPY_SCALARS + NUMPY_ARRAYS)
     def test_numpy_dump(self, np_val, py_val):
         self.assertEqual(
-            json.dumps(py_val),
-            json.dumps(np_val, cls=NumpyEncoder)
+            json.dumps(py_val, separators=(',', ':')).encode('utf8'),
+            orjson.dumps(np_val, option=orjson.OPT_SERIALIZE_NUMPY)
         )
 
-    @parameterized.expand(NUMPY_SCALARS + NUMPY_ARRAYS + NUMPY_STRUCTURES)
+    @parameterized.expand(NUMPY_SCALARS + NUMPY_SCALARS_EXTRA
+                          + NUMPY_ARRAYS + NUMPY_RECARRAYS + NUMPY_STRUCTURES)
     def test_numpy_to_python_coercion(self, np_val, py_val):
         self.assertEqual(py_val, coerce_numpy_to_python(np_val))
 

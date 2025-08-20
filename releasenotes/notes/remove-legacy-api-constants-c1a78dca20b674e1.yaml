@@ -1,0 +1,7 @@
+---
+upgrade:
+  - |
+    Remove API constants deprecated in 0.13.1 and moved to
+    ``dwave.cloud.config.constants`` from ``dwave.cloud.api.constants``:
+    ``DEFAULT_METADATA_API_ENDPOINT``, ``DEFAULT_REGION``,
+    ``DEFAULT_SOLVER_API_ENDPOINT``, ``DEFAULT_LEAP_API_ENDPOINT``.

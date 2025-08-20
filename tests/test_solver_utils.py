@@ -114,6 +114,7 @@ class TestReformatParameters(unittest.TestCase):
         with self.assertRaises(ValueError):
             StructuredSolver.reformat_parameters("INTEGER", {}, {})
 
+
 class QpuAccessTimeEstimate(unittest.TestCase):
     """Test QPU access time estimation method."""
 
@@ -126,7 +127,6 @@ class QpuAccessTimeEstimate(unittest.TestCase):
             raise cls.skipTest(cls, "structured solver mock not available")
 
     def test_mock_conflicting_params(self):
-
         # not allowed annealing_time together with anneal_schedule
         with self.assertRaises(ValueError):
             self.solver_mock.estimate_qpu_access_time(num_qubits=1000,
@@ -136,6 +136,7 @@ class QpuAccessTimeEstimate(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.solver_mock.estimate_qpu_access_time(num_qubits=1000,
                 anneal_schedule=[[0.0, 1.0], [2.75, 0.45], [82.75, 0.45], [82.761, 1.0]])
+
     def test_mock_version(self):
         # currently support is for version 1.0.x
         with self.assertRaises(ValueError):
@@ -166,17 +167,13 @@ class QpuAccessTimeEstimate(unittest.TestCase):
     @unittest.skipUnless(config, "No live server configuration available.")
     def test_live_qpu_access_time_estimate(self):
         with Client(**config) as client:
-            solver = client.get_solver(topology__type='pegasus')
-            try:
-                self.assertEqual(solver.name, 'test')
-            except:
-                print(solver.name)
+            solver = client.get_solver(topology__type='zephyr')
 
             # test live qpu is in a somewhat reasonable range
-            # results for num_qubits=1000: Advanatge4.1 15341, DW_2000Q_6 11775
+            # results for num_qubits=1000: Advantage2_system1.5 ~34700 Advantage4.1 15341, DW_2000Q_6 11775
             runtime_q1000 = solver.estimate_qpu_access_time(num_qubits=1000)
             self.assertGreater(runtime_q1000, 5000)
-            self.assertGreater(20000, runtime_q1000)
+            self.assertGreater(35000, runtime_q1000)
 
             # compare for most qubits in use (best model accuracy in version 1.0.0)
             h = {node: 0.5 for node in list(solver.nodes)[:5000]}
