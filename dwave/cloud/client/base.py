@@ -40,7 +40,6 @@ import time
 import copy
 import queue
 import logging
-import warnings
 import operator
 import threading
 
