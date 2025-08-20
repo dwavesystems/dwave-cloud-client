@@ -80,11 +80,23 @@ def get_regions(config: Optional[Union[ClientConfig, str, dict]] = None,
         ``maxage`` parameter is now just a default value for the maximum allowed
         cache age, and it's typically overridden by regions API's cache control.
 
-    Example:
+    Examples:
+        Fetch available regions using the default client configuration:
+
         >>> from dwave.cloud.regions import get_regions
         >>> get_regions()       # doctest: +NORMALIZE_WHITESPACE
         [Region(code='na-west-1', name='North America', endpoint='https://na-west-1.cloud.dwavesys.com/sapi/v2/'),
          Region(code='eu-central-1', name='Europe', endpoint='https://eu-central-1.cloud.dwavesys.com/sapi/v2/')]
+
+        Alternatively, to fetch available regions using an already configured client:
+
+        .. code::
+
+            from dwave.cloud import Client
+            from dwave.cloud.regions import get_regions
+
+            with Client.from_config(...) as client:
+                get_regions(config=client.config)
 
     """
     if isinstance(config, str):
