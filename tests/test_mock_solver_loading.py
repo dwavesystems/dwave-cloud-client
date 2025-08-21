@@ -325,7 +325,7 @@ class MockSolverLoading(unittest.TestCase):
         version = {'graph_id': graph_id}
         identity = {'name': name, 'version': version}
         self.assertEqual(solver_object(name).name, name)
-        self.assertEqual(solver_object(name, graph_id=graph_id).id, f'{name}:{graph_id}')
+        self.assertEqual(solver_object(name, graph_id=graph_id).id, f'{name};graph_id={graph_id}')
         self.assertEqual(solver_object(name, graph_id=graph_id).graph_id, graph_id)
         self.assertEqual(solver_object(name, graph_id=graph_id).version, version)
         self.assertEqual(solver_object(name, graph_id=graph_id).identity, identity)

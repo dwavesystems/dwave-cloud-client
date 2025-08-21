@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Annotated, Any, Optional, Union
+from urllib.parse import quote, unquote
 
 from pydantic import BaseModel, RootModel, ConfigDict, Field
 from pydantic.functional_validators import AfterValidator
@@ -80,12 +83,28 @@ class SolverIdentity(_DictMixin, _DictEqualityMixin, BaseModel):
     version: Optional[SolverVersion] = None     # only QPU solvers have `version` structure
 
     def __str__(self):
-        s = self.name
+        return self.to_id()
+
+    def to_id(self) -> str:
+        """Serialize to a unique string representation that includes the ``name``
+        and all ``version`` fields.
+        """
+        s = quote(self.name)
         d = self.dict()
         if v := d.get('version'):
-            v = ":".join(map(str, v.values()))
-            s = f"{s}:{v}"
+            v = ";".join(f"{quote(str(k))}={quote(str(v))}" for k,v in v.items())
+            s = f"{s};{v}"
         return s
+
+    @classmethod
+    def from_id(cls, id: str) -> SolverIdentity:
+        """Construct a ``SolverIdentity`` model from the unique string representation
+        generated with :meth:`.to_id` or ``str()``.
+        """
+        name, *version = id.split(';')
+        name = unquote(name)
+        version = dict(map(unquote, v.split('=', maxsplit=2)) for v in version)
+        return cls(name=name, **dict(version=version) if version else {})
 
 
 class SolverCompleteConfiguration(BaseModel):
