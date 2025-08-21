@@ -15,6 +15,7 @@
 import unittest
 
 from pydantic import ValidationError
+from parameterized import parameterized
 
 from dwave.cloud.api import models
 from dwave.cloud.testing.mocks import structured_solver_data, unstructured_solver_data
@@ -57,7 +58,7 @@ class TestModels(unittest.TestCase):
             self.assertIsNone(solver.get('properties'))
 
     def test_solver_identity_model(self):
-        # test validation, construction and serialization with `.dict()`/`str()`
+        # test validation, construction and basic serialization with `.dict()`/`str()`
         name = 'qpu-solver'
         graph_id = '01abcd1234'
 
@@ -113,6 +114,31 @@ class TestModels(unittest.TestCase):
             # compares to SolverVersion
             version = models.SolverVersion.model_validate(data['version'])
             self.assertEqual(identity.version, version)
+
+    @parameterized.expand([
+        (dict(name='hss'), 'hss'),
+        (dict(name='qpu', version=dict(graph_id='123')), 'qpu;graph_id=123'),
+        (dict(name='qpu', version=dict(a='a', b='b')), 'qpu;a=a;b=b'),
+        (dict(name='qpu;a=b', version=dict(a=';', b='=')), 'qpu%3Ba%3Db;a=%3B;b=%3D'),
+        (dict(name='|_%.:', version={";": '"'}), '%7C_%25.%3A;%3B=%22'),
+    ])
+    def test_solver_identity_serialization(self, identity_dict, id_string):
+        # test advanced serialization and deserialization with `.to_id()`/`.from_id()`
+
+        identity = models.SolverIdentity.model_validate(identity_dict)
+
+        with self.subTest('serialization'):
+            self.assertEqual(str(identity), id_string)
+            self.assertEqual(identity.to_id(), id_string)
+
+        with self.subTest('deserialization'):
+            self.assertEqual(models.SolverIdentity.from_id(id_string).dict(), identity_dict)
+
+        with self.subTest('from id to id via model'):
+            self.assertEqual(models.SolverIdentity.from_id(id_string).to_id(), id_string)
+
+        with self.subTest('from model to model via string'):
+            self.assertEqual(models.SolverIdentity.from_id(identity.to_id()), identity)
 
     def test_problem_models(self):
         with self.subTest('ProblemStatus'):
