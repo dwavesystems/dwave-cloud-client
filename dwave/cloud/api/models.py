@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Annotated, Any, Optional, Union
 
@@ -80,12 +82,21 @@ class SolverIdentity(_DictMixin, _DictEqualityMixin, BaseModel):
     version: Optional[SolverVersion] = None     # only QPU solvers have `version` structure
 
     def __str__(self):
+        return self.to_id()
+
+    def to_id(self) -> str:
         s = self.name
         d = self.dict()
         if v := d.get('version'):
-            v = ":".join(map(str, v.values()))
-            s = f"{s}:{v}"
+            v = ";".join(f"{k!s}={v!s}" for k,v in v.items())
+            s = f"{s};{v}"
         return s
+
+    @classmethod
+    def from_id(cls, id: str) -> SolverIdentity:
+        name, *version = id.split(';')
+        version = dict(v.split('=', maxsplit=2) for v in version)
+        return cls(name=name, version=version)
 
 
 class SolverCompleteConfiguration(BaseModel):

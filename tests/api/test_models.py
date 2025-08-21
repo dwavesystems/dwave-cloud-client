@@ -79,14 +79,14 @@ class TestModels(unittest.TestCase):
             data = {"name": name, "version": {"graph_id": graph_id}}
             identity = models.SolverIdentity.model_validate(data)
             self.assertEqual(identity.dict(), data)
-            self.assertEqual(str(identity), f"{name}:{graph_id}")
+            self.assertEqual(str(identity), f"{name};graph_id={graph_id}")
 
         with self.subTest('allow additional version specs'):
             extra = "1.0"
             data = {"name": name, "version": {"graph_id": graph_id, "param_id": extra}}
             identity = models.SolverIdentity.model_validate(data)
             self.assertEqual(identity.dict(), data)
-            self.assertEqual(str(identity), f"{name}:{graph_id}:{extra}")
+            self.assertEqual(str(identity), f"{name};graph_id={graph_id};param_id={extra}")
 
         with self.subTest('identity equality'):
             # compares to dict

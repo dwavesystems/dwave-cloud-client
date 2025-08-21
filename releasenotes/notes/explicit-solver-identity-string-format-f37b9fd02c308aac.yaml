@@ -1,0 +1,12 @@
+---
+features:
+  - |
+    Make ``SolverIdentity`` string representation more explicit. Version
+    components are now clearly identified, avoiding ambiguity and enabling
+    reverse lookups (i.e. conversion between string representation and solver
+    identity structure).
+
+    Add ``SolverIdentity.from_id()`` factory that creates solver identity model
+    off its string representation.
+
+    See `#713 <https://github.com/dwavesystems/dwave-cloud-client/issues/713>`_.
