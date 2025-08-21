@@ -18,7 +18,6 @@ Tests the ability to connect to the SAPI server with the `dwave.cloud.qpu.Client
 test_mock_solver_loading.py duplicates some of these tests against a mock server.
 """
 
-import importlib
 import json
 import sys
 import threading
@@ -33,7 +32,7 @@ import requests
 from parameterized import parameterized
 from plucky import merge
 
-from dwave.cloud.api import models
+from dwave.cloud.api import models, Regions
 from dwave.cloud.client import Client
 from dwave.cloud.config import constants
 from dwave.cloud.config.models import dump_config_v1, PollingStrategy
@@ -770,7 +769,7 @@ class MultiRegionSupport(unittest.TestCase):
             self.assertEqual(config.permissive_ssl, permissive_ssl)
             self.assertEqual(config.proxy, proxy)
 
-            regions = models.Regions()
+            regions = Regions()
             regions._session = _mocked_session()
             return regions
 
@@ -782,7 +781,7 @@ class MultiRegionSupport(unittest.TestCase):
                     # (i.e. config open mock above fails on CI)
                     with Client.from_config(config_file='config_file') as client:
                         # verify get_regions() returns data from metadata_api_endpoint
-                        regions = get_regions()
+                        regions = get_regions(config=client.config)
                         self.assertEqual(regions, expected_get_regions_return)
 
                         # check region endpoint initialized from custom metadata_api_endpoint
