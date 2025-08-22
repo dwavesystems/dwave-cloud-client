@@ -1,0 +1,33 @@
+---
+features:
+  - |
+    Allow ``solver`` to be specified using the new solver identity string
+    representation.
+
+    The new format is supported in a config file::
+
+      [my-experiment]
+      solver = Advantage_system6.4;graph_id=01dae5a273
+
+    environment variable::
+
+      DWAVE_API_SOLVER='Advantage_system6.4;graph_id=01dae5a273'
+
+    as an argument to the ``dwave`` CLI::
+
+      dwave solvers -s 'Advantage_system6.4;graph_id=01dae5a273'
+
+    or as the client constructor argument:
+
+      from dwave.cloud import Client
+
+      with Client.from_config(solver='Advantage_system6.4;graph_id=01dae5a273') as client:
+        solver = client.get_solver()
+
+        assert(solver.name == 'Advantage_system6.4')
+        assert(solver.graph_id == '01dae5a273')
+
+    Note: specifying your solver via name only is still possible. In that case,
+    working graph version is not constrained.
+
+    See `#714 <https://github.com/dwavesystems/dwave-cloud-client/issues/714>`_.

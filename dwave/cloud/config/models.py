@@ -26,7 +26,7 @@ import urllib3
 from pydantic import BaseModel, BeforeValidator, NonNegativeInt
 
 from dwave.cloud.config import constants
-from dwave.cloud.config.loaders import update_config
+from dwave.cloud.config.loaders import update_config, _solver_id_as_identity
 
 __all__ = ['RequestRetryConfig', 'ClientConfig',
            'BackoffPollingSchedule', 'LongPollingSchedule',
@@ -231,18 +231,28 @@ def validate_config_v1(raw_config: abc.Mapping) -> ClientConfig:
         try:
             solver_def = orjson.loads(solver)
         except Exception:
-            # unparseable (or non-dict) json, assume string name for solver
-            # we'll deprecate this eventually, but for now just convert it to
-            # features dict (equality constraint on full solver name)
-            logger.debug("Invalid solver JSON, assuming string name: %r", solver)
-            solver_def = dict(name__eq=solver)
+            # unparseable (or non-dict) json, assume solver identity as string
+            logger.info("Invalid solver JSON, parsing as string identity: %r", solver)
+            try:
+                identity = _solver_id_as_identity(solver)
+            except Exception:
+                logger.debug("Unknown solver identity string format, falling back to string")
+                solver_def = dict(id__eq=solver)
+            else:
+                # use identity equality constraint only when full identity is indeed
+                # specified; this is to prevent mismatches when user specifies just a name
+                # (which is a partial identity for a structured solver)
+                if identity.get('version'):
+                    solver_def = dict(identity__eq=identity)
+                else:
+                    solver_def = dict(name__eq=identity['name'])
         else:
             # if valid json, has to be a dict
             if not isinstance(solver_def, abc.Mapping):
-                logger.debug("Non-dict solver JSON, assuming string name: %r", solver)
-                solver_def = dict(name__eq=solver)
+                logger.debug("Non-dict solver JSON, assuming string identity: %r", solver)
+                solver_def = dict(id__eq=solver)
     else:
-        raise ValueError("Expecting a features dictionary or a string name for 'solver'")
+        raise ValueError("Expecting a features dictionary or a string identity for 'solver'")
     logger.trace("parsed solver definition: %r", solver_def)
     config['solver'] = solver_def
 

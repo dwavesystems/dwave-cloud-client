@@ -19,6 +19,7 @@ import ast
 import logging
 import configparser
 from typing import Optional, Union
+from urllib.parse import quote, unquote
 
 import homebase
 
@@ -114,6 +115,42 @@ def parse_boolean(s, default=None):
             raise ValueError('invalid boolean value: {!r}'.format(s))
 
     return bool(s)
+
+
+def _solver_id_as_identity(id: str) -> dict:
+    """Construct a solver identity dictionary from the unique string representation
+    generated with :func:`_dump_solver_id`.
+
+    Note: for internal use only. For public interface, see
+    :meth:`dwave.cloud.api.models.SolverIdentity.from_id`.
+    """
+    name, *version = id.strip().split(';')
+    identity = dict(name=unquote(name))
+    if not identity['name']:
+        raise ValueError('Invalid id string: missing "name"')
+
+    version = dict(map(unquote, v.split('=', maxsplit=1)) for v in version)
+    identity.update(dict(version=version) if version else {})
+
+    return identity
+
+
+def _solver_identity_as_id(identity: dict) -> str:
+    """Serialize solver identity dictionary to a unique string representation
+    that includes the ``name`` and all of the ``version`` fields.
+
+    Note: for internal use only. For public interface, see
+    :meth:`dwave.cloud.api.models.SolverIdentity.to_id`.
+    """
+    s = quote(identity.get('name', ''))
+    if not s:
+        raise ValueError('Invalid "identity" dict: missing "name"')
+
+    if v := identity.get('version'):
+        v = ";".join(f"{quote(str(k))}={quote(str(v))}" for k,v in v.items())
+        s = f"{s};{v}"
+
+    return s
 
 
 def get_configfile_paths(

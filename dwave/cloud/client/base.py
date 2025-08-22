@@ -956,6 +956,8 @@ class Client(object):
                 topology__type="pegasus"            # same as above, `eq` implied even for nested properties
             )
         """
+        logger.debug('get_solvers(refresh=%r, order_by=%r, **filters=%r)',
+                     refresh, order_by, filters)
 
         def covers_op(prop, val):
             """Does LHS `prop` (range) fully cover RHS `val` (range or item)?"""
@@ -1088,6 +1090,11 @@ class Client(object):
         if 'name__eq' in filters:
             query['name'] = filters['name__eq']
 
+        # shortcircuit lookup if identity defines a name
+        identity = filters.get('identity__eq', filters.get('identity', {}))
+        if 'name' in identity:
+            query['name'] = identity['name']
+
         # filter
         try:
             solvers = self._fetch_solvers(**query)
@@ -1156,21 +1163,21 @@ class Client(object):
             >>> from dwave.cloud import Client
             >>> client = Client.from_config()    # doctest: +SKIP
             >>> client.get_solvers()   # doctest: +SKIP
-            BQMSolver(id='hybrid_binary_quadratic_model_version2p'),
-            DQMSolver(id='hybrid_discrete_quadratic_model_version1p'),
-            CQMSolver(id='hybrid_constrained_quadratic_model_version1p'),
-            StructuredSolver(id='Advantage_system6.1')]
+            BQMSolver(name='hybrid_binary_quadratic_model_version2p'),
+            DQMSolver(name='hybrid_discrete_quadratic_model_version1p'),
+            CQMSolver(name='hybrid_constrained_quadratic_model_version1p'),
+            StructuredSolver(name='Advantage_system6.4', graph_id='01dae5a273')]
             >>> solver1 = client.get_solver()    # doctest: +SKIP
             >>> solver2 = client.get_solver(supported_problem_types__issubset={'cqm'})    # doctest: +SKIP
             >>> solver1.name  # doctest: +SKIP
-            'Advantage_system6.1'
+            'Advantage_system6.4'
             >>> solver2.name   # doctest: +SKIP
             'hybrid_constrained_quadratic_model_version1p'
             >>> # code that uses client
             >>> client.close() # doctest: +SKIP
 
         """
-        logger.info("Requested a solver that best matches feature filters=%r", filters)
+        logger.debug(f"get_solver({name=}, {refresh=}, {filters=})")
 
         # backward compatibility: name as the first feature
         if name is not None:
