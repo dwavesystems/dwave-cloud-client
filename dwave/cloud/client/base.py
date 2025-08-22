@@ -1156,14 +1156,14 @@ class Client(object):
             >>> from dwave.cloud import Client
             >>> client = Client.from_config()    # doctest: +SKIP
             >>> client.get_solvers()   # doctest: +SKIP
-            BQMSolver(id='hybrid_binary_quadratic_model_version2p'),
-            DQMSolver(id='hybrid_discrete_quadratic_model_version1p'),
-            CQMSolver(id='hybrid_constrained_quadratic_model_version1p'),
-            StructuredSolver(id='Advantage_system6.1')]
+            BQMSolver(name='hybrid_binary_quadratic_model_version2p'),
+            DQMSolver(name='hybrid_discrete_quadratic_model_version1p'),
+            CQMSolver(name='hybrid_constrained_quadratic_model_version1p'),
+            StructuredSolver(name='Advantage_system6.4', graph_id='01dae5a273')]
             >>> solver1 = client.get_solver()    # doctest: +SKIP
             >>> solver2 = client.get_solver(supported_problem_types__issubset={'cqm'})    # doctest: +SKIP
             >>> solver1.name  # doctest: +SKIP
-            'Advantage_system6.1'
+            'Advantage_system6.4'
             >>> solver2.name   # doctest: +SKIP
             'hybrid_constrained_quadratic_model_version1p'
             >>> # code that uses client

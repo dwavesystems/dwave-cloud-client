@@ -349,8 +349,10 @@ class ClientConstruction(unittest.TestCase):
                 self.assertEqual(client.config.solver, solver_def)
 
     def test_solver_name_from_config(self):
-        solver_def = {"name__eq": "solver"}
-        conf = {k: k for k in 'endpoint token solver'.split()}
+        solver_def = {"identity__eq": {"name": "solver", "version": {"graph_id": "123"}}}
+        conf = dict(endpoint="endpoint",
+                    token="token",
+                    solver="solver;graph_id=123")
 
         with mock.patch("dwave.cloud.config.loaders.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config() as client:

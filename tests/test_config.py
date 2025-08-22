@@ -618,11 +618,13 @@ class TestConfigModel(unittest.TestCase):
         ("blank", '', {}),
         ("empty", '  ', {}),
         ("string", "name", dict(name__eq="name")),
+        ("identity string", "name;graph_id=123", dict(identity__eq=dict(name="name", version=dict(graph_id="123")))),
         ("simple dict", dict(name="name"), dict(name="name")),
         ("features dict", dict(feature__op="val", x="y"), dict(feature__op="val", x="y")),
         ("valid json", '{"key": "val"}', dict(key="val")),
-        ("valid json non-dict", '"name"', dict(name__eq='"name"')),
-        ("invalid json", "{name}", dict(name__eq="{name}")),
+        ("valid json non-dict", '"id"', dict(id__eq='"id"')),
+        ("invalid json, partial identity", "{name}", dict(name__eq="{name}")),
+        ("invalid json, invalid identity", ";;", dict(id__eq=";;")),
     ])
     def test_solver(self, name, raw_value, model_value):
         self._verify(raw_config={"solver": raw_value},
