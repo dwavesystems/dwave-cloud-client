@@ -16,11 +16,11 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Annotated, Any, Optional, Union
-from urllib.parse import quote, unquote
 
-from pydantic import BaseModel, RootModel, ConfigDict, Field
+from pydantic import BaseModel, RootModel, ConfigDict
 from pydantic.functional_validators import AfterValidator
 
+import dwave.cloud.config
 from dwave.cloud.api import constants
 from dwave.cloud.utils.coders import coerce_numpy_to_python
 
@@ -89,22 +89,14 @@ class SolverIdentity(_DictMixin, _DictEqualityMixin, BaseModel):
         """Serialize to a unique string representation that includes the ``name``
         and all ``version`` fields.
         """
-        s = quote(self.name)
-        d = self.dict()
-        if v := d.get('version'):
-            v = ";".join(f"{quote(str(k))}={quote(str(v))}" for k,v in v.items())
-            s = f"{s};{v}"
-        return s
+        return dwave.cloud.config.loaders._solver_identity_as_id(self.dict())
 
     @classmethod
     def from_id(cls, id: str) -> SolverIdentity:
         """Construct a ``SolverIdentity`` model from the unique string representation
         generated with :meth:`.to_id` or ``str()``.
         """
-        name, *version = id.split(';')
-        name = unquote(name)
-        version = dict(map(unquote, v.split('=', maxsplit=2)) for v in version)
-        return cls(name=name, **dict(version=version) if version else {})
+        return cls(**dwave.cloud.config.loaders._solver_id_as_identity(id))
 
 
 class SolverCompleteConfiguration(BaseModel):
