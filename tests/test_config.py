@@ -34,6 +34,7 @@ from dwave.cloud.config.constants import DEFAULT_METADATA_API_ENDPOINT
 from dwave.cloud.config.exceptions import ConfigFileParseError, ConfigFileReadError
 from dwave.cloud.config.models import ClientConfig, PollingStrategy
 from dwave.cloud.config.models import validate_config_v1, load_config_v1, dump_config_v1
+from dwave.cloud.testing import isolated_environ
 
 
 class TestConfigParsing(unittest.TestCase):
@@ -76,9 +77,11 @@ class TestConfigParsing(unittest.TestCase):
     def setUp(self):
         # clear `config_load`-relevant environment variables before testing, so
         # we only need to patch the ones that we are currently testing
-        for key in frozenset(os.environ.keys()):
-            if key.startswith("DWAVE_") or key.startswith("DW_INTERNAL__"):
-                os.environ.pop(key, None)
+        # also, make sure the env is isolated to prevent interference with other tests
+        self._env = isolated_environ(remove_dwave=True).start()
+
+    def tearDown(self):
+        self._env.stop()
 
     def test_config_load_from_file__invalid_format__duplicate_sections(self):
         """Config loading should fail with ``ConfigFileParseError`` for invalid
