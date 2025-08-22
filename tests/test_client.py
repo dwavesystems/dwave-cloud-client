@@ -163,7 +163,7 @@ class SolverLoading(unittest.TestCase):
 
     def test_get_solver_no_defaults(self):
         """Specialized client returns the correct solver by default."""
-        from dwave.cloud import qpu, sw, hybrid
+        from dwave.cloud.client import qpu, sw, hybrid
 
         conf = config.copy()
         del conf['solver']
@@ -339,20 +339,13 @@ class ClientConstruction(unittest.TestCase):
                 init.assert_called_once_with(
                     endpoint='endpoint', token='token', custom='new-custom')
 
-    def test_solver_features_from_config(self):
-        solver_def = {"qpu": True}
-        conf = {k: k for k in 'endpoint token'.split()}
-        conf.update(solver=json.dumps(solver_def))
-
-        with mock.patch("dwave.cloud.config.loaders.load_profile_from_files", lambda *pa, **kw: conf):
-            with dwave.cloud.Client.from_config() as client:
-                self.assertEqual(client.config.solver, solver_def)
-
-    def test_solver_name_from_config(self):
-        solver_def = {"identity__eq": {"name": "solver", "version": {"graph_id": "123"}}}
-        conf = dict(endpoint="endpoint",
-                    token="token",
-                    solver="solver;graph_id=123")
+    @parameterized.expand([
+        ("json", '{"qpu": true}', {"qpu": True}),
+        ("name", "solver", {"name__eq": "solver"}),
+        ("id", "solver;graph_id=123", {"identity__eq": {"name": "solver", "version": {"graph_id": "123"}}}),
+    ])
+    def test_solver_from_config(self, name, solver_inp, solver_def):
+        conf = dict(endpoint='endpoint', token='token', solver=solver_inp)
 
         with mock.patch("dwave.cloud.config.loaders.load_profile_from_files", lambda *pa, **kw: conf):
             with dwave.cloud.Client.from_config() as client:
@@ -882,7 +875,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             "identity": {
                 "name": "qpu1",
                 "version": {
-                    "graph_id": "q1",
+                    "graph_id": "wg1",
                 },
             },
             "description": "QPU Chimera solver",
@@ -911,7 +904,7 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             "identity": {
                 "name": "qpu2",
                 "version": {
-                    "graph_id": "q2",
+                    "graph_id": "wg1",
                 },
             },
             "description": "QPU Pegasus solver",
@@ -1039,20 +1032,23 @@ class FeatureBasedSolverSelection(unittest.TestCase):
         self.assertSolvers(self.client.get_solvers(name__regex='^qpu(1|2)$'), [self.qpu1, self.qpu2])
 
     def test_graph_id(self):
-        self.assertSolvers(self.client.get_solvers(graph_id='q1'), [self.qpu1])
+        self.assertSolvers(self.client.get_solvers(graph_id='wg1'), [self.qpu1, self.qpu2])
         self.assertSolvers(self.client.get_solvers(graph_id='sw1'), [self.software])
-        self.assertSolvers(self.client.get_solvers(version__graph_id='q2'), [self.qpu2])
-        self.assertSolvers(self.client.get_solvers(version=dict(graph_id='q1')), [self.qpu1])
+        self.assertSolvers(self.client.get_solvers(version__graph_id='wg1'), [self.qpu1, self.qpu2])
+        self.assertSolvers(self.client.get_solvers(version=dict(graph_id='wg1')), [self.qpu1, self.qpu2])
         self.assertSolvers(self.client.get_solvers(graph_id__eq=None), [self.hybrid])
 
-    def test_identity_search(self):
+    def test_identity(self):
+        # model-to-model and model-to-dict equality
         identity = self.qpu1.identity
-        # model to model and model to dict equality
         self.assertSolvers(self.client.get_solvers(identity=identity), [self.qpu1])
         self.assertSolvers(self.client.get_solvers(identity=identity.dict()), [self.qpu1])
+        # partial identity isn't matched
+        self.assertSolvers(self.client.get_solvers(identity=dict(name=identity.name)), [])
         # mix
-        self.assertSolvers(self.client.get_solvers(name='qpu2', graph_id='q2'), [self.qpu2])
-        self.assertSolvers(self.client.get_solvers(name='qpu2', graph_id='q1'), [])
+        self.assertSolvers(self.client.get_solvers(name='qpu1', graph_id='wg1'), [self.qpu1])
+        self.assertSolvers(self.client.get_solvers(name='qpu2', graph_id='wg1'), [self.qpu2])
+        self.assertSolvers(self.client.get_solvers(name='qpu1', graph_id='x'), [])
 
     def test_num_qubits(self):
         self.assertSolvers(self.client.get_solvers(num_qubits=5), [self.qpu2])

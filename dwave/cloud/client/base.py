@@ -956,6 +956,8 @@ class Client(object):
                 topology__type="pegasus"            # same as above, `eq` implied even for nested properties
             )
         """
+        logger.debug('get_solvers(refresh=%r, order_by=%r, **filters=%r)',
+                     refresh, order_by, filters)
 
         def covers_op(prop, val):
             """Does LHS `prop` (range) fully cover RHS `val` (range or item)?"""
@@ -1088,6 +1090,11 @@ class Client(object):
         if 'name__eq' in filters:
             query['name'] = filters['name__eq']
 
+        # shortcircuit lookup if identity defines a name
+        identity = filters.get('identity__eq', filters.get('identity', {}))
+        if 'name' in identity:
+            query['name'] = identity['name']
+
         # filter
         try:
             solvers = self._fetch_solvers(**query)
@@ -1170,7 +1177,7 @@ class Client(object):
             >>> client.close() # doctest: +SKIP
 
         """
-        logger.info("Requested a solver that best matches feature filters=%r", filters)
+        logger.debug(f"get_solver({name=}, {refresh=}, {filters=})")
 
         # backward compatibility: name as the first feature
         if name is not None:

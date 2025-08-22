@@ -232,7 +232,7 @@ def validate_config_v1(raw_config: abc.Mapping) -> ClientConfig:
             solver_def = orjson.loads(solver)
         except Exception:
             # unparseable (or non-dict) json, assume solver identity as string
-            logger.debug("Invalid solver JSON, assuming string identity: %r", solver)
+            logger.info("Invalid solver JSON, parsing as string identity: %r", solver)
             try:
                 identity = _solver_id_as_identity(solver)
             except Exception:
