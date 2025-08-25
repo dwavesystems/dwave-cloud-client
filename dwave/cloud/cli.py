@@ -44,10 +44,12 @@ from dwave.cloud.exceptions import (
     RequestTimeout, PollingTimeout)
 from dwave.cloud.config import (
     load_profile_from_files, load_config_from_files, load_config, get_default_config,
-    get_configfile_path, get_default_configfile_path, get_configfile_paths)
+    get_configfile_path, get_default_configfile_path, get_configfile_paths,
+    get_cache_dir)
 from dwave.cloud.config.models import validate_config_v1
 from dwave.cloud.regions import get_regions
 from dwave.cloud.auth.flows import LeapAuthFlow, OAuthError
+from dwave.cloud.auth.creds import _get_creds_paths
 
 
 # show defaults for all click options when printing --help
@@ -1201,3 +1203,34 @@ def _get_sapi_token_for_leap_project(
     token = account.get_project_token(project=project)
 
     return (project, token)
+
+
+@cli.group()
+def cache():
+    """Interact with Ocean cache."""
+
+
+@cache.command(name='ls')
+@json_output
+@raw_output
+@standardized_output
+def cache_list(*, json_output, raw_output, output):
+    """List cache directories."""
+
+    # used for solvers, regions
+    api_cache_dir = os.path.join(get_cache_dir(), 'api/')
+    output("API cache (solvers, regions): {api_cache_dir}",
+           api_cache_dir=api_cache_dir, raw=api_cache_dir)
+
+    # used by @cached decorator (not in use currently by cc)
+    func_cache_dir = os.path.join(get_cache_dir(), 'func/')
+    output("Function decorator cache: {func_cache_dir}",
+           func_cache_dir=func_cache_dir, raw=func_cache_dir)
+
+    # used to store leap auth creds
+    if paths := _get_creds_paths(only_existing=True):
+        auth_creds_path = paths[-1]
+        output("Auth credentials cache: {auth_creds_path}",
+               auth_creds_path=auth_creds_path, raw=auth_creds_path)
+    else:
+        output("Auth credentials cache is empty")
