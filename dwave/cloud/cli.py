@@ -21,10 +21,12 @@ from collections import abc
 from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps, partial
+from pathlib import Path
 from timeit import default_timer as timer
 from typing import Optional
 
 import click
+import diskcache
 import requests.exceptions
 
 from dwave.cloud import api
@@ -49,7 +51,7 @@ from dwave.cloud.config import (
 from dwave.cloud.config.models import validate_config_v1
 from dwave.cloud.regions import get_regions
 from dwave.cloud.auth.flows import LeapAuthFlow, OAuthError
-from dwave.cloud.auth.creds import _get_creds_paths
+from dwave.cloud.auth.creds import _get_creds_paths, Credentials
 
 
 # show defaults for all click options when printing --help
@@ -1210,27 +1212,61 @@ def cache():
     """Interact with Ocean cache."""
 
 
+def _get_cache_info():
+    def _stats(cache):
+        return {
+            'count': len(cache),
+            'size': cache.volume(),
+        }
+
+    def _cache(path):
+        cache = diskcache.Cache(disk=diskcache.JSONDisk, directory=path)
+        return dict(path=path) | _stats(cache)
+
+    def _creds(path):
+        cache = Credentials(creds_file=path)
+        return dict(path=path) | _stats(cache)
+
+    return {
+        # used for solvers, regions
+        'API cache': [
+            _cache(Path(get_cache_dir()) / 'api'),
+        ],
+
+        # used by @cached decorator (not in use currently by cc)
+        'Function decorator cache': [
+            _cache(Path(get_cache_dir()) / 'func'),
+        ],
+
+        # used to store leap auth creds
+        'Auth credentials cache': [
+            _creds(Path(path)) for path in _get_creds_paths(only_existing=True)
+        ],
+    }
+
+
 @cache.command(name='ls')
-@json_output
-@raw_output
 @standardized_output
-def cache_list(*, json_output, raw_output, output):
+def cache_list(*, output):
     """List cache directories."""
 
-    # used for solvers, regions
-    api_cache_dir = os.path.join(get_cache_dir(), 'api/')
-    output("API cache (solvers, regions): {api_cache_dir}",
-           api_cache_dir=api_cache_dir, raw=api_cache_dir)
+    info = _get_cache_info()
 
-    # used by @cached decorator (not in use currently by cc)
-    func_cache_dir = os.path.join(get_cache_dir(), 'func/')
-    output("Function decorator cache: {func_cache_dir}",
-           func_cache_dir=func_cache_dir, raw=func_cache_dir)
+    for name, collection in info.items():
+        for stats in collection:
+            output(f"{stats['path']}")
 
-    # used to store leap auth creds
-    if paths := _get_creds_paths(only_existing=True):
-        auth_creds_path = paths[-1]
-        output("Auth credentials cache: {auth_creds_path}",
-               auth_creds_path=auth_creds_path, raw=auth_creds_path)
-    else:
-        output("Auth credentials cache is empty")
+
+@cache.command(name='info')
+@standardized_output
+def cache_info(*, output):
+    """Show information about the cache."""
+
+    info = _get_cache_info()
+
+    for name, collection in info.items():
+        output(f"{name}:")
+        for stats in collection:
+            output(f"  - Path: {stats['path']}")
+            output(f"    Items: {stats['count']}")
+            output(f"    Size: {stats['size'] / 2**20:.2f} MiB")
