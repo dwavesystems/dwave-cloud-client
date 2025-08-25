@@ -1,0 +1,7 @@
+---
+features:
+  - |
+    Add ``dwave cache`` group of commands for listing cache directories used by
+    the cloud-client, displaying additional information about the cache, as well
+    as purging it.
+    See `#719 <https://github.com/dwavesystems/dwave-cloud-client/issues/719>`_.

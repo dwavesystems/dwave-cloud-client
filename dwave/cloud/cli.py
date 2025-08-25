@@ -16,6 +16,7 @@ import os
 import sys
 import ast
 import orjson
+import shutil
 import subprocess
 from collections import abc
 from configparser import ConfigParser
@@ -1212,30 +1213,33 @@ def cache():
     """Interact with Ocean cache."""
 
 
-def _get_cache_info():
-    def _stats(cache):
+def _get_cache_info() -> dict[str, list[dict]]:
+    def _stats(cache: diskcache.Cache) -> dict:
         return {
             'count': len(cache),
             'size': cache.volume(),
         }
 
-    def _cache(path):
-        cache = diskcache.Cache(disk=diskcache.JSONDisk, directory=path)
-        return dict(path=path) | _stats(cache)
+    def _cache(path: Path) -> dict:
+        with diskcache.Cache(disk=diskcache.JSONDisk, directory=path) as cache:
+            return dict(path=path) | _stats(cache)
 
-    def _creds(path):
-        cache = Credentials(creds_file=path)
-        return dict(path=path) | _stats(cache)
+    def _creds(path: Path) -> dict:
+        with Credentials(creds_file=path) as cache:
+            return dict(path=path) | _stats(cache)
+
+    def _existing(paths: list[Path]) -> list[Path]:
+        return [p for p in paths if p.exists()]
 
     return {
         # used for solvers, regions
         'API cache': [
-            _cache(Path(get_cache_dir()) / 'api'),
+            _cache(path) for path in _existing([Path(get_cache_dir()) / 'api'])
         ],
 
         # used by @cached decorator (not in use currently by cc)
         'Function decorator cache': [
-            _cache(Path(get_cache_dir()) / 'func'),
+            _cache(path) for path in _existing([Path(get_cache_dir()) / 'func'])
         ],
 
         # used to store leap auth creds
@@ -1256,6 +1260,9 @@ def cache_list(*, output):
         for stats in collection:
             output(f"{stats['path']}")
 
+    if not sum(map(len, info.values())):
+        output("Cache empty.")
+
 
 @cache.command(name='info')
 @standardized_output
@@ -1270,3 +1277,23 @@ def cache_info(*, output):
             output(f"  - Path: {stats['path']}")
             output(f"    Items: {stats['count']}")
             output(f"    Size: {stats['size'] / 2**20:.2f} MiB")
+        if not collection:
+            output("  (empty)")
+
+
+@cache.command(name='purge')
+@standardized_output
+def cache_purge(*, output):
+    """Remove all items from the cache."""
+
+    info = _get_cache_info()
+
+    for name, collection in info.items():
+        for stats in collection:
+            path: Path = stats['path']
+            if path.is_file():
+                path.unlink()
+            else:
+                shutil.rmtree(path)
+
+    output("Cache purged.")
