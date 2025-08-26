@@ -22,6 +22,7 @@ for private and Ocean-internal use.
 import logging
 import math
 import numbers
+import os
 import time
 import warnings
 
@@ -287,7 +288,7 @@ class cached:
         # defer to break circular imports
         from dwave.cloud.config import get_cache_dir
 
-        directory = kwargs.pop('directory', get_cache_dir())
+        directory = kwargs.pop('directory', os.path.join(get_cache_dir(), 'func'))
         compression_level = kwargs.pop('compression_level', 6)
 
         # defer diskcache construction (sqlite db access!) until actually needed.
