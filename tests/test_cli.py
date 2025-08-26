@@ -12,10 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import json
-import unittest
+import contextlib
 import importlib.metadata
+import json
+import os
+import tempfile
+import unittest
+from functools import partial
+from pathlib import Path
 from unittest import mock
 
 from click.testing import CliRunner
@@ -25,7 +29,10 @@ from dwave.cloud.cli import cli
 from dwave.cloud.config import load_config
 from dwave.cloud.config.models import validate_config_v1
 from dwave.cloud.testing import isolated_environ
+from dwave.cloud.auth.creds import Credentials, CREDS_FILENAME
+from dwave.cloud.api.client import _create_default_cache_store
 from dwave.cloud.api.models import LeapProject
+from dwave.cloud.api.resources import Regions
 
 from tests import config, test_config_path, test_config_profile
 from tests.test_mock_solver_loading import solver_object
@@ -680,6 +687,72 @@ class TestAuthCli(unittest.TestCase):
 
             self.assertEqual(result.exit_code, 0)
             self.assertEqual(result.output.strip(), token)
+
+
+class TestCacheCli(unittest.TestCase):
+
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.tmpdir = Path(self._tmpdir.name)
+
+    def tearDown(self):
+        # suppress tmp dir cleanup failures on windows when files are still in use
+        # note: the temp dir is cleaned up automatically when `self.tmpdir` object is gc'ed
+        with contextlib.suppress(OSError):
+            self._tmpdir.cleanup()
+
+    def test_api_cache(self):
+        runner = CliRunner()
+
+        with mock.patch.multiple(
+            'dwave.cloud.cli',
+            get_cache_dir=lambda **kw: str(self.tmpdir),
+            _get_creds_paths=lambda **kw: []
+        ):
+            with self.subTest('empty cache'):
+                result = runner.invoke(cli, ['cache', 'purge'])
+                self.assertIn("Cache purged.", result.output)
+
+                result = runner.invoke(cli, ['cache', 'ls'])
+                self.assertIn("Cache empty.", result.output)
+
+            # populate api cache
+            store = partial(_create_default_cache_store, directory=str(self.tmpdir / 'api'))
+            with Regions(cache=dict(store=store)) as regions:
+                regions.list_regions()
+
+            with self.subTest('one api request cached (data+meta)'):
+                result = runner.invoke(cli, ['cache', 'info'])
+                self.assertIn(f"Path: {self.tmpdir}", result.output)
+                self.assertIn("Items: 2", result.output)
+
+                result = runner.invoke(cli, ['cache', 'ls'])
+                self.assertIn(str(self.tmpdir), result.output)
+
+    def test_creds_cache(self):
+        creds_path = self.tmpdir / CREDS_FILENAME
+        runner = CliRunner()
+
+        with mock.patch.multiple(
+            'dwave.cloud.cli',
+            get_cache_dir=lambda **kw: str(self.tmpdir),
+            _get_creds_paths=lambda **kw: [str(creds_path)]
+        ):
+            with self.subTest('empty cache'):
+                result = runner.invoke(cli, ['cache', 'purge'])
+                self.assertIn("Cache purged.", result.output)
+                self.assertFalse(creds_path.exists())
+
+            # populate creds cache
+            Credentials(creds_file=creds_path)
+
+            with self.subTest('creds db created'):
+                result = runner.invoke(cli, ['cache', 'info'])
+                self.assertIn(f"Path: {creds_path}", result.output)
+                self.assertIn("Items: 0", result.output)
+
+                result = runner.invoke(cli, ['cache', 'ls'])
+                self.assertIn(str(creds_path), result.output)
 
 
 @unittest.skipUnless(config, "No live server configuration available.")
