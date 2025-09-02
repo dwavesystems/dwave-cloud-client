@@ -529,7 +529,9 @@ class Client(object):
         self._download_answer_executor = \
             ThreadPoolExecutor(self._DOWNLOAD_ANSWER_THREAD_COUNT)
 
-    class _Session(api.client.VersionedAPISessionMixin, BaseUrlSession):
+    class _Session(api.client.VersionedAPISessionMixin,
+                   api.client.LoggingSessionMixin,
+                   BaseUrlSession):
         pass
 
     def create_session(self):
@@ -1794,28 +1796,13 @@ class Client(object):
             :class:`~dwave.cloud.exceptions.RequestTimeout`.
         """
 
-        caller = get_caller_name()
-        if logger.isEnabledFor(logging.TRACE):
-            logger.trace("[%s] request: session.%s(*%r, **%r)",
-                         caller, meth.__name__, args, kwargs)
-
         # execute request
         try:
             response = meth(*args, **kwargs)
+            # note: LoggingSessionMixin will wrap timeout exceptions as RequestTimeout
         except api.exceptions.ResourceBadResponseError as e:
             # returned by VersionedAPISessionMixin; wrap for backwards-compatibility
             raise InvalidAPIResponseError(e) from e
-        except Exception as exc:
-            if is_caused_by(exc, (requests.exceptions.Timeout,
-                                  urllib3.exceptions.TimeoutError)):
-                raise RequestTimeout
-            else:
-                raise
-
-        # parse response
-        if logger.isEnabledFor(logging.TRACE):
-            logger.trace("[%s] response: (code=%r, content=%r, headers=%r)",
-                         caller, response.status_code, response.content, response.headers)
 
         # workaround for charset_normalizer episode in requests>=2.26.0,
         # where decoding of an empty json object '{}' fails.
