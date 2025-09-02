@@ -127,8 +127,8 @@ class LoggingSessionMixin:
             logger.debug("[%s] request succeeded with status_code=%r",
                          callee, response.status_code)
         else:   # pragma: no cover
-            logger.trace("[%s] request(...) = (code=%r, body=%r, headers=%r)",
-                         callee, response.status_code, response.text, response.headers)
+            logger.trace("[%s] request(...) = (code=%r, headers=%r, body=%r)",
+                         callee, response.status_code, response.headers, response.text)
 
         return response
 
