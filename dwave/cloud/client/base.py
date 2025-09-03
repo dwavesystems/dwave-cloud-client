@@ -56,8 +56,6 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Union
 
 import orjson
-import requests
-import urllib3
 from dateutil.parser import parse as parse_datetime
 from plucky import pluck
 
@@ -75,9 +73,7 @@ from dwave.cloud.regions import resolve_endpoints
 from dwave.cloud.upload import ChunkedData
 from dwave.cloud.events import dispatches_events
 from dwave.cloud.utils.decorators import retried
-from dwave.cloud.utils.exception import is_caused_by
 from dwave.cloud.utils.http import PretimedHTTPAdapter, BaseUrlSession, default_user_agent
-from dwave.cloud.utils.logging import get_caller_name
 from dwave.cloud.utils.time import datetime_to_timestamp, utcnow
 
 __all__ = ['Client']
@@ -444,6 +440,30 @@ class Client(object):
 
         logger.debug("Creating %s.Client() with: %r", _client, config)
         return _clients[_client](**config)
+
+    class _CountDownLatch:
+        def __init__(self, value: int = 0):
+            self._cond = threading.Condition()
+            self._value = value
+
+        def __repr__(self):
+            return f"{type(self).__name__}(value={self._value})"
+
+        def inc(self):
+            with self._cond:
+                self._value += 1
+
+        def dec(self) -> bool:
+            with self._cond:
+                if self._value > 0:
+                    self._value -= 1
+                if self._value == 0:
+                    self._cond.notify_all()
+
+        def wait(self):
+            with self._cond:
+                if self._value > 0:
+                    self._cond.wait()
 
     @dispatches_events('client_init')
     def __init__(self, **kwargs):
