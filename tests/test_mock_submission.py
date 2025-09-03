@@ -815,7 +815,8 @@ class MockCancel(MockSubmissionBase, unittest.TestCase):
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client(**self.config) as client:
                 solver = Solver(client, self.sapi.solver.data)
-                future = solver._retrieve_problem(submission_id)
+                future = Future(solver, submission_id)
+                client._poll(future)
                 future.cancel()
 
                 try:
@@ -1223,7 +1224,8 @@ class TestClientClose(MockSubmissionBase, unittest.TestCase):
 
         with self.subTest('problem status poll fails'):
             with self.assertRaises(UseAfterCloseError):
-                solver._retrieve_problem('mock-id')
+                future = Future(solver, id_='mock-id')
+                client._poll(future)
 
         with self.subTest('qpu answer load fails'):
             with self.assertRaises(UseAfterCloseError):
@@ -1304,7 +1306,7 @@ class TestClientUseWhileClosing(MockSubmissionBase, unittest.TestCase):
 
                 # now close the client, but since client.close() is blocking,
                 # do it in a background thread
-                t = threading.Thread(target=client.close)
+                t = threading.Thread(target=lambda: client.close(wait=False))
                 t.start()
 
                 # try submitting another job while the client is closing

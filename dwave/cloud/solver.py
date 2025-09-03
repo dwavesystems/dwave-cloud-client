@@ -189,19 +189,6 @@ class BaseSolver:
     def __repr__(self):
         return f"{type(self).__name__}(name={self.name!r})"
 
-    def _retrieve_problem(self, id_):
-        """Resume polling for a problem previously submitted.
-
-        Args:
-            id_: Identification of the query.
-
-        Returns:
-            :class:`~dwave.cloud.computation.Future`
-        """
-        future = Future(self, id_, self.return_matrix)
-        self.client._poll(future)
-        return future
-
     def check_problem(self, *args, **kwargs):
         return True
 

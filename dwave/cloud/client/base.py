@@ -81,14 +81,17 @@ __all__ = ['Client']
 logger = logging.getLogger(__name__)
 
 
-def _ensure_active(method):
-    def _method(obj, *args, **kwargs):
-        with obj._closed_lock:
-            if obj._closed:
-                raise UseAfterCloseError(
-                    f"{method.__name__} cannot be called after client has been closed")
-            return method(obj, *args, **kwargs)
-    return _method
+def _ensure_active(*, allow_while_closing=False):
+    def _decorator(method):
+        @wraps(method)
+        def _method(obj, *args, **kwargs):
+            with obj._close_lock:
+                if obj._closed or (not allow_while_closing and obj._closing):
+                    raise UseAfterCloseError(
+                        f"{method.__name__} cannot be called after client has been closed")
+                return method(obj, *args, **kwargs)
+        return _method
+    return _decorator
 
 
 class Client(object):
@@ -470,7 +473,9 @@ class Client(object):
         logger.debug("Client init called with: %r", kwargs)
 
         self._closed = False
-        self._closed_lock = threading.Lock()
+        self._closing = False
+        self._close_lock = threading.Lock()
+        self._jobs = self._CountDownLatch()
 
         # derive instance-level defaults from class defaults and init defaults
         self.defaults = copy.deepcopy(self.DEFAULTS)
@@ -631,11 +636,17 @@ class Client(object):
                                 self._poll_workers, self._load_workers):
                 worker.join()
 
-    def close(self):
+    def close(self, wait: bool = True):
         """Perform a clean shutdown.
 
         Waits for all the currently scheduled work to finish, kills the workers,
         and closes the connection pool.
+
+        Args:
+            wait:
+                When set to true (the default), allow all (remote) jobs to finish
+                and their results to be downloaded before shutting down the client.
+                New jobs are never accepted while closing.
 
         Where possible, it is recommended you use a context manager
         (a :code:`with Client.from_config(...) as` construct) to ensure your
@@ -651,19 +662,34 @@ class Client(object):
             >>> client.close()    # doctest: +SKIP
 
         """
-        with self._closed_lock:
-            if self._closed:
+        logger.debug("Client.close(wait=%r) initiated while active jobs: %r",
+                     wait, self._jobs)
+
+        with self._close_lock:
+            if self._closing or self._closed:
                 return
 
-            # this client can't be used anymore
-            # note: mark it closed early to prevent job submission while closing!
-            self._closed = True
+            if wait:
+                # by marking client as closing, we allow *only some* job submissions
+                # (like poll and answer download)
+                self._closing = True
+            else:
+                # this client can't be used anymore
+                # note: mark it closed early to prevent job submission while closing!
+                self._closed = True
 
-        self._shutdown_threads(wait=True)
+        # if wait was True, we have to wait for organic shutdown to mark the client closed
+        if wait:
+            self._jobs.wait()
 
         solvers_session = getattr(self, '_solvers_session', None)
         if solvers_session:
             solvers_session.close()
+
+        self._shutdown_threads(wait=wait)
+
+        with self._close_lock:
+            self._closed = True
 
     def __enter__(self):
         """Let connections be used in with blocks."""
@@ -695,7 +721,7 @@ class Client(object):
         return True
 
     @property
-    @_ensure_active
+    @_ensure_active(allow_while_closing=False)
     def solvers_session(self) -> api.resources.Solvers:
         session = getattr(self, '_solvers_session', None)
 
@@ -788,6 +814,7 @@ class Client(object):
 
         """
         future = Future(None, id_)
+        self._jobs.inc()
         self._load(future)
         return future
 
@@ -1228,12 +1255,13 @@ class Client(object):
         except IndexError:
             raise SolverNotFoundError("Solver with the requested features not available")
 
-    @_ensure_active
+    @_ensure_active(allow_while_closing=False)
     def _submit(self, body, future):
         """Enqueue a problem for submission to the server.
 
         This method is thread safe.
         """
+        self._jobs.inc()
         self._submission_queue.put(self._submit.Message(body, future))
 
     _submit.Message = namedtuple('Message', ['body', 'future'])
@@ -1263,6 +1291,7 @@ class Client(object):
                     logger.info("Problem encoding prior to submit "
                                 "failed with: %r", exc)
                     item.future._set_exception(exc)
+                    self._jobs.dec()
                     task_done()
 
                 else:
@@ -1327,6 +1356,7 @@ class Client(object):
                                  len(ready_problems), exc)
                     for msg in ready_problems:
                         msg.future._set_exception(exc)
+                        self._jobs.dec()
                         task_done()
                     continue
 
@@ -1336,6 +1366,7 @@ class Client(object):
                         self._handle_problem_status(msg, submission.future)
                     except Exception as exc:
                         submission.future._set_exception(exc)
+                        self._jobs.dec()
                     finally:
                         task_done()
 
@@ -1416,6 +1447,7 @@ class Client(object):
                         future.solver = self.get_solver(identity=message['solver'])
 
                     future._set_message(message)
+                    self._jobs.dec()
                 # If the problem is complete, but we don't have the result data
                 # put the problem in the queue for loading results.
                 else:
@@ -1438,8 +1470,9 @@ class Client(object):
             # If there were any unhandled errors we need to release the
             # lock in the future, otherwise deadlock occurs.
             future._set_exception(exc)
+            self._jobs.dec()
 
-    @_ensure_active
+    @_ensure_active(allow_while_closing=False)
     def _cancel(self, id_, future):
         """Enqueue a problem to be canceled.
 
@@ -1482,6 +1515,7 @@ class Client(object):
                     for _, future in item_list:
                         if future is not None:
                             future._set_exception(exc)
+                            self._jobs.dec()
 
                 # Mark all the ids as processed regardless of success or failure.
                 for _ in item_list:
@@ -1493,7 +1527,7 @@ class Client(object):
         finally:
             session.close()
 
-    @_ensure_active
+    @_ensure_active(allow_while_closing=True)
     def _poll(self, future: Future) -> None:
         """Enqueue a problem to poll the server for status."""
 
@@ -1658,6 +1692,7 @@ class Client(object):
                 except Exception as exc:
                     for id_ in frame_futures.keys():
                         frame_futures[id_]._set_exception(exc)
+                        self._jobs.dec()
 
                 for id_ in frame_futures.keys():
                     task_done()
@@ -1672,7 +1707,7 @@ class Client(object):
         finally:
             session.close()
 
-    @_ensure_active
+    @_ensure_active(allow_while_closing=True)
     def _load(self, future):
         """Enqueue a problem to download results from the server.
 
@@ -1713,6 +1748,7 @@ class Client(object):
                 except Exception as exc:
                     logger.debug("Answer load request failed with %r", exc)
                     future._set_exception(exc)
+                    self._jobs.dec()
                     self._load_queue.task_done()
                     continue
 
@@ -1726,7 +1762,7 @@ class Client(object):
         finally:
             session.close()
 
-    @_ensure_active
+    @_ensure_active(allow_while_closing=True)
     def _download_answer_binary_ref(self, *, auth_method: str, url: str,
                                     output: Optional[io.IOBase] = None) -> concurrent.futures.Future:
         """Initiate binary-ref answer download, returning the binary data in
@@ -1766,7 +1802,7 @@ class Client(object):
 
         return output
 
-    @_ensure_active
+    @_ensure_active(allow_while_closing=False)
     def upload_problem_encoded(self, problem, problem_id=None, **kwargs):
         """Initiate multipart problem upload, returning the Problem ID in a
         :class:`~concurrent.futures.Future`.
