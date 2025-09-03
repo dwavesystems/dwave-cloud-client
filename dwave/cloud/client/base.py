@@ -1447,7 +1447,14 @@ class Client(object):
                         future.solver = self.get_solver(identity=message['solver'])
 
                     future._set_message(message)
+
+                    # decode the result as part of download (i.e. resolve answer refs)
+                    # note: this is (possibly) blocking, but that's OK because
+                    # we're running from a daemon thread (likely from `_do_load_results`)
+                    future.result()
+
                     self._jobs.dec()
+
                 # If the problem is complete, but we don't have the result data
                 # put the problem in the queue for loading results.
                 else:
