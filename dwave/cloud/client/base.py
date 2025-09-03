@@ -447,7 +447,11 @@ class Client(object):
         logger.debug("Creating %s.Client() with: %r", _client, config)
         return _clients[_client](**config)
 
-    class _CountDownLatch:
+    class _WaitableCounter:
+        """A thread-safe counter, with an ability to block until the count
+        reaches zero (use :meth:`.wait`).
+        """
+
         def __init__(self, value: int = 0):
             self._cond = threading.Condition()
             self._value = value
@@ -478,7 +482,7 @@ class Client(object):
         self._closed = False
         self._closing = False
         self._close_lock = threading.Lock()
-        self._jobs = self._CountDownLatch()
+        self._jobs = self._WaitableCounter()
 
         # derive instance-level defaults from class defaults and init defaults
         self.defaults = copy.deepcopy(self.DEFAULTS)
@@ -639,7 +643,7 @@ class Client(object):
                                 self._poll_workers, self._load_workers):
                 worker.join()
 
-    def close(self, wait: bool = DEFAULT_WAIT_ON_CLOSE):
+    def close(self, wait: Optional[bool] = None):
         """Perform a clean shutdown.
 
         Waits for all the currently scheduled work to finish, kills the workers,
@@ -669,6 +673,9 @@ class Client(object):
             >>> client.close()    # doctest: +SKIP
 
         """
+        if wait is None:
+            wait = self.DEFAULT_WAIT_ON_CLOSE
+
         logger.debug("Client.close(wait=%r) initiated while active jobs: %r",
                      wait, self._jobs)
 
