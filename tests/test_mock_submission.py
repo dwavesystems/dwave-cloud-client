@@ -815,7 +815,8 @@ class MockCancel(MockSubmissionBase, unittest.TestCase):
         with mock.patch.object(Client, 'create_session', create_mock_session):
             with Client(**self.config) as client:
                 solver = Solver(client, self.sapi.solver.data)
-                future = solver._retrieve_problem(submission_id)
+                future = Future(solver, submission_id)
+                client._poll(future)
                 future.cancel()
 
                 try:
@@ -1223,7 +1224,8 @@ class TestClientClose(MockSubmissionBase, unittest.TestCase):
 
         with self.subTest('problem status poll fails'):
             with self.assertRaises(UseAfterCloseError):
-                solver._retrieve_problem('mock-id')
+                future = Future(solver, id_='mock-id')
+                client._poll(future)
 
         with self.subTest('qpu answer load fails'):
             with self.assertRaises(UseAfterCloseError):
@@ -1304,7 +1306,7 @@ class TestClientUseWhileClosing(MockSubmissionBase, unittest.TestCase):
 
                 # now close the client, but since client.close() is blocking,
                 # do it in a background thread
-                t = threading.Thread(target=client.close)
+                t = threading.Thread(target=lambda: client.close(wait=False))
                 t.start()
 
                 # try submitting another job while the client is closing
@@ -1317,6 +1319,86 @@ class TestClientUseWhileClosing(MockSubmissionBase, unittest.TestCase):
 
                 # release the first job
                 release_status.set()
+
+                # verify client is closed
+                t.join()
+                self.assertFalse(t.is_alive())
+
+    def test_results_loaded_while_closing_with_wait(self):
+        submission_id = 'test-id'
+        ev_poll = threading.Event()
+        ev_load = threading.Event()
+
+        def create_mock_session(client):
+            session = mock.Mock()
+
+            def _blocking_poll():
+                ev_poll.wait()
+                return [self.sapi.complete_no_answer_reply(id=submission_id)]
+
+            def _blocking_load():
+                ev_load.wait()
+                return self.sapi.complete_reply(id=submission_id)
+
+            # make sure polling for status stalls until we set `ev_poll`,
+            # and loading results stalls until we set `ev_load`
+            def get(path, **kwargs):
+                return choose_reply(path, fix_status_paths({
+                    f'problems/?id={submission_id}': _blocking_poll,
+                    f'problems/{submission_id}/': _blocking_load,
+                }, **self.poll_params))
+
+            session.get = get
+            session.post = lambda path, **kwargs: choose_reply(path, {
+                'problems/': [self.sapi.continue_reply(id=submission_id)]})
+
+            return session
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client(**self.config) as client:
+                solver = Solver(client, self.sapi.solver.data)
+
+                future = solver.sample_ising(*self.sapi.problem)
+
+                # check the first job is in `pending`
+                future.wait_id()
+                self.assertEqual(future.id, submission_id)
+                self.assertEqual(future.remote_status, 'PENDING')
+
+                # now close the client, but since client.close() is blocking,
+                # do it in a background thread
+                t = threading.Thread(target=lambda: client.close(wait=True))
+                t.start()
+
+                # try submitting another job while the client is closing
+                with self.assertRaises(UseAfterCloseError):
+                    solver.sample_ising(*self.sapi.problem)
+
+                # verify client.close is still running
+                t.join(timeout=0.1)
+                self.assertTrue(t.is_alive())
+
+                # release poll result
+                ev_poll.set()
+
+                # verify the job is now `completed`, but not yet resolved
+                t.join(timeout=0.1)
+                self.assertEqual(future.id, submission_id)
+                self.assertEqual(future.remote_status, 'COMPLETED')
+                self.assertIsNone(future._result)
+                self.assertFalse(future.done())
+
+                # verify client.close is still running
+                t.join(timeout=0.1)
+                self.assertTrue(t.is_alive())
+
+                # release load result
+                ev_load.set()
+
+                # verify the job is now resolved
+                t.join(timeout=0.1)
+                self.assertTrue(future.done())
+                self.assertIsNotNone(future._result)
 
                 # verify client is closed
                 t.join()

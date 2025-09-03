@@ -54,6 +54,8 @@ def choose_reply(path: str,
         response = mock.Mock(['content', 'text', 'json', 'raise_for_status', 'headers'])
         response.status_code = next(statuses[path])
         content = replies[path]
+        if callable(content):
+            content = content()
         if isinstance(content, str):
             content = content.encode('utf8')
         elif not isinstance(content, bytes):
