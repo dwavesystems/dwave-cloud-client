@@ -296,6 +296,9 @@ class Client(object):
     DEFAULT_API_ENDPOINT = config_constants.DEFAULT_SOLVER_API_ENDPOINT
     DEFAULT_API_REGION = config_constants.DEFAULT_REGION
 
+    # Should we wait for all jobs to complete on client.close() by default?
+    DEFAULT_WAIT_ON_CLOSE = True
+
     # Class-level defaults for all constructor and factory arguments
     DEFAULTS = {
         # factory only
@@ -636,7 +639,7 @@ class Client(object):
                                 self._poll_workers, self._load_workers):
                 worker.join()
 
-    def close(self, wait: bool = True):
+    def close(self, wait: bool = DEFAULT_WAIT_ON_CLOSE):
         """Perform a clean shutdown.
 
         Waits for all the currently scheduled work to finish, kills the workers,
@@ -647,6 +650,10 @@ class Client(object):
                 When set to true (the default), allow all (remote) jobs to finish
                 and their results to be downloaded before shutting down the client.
                 New jobs are never accepted while closing.
+
+                .. versionadded:: 0.14.0
+                    The ``wait`` parameter. By default, we now wait for all jobs
+                    to finish on client close.
 
         Where possible, it is recommended you use a context manager
         (a :code:`with Client.from_config(...) as` construct) to ensure your
@@ -697,7 +704,7 @@ class Client(object):
 
     def __exit__(self, *args):
         """At the end of a with block perform a clean shutdown of the connection."""
-        self.close()
+        self.close(wait=self.DEFAULT_WAIT_ON_CLOSE)
         return False
 
     @staticmethod

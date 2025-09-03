@@ -1,0 +1,11 @@
+---
+features:
+  - |
+    Enable the previous client close behavior to wait for all remote jobs to finish.
+
+    Waiting for all jobs to finish and their results to be downloaded before
+    shutting down the client is now the new default. To close the client as
+    fast as possible (immediately preventing status polls and answer downloads),
+    set the ``wait`` argument to false: ``Client.close(wait=False)``.
+
+    See `#712 <https://github.com/dwavesystems/dwave-cloud-client/issues/712>`_.
