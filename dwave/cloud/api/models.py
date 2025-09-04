@@ -277,3 +277,14 @@ class _LeapTokenWrapper(BaseModel):
 
 class _LeapProjectTokenResponse(BaseModel):
     data: _LeapTokenWrapper
+
+
+# Leap deprecation messages
+
+class DeprecationMessage(_DictMixin, BaseModel):
+    id: str
+    context: str
+    deprecated: Optional[datetime] = None
+    link: Optional[str] = None
+    message: str
+    sunset: datetime

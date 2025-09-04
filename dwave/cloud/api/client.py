@@ -25,6 +25,7 @@ from collections import deque, namedtuple, abc
 from collections.abc import Iterable
 from typing import IO, Optional, TypedDict, TYPE_CHECKING, Union
 
+import http_sf
 import orjson
 import requests
 import urllib3
@@ -33,6 +34,7 @@ from packaging.specifiers import SpecifierSet
 
 import dwave.cloud.config
 from dwave.cloud.api import exceptions
+from dwave.cloud.api.models import DeprecationMessage
 from dwave.cloud.utils.exception import is_caused_by
 from dwave.cloud.utils.http import PretimedHTTPAdapter, BaseUrlSessionMixin, default_user_agent
 from dwave.cloud.utils.time import epochnow
@@ -603,6 +605,41 @@ class CachingSessionMixin:
 
 class CachingSession(CachingSessionMixin, VersionedAPISession):
     pass
+
+
+class DeprecationAwareSessionMixin:
+    """A :class:`requests.Session` mixin that interprets Leap deprecation
+    messages in the API response headers, raising warnings on the fly.
+    """
+
+    def _parse_x_deprecation_header(self, response: requests.Response) -> list[DeprecationMessage]:
+        """Parse deprecation notes returned in ``X-Deprecation`` header, encoded
+        using "Structured Field Values for HTTP" (RFC 9651).
+        """
+
+        x_dep = response.headers.get('X-Deprecation')
+        if not x_dep:
+            return []
+
+        deps = http_sf.parse(x_dep.encode(), tltype='list')
+        try:
+            notes = [DeprecationMessage(id=dep[0], **dep[1]) for dep in deps]
+        except Exception as exc:
+            # ignore malformed headers
+            logger.debug("Parsing of deprecation notes %r failed with %r.", deps, exc)
+            notes = []
+
+        return notes
+
+    def request(self, *args, **kwargs) -> requests.Response:
+        response = super().request(*args, **kwargs)
+
+        notes = self._parse_x_deprecation_header(response)
+
+        for note in notes:
+            logger.warning("API Deprecation Warning: %r", note)
+
+        return response
 
 
 class DWaveAPIClient:
