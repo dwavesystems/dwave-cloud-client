@@ -612,22 +612,40 @@ class DeprecationAwareSessionMixin:
     messages in the API response headers, raising warnings on the fly.
     """
 
+    def __init__(self,
+                 set_deprecations: bool = True,
+                 log_deprecations: bool = True,
+                 raise_deprecations: bool = True,
+                 **kwargs):
+
+        self._set_deprecations = set_deprecations
+        self._log_deprecations = log_deprecations
+        self._raise_deprecations = raise_deprecations
+
+        super().__init__(**kwargs)
+
     def _parse_x_deprecation_header(self, response: requests.Response) -> list[DeprecationMessage]:
         """Parse deprecation notes returned in ``X-Deprecation`` header, encoded
         using "Structured Field Values for HTTP" (RFC 9651).
+
+        Note: malformed headers are ignored.
         """
 
         x_dep = response.headers.get('X-Deprecation')
         if not x_dep:
             return []
 
-        deps = http_sf.parse(x_dep.encode(), tltype='list')
         try:
-            notes = [DeprecationMessage(id=dep[0], **dep[1]) for dep in deps]
+            deps = http_sf.parse(x_dep.encode(), tltype='list')
         except Exception as exc:
-            # ignore malformed headers
-            logger.debug("Parsing of deprecation notes %r failed with %r.", deps, exc)
-            notes = []
+            logger.debug("Deprecation header %r parsing failed with %r.", x_dep, exc)
+            return []
+
+        try:
+            notes = [DeprecationMessage(id=str(dep[0]), **dep[1]) for dep in deps]
+        except Exception as exc:
+            logger.debug("Deprecation message %r validation failed with %r.", deps, exc)
+            return []
 
         return notes
 
@@ -636,8 +654,15 @@ class DeprecationAwareSessionMixin:
 
         notes = self._parse_x_deprecation_header(response)
 
-        for note in notes:
-            logger.warning("API Deprecation Warning: %r", note)
+        if self._set_deprecations:
+            setattr(response, 'deprecations', notes)
+
+        if self._log_deprecations:
+            for note in notes:
+                logger.warning("API Deprecation Warning: %r", note)
+
+        if self._raise_deprecations:
+            pass
 
         return response
 
