@@ -814,7 +814,9 @@ class TestDeprecationMessageParsing(unittest.TestCase):
               status_code=200, headers={'X-Deprecation': http_sf.ser(dep_sf)})
 
         with DWaveAPIClient(endpoint='https://mock', session_class=self.session_class) as client:
-            response = client.session.get('')
+
+            with self.assertWarns(exceptions.ResourceDeprecationWarning):
+                response = client.session.get('')
 
             notes = getattr(response, 'deprecations', None)
             self.assertIsNotNone(notes)

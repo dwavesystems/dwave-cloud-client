@@ -662,7 +662,11 @@ class DeprecationAwareSessionMixin:
                 logger.warning("API Deprecation Warning: %r", note)
 
         if self._raise_deprecations:
-            pass
+            for note in notes:
+                msg = f"{note.message}. Sunset date: {note.sunset.isoformat()}."
+                if note.link:
+                    msg = f"{msg} For details, see: {note.link!r}."
+                warnings.warn(msg, exceptions.ResourceDeprecationWarning, stacklevel=3)
 
         return response
 
