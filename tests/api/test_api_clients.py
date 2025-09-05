@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
 import json
 import time
 import uuid
@@ -19,15 +20,16 @@ import unittest
 import zlib
 
 import diskcache
+import http_sf
 import requests
 import requests_mock
 from parameterized import parameterized, parameterized_class
 
-from dwave.cloud.api import exceptions
+from dwave.cloud.api import exceptions, models
 from dwave.cloud.api.client import (
     DWaveAPIClient, SolverAPIClient, MetadataAPIClient, LeapAPIClient,
     LoggingSessionMixin, PayloadCompressingSessionMixin,
-    VersionedAPISessionMixin, CachingSessionMixin)
+    VersionedAPISessionMixin, CachingSessionMixin, DeprecationAwareSessionMixin)
 from dwave.cloud.config import ClientConfig, constants
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.utils.http import BaseUrlSession
@@ -784,3 +786,41 @@ class TestResponseCaching(unittest.TestCase):
                 self.assertEqual(r.json(), data)
 
                 self.assertTrue(m.called)
+
+
+@parameterized_class(("session_class", ), [
+    (make_session_class(DeprecationAwareSessionMixin, BaseUrlSession), ),
+])
+class TestDeprecationMessageParsing(unittest.TestCase):
+    session_class = None
+
+    @requests_mock.Mocker()
+    def test_parsing(self, m):
+
+        # structured field date is in integer seconds
+        now = datetime.datetime.now().replace(microsecond=0)
+
+        dep_id = 'dep-1'
+        dep_params = dict(
+            context='api',
+            deprecated=now,
+            link='https://mock',
+            message='msg',
+            sunset=now,
+        )
+        dep_sf = [(http_sf.Token(dep_id), dep_params)]
+
+        m.get(requests_mock.ANY, content=b'ok',
+              status_code=200, headers={'X-Deprecation': http_sf.ser(dep_sf)})
+
+        with DWaveAPIClient(endpoint='https://mock', session_class=self.session_class) as client:
+            response = client.session.get('')
+
+            notes = getattr(response, 'deprecations', None)
+            self.assertIsNotNone(notes)
+            self.assertIsInstance(notes, list)
+            self.assertEqual(len(notes), 1)
+
+            note = notes[0]
+            self.assertIsInstance(note, models.DeprecationMessage)
+            self.assertEqual(note.dict(), {'id': dep_id} | dep_params)
