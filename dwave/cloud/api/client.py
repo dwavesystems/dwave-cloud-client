@@ -609,26 +609,65 @@ class CachingSession(CachingSessionMixin, VersionedAPISession):
 
 class DeprecationAwareSessionMixin:
     """A :class:`requests.Session` mixin that interprets Leap deprecation
-    messages in the API response headers, raising warnings on the fly.
+    messages in the API response headers, storing them, logging and raising
+    warnings on the fly.
+
+    Args:
+        on_deprecation:
+            Configuration typed dictionary describing behavior when a
+            deprecation message is received. The following keys are supported
+            (all optional and true by default):
+
+                * ``log`` (bool):
+                    Enable deprecation message logging (using ``WARNING`` log level).
+
+                * ``warn`` (bool):
+                    Raise each deprecation message as a warning:
+                    :class:`~dwave.cloud.api.exceptions.ResourceDeprecationWarning`.
+
+                * ``store`` (bool):
+                    Enable deprecation message storing in a session attribute,
+                    :attr:`.deprecations`.
+
     """
 
-    def __init__(self,
-                 set_deprecations: bool = True,
-                 log_deprecations: bool = True,
-                 raise_deprecations: bool = True,
-                 **kwargs):
+    deprecations: list[DeprecationMessage] = None
+    """Deprecation messages received in the last response, if storing enabled."""
 
-        self._set_deprecations = set_deprecations
-        self._log_deprecations = log_deprecations
-        self._raise_deprecations = raise_deprecations
+    class OnDeprecationConfig(TypedDict, total=False):
+        log: bool
+        warn: bool
+        store: bool
 
+    DEFAULT_ON_DEPRECATION_CONFIG = OnDeprecationConfig(log=True, warn=True, store=True)
+
+    def __init__(self, on_deprecation: Optional[OnDeprecationConfig] = None, **kwargs):
         super().__init__(**kwargs)
 
-    def _parse_x_deprecation_header(self, response: requests.Response) -> list[DeprecationMessage]:
+        self.set_on_deprecation(**self.DEFAULT_ON_DEPRECATION_CONFIG)
+        if on_deprecation is not None:
+            self.set_on_deprecation(**on_deprecation)
+
+    def set_on_deprecation(self,
+                           *,
+                           log: Optional[bool] = None,
+                           warn: Optional[bool] = None,
+                           store: Optional[bool] = None,
+                           ) -> None:
+        if log is not None:
+            self._log_deprecations = log
+        if warn is not None:
+            self._raise_deprecations = warn
+        if store is not None:
+            self._store_deprecations = store
+
+    def _parse_deprecation_messages(self, response: requests.Response) -> list[DeprecationMessage]:
         """Parse deprecation notes returned in ``X-Deprecation`` header, encoded
         using "Structured Field Values for HTTP" (RFC 9651).
 
         Note: malformed headers are ignored.
+
+        Note: this format of deprecation messages is Leap-specific.
         """
 
         x_dep = response.headers.get('X-Deprecation')
@@ -636,37 +675,37 @@ class DeprecationAwareSessionMixin:
             return []
 
         try:
-            deps = http_sf.parse(x_dep.encode(), tltype='list')
+            sfv = http_sf.parse(x_dep.encode(), tltype='list')
         except Exception as exc:
             logger.debug("Deprecation header %r parsing failed with %r.", x_dep, exc)
             return []
 
         try:
-            notes = [DeprecationMessage(id=str(dep[0]), **dep[1]) for dep in deps]
+            deps = [DeprecationMessage(id=str(v[0]), **v[1]) for v in sfv]
         except Exception as exc:
-            logger.debug("Deprecation message %r validation failed with %r.", deps, exc)
+            logger.debug("Deprecation message %r validation failed with %r.", sfv, exc)
             return []
 
-        return notes
+        return deps
 
     def request(self, *args, **kwargs) -> requests.Response:
         response = super().request(*args, **kwargs)
 
-        notes = self._parse_x_deprecation_header(response)
+        deps = self._parse_deprecation_messages(response)
 
-        if self._set_deprecations:
-            setattr(response, 'deprecations', notes)
+        if self._store_deprecations:
+            setattr(response, 'deprecations', deps)
 
         if self._log_deprecations:
-            for note in notes:
-                logger.warning("API Deprecation Warning: %r", note)
+            for dep in deps:
+                logger.warning("Resource Deprecation Warning: %r", dep)
 
         if self._raise_deprecations:
-            for note in notes:
-                msg = f"{note.message}. Sunset date: {note.sunset.isoformat()}."
-                if note.link:
-                    msg = f"{msg} For details, see: {note.link!r}."
-                warnings.warn(msg, exceptions.ResourceDeprecationWarning, stacklevel=3)
+            for dep in deps:
+                text = f"{dep.message}. Sunset date: {dep.sunset.isoformat()}."
+                if dep.link:
+                    text = f"{text} For details, see: {dep.link!r}."
+                warnings.warn(text, exceptions.ResourceDeprecationWarning, stacklevel=3)
 
         return response
 
