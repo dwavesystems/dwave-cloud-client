@@ -794,35 +794,55 @@ class TestResponseCaching(unittest.TestCase):
 class TestDeprecationMessageParsing(unittest.TestCase):
     session_class = None
 
-    @requests_mock.Mocker()
-    def test_parsing(self, m):
+    def setUp(self):
+        self.mocker = requests_mock.Mocker()
 
         # structured field date is in integer seconds
         now = datetime.datetime.now().replace(microsecond=0)
 
-        dep_id = 'dep-1'
-        dep_params = dict(
+        self.dep_id = 'dep-1'
+        self.dep_params = dict(
             context='api',
             deprecated=now,
             link='https://mock',
             message='msg',
             sunset=now,
         )
-        dep_sf = [(http_sf.Token(dep_id), dep_params)]
+        self.dep_sf = [(http_sf.Token(self.dep_id), self.dep_params)]
 
-        m.get(requests_mock.ANY, content=b'ok',
-              status_code=200, headers={'X-Deprecation': http_sf.ser(dep_sf)})
+        self.mocker.get(requests_mock.ANY, content=b'ok', status_code=200,
+                        headers={'X-Deprecation': http_sf.ser(self.dep_sf)})
 
+        self.mocker.start()
+
+    def tearDown(self):
+        self.mocker.stop()
+
+    def test_parsing(self):
         with DWaveAPIClient(endpoint='https://mock', session_class=self.session_class) as client:
-
             with self.assertWarns(exceptions.ResourceDeprecationWarning):
                 response = client.session.get('')
 
-            notes = getattr(response, 'deprecations', None)
-            self.assertIsNotNone(notes)
-            self.assertIsInstance(notes, list)
-            self.assertEqual(len(notes), 1)
+            deps = getattr(response, 'deprecations', None)
+            self.assertIsNotNone(deps)
+            self.assertIsInstance(deps, list)
+            self.assertEqual(len(deps), 1)
 
-            note = notes[0]
-            self.assertIsInstance(note, models.DeprecationMessage)
-            self.assertEqual(note.dict(), {'id': dep_id} | dep_params)
+            dep = deps[0]
+            self.assertIsInstance(dep, models.DeprecationMessage)
+            self.assertEqual(dep.dict(), {'id': self.dep_id} | self.dep_params)
+
+    def test_config(self):
+        with DWaveAPIClient(endpoint='https://mock', session_class=self.session_class) as client:
+            client.session.set_on_deprecation(warn=False, store=False, log=False)
+
+            try:
+                with self.assertWarns(exceptions.ResourceDeprecationWarning):
+                    response = client.session.get('')
+            except AssertionError:
+                pass
+            else:
+                self.fail("Warning raised, when it shouldn't have been.")
+
+            deps = getattr(response, 'deprecations', None)
+            self.assertIsNone(deps)
