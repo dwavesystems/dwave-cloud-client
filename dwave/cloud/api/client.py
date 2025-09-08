@@ -628,7 +628,7 @@ class DeprecationAwareSessionMixin:
 
                 * ``store`` (bool):
                     Enable deprecation message storing in the session attribute,
-                    :attr:`.deprecations`.
+                    :attr:`.deprecations`, as well as in the request response.
     """
 
     deprecations: list[DeprecationMessage] = None
@@ -697,6 +697,7 @@ class DeprecationAwareSessionMixin:
         deps = self._parse_deprecation_messages(response)
 
         if self._store_deprecations:
+            self.deprecations = deps
             setattr(response, 'deprecations', deps)
 
         if self._log_deprecations:

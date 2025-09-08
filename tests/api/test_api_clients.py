@@ -832,8 +832,8 @@ class TestDeprecationMessageParsing(unittest.TestCase):
             else:
                 self.fail("Warning raised, when it shouldn't have been.")
 
-            deps = getattr(response, 'deprecations', None)
-            self.assertIsNone(deps)
+            self.assertIsNone(client.session.deprecations)
+            self.assertIsNone(getattr(response, 'deprecations', None))
 
     def test_client_config(self):
         # verify client config is passed to the session
@@ -844,8 +844,8 @@ class TestDeprecationMessageParsing(unittest.TestCase):
             with self.assertWarns(exceptions.ResourceDeprecationWarning):
                 response = client.session.get('')
 
-            deps = getattr(response, 'deprecations', None)
-            self.assertIsNone(deps)
+            self.assertIsNone(client.session.deprecations)
+            self.assertIsNone(getattr(response, 'deprecations', None))
 
     def test_parsing(self):
         # verify a deprecation is parsed and processed as expected
@@ -864,3 +864,18 @@ class TestDeprecationMessageParsing(unittest.TestCase):
             dep = deps[0]
             self.assertIsInstance(dep, models.DeprecationMessage)
             self.assertEqual(dep.dict(), {'id': self.dep_id} | self.dep_params)
+
+    @parameterized.expand([
+        ('no deprecations', {}),
+        ('invalid deprecation header', {'X-Deprecation': '"'}),
+        ('invalid deprecation message', {'X-Deprecation': '1;context=1;message=2;sunset=3'}),
+    ])
+    def test_parsing_errors(self, name, headers):
+        self.mocker.get(requests_mock.ANY, content=b'ok', status_code=200, headers=headers)
+
+        with DWaveAPIClient(endpoint='https://mock', session_class=self.session_class,
+                            on_deprecation=dict(store=True)) as client:
+
+            response = client.session.get('')
+            self.assertEqual(response.deprecations, [])
+            self.assertEqual(client.session.deprecations, [])
