@@ -790,6 +790,7 @@ class TestResponseCaching(unittest.TestCase):
 
 @parameterized_class(("session_class", ), [
     (make_session_class(DeprecationAwareSessionMixin, BaseUrlSession), ),
+    (DWaveAPIClient.DefaultSession, ),
 ])
 class TestDeprecationMessageParsing(unittest.TestCase):
     session_class = None
@@ -818,23 +819,10 @@ class TestDeprecationMessageParsing(unittest.TestCase):
     def tearDown(self):
         self.mocker.stop()
 
-    def test_parsing(self):
+    def test_session_config(self):
+        # verify session.set_on_deprecation works
         with DWaveAPIClient(endpoint='https://mock', session_class=self.session_class) as client:
-            with self.assertWarns(exceptions.ResourceDeprecationWarning):
-                response = client.session.get('')
-
-            deps = getattr(response, 'deprecations', None)
-            self.assertIsNotNone(deps)
-            self.assertIsInstance(deps, list)
-            self.assertEqual(len(deps), 1)
-
-            dep = deps[0]
-            self.assertIsInstance(dep, models.DeprecationMessage)
-            self.assertEqual(dep.dict(), {'id': self.dep_id} | self.dep_params)
-
-    def test_config(self):
-        with DWaveAPIClient(endpoint='https://mock', session_class=self.session_class) as client:
-            client.session.set_on_deprecation(warn=False, store=False, log=False)
+            client.session.set_on_deprecation(warn=False, store=False)
 
             try:
                 with self.assertWarns(exceptions.ResourceDeprecationWarning):
@@ -846,3 +834,33 @@ class TestDeprecationMessageParsing(unittest.TestCase):
 
             deps = getattr(response, 'deprecations', None)
             self.assertIsNone(deps)
+
+    def test_client_config(self):
+        # verify client config is passed to the session
+        with DWaveAPIClient(endpoint='https://mock',
+                            session_class=self.session_class,
+                            on_deprecation=dict(warn=True, store=False)) as client:
+
+            with self.assertWarns(exceptions.ResourceDeprecationWarning):
+                response = client.session.get('')
+
+            deps = getattr(response, 'deprecations', None)
+            self.assertIsNone(deps)
+
+    def test_parsing(self):
+        # verify a deprecation is parsed and processed as expected
+        with DWaveAPIClient(endpoint='https://mock', session_class=self.session_class) as client:
+
+            self.assertTrue(client.session._raise_deprecations)
+            with self.assertWarns(exceptions.ResourceDeprecationWarning):
+                response = client.session.get('')
+
+            self.assertTrue(client.session._store_deprecations)
+            deps = getattr(response, 'deprecations', None)
+            self.assertIsNotNone(deps)
+            self.assertIsInstance(deps, list)
+            self.assertEqual(len(deps), 1)
+
+            dep = deps[0]
+            self.assertIsInstance(dep, models.DeprecationMessage)
+            self.assertEqual(dep.dict(), {'id': self.dep_id} | self.dep_params)

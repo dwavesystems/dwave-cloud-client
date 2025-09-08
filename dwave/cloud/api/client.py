@@ -622,13 +622,13 @@ class DeprecationAwareSessionMixin:
                     Enable deprecation message logging (using ``WARNING`` log level).
 
                 * ``warn`` (bool):
-                    Raise each deprecation message as a warning:
-                    :class:`~dwave.cloud.api.exceptions.ResourceDeprecationWarning`.
+                    Raise each deprecation message using
+                    :class:`~dwave.cloud.api.exceptions.ResourceDeprecationWarning`
+                    warning category class.
 
                 * ``store`` (bool):
-                    Enable deprecation message storing in a session attribute,
+                    Enable deprecation message storing in the session attribute,
                     :attr:`.deprecations`.
-
     """
 
     deprecations: list[DeprecationMessage] = None
@@ -654,6 +654,9 @@ class DeprecationAwareSessionMixin:
                            warn: Optional[bool] = None,
                            store: Optional[bool] = None,
                            ) -> None:
+        """Configure the on-deprecation behavior, as described in
+        :class:`.DeprecationAwareSessionMixin`.
+        """
         if log is not None:
             self._log_deprecations = log
         if warn is not None:
@@ -731,6 +734,7 @@ class DWaveAPIClient:
     """
 
     class DefaultSession(VersionedAPISessionMixin,
+                         DeprecationAwareSessionMixin,
                          PayloadCompressingSessionMixin,
                          BaseUrlSessionMixin,
                          CachingSessionMixin,
@@ -773,6 +777,9 @@ class DWaveAPIClient:
 
         # enable conditional requests and response caching, see :class:`CachingSession`
         'cache': dict(enabled=False),       # type: CachingSession.CacheConfig
+
+        # api deprecation message handling, see :class:`DeprecationAwareSessionMixin`
+        'on_deprecation': dict(log=True, warn=True, store=True),
     }
 
     # client instance config, populated on init from kwargs overriding DEFAULTS
@@ -903,12 +910,14 @@ class DWaveAPIClient:
             session_kwargs.update(base_url=endpoint)
         if issubclass(session_class, LoggingSessionMixin):
             session_kwargs.update(history_size=config['history_size'])
+        if issubclass(session_class, CachingSessionMixin):
+            session_kwargs.update(cache=config['cache'])
         if issubclass(session_class, PayloadCompressingSessionMixin):
             session_kwargs.update(compress=config['compress'])
         if issubclass(session_class, VersionedAPISessionMixin):
             session_kwargs.update(strict_mode=config['version_strict_mode'])
-        if issubclass(session_class, CachingSessionMixin):
-            session_kwargs.update(cache=config['cache'])
+        if issubclass(session_class, DeprecationAwareSessionMixin):
+            session_kwargs.update(on_deprecation=config['on_deprecation'])
 
         session = session_class(**session_kwargs)
 
