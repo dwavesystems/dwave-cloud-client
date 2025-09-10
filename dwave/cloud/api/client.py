@@ -622,13 +622,25 @@ class DeprecationAwareSessionMixin:
                     Enable deprecation message logging (using ``WARNING`` log level).
 
                 * ``warn`` (bool):
-                    Raise each deprecation message using
-                    :class:`~dwave.cloud.api.exceptions.ResourceDeprecationWarning`
+                    Raise each deprecation message using :exc:`DeprecationWarning`,
+                    or :class:`~dwave.cloud.api.exceptions.ResourceDeprecationWarning`
                     warning category class.
 
                 * ``store`` (bool):
                     Enable deprecation message storing in the session attribute,
                     :attr:`.deprecations`, as well as in the request response.
+
+     .. note::
+        Low-level API deprecations are raised using (usually silenced)
+        :exc:`DeprecationWarning` warning category. User application-level
+        deprecations of, for example, a solver, solver feature or solver
+        parameter are raised using a more prominent (not silenced by default)
+        :class:`~dwave.cloud.api.exceptions.ResourceDeprecationWarning` user
+        warning category.
+
+    .. versionadded:: 0.14.0
+        Support for Leap deprecation messages added to :class:`.DWaveAPIClient`.
+
     """
 
     deprecations: list[DeprecationMessage] = None
