@@ -62,3 +62,11 @@ class ProblemType(str, enum.Enum):
     CQM = "cqm"
     DQM = "dqm"
     NL = "nl"
+
+
+class DeprecationContext(str, enum.Enum):
+    API = "api"                 # API changes such as endpoints, data structure, and headers
+    FEATURE = "feature"         # solver feature is deprecated
+    PARAMETER = "parameter"     # solver parameter is deprecated
+    SOLVER = "solver"           # solver or solver type is deprecated
+    OTHER = "other"

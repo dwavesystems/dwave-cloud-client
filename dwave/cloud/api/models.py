@@ -283,8 +283,19 @@ class _LeapProjectTokenResponse(BaseModel):
 
 class DeprecationMessage(_DictMixin, BaseModel):
     id: str
-    context: str
+    context: constants.DeprecationContext
     deprecated: Optional[datetime] = None
     link: Optional[str] = None
     message: str
     sunset: datetime
+
+    @property
+    def is_app_context(self) -> bool:
+        """True when deprecation context implies a user application
+        change is required.
+        """
+        return self.context in (
+            constants.DeprecationContext.FEATURE,
+            constants.DeprecationContext.PARAMETER,
+            constants.DeprecationContext.SOLVER,
+        )
