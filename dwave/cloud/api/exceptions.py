@@ -61,5 +61,5 @@ class RequestTimeout(RequestError):
     """API request timed out"""
 
 
-class ResourceDeprecationWarning(FutureWarning):
+class ResourceDeprecationWarning(UserWarning):
     """API resource or feature is deprecated."""

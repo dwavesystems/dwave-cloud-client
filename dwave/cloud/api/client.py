@@ -702,14 +702,19 @@ class DeprecationAwareSessionMixin:
 
         if self._log_deprecations:
             for dep in deps:
-                logger.warning("Resource Deprecation Warning: %r", dep)
+                logger.warning("API Deprecation Warning: %r", dep)
 
         if self._raise_deprecations:
             for dep in deps:
-                text = f"{dep.message}. Sunset date: {dep.sunset.isoformat()}."
+                text = f"{dep.message} Sunset date: {dep.sunset.date().isoformat()}."
                 if dep.link:
                     text = f"{text} For details, see: {dep.link!r}."
-                warnings.warn(text, exceptions.ResourceDeprecationWarning, stacklevel=3)
+                if dep.is_app_level_deprecation:
+                    # user warning: user should change the solver, parameter used, etc.
+                    warnings.warn(text, exceptions.ResourceDeprecationWarning, stacklevel=3)
+                else:
+                    # developer warning
+                    warnings.warn(text, DeprecationWarning, stacklevel=3)
 
         return response
 

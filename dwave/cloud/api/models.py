@@ -290,9 +290,9 @@ class DeprecationMessage(_DictMixin, BaseModel):
     sunset: datetime
 
     @property
-    def is_app_context(self) -> bool:
+    def is_app_level_deprecation(self) -> bool:
         """True when deprecation context implies a user application
-        change is required.
+        change is required, hence the warning should be user-visible.
         """
         return self.context in (
             constants.DeprecationContext.FEATURE,
