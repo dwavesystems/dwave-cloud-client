@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
 import json
 import time
 import uuid
@@ -19,15 +20,17 @@ import unittest
 import zlib
 
 import diskcache
+import http_sf
 import requests
 import requests_mock
 from parameterized import parameterized, parameterized_class
 
-from dwave.cloud.api import exceptions
+from dwave.cloud.api import exceptions, models
+from dwave.cloud.api.constants import DeprecationContext
 from dwave.cloud.api.client import (
     DWaveAPIClient, SolverAPIClient, MetadataAPIClient, LeapAPIClient,
     LoggingSessionMixin, PayloadCompressingSessionMixin,
-    VersionedAPISessionMixin, CachingSessionMixin)
+    VersionedAPISessionMixin, CachingSessionMixin, DeprecationAwareSessionMixin)
 from dwave.cloud.config import ClientConfig, constants
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.utils.http import BaseUrlSession
@@ -784,3 +787,115 @@ class TestResponseCaching(unittest.TestCase):
                 self.assertEqual(r.json(), data)
 
                 self.assertTrue(m.called)
+
+
+@parameterized_class(("session_class", ), [
+    (make_session_class(DeprecationAwareSessionMixin, BaseUrlSession), ),
+    (DWaveAPIClient.DefaultSession, ),
+])
+class TestDeprecationMessageParsing(unittest.TestCase):
+    session_class = None
+
+    def setUp(self):
+        self.mocker = requests_mock.Mocker()
+
+        # structured field date is in integer seconds
+        now = datetime.datetime.now().replace(microsecond=0)
+
+        self.dep_id = 'dep-1'
+        self.dep_params = dict(
+            context='solver',
+            deprecated=now,
+            link='https://mock',
+            message='msg',
+            sunset=now,
+        )
+        self.dep_sf = [(http_sf.Token(self.dep_id), self.dep_params)]
+
+        self.mocker.get(requests_mock.ANY, content=b'ok', status_code=200,
+                        headers={'X-Deprecation': http_sf.ser(self.dep_sf)})
+
+        self.mocker.start()
+
+    def tearDown(self):
+        self.mocker.stop()
+
+    def test_session_config(self):
+        # verify session.set_on_deprecation works
+        with DWaveAPIClient(endpoint='https://mock', session_class=self.session_class) as client:
+            client.session.set_on_deprecation(warn=False, store=False)
+
+            try:
+                with self.assertWarns(exceptions.ResourceDeprecationWarning):
+                    response = client.session.get('')
+            except AssertionError:
+                pass
+            else:
+                self.fail("Warning raised, when it shouldn't have been.")
+
+            self.assertIsNone(client.session.deprecations)
+            self.assertIsNone(getattr(response, 'deprecations', None))
+
+    def test_client_config(self):
+        # verify client config is passed to the session
+        with DWaveAPIClient(endpoint='https://mock',
+                            session_class=self.session_class,
+                            on_deprecation=dict(warn=True, store=False)) as client:
+
+            with self.assertWarns(exceptions.ResourceDeprecationWarning):
+                response = client.session.get('')
+
+            self.assertIsNone(client.session.deprecations)
+            self.assertIsNone(getattr(response, 'deprecations', None))
+
+    def test_parsing(self):
+        # verify a deprecation is parsed and processed as expected
+        with DWaveAPIClient(endpoint='https://mock', session_class=self.session_class) as client:
+
+            self.assertTrue(client.session._raise_deprecations)
+            with self.assertWarns(exceptions.ResourceDeprecationWarning):
+                response = client.session.get('')
+
+            self.assertTrue(client.session._store_deprecations)
+            deps = getattr(response, 'deprecations', None)
+            self.assertIsNotNone(deps)
+            self.assertIsInstance(deps, list)
+            self.assertEqual(len(deps), 1)
+
+            dep = deps[0]
+            self.assertIsInstance(dep, models.DeprecationMessage)
+            self.assertEqual(dep.dict(), {'id': self.dep_id} | self.dep_params)
+
+    @parameterized.expand([
+        ('no deprecations', {}),
+        ('invalid deprecation header', {'X-Deprecation': '"'}),
+        ('invalid deprecation message', {'X-Deprecation': '1;context=1;message=2;sunset=3'}),
+    ])
+    def test_parsing_errors(self, name, headers):
+        self.mocker.get(requests_mock.ANY, content=b'ok', status_code=200, headers=headers)
+
+        with DWaveAPIClient(endpoint='https://mock', session_class=self.session_class,
+                            on_deprecation=dict(store=True)) as client:
+
+            response = client.session.get('')
+            self.assertEqual(response.deprecations, [])
+            self.assertEqual(client.session.deprecations, [])
+
+    @parameterized.expand([
+        ('silent: api', DeprecationContext.API, DeprecationWarning),
+        ('silent: other', DeprecationContext.OTHER, DeprecationWarning),
+        ('visible: feature', DeprecationContext.FEATURE, exceptions.ResourceDeprecationWarning),
+        ('visible: parameter', DeprecationContext.PARAMETER, exceptions.ResourceDeprecationWarning),
+        ('visible: solver', DeprecationContext.SOLVER, exceptions.ResourceDeprecationWarning),
+    ])
+    def test_context_switch(self, name, context, exc):
+        params = self.dep_params | dict(context=context.value)
+        dep_sf = [(http_sf.Token(self.dep_id), params)]
+        self.mocker.get(requests_mock.ANY, content=b'ok', status_code=200,
+                        headers={'X-Deprecation': http_sf.ser(dep_sf)})
+
+        with DWaveAPIClient(endpoint='https://mock', session_class=self.session_class,
+                            on_deprecation=dict(warn=True)) as client:
+
+            with self.assertWarns(exc):
+                client.session.get('')

@@ -25,6 +25,7 @@ from collections import deque, namedtuple, abc
 from collections.abc import Iterable
 from typing import IO, Optional, TypedDict, TYPE_CHECKING, Union
 
+import http_sf
 import orjson
 import requests
 import urllib3
@@ -33,6 +34,7 @@ from packaging.specifiers import SpecifierSet
 
 import dwave.cloud.config
 from dwave.cloud.api import exceptions
+from dwave.cloud.api.models import DeprecationMessage
 from dwave.cloud.utils.exception import is_caused_by
 from dwave.cloud.utils.http import PretimedHTTPAdapter, BaseUrlSessionMixin, default_user_agent
 from dwave.cloud.utils.time import epochnow
@@ -605,6 +607,130 @@ class CachingSession(CachingSessionMixin, VersionedAPISession):
     pass
 
 
+class DeprecationAwareSessionMixin:
+    """A :class:`requests.Session` mixin that interprets Leap deprecation
+    messages in the API response headers, storing them, logging and raising
+    warnings on the fly.
+
+    Args:
+        on_deprecation:
+            Configuration typed dictionary describing behavior when a
+            deprecation message is received. The following keys are supported
+            (all optional and true by default):
+
+                * ``log`` (bool):
+                    Enable deprecation message logging (using ``WARNING`` log level).
+
+                * ``warn`` (bool):
+                    Raise each deprecation message using :exc:`DeprecationWarning`,
+                    or :class:`~dwave.cloud.api.exceptions.ResourceDeprecationWarning`
+                    warning category class.
+
+                * ``store`` (bool):
+                    Enable deprecation message storing in the session attribute,
+                    :attr:`.deprecations`, as well as in the request response.
+
+     .. note::
+        Low-level API deprecations are raised using (usually silenced)
+        :exc:`DeprecationWarning` warning category. User application-level
+        deprecations of, for example, a solver, solver feature or solver
+        parameter are raised using a more prominent (not silenced by default)
+        :class:`~dwave.cloud.api.exceptions.ResourceDeprecationWarning` user
+        warning category.
+
+    .. versionadded:: 0.14.0
+        Support for Leap deprecation messages added to :class:`.DWaveAPIClient`.
+
+    """
+
+    deprecations: list[DeprecationMessage] = None
+    """Deprecation messages received in the last response, if storing enabled."""
+
+    class OnDeprecationConfig(TypedDict, total=False):
+        log: bool
+        warn: bool
+        store: bool
+
+    DEFAULT_ON_DEPRECATION_CONFIG = OnDeprecationConfig(log=True, warn=True, store=True)
+
+    def __init__(self, on_deprecation: Optional[OnDeprecationConfig] = None, **kwargs):
+        super().__init__(**kwargs)
+
+        self.set_on_deprecation(**self.DEFAULT_ON_DEPRECATION_CONFIG)
+        if on_deprecation is not None:
+            self.set_on_deprecation(**on_deprecation)
+
+    def set_on_deprecation(self,
+                           *,
+                           log: Optional[bool] = None,
+                           warn: Optional[bool] = None,
+                           store: Optional[bool] = None,
+                           ) -> None:
+        """Configure the on-deprecation behavior, as described in
+        :class:`.DeprecationAwareSessionMixin`.
+        """
+        if log is not None:
+            self._log_deprecations = log
+        if warn is not None:
+            self._raise_deprecations = warn
+        if store is not None:
+            self._store_deprecations = store
+
+    def _parse_deprecation_messages(self, response: requests.Response) -> list[DeprecationMessage]:
+        """Parse deprecation notes returned in ``X-Deprecation`` header, encoded
+        using "Structured Field Values for HTTP" (RFC 9651).
+
+        Note: malformed headers are ignored.
+
+        Note: this format of deprecation messages is Leap-specific.
+        """
+
+        x_dep = response.headers.get('X-Deprecation')
+        if not x_dep:
+            return []
+
+        try:
+            sfv = http_sf.parse(x_dep.encode(), tltype='list')
+        except Exception as exc:
+            logger.debug("Deprecation header %r parsing failed with %r.", x_dep, exc)
+            return []
+
+        try:
+            deps = [DeprecationMessage(id=str(v[0]), **v[1]) for v in sfv]
+        except Exception as exc:
+            logger.debug("Deprecation message %r validation failed with %r.", sfv, exc)
+            return []
+
+        return deps
+
+    def request(self, *args, **kwargs) -> requests.Response:
+        response = super().request(*args, **kwargs)
+
+        deps = self._parse_deprecation_messages(response)
+
+        if self._store_deprecations:
+            self.deprecations = deps
+            setattr(response, 'deprecations', deps)
+
+        if self._log_deprecations:
+            for dep in deps:
+                logger.warning("API Deprecation Warning: %r", dep)
+
+        if self._raise_deprecations:
+            for dep in deps:
+                text = f"{dep.message} Sunset date: {dep.sunset.date().isoformat()}."
+                if dep.link:
+                    text = f"{text} For details, see: {dep.link!r}."
+                if dep.is_app_level_deprecation:
+                    # user warning: user should change the solver, parameter used, etc.
+                    warnings.warn(text, exceptions.ResourceDeprecationWarning, stacklevel=3)
+                else:
+                    # developer warning
+                    warnings.warn(text, DeprecationWarning, stacklevel=3)
+
+        return response
+
+
 class DWaveAPIClient:
     """Low-level client for D-Wave APIs. A thin wrapper around
     `requests.Session` that handles API specifics such as authentication,
@@ -626,6 +752,7 @@ class DWaveAPIClient:
     """
 
     class DefaultSession(VersionedAPISessionMixin,
+                         DeprecationAwareSessionMixin,
                          PayloadCompressingSessionMixin,
                          BaseUrlSessionMixin,
                          CachingSessionMixin,
@@ -668,6 +795,9 @@ class DWaveAPIClient:
 
         # enable conditional requests and response caching, see :class:`CachingSession`
         'cache': dict(enabled=False),       # type: CachingSession.CacheConfig
+
+        # api deprecation message handling, see :class:`DeprecationAwareSessionMixin`
+        'on_deprecation': dict(log=True, warn=True, store=True),
     }
 
     # client instance config, populated on init from kwargs overriding DEFAULTS
@@ -798,12 +928,14 @@ class DWaveAPIClient:
             session_kwargs.update(base_url=endpoint)
         if issubclass(session_class, LoggingSessionMixin):
             session_kwargs.update(history_size=config['history_size'])
+        if issubclass(session_class, CachingSessionMixin):
+            session_kwargs.update(cache=config['cache'])
         if issubclass(session_class, PayloadCompressingSessionMixin):
             session_kwargs.update(compress=config['compress'])
         if issubclass(session_class, VersionedAPISessionMixin):
             session_kwargs.update(strict_mode=config['version_strict_mode'])
-        if issubclass(session_class, CachingSessionMixin):
-            session_kwargs.update(cache=config['cache'])
+        if issubclass(session_class, DeprecationAwareSessionMixin):
+            session_kwargs.update(on_deprecation=config['on_deprecation'])
 
         session = session_class(**session_kwargs)
 

@@ -277,3 +277,25 @@ class _LeapTokenWrapper(BaseModel):
 
 class _LeapProjectTokenResponse(BaseModel):
     data: _LeapTokenWrapper
+
+
+# Leap deprecation messages
+
+class DeprecationMessage(_DictMixin, BaseModel):
+    id: str
+    context: constants.DeprecationContext
+    deprecated: Optional[datetime] = None
+    link: Optional[str] = None
+    message: str
+    sunset: datetime
+
+    @property
+    def is_app_level_deprecation(self) -> bool:
+        """True when deprecation context implies a user application
+        change is required, hence the warning should be user-visible.
+        """
+        return self.context in (
+            constants.DeprecationContext.FEATURE,
+            constants.DeprecationContext.PARAMETER,
+            constants.DeprecationContext.SOLVER,
+        )

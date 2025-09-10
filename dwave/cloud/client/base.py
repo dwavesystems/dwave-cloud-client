@@ -377,6 +377,9 @@ class Client(object):
     # Binary-ref answer download parameters
     _DOWNLOAD_ANSWER_THREAD_COUNT = 2
 
+    # SAPI deprecation message handling; keep private for now
+    _DEFAULT_ON_DEPRECATION_CONFIG = dict(log=True, warn=True, store=True)
+
     @classmethod
     def from_config(cls, config_file=None, profile=None, client=None, **kwargs):
         """Client factory method to instantiate a client instance from configuration.
@@ -562,6 +565,7 @@ class Client(object):
             ThreadPoolExecutor(self._DOWNLOAD_ANSWER_THREAD_COUNT)
 
     class _Session(api.client.VersionedAPISessionMixin,
+                   api.client.DeprecationAwareSessionMixin,
                    api.client.LoggingSessionMixin,
                    BaseUrlSession):
         pass
@@ -578,7 +582,8 @@ class Client(object):
         if not endpoint.endswith('/'):
             endpoint += '/'
 
-        session = self._Session(base_url=endpoint, strict_mode=True)
+        session = self._Session(base_url=endpoint, strict_mode=True,
+                                on_deprecation=self._DEFAULT_ON_DEPRECATION_CONFIG)
         session.mount('http://', PretimedHTTPAdapter(
             timeout=self.config.request_timeout,
             max_retries=self.config.request_retry.to_urllib3_retry()))

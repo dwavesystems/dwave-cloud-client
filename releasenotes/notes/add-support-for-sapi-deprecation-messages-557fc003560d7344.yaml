@@ -1,0 +1,11 @@
+---
+features:
+  - |
+    Add support for Leap deprecation messages to ``dwave.cloud.client.Client``
+    and ``dwave.cloud.api.client.DWaveAPIClient``.
+
+    Deprecation messages received are raised as Python warnings using a new category,
+    ``dwave.cloud.api.exceptions.ResourceDeprecationWarning`` and logged using the
+    ``WARNING`` log level.
+
+    See `#721 <https://github.com/dwavesystems/dwave-cloud-client/issues/721>`_.
