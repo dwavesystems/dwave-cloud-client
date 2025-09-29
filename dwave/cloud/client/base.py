@@ -985,7 +985,6 @@ class Client(object):
         Common solver properties are:
 
         * `num_qubits` (int): Number of qubits available.
-        * `vfyc` (bool): Should solver work on "virtual full-yield chip"?
         * `max_anneal_schedule_points` (int): Piecewise linear annealing schedule points.
         * `h_range` ([int,int]), j_range ([int,int]): Biases/couplings values range.
         * `num_reads_range` ([int,int]): Range of allowed values for `num_reads` parameter.
