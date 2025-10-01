@@ -1,0 +1,7 @@
+---
+deprecations:
+  - |
+    ``Solver.is_vfyc`` property is deprecated since dwave-cloud-client 0.14.1
+    and will be removed in 0.15.0.
+    Note that Leap QPU solvers in general don't support the ``vfyc`` (virtual
+    full-yield chip) property anymore.

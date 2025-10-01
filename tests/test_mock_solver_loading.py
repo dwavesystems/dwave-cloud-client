@@ -346,6 +346,8 @@ class MockSolverLoading(unittest.TestCase):
         self.assertFalse(Solver(None, data).is_vfyc)
         data['properties']['vfyc'] = True
         self.assertTrue(Solver(None, data).is_vfyc)
+        with self.assertWarns(DeprecationWarning):
+            Solver(None, data).is_vfyc
 
         # test .has_flux_biases
         self.assertFalse(Solver(None, data).has_flux_biases)

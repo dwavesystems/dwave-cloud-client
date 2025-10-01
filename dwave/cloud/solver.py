@@ -988,6 +988,10 @@ class StructuredSolver(BaseSolver):
     @property
     def is_vfyc(self):
         "Is this a virtual full-yield chip?"
+        warnings.warn(
+            "`Solver.is_vfyc` property is deprecated since dwave-cloud-client 0.14.1, "
+            "and will be removed in 0.15.0.",
+            DeprecationWarning, stacklevel=2)
         return self.properties.get('vfyc') == True
 
     @property
