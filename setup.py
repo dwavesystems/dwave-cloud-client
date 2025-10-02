@@ -10,7 +10,7 @@ package_info = {}
 with open(package_info_path, encoding='utf-8') as f:
     exec(f.read(), package_info)
 
-python_requires = '>=3.9'
+python_requires = '>=3.10'
 
 # Package requirements, minimal pinning
 install_requires = ['requests[socks]>=2.25,<3', 'urllib3>=1.26,<3',
@@ -50,7 +50,6 @@ classifiers = [
     'License :: OSI Approved :: Apache Software License',
     'Operating System :: OS Independent',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
