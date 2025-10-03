@@ -814,16 +814,6 @@ class TestCliLive(unittest.TestCase):
 
 class TestLogging(unittest.TestCase):
 
-    # TODO: simplify the logic by requiring click>8.2 once we drop py39
-    @classmethod
-    def setUpClass(cls):
-        cls.clirunner_kwargs = {}
-        # in click<8.2 we need to use `mix_stderr=False` to split streams
-        # (`mix_stderr` is removed in click 8.2, and split streams are now the default)
-        click_version = tuple(map(int, importlib.metadata.version('click').split('.')))
-        if click_version < (8, 2, 0):
-            cls.clirunner_kwargs.update(mix_stderr=False)
-
     @isolated_environ(remove_dwave=True)
     def test_json_logs(self):
         env = {
@@ -832,7 +822,7 @@ class TestLogging(unittest.TestCase):
             'DWAVE_LOG_FORMAT': 'json',
         }
 
-        runner = CliRunner(env=env, **self.clirunner_kwargs)
+        runner = CliRunner(env=env)
         result = runner.invoke(cli, ['ping'])
 
         # ping will fail because API token is undefined

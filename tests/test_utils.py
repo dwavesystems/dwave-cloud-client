@@ -1026,8 +1026,7 @@ class TestFilteredSecretsFormatter(unittest.TestCase):
         rec = logging.makeLogRecord(dict(msg=msg))
         return fmt.format(rec)
 
-    # dev note: define as unbound local function, to be used in class def context only
-    # in py310+ we can declare it as @staticmethod and call it as regular function
+    @staticmethod
     def _snipped(inp: Union[str, uuid.UUID]) -> tuple[str, str]:
         """Naively assuming `inp` is a secret/token, scrub the middle part."""
         return (lambda x: (x, f"{x[:3]}...{x[-3:]}"))(str(inp))

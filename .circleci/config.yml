@@ -311,7 +311,7 @@ workflows:
           context: &ctx-build "ocean-build"
           matrix:
             parameters:
-              python-version: &python-versions ["3.9", "3.10", "3.11", "3.12", "3.13"]
+              python-version: &python-versions ["3.10", "3.11", "3.12", "3.13"]
               dimod-numpy-version: ["", "dimod~=0.10.0", "dimod~=0.11.0", "dimod~=0.12.0"]
             exclude:
               # dimod < 0.12 not supported on py311+
