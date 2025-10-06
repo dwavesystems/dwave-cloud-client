@@ -463,6 +463,36 @@ class MockSubmissionBaseTests(MockSubmissionBase):
                     self._check(results1, linear, quadratic, **params)
                 self._check(results2, linear, quadratic, **params)
 
+    def test_retrieve_answer(self):
+        # Client.retrieve_answer() loads the answer of a completed problem by id
+
+        def mock_create_session(client):
+            session = mock.Mock()
+            session.post = lambda path, **kwargs: choose_reply(path, {
+                'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
+            session.get = lambda path, **kwargs: choose_reply(path, {
+                'problems/123/': self.sapi.complete_reply(id='123')})
+            return session
+
+        # we expect the full solver identity to be used
+        def mock_get_solver(client, **filters):
+            solver = Solver(client, self.sapi.solver.data)
+            self.assertEqual(filters, dict(identity=solver.identity))
+            return solver
+
+        with mock.patch.object(Client, 'create_session', mock_create_session):
+            with mock.patch.object(Client, 'get_solver', mock_get_solver):
+                with Client(**self.config) as client:
+                    solver = Solver(client, self.sapi.solver.data)
+
+                    linear, quadratic = self.sapi.problem
+                    params = dict(num_reads=100)
+                    future = solver.sample_ising(linear, quadratic, **params)
+                    problem_id = future.wait_id()
+
+                    results = client.retrieve_answer(problem_id)
+                    self._check(results, linear, quadratic, **params)
+
 
 class TestAPIVersionCheck(MockSubmissionBase, unittest.TestCase):
 
