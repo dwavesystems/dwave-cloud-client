@@ -1462,7 +1462,23 @@ class Client(object):
                     # An alternative to making this call here would be to pass
                     # self in with the message
                     if future.solver is None:
-                        future.solver = self.get_solver(identity=message['solver'])
+                        # handle problems with v2 solver representation
+                        # (prior to `graph_id` introduction)
+                        # see: https://github.com/dwavesystems/dwave-cloud-client/issues/727
+                        # TODO: remove after a server-side fix
+                        solver = message['solver']
+                        if isinstance(solver, dict):
+                            if 'version' in solver:
+                                # full identity match for valid v3 response
+                                future.solver = self.get_solver(identity=solver)
+                            elif 'name' in solver:
+                                # partial solver match; valid during v2 deprecation period
+                                future.solver = self.get_solver(name=solver['name'])
+                            else:
+                                raise InvalidAPIResponseError("incomplete solver object in problem description response")
+                        else:
+                            # v2 solver representation (string), now deprecated
+                            future.solver = self.get_solver(name=solver)
 
                     future._set_message(message)
 
