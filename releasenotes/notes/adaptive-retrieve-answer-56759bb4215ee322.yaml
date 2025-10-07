@@ -1,0 +1,8 @@
+---
+fixes:
+  - |
+    Workaround for SAPI returning invalid v3 solver representation of problems
+    submitted using v2 representation (with Ocean < 9).
+    When ``Client.retrieve_answer()`` receives a solver identity with ``graph_id``
+    missing, we fall back to a partial solver match (based on name only).
+    See `#727 <https://github.com/dwavesystems/dwave-cloud-client/issues/727>`_.
