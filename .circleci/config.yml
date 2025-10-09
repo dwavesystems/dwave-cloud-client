@@ -17,7 +17,7 @@ jobs:
     parameters:
       python-version:
         type: string
-      dimod-numpy-version:
+      dependency-specifiers:
         type: string
 
     docker:
@@ -55,8 +55,8 @@ jobs:
           name: Install appropriate dimod version
           command: |
             . env/bin/activate
-            if [[ "<< parameters.dimod-numpy-version >>" ]]; then
-              pip install << parameters.dimod-numpy-version >>
+            if [[ "<< parameters.dependency-specifiers >>" ]]; then
+              pip install << parameters.dependency-specifiers >>
             else
               pip uninstall dimod -y
             fi
@@ -77,7 +77,7 @@ jobs:
         type: string
       xcode:
         type: string
-        default: "16.0.0"
+        default: "16.4.0"
 
     macos:
       xcode: << parameters.xcode >>
@@ -307,26 +307,30 @@ workflows:
   test:
     jobs:
       - test-linux:
-          name: test-linux-py<< matrix.python-version >><<# matrix.dimod-numpy-version >> | << matrix.dimod-numpy-version >><</ matrix.dimod-numpy-version >>
+          name: test-linux-py<< matrix.python-version >><<# matrix.dependency-specifiers >> | << matrix.dependency-specifiers >><</ matrix.dependency-specifiers >>
           context: &ctx-build "ocean-build"
           matrix:
             parameters:
-              python-version: &python-versions ["3.10", "3.11", "3.12", "3.13"]
-              dimod-numpy-version: ["", "dimod~=0.10.0", "dimod~=0.11.0", "dimod~=0.12.0"]
+              python-version: &python-versions ["3.10", "3.11", "3.12", "3.13", "3.14"]
+              dependency-specifiers: ["", "dimod~=0.10.0", "dimod~=0.11.0", "dimod~=0.12.0"]
             exclude:
               # dimod < 0.12 not supported on py311+
               - python-version: "3.11"
-                dimod-numpy-version: "dimod~=0.10.0"
+                dependency-specifiers: "dimod~=0.10.0"
               - python-version: "3.11"
-                dimod-numpy-version: "dimod~=0.11.0"
+                dependency-specifiers: "dimod~=0.11.0"
               - python-version: "3.12"
-                dimod-numpy-version: "dimod~=0.10.0"
+                dependency-specifiers: "dimod~=0.10.0"
               - python-version: "3.12"
-                dimod-numpy-version: "dimod~=0.11.0"
+                dependency-specifiers: "dimod~=0.11.0"
               - python-version: "3.13"
-                dimod-numpy-version: "dimod~=0.10.0"
+                dependency-specifiers: "dimod~=0.10.0"
               - python-version: "3.13"
-                dimod-numpy-version: "dimod~=0.11.0"
+                dependency-specifiers: "dimod~=0.11.0"
+              - python-version: "3.14"
+                dependency-specifiers: "dimod~=0.10.0"
+              - python-version: "3.14"
+                dependency-specifiers: "dimod~=0.11.0"
 
       - test-macos:
           name: test-macos-py<< matrix.python-version >>
