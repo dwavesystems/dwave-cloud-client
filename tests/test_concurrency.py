@@ -24,6 +24,25 @@ from dwave.cloud.concurrency import (
     PriorityThreadPoolExecutor,
 )
 
+# in python 3.14, _WorkItem aggregates (fn, args, kwargs) under task
+try:
+    # in py313 and earlier, _WorkItem construction with only 2 positional args fails with TypeError
+    workitem_uses_task = hasattr(concurrent.futures.thread._WorkItem(None, None), 'task')
+except TypeError:
+    workitem_uses_task = False
+
+def create_workitem(future, task):
+    if workitem_uses_task:
+        return concurrent.futures.thread._WorkItem(future, task)
+    else:
+        return concurrent.futures.thread._WorkItem(future, *task)
+
+def get_workitem_task(w):
+    if workitem_uses_task:
+        return w.task
+    else:
+        return (w.fn, w.args, w.kwargs)
+
 
 class Test_PrioritizedWorkItem(unittest.TestCase):
 
@@ -33,32 +52,27 @@ class Test_PrioritizedWorkItem(unittest.TestCase):
         fn = lambda: None
         args = (1,)
         kwargs = {'a': 1}
+        task = (fn, args, kwargs)
 
         # without priority
-        w = concurrent.futures.thread._WorkItem(future, fn, args, kwargs)
+        w = create_workitem(future, task)
         pw = _PrioritizedWorkItem(w)
         self.assertEqual(pw.priority, sys.maxsize)
         self.assertEqual(pw.item.future, future)
-        self.assertEqual(pw.item.fn, fn)
-        self.assertEqual(pw.item.args, args)
-        self.assertEqual(pw.item.kwargs, kwargs)
+        self.assertEqual(get_workitem_task(pw.item), task)
 
         # with priority
-        kwargs_pri = kwargs.copy()
-        kwargs_pri.update(priority=priority)
-        w = concurrent.futures.thread._WorkItem(future, fn, args, kwargs_pri)
+        kwargs_pri = kwargs | dict(priority=priority)
+        task = (fn, args, kwargs_pri)
+        w = create_workitem(future, task)
         pw = _PrioritizedWorkItem(w)
         self.assertEqual(pw.priority, priority)
         self.assertEqual(pw.item.future, future)
-        self.assertEqual(pw.item.fn, fn)
-        self.assertEqual(pw.item.args, args)
-        self.assertEqual(pw.item.kwargs, kwargs)
+        self.assertEqual(get_workitem_task(pw.item), task)
 
     def test_priority_ordering(self):
-        w1 = _PrioritizedWorkItem(
-            concurrent.futures.thread._WorkItem(None, None, (), dict(priority=1)))
-        w2 = _PrioritizedWorkItem(
-            concurrent.futures.thread._WorkItem(None, None, (), dict(priority=2)))
+        w1 = _PrioritizedWorkItem(create_workitem(None, (None, (), dict(priority=1))))
+        w2 = _PrioritizedWorkItem(create_workitem(None, (None, (), dict(priority=2))))
 
         # ordered
         self.assertLess(w1, w2)
@@ -74,25 +88,24 @@ class Test_PrioritizedWorkItem(unittest.TestCase):
 class Test_PrioritizingQueue(unittest.TestCase):
 
     def test_prioritization(self):
-        w1 = concurrent.futures.thread._WorkItem(None, None, (1,), dict(priority=1))
-        w2 = _PrioritizedWorkItem(
-            concurrent.futures.thread._WorkItem(None, None, (2,), dict(priority=2)))
+        w1 = create_workitem(None, t1 := (None, (1,), dict(priority=1)))
+        w2 = _PrioritizedWorkItem(create_workitem(None, t2 := (None, (2,), dict(priority=2))))
         w3 = None
-        w4 = concurrent.futures.thread._WorkItem(None, None, (3,), {})
+        w4 = create_workitem(None, t4 := (None, (4,), {}))
 
         q = _PrioritizingQueue()
 
         # put different types of items in queue
         q.put(w2)
-        q.put(w3)
         q.put(w1)
+        q.put(w3)
         q.put(w4)
 
         # verify order on get
-        self.assertEqual(q.get(), None)
-        self.assertEqual(q.get().args, (1,))
-        self.assertEqual(q.get().item.args, (2,))
-        self.assertEqual(q.get().args, (3,))
+        self.assertEqual(q.get(), None)     # w3
+        self.assertEqual(get_workitem_task(q.get()), t1)
+        self.assertEqual(get_workitem_task(q.get().item), t2)
+        self.assertEqual(get_workitem_task(q.get()), t4)
         self.assertTrue(q.empty())
 
     def test_double_none_edgecase(self):

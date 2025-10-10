@@ -51,6 +51,9 @@ class _PrioritizedWorkItem(_PriorityOrderedItem):
     priority passed in `kwargs` of :class:`concurrent.futures.thread._WorkItem`
     items.
     """
+    # TODO: reliance on python's internal/private :class:`concurrent.futures.thread._WorkItem`
+    # structure is fragile. The structure changed in py314 (for the first time since before py2),
+    # so we should rethink our approach here before it changes again.
 
     def __init__(self, item):
         if not isinstance(item, concurrent.futures.thread._WorkItem):
@@ -60,7 +63,16 @@ class _PrioritizedWorkItem(_PriorityOrderedItem):
         if isinstance(item, _PrioritizedWorkItem):
             priority = item.priority
         else:
-            priority = item.kwargs.pop('priority', sys.maxsize)
+            if hasattr(item, 'kwargs'):
+                # python < 3.14
+                kwargs = item.kwargs
+            elif hasattr(item, 'task'):
+                # python >= 3.14
+                fn, args, kwargs = item.task
+            else:
+                raise TypeError("unknown concurrent.futures.thread._WorkItem structure")
+
+            priority = kwargs.pop('priority', sys.maxsize)
 
         super().__init__(item, priority)
 
