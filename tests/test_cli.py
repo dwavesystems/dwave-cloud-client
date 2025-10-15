@@ -13,11 +13,11 @@
 # limitations under the License.
 
 import contextlib
-import importlib.metadata
 import json
 import os
 import tempfile
 import unittest
+import warnings
 from functools import partial
 from pathlib import Path
 from unittest import mock
@@ -822,8 +822,12 @@ class TestLogging(unittest.TestCase):
             'DWAVE_LOG_FORMAT': 'json',
         }
 
-        runner = CliRunner(env=env)
-        result = runner.invoke(cli, ['ping'])
+        # ensure warnings (on stderr) do not interfere with the expected output
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+
+            runner = CliRunner(env=env)
+            result = runner.invoke(cli, ['ping'])
 
         # ping will fail because API token is undefined
         self.assertEqual(result.exit_code, 1)
