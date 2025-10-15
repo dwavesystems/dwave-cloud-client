@@ -16,10 +16,10 @@ python_requires = '>=3.10'
 install_requires = ['requests[socks]>=2.25,<3', 'urllib3>=1.26,<3',
                     'pydantic>=2,<3', 'homebase>=1.0,<2',
                     'click>=8.2,<9', 'python-dateutil>=2.7,<3', 'plucky>=0.4.3,<0.5',
-                    'diskcache>=5.2.1,<6', 'packaging>=19', 'werkzeug>=2.2,<4',
+                    'diskcache>=5.2.1,<6', 'packaging>=19', 'werkzeug>=3.1.0,<4',
                     'typing-extensions>=4.5.0,<5', 'authlib>=1.2,<2',
                     'importlib_metadata>=5.0.0',    # can be dropped in py312+
-                    'orjson>=3.10', 'http-sf>=1.0.4',
+                    'orjson>=3.11', 'http-sf>=1.0.4',
                     ]
 
 # Package extras requirements
