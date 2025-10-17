@@ -1109,9 +1109,15 @@ def capture_stderr(fn):
     """Decorator that captures stderr and provides access via `output` argument."""
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        stream = io.TextIOWrapper(io.BytesIO())
-        with contextlib.redirect_stderr(stream) as output:
-            return fn(*args, output=output, **kwargs)
+        # ensure warnings (on stderr) do not interfere with the expected output
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+
+            # redirect sys.stderr to a BytesIO stream
+            stream = io.TextIOWrapper(io.BytesIO())
+            with contextlib.redirect_stderr(stream) as output:
+                return fn(*args, output=output, **kwargs)
+
     return wrapper
 
 

@@ -13,15 +13,16 @@
 # limitations under the License.
 
 import contextlib
-import importlib.metadata
 import json
 import os
 import tempfile
 import unittest
-from functools import partial
+import warnings
+from functools import partial, wraps
 from pathlib import Path
 from unittest import mock
 
+import diskcache
 from click.testing import CliRunner
 from parameterized import parameterized
 
@@ -30,12 +31,21 @@ from dwave.cloud.config import load_config
 from dwave.cloud.config.models import validate_config_v1
 from dwave.cloud.testing import isolated_environ
 from dwave.cloud.auth.creds import Credentials, CREDS_FILENAME
-from dwave.cloud.api.client import _create_default_cache_store
 from dwave.cloud.api.models import LeapProject
 from dwave.cloud.api.resources import Regions
 
 from tests import config, test_config_path, test_config_profile
 from tests.test_mock_solver_loading import solver_object
+
+
+def ignored_warnings(fn):
+    """Ignores warnings during the execution of the decorated function."""
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return fn(*args, **kwargs)
+    return wrapper
 
 
 def touch(path):
@@ -143,6 +153,7 @@ class TestConfigCreate(unittest.TestCase):
 
 class TestCli(unittest.TestCase):
 
+    @ignored_warnings
     def test_config_ls(self):
         runner = CliRunner()
         with runner.isolated_filesystem():
@@ -522,6 +533,7 @@ class TestAuthCli(unittest.TestCase):
             self.assertEqual(result.exit_code, 0)
 
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
+    @ignored_warnings
     def test_get(self, flow_factory):
         flow = flow_factory.return_value
         token = dict(access_token='123', refresh_token='456')
@@ -652,6 +664,7 @@ class TestAuthCli(unittest.TestCase):
 
     @mock.patch('dwave.cloud.api.resources.LeapAccount.from_config')
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
+    @ignored_warnings
     def test_leap_project_token(self, flow_factory, account_factory):
         flow = flow_factory.return_value
         account = account_factory.return_value
@@ -717,7 +730,7 @@ class TestCacheCli(unittest.TestCase):
                 self.assertIn("Cache empty.", result.output)
 
             # populate api cache
-            store = partial(_create_default_cache_store, directory=str(self.tmpdir / 'api'))
+            store = diskcache.Cache(directory=str(self.tmpdir / 'api'))
             with Regions(cache=dict(store=store)) as regions:
                 regions.list_regions()
 
@@ -765,6 +778,7 @@ class TestCliLive(unittest.TestCase):
                                      '--profile', test_config_profile])
         self.assertEqual(result.exit_code, 0)
 
+    @ignored_warnings
     def test_ping_json(self):
         runner = CliRunner()
         result = runner.invoke(cli, ['ping',
@@ -779,6 +793,7 @@ class TestCliLive(unittest.TestCase):
         self.assertIn('code', res)
         self.assertEqual(result.exit_code, 0)
 
+    @ignored_warnings
     def test_ping_json_timeout_error(self):
         runner = CliRunner()
         result = runner.invoke(cli, ['ping',
@@ -815,6 +830,7 @@ class TestCliLive(unittest.TestCase):
 class TestLogging(unittest.TestCase):
 
     @isolated_environ(remove_dwave=True)
+    @ignored_warnings
     def test_json_logs(self):
         env = {
             'DWAVE_CONFIG_FILE': test_config_path,
@@ -822,6 +838,7 @@ class TestLogging(unittest.TestCase):
             'DWAVE_LOG_FORMAT': 'json',
         }
 
+        # ensure warnings (on stderr) do not interfere with the expected output
         runner = CliRunner(env=env)
         result = runner.invoke(cli, ['ping'])
 

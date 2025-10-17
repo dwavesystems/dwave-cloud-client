@@ -7,10 +7,10 @@ click>=8.2,<9
 plucky>=0.4.3,<0.5
 diskcache>=5.2.1,<6
 packaging>=19
-werkzeug>=2.2,<3
+werkzeug>=3.1.0,<4
 typing-extensions>=4.5.0,<5
 authlib>=1.2,<2
-orjson>=3.10
+orjson>=3.11
 http-sf>=1.0.4
 
 # bring in py312 semantics of importlib.metadata.entry_points()
