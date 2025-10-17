@@ -429,6 +429,13 @@ class CachingSessionMixin:
 
         super().__init__(**kwargs)
 
+    def close(self):
+        # close diskcache (db conn) on session close
+        if hasattr(self, '_store') and hasattr(self._store, 'close'):
+            self._store.close()
+
+        super().close()
+
     def configure_cache(self, cache: CacheConfig) -> None:
         config = {opt: cache.get(opt, default)
                   for opt, default in self._default_cache_config.items()}
