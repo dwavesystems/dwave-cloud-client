@@ -163,6 +163,17 @@ class AuthFlow:
             self.creds[self.leap_api_endpoint] = token
             logger.debug(f"{type(self).__name__} saved token {token!r} to {self.creds}")
 
+    def close(self):
+        """Override in a subclass if resource clean-up needed."""
+        self.session.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+        return False
+
     @property
     def redirect_uri(self) -> str:
         return self.session.redirect_uri
@@ -378,6 +389,20 @@ class LeapAuthFlow(AuthFlow):
         flow.config = config
 
         return flow
+
+    def close(self):
+        # close creds db conn on object destruction
+        if hasattr(self, 'creds') and hasattr(self.creds, 'close'):
+            self.creds.close()
+        super().close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        # perform a clean shutdown of the creds db connection
+        self.close()
+        return False
 
     def run_oob_flow(self, *, open_browser: Union[bool, abc.Callable] = False):
         """Run OAuth 2.0 code exchange (out-of-band flow.) 
