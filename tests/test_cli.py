@@ -22,6 +22,7 @@ from functools import partial, wraps
 from pathlib import Path
 from unittest import mock
 
+import diskcache
 from click.testing import CliRunner
 from parameterized import parameterized
 
@@ -30,7 +31,6 @@ from dwave.cloud.config import load_config
 from dwave.cloud.config.models import validate_config_v1
 from dwave.cloud.testing import isolated_environ
 from dwave.cloud.auth.creds import Credentials, CREDS_FILENAME
-from dwave.cloud.api.client import CachingSessionMixin
 from dwave.cloud.api.models import LeapProject
 from dwave.cloud.api.resources import Regions
 
@@ -730,9 +730,7 @@ class TestCacheCli(unittest.TestCase):
                 self.assertIn("Cache empty.", result.output)
 
             # populate api cache
-            store = staticmethod(partial(
-                CachingSessionMixin._create_default_cache_store,
-                directory=str(self.tmpdir / 'api')))
+            store = diskcache.Cache(directory=str(self.tmpdir / 'api'))
             with Regions(cache=dict(store=store)) as regions:
                 regions.list_regions()
 

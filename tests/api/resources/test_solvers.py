@@ -20,12 +20,12 @@ import unittest
 from functools import partial
 from urllib.parse import urljoin, urlparse, parse_qsl
 
+import diskcache
 import json
 import requests
 import requests_mock
 
 from dwave.cloud.api import exceptions, models
-from dwave.cloud.api.client import CachingSessionMixin
 from dwave.cloud.api.resources import Solvers
 from dwave.cloud.config import validate_config_v1
 from dwave.cloud.testing.mocks import qpu_clique_solver_data
@@ -267,14 +267,13 @@ class TestLiveSolversCaching(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmpdir = tempfile.TemporaryDirectory()
-        cls.store = partial(CachingSessionMixin._create_default_cache_store,
-                            directory=cls.tmpdir.name)
+        cls.store = diskcache.Cache(directory=cls.tmpdir.name)
         cls.filter_ids = 'none,+identity'
 
     @classmethod
     def tearDownClass(cls):
-        with contextlib.suppress(OSError):
-            cls.tmpdir.cleanup()
+        cls.store.close()
+        cls.tmpdir.cleanup()
 
     def test_default(self):
         # caching is disabled by default
