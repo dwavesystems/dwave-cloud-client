@@ -281,6 +281,11 @@ class cached:
 
         return wrapper
 
+    def __del__(self):
+        # close diskcache (db conn) on decorator destruction
+        if hasattr(self, 'store') and hasattr(self.store, 'close'):
+            self.store.close()
+
     @classmethod
     def ondisk(cls, **kwargs):
         """@cached backed by an on-disk sqlite3-based cache."""
