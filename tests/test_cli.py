@@ -30,7 +30,7 @@ from dwave.cloud.config import load_config
 from dwave.cloud.config.models import validate_config_v1
 from dwave.cloud.testing import isolated_environ
 from dwave.cloud.auth.creds import Credentials, CREDS_FILENAME
-from dwave.cloud.api.client import _create_default_cache_store
+from dwave.cloud.api.client import CachingSessionMixin
 from dwave.cloud.api.models import LeapProject
 from dwave.cloud.api.resources import Regions
 
@@ -730,7 +730,9 @@ class TestCacheCli(unittest.TestCase):
                 self.assertIn("Cache empty.", result.output)
 
             # populate api cache
-            store = partial(_create_default_cache_store, directory=str(self.tmpdir / 'api'))
+            store = staticmethod(partial(
+                CachingSessionMixin._create_default_cache_store,
+                directory=str(self.tmpdir / 'api')))
             with Regions(cache=dict(store=store)) as regions:
                 regions.list_regions()
 

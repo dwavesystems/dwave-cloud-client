@@ -355,19 +355,6 @@ class VersionedAPISessionMixin:
         return response
 
 
-def _create_default_cache_store(**kwargs) -> abc.Mapping:
-    # TODO: de-dup vs `dwave.cloud.utils.decorators.cached`?
-
-    # defer to break circular imports
-    from dwave.cloud.config import get_cache_dir
-
-    directory = kwargs.pop('directory', os.path.join(get_cache_dir(), 'api'))
-
-    # defer import and construction until needed
-    import diskcache
-    return diskcache.Cache(directory=directory)
-
-
 class VersionedAPISession(VersionedAPISessionMixin, PayloadCompressingSession):
     pass
 
@@ -405,6 +392,19 @@ class CachingSessionMixin:
         * ``refresh_`` (bool):
             Force cache update, skipping time-based or etag-based validation.
     """
+
+    @staticmethod
+    def _create_default_cache_store(**kwargs) -> abc.Mapping:
+        # TODO: de-dup vs `dwave.cloud.utils.decorators.cached`?
+
+        # defer to break circular imports
+        from dwave.cloud.config import get_cache_dir
+
+        directory = kwargs.pop('directory', os.path.join(get_cache_dir(), 'api'))
+
+        # defer import and construction until needed
+        import diskcache
+        return diskcache.Cache(directory=directory)
 
     class CacheConfig(TypedDict, total=False):
         enabled: bool

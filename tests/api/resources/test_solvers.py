@@ -267,7 +267,7 @@ class TestLiveSolversCaching(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmpdir = tempfile.TemporaryDirectory()
-        cls.store = partial(CachingSessionMixin._default_cache_config['store'],
+        cls.store = partial(CachingSessionMixin._create_default_cache_store,
                             directory=cls.tmpdir.name)
         cls.filter_ids = 'none,+identity'
 
