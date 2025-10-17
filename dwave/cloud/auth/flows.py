@@ -379,6 +379,19 @@ class LeapAuthFlow(AuthFlow):
 
         return flow
 
+    def close(self):
+        # close creds db conn on object destruction
+        if hasattr(self, 'creds') and hasattr(self.creds, 'close'):
+            self.creds.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        # perform a clean shutdown of the creds db connection
+        self.close()
+        return False
+
     def run_oob_flow(self, *, open_browser: Union[bool, abc.Callable] = False):
         """Run OAuth 2.0 code exchange (out-of-band flow.) 
         

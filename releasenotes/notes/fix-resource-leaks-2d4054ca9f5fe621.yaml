@@ -1,0 +1,7 @@
+---
+fixes:
+  - |
+    Fix resource leaks during diskcache/sqlite database use in ``CachingSessionMixin``,
+    ``LeapAuthFlow`` and ``@cached``.
+
+    See `#731 <https://github.com/dwavesystems/dwave-cloud-client/issues/731>`_.
