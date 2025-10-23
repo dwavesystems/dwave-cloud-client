@@ -1014,17 +1014,17 @@ def login(*, config_file, profile, oob, skip_valid, output):
 
 def _login(*, config_file, profile, oob, skip_valid, output):
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
-    flow = LeapAuthFlow.from_config_model(config)
 
-    if skip_valid:
-        if flow.ensure_active_token():
-            output('Valid token found, skipping authorization.')
-            return
+    with LeapAuthFlow.from_config_model(config) as flow:
+        if skip_valid:
+            if flow.ensure_active_token():
+                output('Valid token found, skipping authorization.')
+                return
 
-    if oob:
-        flow.run_oob_flow(open_browser=True)
-    else:
-        flow.run_redirect_flow(open_browser=True)
+        if oob:
+            flow.run_oob_flow(open_browser=True)
+        else:
+            flow.run_redirect_flow(open_browser=True)
 
     output('Authorization completed successfully. '
            'You can now use "dwave auth get" to fetch your token.')
@@ -1041,31 +1041,31 @@ def get(*, config_file, profile, token_type, json_output, raw_output, output):
     """Fetch Leap API token."""
 
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
-    flow = LeapAuthFlow.from_config_model(config)
 
-    token_key = token_type.replace('-', '_')
-    if not flow.token or not token_key in flow.token:
-        raise CLIError('Token not found. Please run "dwave auth login".', code=100)
+    with LeapAuthFlow.from_config_model(config) as flow:
+        token_key = token_type.replace('-', '_')
+        if not flow.token or not token_key in flow.token:
+            raise CLIError('Token not found. Please run "dwave auth login".', code=100)
 
-    token_pretty = token_type.replace('-', ' ').capitalize()
-    token_val = flow.token[token_key]
-    output(f"{token_pretty}: {{%s}}" % token_key, **{token_key: token_val})
-    output(raw=token_val)
+        token_pretty = token_type.replace('-', ' ').capitalize()
+        token_val = flow.token[token_key]
+        output(f"{token_pretty}: {{%s}}" % token_key, **{token_key: token_val})
+        output(raw=token_val)
 
-    if token_type == 'access-token':
-        expires_at = flow.token.get('expires_at')
-        if not expires_at:
-            return
-        expires_at = int(expires_at)
-        expired = expires_at < epochnow()
+        if token_type == 'access-token':
+            expires_at = flow.token.get('expires_at')
+            if not expires_at:
+                return
+            expires_at = int(expires_at)
+            expired = expires_at < epochnow()
 
-        output("Expires at: {expires_at_iso}Z (timestamp={expires_at}) ({is_valid})",
-            expires_at_iso=datetime.utcfromtimestamp(expires_at).isoformat(),
-            expires_at=expires_at,
-            is_valid="expired" if expired else "valid")
+            output("Expires at: {expires_at_iso}Z (timestamp={expires_at}) ({is_valid})",
+                expires_at_iso=datetime.utcfromtimestamp(expires_at).isoformat(),
+                expires_at=expires_at,
+                is_valid="expired" if expired else "valid")
 
-        if expired:
-            output('\nTo refresh the token, please run "dwave auth refresh".')
+            if expired:
+                output('\nTo refresh the token, please run "dwave auth refresh".')
 
 
 @auth.command()
@@ -1075,14 +1075,14 @@ def refresh(*, config_file, profile, output):
     """Refresh Leap API access token."""
 
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
-    flow = LeapAuthFlow.from_config_model(config)
 
-    # check we have a token
-    if not flow.token or 'refresh_token' not in flow.token:
-        raise CLIError('Refresh token not found. Please run "dwave auth login".', code=100)
+    with LeapAuthFlow.from_config_model(config) as flow:
+        # check we have a token
+        if not flow.token or 'refresh_token' not in flow.token:
+            raise CLIError('Refresh token not found. Please run "dwave auth login".', code=100)
 
-    # refresh
-    flow.refresh_token()
+        # refresh
+        flow.refresh_token()
 
     output('Access and refresh tokens successfully refreshed. '
            'You can now use "dwave auth get" to view them.')
@@ -1097,19 +1097,20 @@ def refresh(*, config_file, profile, output):
 def revoke(*, config_file, profile, token_type, json_output, output):
     """Revoke access and/or refresh token(s) for Leap API."""
 
-    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
-    flow = LeapAuthFlow.from_config_model(config)
-
     token_key = token_type.replace('-', '_')
     token_pretty = token_type.replace('-', ' ').capitalize()
-    if not flow.token or not token_key in flow.token:
-        raise CLIError('Token not found. Please run "dwave auth login".', code=100)
 
-    # revoke
-    revoked = flow.revoke_token(token=flow.token[token_key], token_type_hint=token_key)
+    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
 
-    if not revoked:
-        raise CLIError(f'{token_pretty} revocation failed.', code=102)
+    with LeapAuthFlow.from_config_model(config) as flow:
+        if not flow.token or not token_key in flow.token:
+            raise CLIError('Token not found. Please run "dwave auth login".', code=100)
+
+        # revoke
+        revoked = flow.revoke_token(token=flow.token[token_key], token_type_hint=token_key)
+
+        if not revoked:
+            raise CLIError(f'{token_pretty} revocation failed.', code=102)
 
     output(f'{token_pretty} successfully revoked.')
 
@@ -1132,21 +1133,21 @@ def list_leap_projects(*, config_file, profile, json_output, output):
     """List available Leap projects."""
 
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
-    flow = LeapAuthFlow.from_config_model(config)
 
-    if not flow.token or 'access_token' not in flow.token:
-        raise CLIError('Leap API access token not found. Please run "dwave auth login".', code=100)
+    with LeapAuthFlow.from_config_model(config) as flow:
+        if not flow.token or 'access_token' not in flow.token:
+            raise CLIError('Leap API access token not found. Please run "dwave auth login".', code=100)
 
-    if flow.token_expires_soon(within=60):
-        output("Access token expired (or expires soon), refreshing it.")
-        flow.refresh_token()
+        if flow.token_expires_soon(within=60):
+            output("Access token expired (or expires soon), refreshing it.")
+            flow.refresh_token()
 
-    account = api.LeapAccount.from_config(config=flow.config,
-                                          token=flow.token.get('access_token'))
-    projects = account.list_projects()
-    output("Leap projects:", projects=[p.model_dump() for p in projects])
-    for project in projects:
-        output(f" - {project.name} (code={project.code!r}, id={project.id})")
+        with api.LeapAccount.from_config(config=flow.config,
+                                         token=flow.token.get('access_token')) as account:
+            projects = account.list_projects()
+            output("Leap projects:", projects=[p.model_dump() for p in projects])
+            for project in projects:
+                output(f" - {project.name} (code={project.code!r}, id={project.id})")
 
 
 @project.command(name='token')
@@ -1172,40 +1173,38 @@ def _get_sapi_token_for_leap_project(
         project_hint: Optional[str], output: abc.Callable) -> tuple[api.models.LeapProject, str]:
 
     config = validate_config_v1(load_config(config_file=config_file, profile=profile))
-    flow = LeapAuthFlow.from_config_model(config)
 
-    if not flow.token or 'access_token' not in flow.token:
-        raise CLIError('Leap API access token not found. '
-                       'Please run "dwave auth login".', code=100)
+    with LeapAuthFlow.from_config_model(config) as flow:
+        if not flow.token or 'access_token' not in flow.token:
+            raise CLIError('Leap API access token not found. '
+                        'Please run "dwave auth login".', code=100)
 
-    if flow.token_expires_soon(within=120):
-        output("Access token expired (or expires soon), refreshing it.")
-        flow.refresh_token()
+        if flow.token_expires_soon(within=120):
+            output("Access token expired (or expires soon), refreshing it.")
+            flow.refresh_token()
 
-    account = api.LeapAccount.from_config(config=flow.config,
-                                          token=flow.token.get('access_token'))
+        with api.LeapAccount.from_config(config=flow.config,
+                                         token=flow.token.get('access_token')) as account:
+            if project_hint is None:
+                # use active project
+                project = account.get_active_project()
+            else:
+                # find project using project_hint
+                projects = account.list_projects()
+                needle = str(project_hint).strip().lower()
+                project = [p for p in projects
+                        if needle in (str(p.id), p.name.lower(), p.code.lower())]
 
-    if project_hint is None:
-        # use active project
-        project = account.get_active_project()
+                if not project:
+                    raise CLIError(f'Project with {project_hint!r} ID, name or code not found. '
+                                'Please run "dwave leap project ls" to list available projects.', code=101)
 
-    else:
-        # find project using project_hint
-        projects = account.list_projects()
-        needle = str(project_hint).strip().lower()
-        project = [p for p in projects
-                   if needle in (str(p.id), p.name.lower(), p.code.lower())]
+                project = project[0]
 
-        if not project:
-            raise CLIError(f'Project with {project_hint!r} ID, name or code not found. '
-                           'Please run "dwave leap project ls" to list available projects.', code=101)
+            # get token
+            token = account.get_project_token(project=project)
 
-        project = project[0]
-
-    # get token
-    token = account.get_project_token(project=project)
-
-    return (project, token)
+            return (project, token)
 
 
 @cli.group()

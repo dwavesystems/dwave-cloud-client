@@ -30,7 +30,7 @@ from dwave.cloud.api.client import (
 if TYPE_CHECKING:
     from dwave.cloud.config.models import ClientConfig
 
-__all__ = ['Solvers', 'Problems', 'Regions']
+__all__ = ['Solvers', 'Problems', 'Regions', 'LeapAccount']
 
 
 class accepts:
