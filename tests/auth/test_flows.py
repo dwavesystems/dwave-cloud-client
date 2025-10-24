@@ -52,6 +52,9 @@ class TestAuthFlow(unittest.TestCase):
             leap_api_endpoint=self.leap_api_endpoint,
             creds=self.creds)
 
+    def tearDown(self):
+        self.creds.close()
+
     def test_auth_url(self):
         flow = AuthFlow(**self.test_args)
 
@@ -275,12 +278,11 @@ class TestLeapAuthFlow(unittest.TestCase):
     def test_from_default_config(self):
         config = ClientConfig()
 
-        flow = LeapAuthFlow.from_config_model(config)
-
-        # endpoint urls are generated?
-        prefix = urljoin(DEFAULT_LEAP_API_ENDPOINT, '/')
-        self.assertTrue(flow.authorization_endpoint.startswith(prefix))
-        self.assertTrue(flow.token_endpoint.startswith(prefix))
+        with LeapAuthFlow.from_config_model(config) as flow:
+            # endpoint urls are generated?
+            prefix = urljoin(DEFAULT_LEAP_API_ENDPOINT, '/')
+            self.assertTrue(flow.authorization_endpoint.startswith(prefix))
+            self.assertTrue(flow.token_endpoint.startswith(prefix))
 
     def test_from_minimal_config(self):
         config = ClientConfig(leap_api_endpoint=self.mock_leap_api_endpoint)
@@ -300,6 +302,8 @@ class TestLeapAuthFlow(unittest.TestCase):
         self.assertEqual(flow.redirect_uri, LeapAuthFlow._OOB_REDIRECT_URI)
         self.assertIsNotNone(flow.creds)
 
+        flow.close()
+
     def test_from_minimal_config_with_overrides(self):
         config = ClientConfig(leap_api_endpoint=self.mock_leap_api_endpoint)
         client_id = '123'
@@ -314,23 +318,23 @@ class TestLeapAuthFlow(unittest.TestCase):
         self.assertEqual(flow.scopes, ' '.join(scopes))
         self.assertEqual(flow.redirect_uri, redirect_uri)
 
+        flow.close()
+
     def test_from_common_config(self):
         config = ClientConfig(leap_api_endpoint=self.mock_leap_api_endpoint,
                               headers=dict(injected='value'), request_timeout=10)
 
-        flow = LeapAuthFlow.from_config_model(config)
-
-        self.assertEqual(flow.session.headers.get('injected'), 'value')
-        self.assertEqual(flow.session.default_timeout, 10)
+        with LeapAuthFlow.from_config_model(config) as flow:
+            self.assertEqual(flow.session.headers.get('injected'), 'value')
+            self.assertEqual(flow.session.default_timeout, 10)
 
     def test_client_id_from_config(self):
         client_id = '123'
         config = ClientConfig(leap_api_endpoint=self.mock_leap_api_endpoint,
                               leap_client_id=client_id)
 
-        flow = LeapAuthFlow.from_config_model(config)
-
-        self.assertEqual(flow.client_id, client_id)
+        with LeapAuthFlow.from_config_model(config) as flow:
+            self.assertEqual(flow.client_id, client_id)
 
 
 class TestLeapAuthFlowOOB(unittest.TestCase):
@@ -346,6 +350,8 @@ class TestLeapAuthFlowOOB(unittest.TestCase):
             with mock.patch.object(flow, 'fetch_token') as fetch_token:
                 flow.run_oob_flow()
                 fetch_token.assert_called_once_with(code=mock_code)
+
+        flow.close()
 
 
 class TestLeapAuthFlowRedirect(unittest.TestCase):
@@ -383,6 +389,8 @@ class TestLeapAuthFlowRedirect(unittest.TestCase):
 
             f.join()
             fetch_token.assert_called_once_with(code=mock_code, state=ctx['state'])
+
+        flow.close()
 
     class FlowRunner(threading.Thread):
         def __init__(self, *, flow, authorize_response_params, **kwargs):
@@ -470,6 +478,8 @@ class TestLeapAuthFlowRedirect(unittest.TestCase):
             with self.assertRaisesRegex(OAuthError, error_description):
                 t.exception()
 
+        flow.close()
+
     @mock.patch('click.echo', return_value=None)
     def test_exchange_fails(self, m):
         # error case: access authorized, but code exchange fails with oauth error
@@ -509,6 +519,8 @@ class TestLeapAuthFlowRedirect(unittest.TestCase):
             with self.assertRaisesRegex(OAuthError, str(error)):
                 t.exception()
 
+        flow.close()
+
     @mock.patch('click.echo', return_value=None)
     def test_non_auth_failure_during_code_exchange(self, m):
         # error case: access authorized, but code exchange fails with unexpected non-auth error
@@ -547,6 +559,8 @@ class TestLeapAuthFlowRedirect(unittest.TestCase):
             with self.assertRaisesRegex(type(error), str(error)):
                 t.exception()
 
+        flow.close()
+
     @mock.patch('click.echo', return_value=None)
     def test_csrf_failure_during_code_exchange(self, m):
         # error case: access authorized, but code exchange fails due to state mismatch
@@ -581,3 +595,5 @@ class TestLeapAuthFlowRedirect(unittest.TestCase):
             # oauth exception raised by the redirect flow runner
             with self.assertRaisesRegex(type(error), str(error)):
                 t.exception()
+
+        flow.close()

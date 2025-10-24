@@ -480,7 +480,7 @@ class TestAuthCli(unittest.TestCase):
 
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
     def test_login(self, flow_factory):
-        flow = flow_factory.return_value
+        flow = flow_factory.return_value.__enter__.return_value
 
         with self.subTest('dwave auth login'):
             flow.reset_mock()
@@ -535,7 +535,7 @@ class TestAuthCli(unittest.TestCase):
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
     @ignored_warnings
     def test_get(self, flow_factory):
-        flow = flow_factory.return_value
+        flow = flow_factory.return_value.__enter__.return_value
         token = dict(access_token='123', refresh_token='456')
         type(flow).token = mock.PropertyMock(return_value=token)
 
@@ -568,7 +568,7 @@ class TestAuthCli(unittest.TestCase):
 
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
     def test_refresh(self, flow_factory):
-        flow = flow_factory.return_value
+        flow = flow_factory.return_value.__enter__.return_value
         type(flow).token = mock.PropertyMock(return_value=dict(refresh_token='123'))
 
         with self.subTest('dwave auth refresh'):
@@ -591,7 +591,7 @@ class TestAuthCli(unittest.TestCase):
 
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
     def test_revoke(self, flow_factory):
-        flow = flow_factory.return_value
+        flow = flow_factory.return_value.__enter__.return_value
         token = dict(access_token='123', refresh_token='456')
         type(flow).token = mock.PropertyMock(return_value=token)
 
@@ -624,7 +624,7 @@ class TestAuthCli(unittest.TestCase):
 
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
     def test_revoke_failure_modes(self, flow_factory):
-        flow = flow_factory.return_value
+        flow = flow_factory.return_value.__enter__.return_value
         type(flow).token = mock.PropertyMock(return_value={})
 
         with self.subTest('dwave auth revoke: token missing'):
@@ -648,8 +648,8 @@ class TestAuthCli(unittest.TestCase):
     @mock.patch('dwave.cloud.api.resources.LeapAccount.from_config')
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
     def test_leap_project_ls(self, flow_factory, account_factory):
-        flow = flow_factory.return_value
-        account = account_factory.return_value
+        flow = flow_factory.return_value.__enter__.return_value
+        account = account_factory.return_value.__enter__.return_value
 
         type(flow).token = mock.PropertyMock(return_value=dict(access_token='123'))
         flow.token_expires_soon.return_value = False
@@ -666,8 +666,8 @@ class TestAuthCli(unittest.TestCase):
     @mock.patch('dwave.cloud.auth.flows.LeapAuthFlow.from_config_model')
     @ignored_warnings
     def test_leap_project_token(self, flow_factory, account_factory):
-        flow = flow_factory.return_value
-        account = account_factory.return_value
+        flow = flow_factory.return_value.__enter__.return_value
+        account = account_factory.return_value.__enter__.return_value
 
         type(flow).token = mock.PropertyMock(return_value=dict(access_token='123'))
         flow.token_expires_soon.return_value = False
