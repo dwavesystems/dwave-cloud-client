@@ -35,6 +35,7 @@ from plucky import merge
 from dwave.cloud.api import models, Regions
 from dwave.cloud.client import Client
 from dwave.cloud.config import constants
+from dwave.cloud.config.loaders import get_cache_dir
 from dwave.cloud.config.models import dump_config_v1, PollingStrategy
 from dwave.cloud.exceptions import (
     SolverAuthenticationError, SolverError, SolverNotFoundError)
@@ -646,6 +647,59 @@ class ClientConstruction(unittest.TestCase):
                 self._verify_retry_config(retry, retry_kwargs)
 
 
+class CacheConfiguration(unittest.TestCase):
+
+    cache_home = "/path/to/cache"
+    config_body = f"""
+        [defaults]
+        token = token
+
+        [default]
+
+        [disabled]
+        cache_enabled = false
+
+        [custom-home]
+        cache_home = {cache_home}
+
+        [disabled-via-home]
+        cache_home = disabled
+    """
+
+    @parameterized.expand([
+        ("default", True, get_cache_dir()),
+        ("disabled", False, None),
+        ("custom-home", True, cache_home),
+        ("disabled-via-home", False, None),
+    ])
+    @isolated_environ(empty=True)
+    def test_cache_from_config(self, profile, enabled, home):
+        with mock.patch("dwave.cloud.config.loaders.open", iterable_mock_open(self.config_body)):
+            with Client.from_config('config_file', profile=profile) as client:
+                self.assertEqual(client.config.cache.enabled, enabled)
+                self.assertEqual(client.config.cache.home, home)
+
+    @parameterized.expand([
+        ("default", {"DWAVE_CACHE_ENABLED": "0"}, False, None),
+        ("default", {"DWAVE_CACHE_HOME": "off"}, False, None),
+        ("default", {"DWAVE_CACHE_HOME": "default"}, True, get_cache_dir()),
+        ("default", {"DWAVE_CACHE_HOME": cache_home}, True, cache_home),
+        ("disabled", {"DWAVE_CACHE_ENABLED": "1"}, True, get_cache_dir()),
+        ("disabled", {"DWAVE_CACHE_HOME": cache_home}, False, cache_home),      # regular home value will not flip enabled
+        ("disabled", {"DWAVE_CACHE_HOME": "default"}, True, get_cache_dir()),   # ... but sentinel will
+        ("disabled", {"DWAVE_CACHE_HOME": cache_home, "DWAVE_CACHE_ENABLED": "true"}, True, cache_home),
+        ("custom-home", {"DWAVE_CACHE_HOME": "/tmp/"}, True, "/tmp/"),
+        ("disabled-via-home", {"DWAVE_CACHE_ENABLED": "1"}, False, None),       # home overrides
+        ("disabled-via-home", {"DWAVE_CACHE_HOME": cache_home}, True, cache_home),
+    ])
+    def test_cache_from_env_over_config(self, profile, env, enabled, home):
+        with isolated_environ(add=env, empty=True):
+            with mock.patch("dwave.cloud.config.loaders.open", iterable_mock_open(self.config_body)):
+                with Client.from_config('config_file', profile=profile) as client:
+                    self.assertEqual(client.config.cache.enabled, enabled)
+                    self.assertEqual(client.config.cache.home, home)
+
+
 class VerifyLazyClientImport(unittest.TestCase):
 
     def test_client_available(self):
@@ -1002,8 +1056,9 @@ class FeatureBasedSolverSelection(unittest.TestCase):
             patchers = [mock.patch.dict(s.properties, update) for s in solvers]
             try:
                 yield (p.start() for p in patchers)
-            finally:
-                return (p.stop() for p in patchers)
+            except:
+                pass
+            return (p.stop() for p in patchers)
 
         with mock.patch.object(self.software.identity, 'name', 'c4-sw_solver3'):
             # patch categories and re-run the category-based filtering test

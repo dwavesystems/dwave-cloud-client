@@ -242,6 +242,20 @@ class Client(object):
             Leap OAuth 2.0 Ocean client id. Reserved for testing, otherwise
             don't override.
 
+        cache_enabled (bool, optional, default=True):
+            A flag to explicitly disable cache. Can also be done by setting
+            ``cache_home`` to ``"off"``.
+
+            .. versionadded:: 0.14.2
+
+        cache_home (str, optional):
+            Disk cache base directory. Set to ``"off"`` to disable caching, and
+            set to ``"default"`` (or leave unspecified) to use the default cache
+            directory inferred from the environment, as returned by
+            :meth:`~dwave.cloud.config.loaders.get_cache_dir`.
+
+            .. versionadded:: 0.14.2
+
         defaults (dict, optional):
             Defaults for the client instance that override the class
             :attr:`.Client.DEFAULTS`.
@@ -338,6 +352,9 @@ class Client(object):
         'http_retry_status': None,
         'http_retry_backoff_factor': 0.01,
         'http_retry_backoff_max': 60,
+        # cache conf
+        'cache_enabled': True,
+        'cache_home': None,
     }
 
     # Number of problems to include in a submit/status query

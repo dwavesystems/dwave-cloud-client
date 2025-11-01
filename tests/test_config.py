@@ -404,6 +404,12 @@ class TestConfigParsing(unittest.TestCase):
             with mock.patch.dict(os.environ, {'DWAVE_API_REGION': 'test'}):
                 self.assertEqual(load_config(config_file='myfile')['region'], 'test')
 
+            with mock.patch.dict(os.environ, {'DWAVE_CACHE_ENABLED': 'test'}):
+                self.assertEqual(load_config(config_file='myfile')['cache_enabled'], 'test')
+
+            with mock.patch.dict(os.environ, {'DWAVE_CACHE_HOME': 'test'}):
+                self.assertEqual(load_config(config_file='myfile')['cache_home'], 'test')
+
             with mock.patch.dict(os.environ, {'DWAVE_METADATA_API_ENDPOINT': 'test'}):
                 self.assertEqual(load_config(config_file='myfile')['metadata_api_endpoint'], 'test')
 
