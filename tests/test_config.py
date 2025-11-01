@@ -601,6 +601,23 @@ class TestConfigModel(unittest.TestCase):
                      model_value=model_value)
 
     @parameterized.expand([
+        ("default", {}, {"enabled": True, "home": get_cache_dir()}),
+        ("disabled", {"cache_enabled": False}, {"enabled": False, "home": get_cache_dir()}),
+        ("enabled", {"cache_enabled": True}, {"enabled": True, "home": get_cache_dir()}),
+        ("set home", {"cache_home": "/path/to/cache"}, {"enabled": True, "home": "/path/to/cache"}),
+        ("set all enabled", {"cache_enabled": True, "cache_home": "/path/to/cache"}, {"enabled": True, "home": "/path/to/cache"}),
+        ("set all disabled", {"cache_enabled": False, "cache_home": "/path/to/cache"}, {"enabled": False, "home": "/path/to/cache"}),
+        # model-level validation
+        ("disabled via home off", {"cache_home": "off"}, {"enabled": False, "home": None}),
+        ("disabled via home disabled", {"cache_home": "disabled"}, {"enabled": False, "home": None}),
+        ("default via home default", {"cache_home": "default"}, {"enabled": True, "home": get_cache_dir()}),
+    ])
+    def test_cache(self, name, raw_config, model_value):
+        self._verify(raw_config=raw_config,
+                     get_field=lambda config: config.cache.model_dump(),
+                     model_value=model_value)
+
+    @parameterized.expand([
         ("null", None, {}),
         ("blank", '', {}),
         ("empty", '  ', {}),
@@ -655,6 +672,8 @@ class TestConfigModel(unittest.TestCase):
         ("cert missing", {"client_cert": None, "client_cert_key": "key"}, ValueError),
         ("invalid headers", {"headers": [1,2,3]}, ValueError),
         ("invalid solver", {"solver": {1,2,3}}, ValueError),
+        ("invalid cache home", {"cache_home": ''}, ValueError),
+        ("invalid cache combo", {"cache_enabled": True, "cache_home": None}, ValueError),
     ])
     def test_validation_errors(self, name, raw_config, error):
         with self.assertRaises(error):
