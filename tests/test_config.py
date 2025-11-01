@@ -611,6 +611,10 @@ class TestConfigModel(unittest.TestCase):
         ("disabled via home off", {"cache_home": "off"}, {"enabled": False, "home": None}),
         ("disabled via home disabled", {"cache_home": "disabled"}, {"enabled": False, "home": None}),
         ("default via home default", {"cache_home": "default"}, {"enabled": True, "home": get_cache_dir()}),
+        # model-level validation overrides
+        ("override via home off", {"cache_enabled": True, "cache_home": "off"}, {"enabled": False, "home": None}),
+        ("override via home disabled", {"cache_enabled": True, "cache_home": "disabled"}, {"enabled": False, "home": None}),
+        ("override via home default", {"cache_enabled": False, "cache_home": "default"}, {"enabled": True, "home": get_cache_dir()}),
     ])
     def test_cache(self, name, raw_config, model_value):
         self._verify(raw_config=raw_config,
@@ -673,7 +677,6 @@ class TestConfigModel(unittest.TestCase):
         ("invalid headers", {"headers": [1,2,3]}, ValueError),
         ("invalid solver", {"solver": {1,2,3}}, ValueError),
         ("invalid cache home", {"cache_home": ''}, ValueError),
-        ("invalid cache combo", {"cache_enabled": True, "cache_home": None}, ValueError),
     ])
     def test_validation_errors(self, name, raw_config, error):
         with self.assertRaises(error):

@@ -141,20 +141,25 @@ class CacheConfig(BaseModel):
 
     @model_validator(mode='after')
     def process_home_sentinels(self):
-        if self.home is None and self.enabled:
-            raise ValueError('Cache enabled, but home directory undefined')
-        if self.enabled:
-            if (home := self.home.lower()) in ['off', 'disabled']:
+        if self.enabled and self.home is None:
+            self.home = 'default'
+
+        # expand home sentinels (override enabled)
+        if self.home is not None:
+            home = self.home.lower()
+            if home in ['off', 'disabled']:
                 self.enabled = False
                 self.home = None
             elif home == 'default':
+                self.enabled = True
                 self.home = get_cache_dir()
             elif not home:
                 # note: we could verify the path exists at this point, but that's
-                # rather expensive, so we'll defer it and fail on first use
+                # rather expensive, so we'll lazy-fail on the first use
                 # (also note, on average `get_cache_dir` is cheap and just
                 # returns XDG_CACHE_HOME or the hard-coded default string)
                 raise ValueError('Empty string is invalid value for cache home directory')
+
         return self
 
 
@@ -393,7 +398,7 @@ _V1_CONFIG_DEFAULTS = {
     'http_retry_backoff_max': 60,
     # cache config
     'cache_enabled': True,
-    'cache_home': get_cache_dir(),
+    'cache_home': None,
 }
 
 def load_config_v1(raw_config: dict, defaults: Optional[dict] = None) -> ClientConfig:
