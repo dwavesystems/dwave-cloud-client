@@ -433,11 +433,11 @@ class CachingSessionMixin:
 
     def __init__(self, cache: ExtendedCacheConfig | bool | None = None, **kwargs):
         if cache is None:
-            cache = self._default_cache_config
+            cache = self._default_cache_config.copy()
 
         if not isinstance(cache, dict):
             enabled = bool(cache)
-            cache = self._default_cache_config
+            cache = self._default_cache_config.copy()
             cache.update(enabled=enabled)
 
         self.configure_cache(cache)

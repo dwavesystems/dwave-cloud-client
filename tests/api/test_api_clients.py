@@ -412,9 +412,17 @@ class TestResponseCaching(unittest.TestCase):
                 self.assertIsNotNone(client.session._default_maxage)
                 self.assertIsInstance(client.session._store, diskcache.Cache)
 
+        with self.subTest("cache needs to be explicitly enabled"):
+            with DWaveAPIClient(endpoint='https://mock',
+                                cache=dict(default_maxage=5),
+                                session_class=self.session_class) as client:
+                self.assertFalse(client.session._cache_enabled)
+
         with self.subTest("cache configured"):
             with DWaveAPIClient(endpoint='https://mock',
-                                cache=dict(default_maxage=5, store_factory=lambda **kw: {}),
+                                cache=dict(enabled=True,
+                                           default_maxage=5,
+                                           store_factory=lambda **kw: {}),
                                 session_class=self.session_class) as client:
                 self.assertTrue(client.session._cache_enabled)
                 self.assertEqual(client.session._default_maxage, 5)
@@ -423,7 +431,7 @@ class TestResponseCaching(unittest.TestCase):
         with self.subTest("disk cache home configured"):
             with tempfile.TemporaryDirectory() as tmpdir:
                 with DWaveAPIClient(endpoint='https://mock',
-                                    cache=dict(home=tmpdir),
+                                    cache=dict(enabled=True, home=tmpdir),
                                     session_class=self.session_class) as client:
                     self.assertTrue(client.session._cache_enabled)
                     self.assertIsInstance(client.session._store, diskcache.Cache)
