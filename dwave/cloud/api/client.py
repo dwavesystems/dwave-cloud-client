@@ -427,7 +427,7 @@ class CachingSessionMixin:
     _default_cache_config = ExtendedCacheConfig(
         enabled=False,
         home=None,          # resolved to `get_cache_dir()` if cache is enabled
-        default_maxage=60,  # 1 minute
+        default_maxage=0,
         store_factory=_default_store_factory
     )
 

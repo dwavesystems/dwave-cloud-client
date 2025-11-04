@@ -14,6 +14,7 @@
 
 import datetime
 import json
+import tempfile
 import time
 import uuid
 import unittest
@@ -408,16 +409,25 @@ class TestResponseCaching(unittest.TestCase):
             with DWaveAPIClient(endpoint='https://mock', cache=True,
                                 session_class=self.session_class) as client:
                 self.assertTrue(client.session._cache_enabled)
-                self.assertIsNotNone(client.session._maxage)
+                self.assertIsNotNone(client.session._default_maxage)
                 self.assertIsInstance(client.session._store, diskcache.Cache)
 
         with self.subTest("cache configured"):
             with DWaveAPIClient(endpoint='https://mock',
-                                cache=dict(maxage=5, store={}),
+                                cache=dict(default_maxage=5, store_factory=lambda **kw: {}),
                                 session_class=self.session_class) as client:
                 self.assertTrue(client.session._cache_enabled)
-                self.assertEqual(client.session._maxage, 5)
+                self.assertEqual(client.session._default_maxage, 5)
                 self.assertIsInstance(client.session._store, dict)
+
+        with self.subTest("disk cache home configured"):
+            with tempfile.TemporaryDirectory() as tmpdir:
+                with DWaveAPIClient(endpoint='https://mock',
+                                    cache=dict(home=tmpdir),
+                                    session_class=self.session_class) as client:
+                    self.assertTrue(client.session._cache_enabled)
+                    self.assertIsInstance(client.session._store, diskcache.Cache)
+                    self.assertTrue(client.session._store.directory.startswith(tmpdir))
 
     @parameterized.expand([
         (None, ),
@@ -427,7 +437,7 @@ class TestResponseCaching(unittest.TestCase):
     def test_invalid_maxage(self, maxage):
         with self.assertRaises(ValueError):
             DWaveAPIClient(endpoint='https://mock',
-                           cache=dict(maxage=maxage, store={}),
+                           cache=dict(enabled=True, default_maxage=maxage),
                            session_class=self.session_class)
 
     @parameterized.expand([
@@ -437,9 +447,19 @@ class TestResponseCaching(unittest.TestCase):
     ])
     def test_valid_maxage(self, maxage):
         with DWaveAPIClient(endpoint='https://mock',
-                            cache=dict(maxage=maxage, store={}),
+                            cache=dict(enabled=True, default_maxage=maxage),
                             session_class=self.session_class) as client:
-            self.assertEqual(client.session._maxage, maxage)
+            self.assertEqual(client.session._default_maxage, maxage)
+
+    @parameterized.expand([
+        ({}, ),
+        (None, ),
+    ])
+    def test_invalid_store_factory(self, factory):
+        with self.assertRaises(ValueError):
+            DWaveAPIClient(endpoint='https://mock',
+                           cache=dict(enabled=True, store_factory=factory),
+                           session_class=self.session_class)
 
     @requests_mock.Mocker()
     def test_conditional_requests_with_no_cache_control(self, m):
@@ -474,7 +494,7 @@ class TestResponseCaching(unittest.TestCase):
 
         store = {}
 
-        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store),
+        with DWaveAPIClient(endpoint=endpoint, cache=dict(enabled=True, store_factory=lambda **kw: store),
                             history_size=1, session_class=self.session_class) as client:
 
             with self.subTest("cache miss"):
@@ -559,8 +579,9 @@ class TestResponseCaching(unittest.TestCase):
               headers={'ETag': etag, 'Cache-Control': f'public, max-age={maxage}'})
 
         store = {}
+        cache = dict(enabled=True, store_factory=lambda **kw: store)
 
-        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store),
+        with DWaveAPIClient(endpoint=endpoint, cache=cache,
                             history_size=1, session_class=self.session_class) as client:
 
             with self.subTest("cache miss"):
@@ -609,8 +630,9 @@ class TestResponseCaching(unittest.TestCase):
               status_code=304, headers=headers)
 
         store = {}
+        cache = dict(enabled=True, store_factory=lambda **kw: store)
 
-        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store),
+        with DWaveAPIClient(endpoint=endpoint, cache=cache,
                             history_size=1, session_class=self.session_class) as client:
 
             with self.subTest("cache populate"):
@@ -670,8 +692,9 @@ class TestResponseCaching(unittest.TestCase):
               headers={'ETag': etag, 'Cache-Control': 'no-store'})
 
         store = {}
+        cache = dict(enabled=True, store_factory=lambda **kw: store)
 
-        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store),
+        with DWaveAPIClient(endpoint=endpoint, cache=cache,
                             session_class=self.session_class) as client:
 
             with self.subTest("cache miss"):
@@ -700,8 +723,9 @@ class TestResponseCaching(unittest.TestCase):
               headers={'ETag': etag, 'Cache-Control': f'no-cache, max-age=100'})
 
         store = {}
+        cache = dict(enabled=True, store_factory=lambda **kw: store)
 
-        with DWaveAPIClient(endpoint=endpoint, cache=dict(store=store),
+        with DWaveAPIClient(endpoint=endpoint, cache=cache,
                             history_size=1, session_class=self.session_class) as client:
 
             with self.subTest("cache miss"):
@@ -734,9 +758,9 @@ class TestResponseCaching(unittest.TestCase):
 
         store = {}
         maxage = 10
+        cache = dict(enabled=True, default_maxage=maxage, store_factory=lambda **kw: store)
 
-        with DWaveAPIClient(endpoint=endpoint,
-                            cache=dict(store=store, maxage=maxage),
+        with DWaveAPIClient(endpoint=endpoint, cache=cache,
                             session_class=self.session_class) as client:
 
             with self.subTest("cache miss"):
