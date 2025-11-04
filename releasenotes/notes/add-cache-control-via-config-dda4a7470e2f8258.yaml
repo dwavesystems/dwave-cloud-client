@@ -1,0 +1,11 @@
+---
+features:
+  - |
+    Implement minimal cache control through Ocean config interface (config files,
+    environment variables, constructor keyword arguments).
+
+    Client caching is now controlled with ``cache_enabled``/``cache_home``
+    configuration parameters and ``DWAVE_CACHE_ENABLED``/``DWAVE_CACHE_HOME``
+    environment variables.
+
+    See `#614 <https://github.com/dwavesystems/dwave-cloud-client/issues/614>`_.

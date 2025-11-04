@@ -360,24 +360,28 @@ class VersionedAPISession(VersionedAPISessionMixin, PayloadCompressingSession):
 
 
 class CachingSessionMixin:
-    """A :class:`requests.Session` subclass (technically, further specialized
-    :class:`.VersionedAPISession`) that caches responses and uses conditional
-    requests for smart cache updates.
+    """A :class:`requests.Session` mixin that caches responses and uses
+    conditional requests for smart cache updates.
 
     Args:
         cache (dict):
-            Cache configuration in a dict with keys:
+            Cache configuration:
 
                 * ``enabled`` (bool):
                     Enable request caching.
 
-                * ``maxage`` (float):
+                * ``home`` (str):
+                    Path to cache base directory.
+
+                * ``default_maxage`` (float):
                     Default response maxage, in case server response
                     doesn't specify ``Cache-Control``.
 
-                * ``store`` (mapping, callable):
-                    Define cache storage (with a Mapping interface). Default to
-                    ``diskcache.Cache`` with pickle serialization.
+                * ``store_factory`` (callable):
+                    A callable that constructs a cache storage (with a Mapping
+                    interface). Default factory creates a ``diskcache.Cache``
+                    with pickle serialization and database residing under the
+                    ``home`` base directory.
 
     :meth:`CachingSession.request` accepts the following keyword arguments,
     in addition to the base class method:
@@ -393,30 +397,41 @@ class CachingSessionMixin:
             Force cache update, skipping time-based or etag-based validation.
     """
 
+    # more detailed :class:`dwave.cloud.config.models.CacheConfig`
+    # TODO: consider subclassing the model here, or adding these options
+    # to the CacheConfig model
+    class ExtendedCacheConfig(TypedDict, total=False):
+        enabled: bool
+        home: str | None
+        default_maxage: float
+        store_factory: abc.Callable[..., abc.Mapping]
+
     @staticmethod
-    def _create_default_cache_store(**kwargs) -> abc.Mapping:
-        # TODO: de-dup vs `dwave.cloud.utils.decorators.cached`?
+    def _default_store_factory(config: ExtendedCacheConfig, **kwargs) -> abc.Mapping | None:
+        if not config.get('enabled'):
+            return None
 
-        # defer to break circular imports
-        from dwave.cloud.config import get_cache_dir
-
-        directory = kwargs.pop('directory', os.path.join(get_cache_dir(), 'api'))
+        directory = kwargs.pop('directory', None)
+        if not directory:
+            home = config.get('home')
+            if not home:
+                from dwave.cloud.config import get_cache_dir
+                home = get_cache_dir()
+            directory = os.path.join(home, 'api')
 
         # defer import and construction until needed
         import diskcache
         return diskcache.Cache(directory=directory)
 
-    class CacheConfig(TypedDict, total=False):
-        enabled: bool
-        maxage: float
-        store: Union[abc.Mapping, abc.Callable[[], abc.Mapping]]
-
     # default cache config
-    _default_cache_config = CacheConfig(enabled=True,
-                                        maxage=0,
-                                        store=_create_default_cache_store)
+    _default_cache_config = ExtendedCacheConfig(
+        enabled=False,
+        home=None,          # resolved to `get_cache_dir()` if cache is enabled
+        default_maxage=60,  # 1 minute
+        store_factory=_default_store_factory
+    )
 
-    def __init__(self, cache: Union[CacheConfig, bool, None] = None, **kwargs):
+    def __init__(self, cache: ExtendedCacheConfig | bool | None = None, **kwargs):
         if cache is None:
             cache = self._default_cache_config
 
@@ -436,7 +451,7 @@ class CachingSessionMixin:
 
         super().close()
 
-    def configure_cache(self, cache: CacheConfig) -> None:
+    def configure_cache(self, cache: ExtendedCacheConfig) -> None:
         config = {opt: cache.get(opt, default)
                   for opt, default in self._default_cache_config.items()}
 
@@ -445,17 +460,18 @@ class CachingSessionMixin:
             logger.debug("[%s] cache disabled.", type(self).__name__)
             return
 
-        _maxage = config.get('maxage')
-        if not isinstance(_maxage, numbers.Real) or _maxage < 0:
-            raise ValueError("A non-negative real value required for 'maxage'.")
-        self._maxage = _maxage
+        default_maxage = config.get('default_maxage')
+        if not isinstance(default_maxage, numbers.Real) or default_maxage < 0:
+            raise ValueError("A non-negative real value required for 'default_maxage'.")
+        self._default_maxage = default_maxage
 
-        self._store = config['store']
-        if callable(self._store):
-            self._store = self._store()
+        store_factory = config.get('store_factory')
+        if not callable(store_factory):
+            raise ValueError("A callable object required for 'store_factory'.")
+        self._store = store_factory(config)
 
-        logger.debug("[%s] configured cache: (enabled=%r, maxage=%r, store=%r)",
-                     type(self).__name__, self._cache_enabled, self._maxage, self._store)
+        logger.debug("[%s] configured cache: (enabled=%r, default_maxage=%r, store=%r)",
+                     type(self).__name__, self._cache_enabled, self._default_maxage, self._store)
 
         if hasattr(self._store, 'directory'):
             logger.debug("cache.store.directory=%r", self._store.directory)
@@ -545,12 +561,12 @@ class CachingSessionMixin:
             return super().request(method, url, params=params, headers=headers, **kwargs)
 
         if default_maxage is None:
-            default_maxage = self._maxage
+            default_maxage = self._default_maxage
         elif not isinstance(default_maxage, numbers.Real) or default_maxage < 0:
            warnings.warn(
                f"non-negative real value required for 'maxage_'; ignoring {default_maxage}",
                UserWarning, stacklevel=2)
-           default_maxage = self._maxage
+           default_maxage = self._default_maxage
 
         key = (method, url,
                self.params, params,
@@ -801,14 +817,14 @@ class DWaveAPIClient:
         'version_strict_mode': True,
 
         # enable conditional requests and response caching, see :class:`CachingSession`
-        'cache': dict(enabled=False),       # type: CachingSession.CacheConfig
+        'cache': dict(enabled=False),       # type: CachingSession.ExtendedCacheConfig
 
         # api deprecation message handling, see :class:`DeprecationAwareSessionMixin`
         'on_deprecation': dict(log=True, warn=True, store=True),
     }
 
     # client instance config, populated on init from kwargs overriding DEFAULTS
-    config = None
+    config: dict
 
     def __init__(self, **config):
         self.config = {}
@@ -836,6 +852,13 @@ class DWaveAPIClient:
         if config.connection_close:
             headers.update({'Connection': 'close'})
 
+        if config.cache:
+            cache = config.cache.model_dump()
+            if updates := options.pop('cache', None):
+                cache.update(updates)
+        else:
+            cache = None
+
         opts = dict(
             endpoint=config.endpoint,
             token=config.token,
@@ -845,6 +868,7 @@ class DWaveAPIClient:
             retry=config.request_retry.model_dump(),
             proxies=dict(http=config.proxy, https=config.proxy),
             verify=not config.permissive_ssl,
+            cache=cache,
         )
 
         # add class-specific options not existing in ClientConfig
