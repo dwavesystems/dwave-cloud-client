@@ -607,10 +607,10 @@ class TestConfigModel(unittest.TestCase):
                      model_value=model_value)
 
     @parameterized.expand([
-        ("default", {}, {"enabled": True, "home": get_cache_dir()}),
+        ("default", {}, {"enabled": False, "home": get_cache_dir()}),
         ("disabled", {"cache_enabled": False}, {"enabled": False, "home": get_cache_dir()}),
         ("enabled", {"cache_enabled": True}, {"enabled": True, "home": get_cache_dir()}),
-        ("set home", {"cache_home": "/path/to/cache"}, {"enabled": True, "home": "/path/to/cache"}),
+        ("set home", {"cache_home": "/path/to/cache"}, {"enabled": False, "home": "/path/to/cache"}),
         ("set all enabled", {"cache_enabled": True, "cache_home": "/path/to/cache"}, {"enabled": True, "home": "/path/to/cache"}),
         ("set all disabled", {"cache_enabled": False, "cache_home": "/path/to/cache"}, {"enabled": False, "home": "/path/to/cache"}),
         # model-level validation

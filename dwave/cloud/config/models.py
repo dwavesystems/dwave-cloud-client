@@ -132,7 +132,7 @@ class CacheConfig(BaseModel):
     # keeping it simple for now
 
     #: cache enabled? inferred from `home`
-    enabled: bool = True
+    enabled: bool = False
 
     #: path to cache base directory; default to None if cache disabled, or
     #: to `homebase.user_cache_dir` otherwise
@@ -397,7 +397,7 @@ _V1_CONFIG_DEFAULTS = {
     'http_retry_backoff_factor': 0.01,
     'http_retry_backoff_max': 60,
     # cache config
-    'cache_enabled': True,
+    'cache_enabled': False,
     'cache_home': None,
 }
 
