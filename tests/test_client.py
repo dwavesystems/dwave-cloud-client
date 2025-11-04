@@ -20,6 +20,7 @@ test_mock_solver_loading.py duplicates some of these tests against a mock server
 
 import json
 import sys
+import tempfile
 import threading
 import time
 import unittest
@@ -698,6 +699,20 @@ class CacheConfiguration(unittest.TestCase):
                 with Client.from_config('config_file', profile=profile) as client:
                     self.assertEqual(client.config.cache.enabled, enabled)
                     self.assertEqual(client.config.cache.home, home)
+
+    def test_solvers_session(self):
+        with self.subTest("solvers cached by default"):
+            with isolated_environ(empty=True):
+                with mock.patch("dwave.cloud.config.loaders.open", iterable_mock_open(self.config_body)):
+                    with Client.from_config('config_file', profile='default') as client:
+                        self.assertTrue(client.config.cache.enabled)
+                        self.assertTrue(client.solvers_session.session._cache_enabled)
+
+        with self.subTest("solvers cache can be turned off from env"):
+            with isolated_environ(empty=True, add={"DWAVE_CACHE_HOME": "off"}):
+                with mock.patch("dwave.cloud.config.loaders.open", iterable_mock_open(self.config_body)):
+                    with Client.from_config('config_file', profile='default') as client:
+                        self.assertFalse(client.config.cache.enabled)
 
 
 class VerifyLazyClientImport(unittest.TestCase):

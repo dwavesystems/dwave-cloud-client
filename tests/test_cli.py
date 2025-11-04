@@ -730,8 +730,7 @@ class TestCacheCli(unittest.TestCase):
                 self.assertIn("Cache empty.", result.output)
 
             # populate api cache
-            store = diskcache.Cache(directory=str(self.tmpdir / 'api'))
-            with Regions(cache=dict(store=store)) as regions:
+            with Regions(cache=dict(enabled=True, home=str(self.tmpdir))) as regions:
                 regions.list_regions()
 
             with self.subTest('one api request cached (data+meta)'):

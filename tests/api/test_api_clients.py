@@ -32,7 +32,7 @@ from dwave.cloud.api.client import (
     DWaveAPIClient, SolverAPIClient, MetadataAPIClient, LeapAPIClient,
     LoggingSessionMixin, PayloadCompressingSessionMixin,
     VersionedAPISessionMixin, CachingSessionMixin, DeprecationAwareSessionMixin)
-from dwave.cloud.config import ClientConfig, constants
+from dwave.cloud.config import ClientConfig, constants, validate_config_v1
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.utils.http import BaseUrlSession
 
@@ -70,7 +70,8 @@ class TestConfig(unittest.TestCase):
                       retry=dict(total=3),
                       headers={'Custom': 'Field 123'},
                       verify=False,
-                      proxies={'https': 'http://proxy.com'})
+                      proxies={'https': 'http://proxy.com'},
+                      cache=dict(enabled=True, store_factory=lambda **kw: 1))
 
         with DWaveAPIClient(**config) as client:
             session = client.session
@@ -84,10 +85,17 @@ class TestConfig(unittest.TestCase):
             self.assertIn(__version__, session.headers['User-Agent'])
             self.assertEqual(session.verify, config['verify'])
             self.assertEqual(session.proxies, config['proxies'])
+            self.assertEqual(session._cache_enabled, True)
+            self.assertEqual(session._store, 1)
 
             # verify Retry object config
             retry = session.get_adapter('https://').max_retries
             self.assertEqual(retry.total, config['retry']['total'])
+
+    def test_cache_disable(self):
+        config = validate_config_v1(dict(cache_home='off', endpoint='mock'))
+        with DWaveAPIClient.from_config(config) as client:
+            self.assertFalse(client.session._cache_enabled)
 
     def test_sapi_client(self):
         with SolverAPIClient() as client:
@@ -433,6 +441,29 @@ class TestResponseCaching(unittest.TestCase):
                 with DWaveAPIClient(endpoint='https://mock',
                                     cache=dict(enabled=True, home=tmpdir),
                                     session_class=self.session_class) as client:
+                    self.assertTrue(client.session._cache_enabled)
+                    self.assertIsInstance(client.session._store, diskcache.Cache)
+                    self.assertTrue(client.session._store.directory.startswith(tmpdir))
+
+    def test_cache_config_from_client_config(self):
+        with self.subTest("cache disabled by default"):
+            config = validate_config_v1(dict(endpoint='https://mock'))
+            with DWaveAPIClient.from_config(config, session_class=self.session_class) as client:
+                self.assertFalse(client.session._cache_enabled)
+
+        with self.subTest("cache enabled with config"):
+            config = validate_config_v1(dict(endpoint='https://mock', cache_enabled=True))
+            with DWaveAPIClient.from_config(config, session_class=self.session_class) as client:
+                self.assertTrue(client.session._cache_enabled)
+                self.assertIsNotNone(client.session._default_maxage)
+                self.assertIsInstance(client.session._store, diskcache.Cache)
+
+        with self.subTest("disk cache home configured from_config"):
+            with tempfile.TemporaryDirectory() as tmpdir:
+                config = validate_config_v1(dict(endpoint='https://mock',
+                                                 cache_enabled=True,
+                                                 cache_home=tmpdir))
+                with DWaveAPIClient.from_config(config, session_class=self.session_class) as client:
                     self.assertTrue(client.session._cache_enabled)
                     self.assertIsInstance(client.session._store, diskcache.Cache)
                     self.assertTrue(client.session._store.directory.startswith(tmpdir))
