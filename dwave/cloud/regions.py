@@ -28,8 +28,7 @@ __all__ = ['get_regions']
 logger = logging.getLogger(__name__)
 
 _DEFAULT_REGIONS_CACHE_CONFIG = dict(
-    enabled=True,
-    maxage=7 * 86400    # 7 days
+    default_maxage=7 * 86400    # 7 days
 )
 
 

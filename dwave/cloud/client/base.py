@@ -377,9 +377,8 @@ class Client(object):
     _DEFAULT_SOLVERS_STATIC_PART_MAXAGE = 3600  # 1 hour
     _DEFAULT_SOLVERS_DYNAMIC_PART_MAXAGE = 900  # 15 min
     _DEFAULT_SOLVERS_CACHE_CONFIG = dict(
-        enabled=True,
         # heuristic maxage (cache-control in response overrides it)
-        maxage=_DEFAULT_SOLVERS_STATIC_PART_MAXAGE,
+        default_maxage=_DEFAULT_SOLVERS_STATIC_PART_MAXAGE,
     )
 
     # Downloaded region metadata cache maxage [sec]
