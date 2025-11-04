@@ -407,7 +407,7 @@ class CachingSessionMixin:
         store_factory: abc.Callable[..., abc.Mapping]
 
     @staticmethod
-    def _default_store_factory(config: ExtendedCacheConfig, **kwargs) -> abc.Mapping | None:
+    def _default_store_factory(*, config: ExtendedCacheConfig, **kwargs) -> abc.Mapping | None:
         if not config.get('enabled'):
             return None
 
@@ -421,7 +421,7 @@ class CachingSessionMixin:
 
         # defer import and construction until needed
         import diskcache
-        return diskcache.Cache(directory=directory)
+        return diskcache.Cache(directory=directory, **kwargs)
 
     # default cache config
     _default_cache_config = ExtendedCacheConfig(
@@ -451,7 +451,7 @@ class CachingSessionMixin:
 
         super().close()
 
-    def configure_cache(self, cache: ExtendedCacheConfig) -> None:
+    def configure_cache(self, cache: ExtendedCacheConfig, **store_params) -> None:
         config = {opt: cache.get(opt, default)
                   for opt, default in self._default_cache_config.items()}
 
@@ -468,7 +468,7 @@ class CachingSessionMixin:
         store_factory = config.get('store_factory')
         if not callable(store_factory):
             raise ValueError("A callable object required for 'store_factory'.")
-        self._store = store_factory(config)
+        self._store = store_factory(config=config, **store_params)
 
         logger.debug("[%s] configured cache: (enabled=%r, default_maxage=%r, store=%r)",
                      type(self).__name__, self._cache_enabled, self._default_maxage, self._store)
