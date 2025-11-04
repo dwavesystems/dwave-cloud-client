@@ -8,4 +8,9 @@ features:
     configuration parameters and ``DWAVE_CACHE_ENABLED``/``DWAVE_CACHE_HOME``
     environment variables.
 
+    Caching is disabled by default in the low-level interfaces (``ClientConfig``
+    configuration model, ``dwave.cloud.api.*`` models, clients and resources, e.g.
+    ``api.Solvers``, ``api.Regions``, etc.), but enabled in the high-level
+    ``Client`` interface.
+
     See `#614 <https://github.com/dwavesystems/dwave-cloud-client/issues/614>`_.

@@ -49,7 +49,7 @@ from dwave.cloud.config import (
     load_profile_from_files, load_config_from_files, load_config, get_default_config,
     get_configfile_path, get_default_configfile_path, get_configfile_paths,
     get_cache_dir)
-from dwave.cloud.config.models import validate_config_v1
+from dwave.cloud.config.models import validate_config_v1, ClientConfig
 from dwave.cloud.regions import get_regions
 from dwave.cloud.auth.flows import LeapAuthFlow, OAuthError
 from dwave.cloud.auth.creds import _get_creds_paths, Credentials
@@ -1212,7 +1212,7 @@ def cache():
     """Interact with Ocean cache."""
 
 
-def _get_cache_info() -> dict[str, list[dict]]:
+def _get_cache_info(config: ClientConfig) -> dict[str, list[dict]]:
     def _stats(cache: diskcache.Cache) -> dict:
         return {
             'count': len(cache),
@@ -1230,15 +1230,21 @@ def _get_cache_info() -> dict[str, list[dict]]:
     def _existing(paths: list[Path]) -> list[Path]:
         return [p for p in paths if p.exists()]
 
+    def _path_candidates(subdir: str = '.') -> list[Path]:
+        paths = set([get_cache_dir()])
+        if config.cache and config.cache.home:
+            paths.add(config.cache.home)
+        return [(Path(p) / subdir).resolve() for p in paths]
+
     return {
         # used for solvers, regions
         'API cache': [
-            _cache(path) for path in _existing([Path(get_cache_dir()) / 'api'])
+            _cache(path) for path in _existing(_path_candidates('api'))
         ],
 
         # used by @cached decorator (not in use currently by cc)
         'Function decorator cache': [
-            _cache(path) for path in _existing([Path(get_cache_dir()) / 'func'])
+            _cache(path) for path in _existing(_path_candidates('func'))
         ],
 
         # used to store leap auth creds
@@ -1249,11 +1255,13 @@ def _get_cache_info() -> dict[str, list[dict]]:
 
 
 @cache.command(name='ls')
+@config_file_options()
 @standardized_output
-def cache_list(*, output):
+def cache_list(*, config_file, profile, output):
     """List cache directories."""
 
-    info = _get_cache_info()
+    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
+    info = _get_cache_info(config)
 
     for name, collection in info.items():
         for stats in collection:
@@ -1264,11 +1272,13 @@ def cache_list(*, output):
 
 
 @cache.command(name='info')
+@config_file_options()
 @standardized_output
-def cache_info(*, output):
+def cache_info(*, config_file, profile, output):
     """Show information about the cache."""
 
-    info = _get_cache_info()
+    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
+    info = _get_cache_info(config)
 
     for name, collection in info.items():
         output(f"{name}:")
@@ -1281,11 +1291,13 @@ def cache_info(*, output):
 
 
 @cache.command(name='purge')
+@config_file_options()
 @standardized_output
-def cache_purge(*, output):
+def cache_purge(*, config_file, profile, output):
     """Remove all items from the cache."""
 
-    info = _get_cache_info()
+    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
+    info = _get_cache_info(config)
 
     for name, collection in info.items():
         for stats in collection:

@@ -706,7 +706,7 @@ class TestCacheCli(unittest.TestCase):
 
     def setUp(self):
         self._tmpdir = tempfile.TemporaryDirectory()
-        self.tmpdir = Path(self._tmpdir.name)
+        self.tmpdir = Path(self._tmpdir.name).resolve()
 
     def tearDown(self):
         # suppress tmp dir cleanup failures on windows when files are still in use
