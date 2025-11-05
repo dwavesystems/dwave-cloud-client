@@ -528,6 +528,42 @@ class MockSubmissionBaseTests(MockSubmissionBase):
                     results = client.retrieve_answer(problem_id)
                     self._check(results, linear, quadratic, **params)
 
+    def test_retrieve_answer_with_null_solver_version(self):
+        # Client.retrieve_answer() loads the answer of a completed problem by id,
+        # when solver version is returned as null (SAPI bug)
+
+        partial_solver_identity = {'name': self.sapi.solver.name}
+        solver_null_version = partial_solver_identity | {'version': None}
+
+        def mock_create_session(client):
+            session = mock.Mock()
+            session.post = lambda path, **kwargs: choose_reply(path, {
+                'problems/': [self.sapi.complete_no_answer_reply(
+                    id='123', solver=solver_null_version)]})
+            session.get = lambda path, **kwargs: choose_reply(path, {
+                'problems/123/': self.sapi.complete_reply(
+                    id='123', solver=solver_null_version)})
+            return session
+
+        # we expect only partial solver identity to be used (name)
+        def mock_get_solver(client, **filters):
+            solver = Solver(client, self.sapi.solver.data)
+            self.assertEqual(filters, partial_solver_identity)
+            return solver
+
+        with mock.patch.object(Client, 'create_session', mock_create_session):
+            with mock.patch.object(Client, 'get_solver', mock_get_solver):
+                with Client(**self.config) as client:
+                    solver = Solver(client, self.sapi.solver.data)
+
+                    linear, quadratic = self.sapi.problem
+                    params = dict(num_reads=100)
+                    future = solver.sample_ising(linear, quadratic, **params)
+                    problem_id = future.wait_id()
+
+                    results = client.retrieve_answer(problem_id)
+                    self._check(results, linear, quadratic, **params)
+
 
 class TestAPIVersionCheck(MockSubmissionBase, unittest.TestCase):
 

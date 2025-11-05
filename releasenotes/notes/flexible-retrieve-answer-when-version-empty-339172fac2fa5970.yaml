@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Fix answer retrieval for problems with ``null`` for solver version (as
+    returned by SAPI).
