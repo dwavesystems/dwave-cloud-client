@@ -47,6 +47,8 @@ ENV_OPTION_MAP = {
     'DWAVE_API_SOLVER': 'solver',
     'DWAVE_API_PROXY': 'proxy',
     'DWAVE_API_HEADERS': 'headers',
+    'DWAVE_CACHE_ENABLED': 'cache_enabled',
+    'DWAVE_CACHE_HOME': 'cache_home',
     'DWAVE_LEAP_API_ENDPOINT': 'leap_api_endpoint',
     'DWAVE_LEAP_CLIENT_ID': 'leap_client_id',
     'DWAVE_METADATA_API_ENDPOINT': 'metadata_api_endpoint',
@@ -537,7 +539,7 @@ def load_config(config_file: Optional[Union[str, bool]] = None,
     ``DWAVE_API_CLIENT``, ``DWAVE_API_REGION``, ``DWAVE_API_ENDPOINT``,
     ``DWAVE_API_TOKEN``, ``DWAVE_API_SOLVER``, ``DWAVE_API_PROXY``,
     ``DWAVE_API_HEADERS``, ``DWAVE_LEAP_API_ENDPOINT``, ``DWAVE_LEAP_CLIENT_ID``,
-    ``DWAVE_METADATA_API_ENDPOINT``.
+    ``DWAVE_METADATA_API_ENDPOINT``, ``DWAVE_CACHE_ENABLED``, ``DWAVE_CACHE_HOME``.
 
     Environment variables are described in :mod:`dwave.cloud.config`.
 
@@ -599,7 +601,7 @@ def load_config(config_file: Optional[Union[str, bool]] = None,
          'token': 'ABC-123456789123456789123456789'}
         >>> # See which configuration file was loaded
         >>> config.get_configfile_paths()             # doctest: +SKIP
-        ['C:\\Users\\jane\\AppData\\Local\\dwavesystem\\dwave\\dwave.conf']
+        ['/home/user/.config/dwave/dwave.conf']
 
         Additional examples are given in :mod:`dwave.cloud.config`.
 

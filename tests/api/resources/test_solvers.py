@@ -13,14 +13,11 @@
 # limitations under the License.
 
 import io
-import contextlib
 import tempfile
 import uuid
 import unittest
-from functools import partial
 from urllib.parse import urljoin, urlparse, parse_qsl
 
-import diskcache
 import json
 import requests
 import requests_mock
@@ -267,12 +264,10 @@ class TestLiveSolversCaching(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmpdir = tempfile.TemporaryDirectory()
-        cls.store = diskcache.Cache(directory=cls.tmpdir.name)
         cls.filter_ids = 'none,+identity'
 
     @classmethod
     def tearDownClass(cls):
-        cls.store.close()
         cls.tmpdir.cleanup()
 
     def test_default(self):
@@ -289,7 +284,7 @@ class TestLiveSolversCaching(unittest.TestCase):
 
     def test_cache(self):
         with Solvers.from_config(validate_config_v1(config),
-                                 cache=dict(store=self.store, maxage=60),
+                                 cache=dict(enabled=True, home=self.tmpdir.name),
                                  history_size=2,
                                  ) as resource:
 

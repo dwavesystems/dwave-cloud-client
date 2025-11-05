@@ -55,6 +55,8 @@ Environment variables:
 *   ``DWAVE_API_REGION``: API region code.
 *   ``DWAVE_API_SOLVER``: Default solver.
 *   ``DWAVE_API_TOKEN``: Solver API authorization token.
+*   ``DWAVE_CACHE_ENABLED``: Disk cache enabled flag.
+*   ``DWAVE_CACHE_HOME``: Disk cache base directory. Sentinel values: ``off``/``disabled`` and ``default``.
 *   ``DWAVE_CONFIG_FILE``: Configuration file path.
 *   ``DWAVE_LEAP_API_ENDPOINT``: Leap API endpoint URL.
 *   ``DWAVE_LEAP_CLIENT_ID``: Leap OAuth client ID.

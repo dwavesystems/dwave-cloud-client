@@ -706,7 +706,7 @@ class TestCacheCli(unittest.TestCase):
 
     def setUp(self):
         self._tmpdir = tempfile.TemporaryDirectory()
-        self.tmpdir = Path(self._tmpdir.name)
+        self.tmpdir = Path(self._tmpdir.name).resolve()
 
     def tearDown(self):
         # suppress tmp dir cleanup failures on windows when files are still in use
@@ -730,8 +730,7 @@ class TestCacheCli(unittest.TestCase):
                 self.assertIn("Cache empty.", result.output)
 
             # populate api cache
-            store = diskcache.Cache(directory=str(self.tmpdir / 'api'))
-            with Regions(cache=dict(store=store)) as regions:
+            with Regions(cache=dict(enabled=True, home=str(self.tmpdir))) as regions:
                 regions.list_regions()
 
             with self.subTest('one api request cached (data+meta)'):

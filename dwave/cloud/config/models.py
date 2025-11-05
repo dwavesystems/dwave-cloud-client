@@ -23,10 +23,12 @@ from collections import abc
 from typing import Optional, Union, Literal, Any, Annotated
 
 import urllib3
-from pydantic import BaseModel, BeforeValidator, NonNegativeInt
+from pydantic import BaseModel, BeforeValidator, NonNegativeInt, Field, model_validator
 
 from dwave.cloud.config import constants
-from dwave.cloud.config.loaders import update_config, _solver_id_as_identity
+from dwave.cloud.config.loaders import (
+    update_config, _solver_id_as_identity, get_cache_dir,
+)
 
 __all__ = ['RequestRetryConfig', 'ClientConfig',
            'BackoffPollingSchedule', 'LongPollingSchedule',
@@ -125,6 +127,42 @@ class LongPollingSchedule(BaseModel):
     pause: Optional[float] = 0.0
 
 
+class CacheConfig(BaseModel):
+    """Client cache configuration."""
+    # keeping it simple for now
+
+    #: cache enabled? inferred from `home`
+    enabled: bool = False
+
+    #: path to cache base directory; default to None if cache disabled, or
+    #: to `homebase.user_cache_dir` otherwise
+    #: Note: `home` sentinel values take precedence over `enabled`
+    home: Annotated[str | None, Field(default_factory=get_cache_dir)]
+
+    @model_validator(mode='after')
+    def process_home_sentinels(self):
+        if self.enabled and self.home is None:
+            self.home = 'default'
+
+        # expand home sentinels (override enabled)
+        if self.home is not None:
+            home = self.home.lower()
+            if home in ['off', 'disabled']:
+                self.enabled = False
+                self.home = None
+            elif home == 'default':
+                self.enabled = True
+                self.home = get_cache_dir()
+            elif not home:
+                # note: we could verify the path exists at this point, but that's
+                # rather expensive, so we'll lazy-fail on the first use
+                # (also note, on average `get_cache_dir` is cheap and just
+                # returns XDG_CACHE_HOME or the hard-coded default string)
+                raise ValueError('Empty string is invalid value for cache home directory')
+
+        return self
+
+
 def _literal_eval(obj):
     if isinstance(obj, str):
         return ast.literal_eval(obj)
@@ -171,6 +209,9 @@ class ClientConfig(BaseModel, GetterMixin):
     request_retry: Optional[RequestRetryConfig] = RequestRetryConfig()
     request_timeout: Annotated[Optional[Union[float, tuple[float, float]]],
                                BeforeValidator(_literal_eval)] = (60.0, 120.0)
+
+    # client-global settings
+    cache: Optional[CacheConfig] = CacheConfig()
 
 
 def validate_config_v1(raw_config: abc.Mapping) -> ClientConfig:
@@ -269,6 +310,11 @@ def validate_config_v1(raw_config: abc.Mapping) -> ClientConfig:
     config['request_retry'] = {k[len(prefix):]: v for k, v in config.items()
                                if k.startswith(prefix)}
 
+    # cache
+    prefix = 'cache_'
+    config['cache'] = {k[len(prefix):]: v for k, v in config.items()
+                       if k.startswith(prefix)}
+
     return ClientConfig.model_validate(config)
 
 
@@ -308,6 +354,10 @@ def dump_config_v1(config: ClientConfig) -> dict:
     raw_config.update({f"http_retry_{k}": v for k, v in raw_config['request_retry'].items()})
     del raw_config['request_retry']
 
+    # expand/translate cache config
+    raw_config.update({f"cache_{k}": v for k, v in raw_config['cache'].items()})
+    del raw_config['cache']
+
     return raw_config
 
 
@@ -346,6 +396,9 @@ _V1_CONFIG_DEFAULTS = {
     'http_retry_status': None,
     'http_retry_backoff_factor': 0.01,
     'http_retry_backoff_max': 60,
+    # cache config
+    'cache_enabled': False,
+    'cache_home': None,
 }
 
 def load_config_v1(raw_config: dict, defaults: Optional[dict] = None) -> ClientConfig:
