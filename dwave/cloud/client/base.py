@@ -982,7 +982,7 @@ class Client(object):
 
         Derived properies are:
 
-        * `identity` (str): Solver identity dict. Includes a name, and possibly version(s).
+        * `identity` (dict): Solver identity dict. Includes a name, and possibly version(s).
         * `name` (str): Solver name.
         * `version` (dict): QPU solver version dict (contains at least `graph_id`)
         * `graph_id` (str): QPU solver working graph id
@@ -1484,12 +1484,12 @@ class Client(object):
                         # TODO: remove after a server-side fix
                         solver = message['solver']
                         if isinstance(solver, dict):
-                            if 'version' in solver:
-                                # full identity match for valid v3 response
+                            if solver.get('version'):
+                                # full identity match for valid v3 response (and non-empty/null version)
                                 future.solver = self.get_solver(identity=solver)
-                            elif 'name' in solver:
+                            elif name := solver.get('name'):
                                 # partial solver match; valid during v2 deprecation period
-                                future.solver = self.get_solver(name=solver['name'])
+                                future.solver = self.get_solver(name=name)
                             else:
                                 raise InvalidAPIResponseError("incomplete solver object in problem description response")
                         else:
