@@ -173,7 +173,7 @@ class TestBackgroundAppServer(unittest.TestCase):
             time.sleep(timeout)
 
             try:
-                sock.send('GET /\n\n'.encode('utf-8'))
+                sock.send('GET / HTTP/1.1\r\n\r\n'.encode('utf-8'))
                 data = sock.recv(1024)
                 sock.close()
             except ConnectionError:
