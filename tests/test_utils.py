@@ -1154,6 +1154,30 @@ class TestLogging(unittest.TestCase):
         self.assertEqual(record.get('key'), 'value')
 
     @capture_stderr
+    def test_secrets_in_structured_output(self, output):
+        secret = 'beefcafe-aaaa-bbbb-cccc-0123456789ab'
+
+        # secrets filtered by default
+        configure_logging(logger, level=logging.INFO, structured_output=True)
+        logger.info('test', extra=dict(secret=secret))
+
+        # secrets not filtered
+        configure_logging(logger, level=logging.INFO, structured_output=True, filter_secrets=False)
+        logger.info('test', extra=dict(secret=secret))
+
+        output.seek(0)
+        lines = output.readlines()
+        self.assertEqual(len(lines), 2)
+
+        # verify filtering on
+        record = json.loads(lines[0])
+        self.assertEqual(record.get('secret'), f'{secret[:3]}...{secret[-3:]}')
+
+        # verify filtering off
+        record = json.loads(lines[1])
+        self.assertEqual(record.get('secret'), secret)
+
+    @capture_stderr
     def test_multiple_handlers(self, output):
         structured_stream = io.StringIO()
 

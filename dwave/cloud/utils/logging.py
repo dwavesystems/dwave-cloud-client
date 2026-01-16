@@ -190,11 +190,11 @@ def configure_logging(logger: Optional[logging.Logger] = None,
     Formatter = ISOFormatter
 
     if structured_output:
-        class Formatter(Formatter, JSONFormatter):
+        class Formatter(JSONFormatter, Formatter):
             pass
 
     if filter_secrets:
-        class Formatter(Formatter, FilteredSecretsFormatter):
+        class Formatter(FilteredSecretsFormatter, Formatter):
             pass
 
     format = dict(
