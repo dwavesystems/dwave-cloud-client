@@ -421,7 +421,7 @@ class CachingSessionMixin:
 
         # defer import and construction until needed
         import diskcache
-        return diskcache.Cache(directory=directory, **kwargs)
+        return diskcache.Cache(disk=diskcache.JSONDisk, directory=directory, **kwargs)
 
     # default cache config
     _default_cache_config = ExtendedCacheConfig(
@@ -529,7 +529,10 @@ class CachingSessionMixin:
             logger.debug("cache_write (meta): %r = %r", key_meta, meta)
 
             if not only_meta:
-                content = self._store[key_data] = response.content
+                content = response.content
+                # note: when value is a file-like object (read=True),
+                # JSON serialization is skipped by `diskcache.Cache.{get,set}`.
+                self._store.set(key=key_data, value=io.BytesIO(content), read=True)
                 logger.debug("cache_write (data): %r <- (%d bytes)",
                              key_data, len(content))
 
@@ -576,19 +579,26 @@ class CachingSessionMixin:
         key_data = hashlib.sha256(repr(key).encode('utf8')).hexdigest()
         key_meta = f"{key_data}:meta"
 
-        def make_response(meta, content):
+        def make_response(meta, raw):
             res = requests.Response()
             res.status_code = 200
-            res.raw = io.BytesIO(content)
+            res.raw = raw
             res.headers['content-type'] = meta.get('content_type')
             return res
 
-        meta = self._store.get(key_meta)
-        content = self._store.get(key_data)
+        def get_file_size(f):
+            if hasattr(f, "seek") and f.seekable():
+                size = f.seek(0, os.SEEK_END)
+                f.seek(0)
+                return size
 
-        if not refresh and meta and content:
-            logger.debug("cache_read (meta): %r = %r", key_meta, meta)
-            logger.debug("cache_read (data): %r -> (%d bytes)", key_data, len(content))
+        meta = self._store.get(key_meta)
+        raw = self._store.get(key=key_data, read=True)
+
+        if not refresh and meta and raw:
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("cache_read (meta): %r = %r", key_meta, meta)
+                logger.debug("cache_read (data): %r -> (%r bytes)", key_data, get_file_size(raw))
 
             # respect max-age from response cache-control
             maxage = meta.get('maxage')
@@ -598,7 +608,7 @@ class CachingSessionMixin:
 
             if epochnow() - meta['created'] < maxage:
                 logger.debug(f'cache hit within maxage ({maxage} seconds)')
-                return make_response(meta, content)
+                return make_response(meta, raw)
 
             # validate with conditional request if possible
             if etag := meta.get('etag'):
@@ -612,7 +622,7 @@ class CachingSessionMixin:
                 # we know SAPI only uses weak validators
                 logger.debug('resource "not modified", using cached value')
                 self._update_cache(res, key_meta=key_meta, only_meta=True)
-                return make_response(meta, content)
+                return make_response(meta, raw)
 
             else:
                 logger.debug('resource modified, updating cache')
@@ -816,7 +826,7 @@ class DWaveAPIClient:
         # response version strict mode validation, see :class:`VersionedAPISession`
         'version_strict_mode': True,
 
-        # enable conditional requests and response caching, see :class:`CachingSession`
+        # control conditional requests and response caching, see :class:`CachingSession`
         'cache': dict(enabled=False),       # type: CachingSession.ExtendedCacheConfig
 
         # api deprecation message handling, see :class:`DeprecationAwareSessionMixin`

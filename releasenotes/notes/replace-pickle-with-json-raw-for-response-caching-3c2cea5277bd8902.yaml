@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Make ``CachingSessionMixin`` safer by replacing DiskCache's default ``pickle``
+    serialization with JSON (for response headers) + raw binary (for response
+    content).
