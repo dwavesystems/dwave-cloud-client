@@ -337,3 +337,37 @@ class UnstructuredSapiMockResponsesWithBinaryRefAnswer(UnstructuredSapiMockRespo
     def __init__(self, **kwargs):
         kwargs.setdefault('answer', self._problem_answer(**kwargs))
         super().__init__(**kwargs)
+
+
+class MemoryCache(dict):
+    """In-memory cache with API partially compatible with ``diskcache``.
+
+    Implemented as a thin wrapper around ``dict`` that adds a subset of diskcache
+    API that's used in the cloud-client. Namely, methods: ``.get(..., read: bool)``
+    and `.set(..., read: bool)``.
+    """
+
+    def get(self, key, default=None, read=False, **kwargs):
+        """Retrieve value from cache. If `key` is missing, return `default`.
+
+        When `read` is True, return a file handle to value.
+
+        Note: other diskcache arguments are ignored.
+        """
+        value = super().get(key, default)
+        if value is not None and read:
+            value = io.BytesIO(value)
+        return value
+
+    def set(self, key, value, read=False, **kwargs):
+        """Set `key` and `value` item in cache.
+
+        When `read` is `True`, `value` should be a file-like object opened
+        for reading in binary mode.
+
+        Note: other diskcache arguments are ignored.
+        """
+        if read:
+            value = value.read()
+        self[key] = value
+        return True

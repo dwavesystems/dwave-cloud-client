@@ -28,6 +28,8 @@ from dwave.cloud.client.hybrid import Client as HybridClient
 from dwave.cloud.solver import Solver
 from dwave.cloud.exceptions import *
 
+from tests.api.mocks import MemoryCache
+
 
 def solver_data(name, status="ONLINE", avg_load=0.1, cat='qpu', incomplete=False, subset='all', graph_id='1'):
     """Return data dict describing a single solver."""
@@ -212,7 +214,7 @@ class MockSolverLoading(unittest.TestCase):
                 _DEFAULT_SOLVERS_STATIC_PART_MAXAGE=60,
                 _DEFAULT_SOLVERS_DYNAMIC_PART_MAXAGE=10,
                 _DEFAULT_SOLVERS_CACHE_CONFIG=dict(default_maxage=60,
-                                                   store_factory=lambda **kw: {})):
+                                                   store_factory=lambda **kw: MemoryCache())):
 
             with Client(endpoint=self.endpoint, token=self.token) as client:
 

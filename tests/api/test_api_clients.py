@@ -36,6 +36,8 @@ from dwave.cloud.config import ClientConfig, constants, validate_config_v1
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.utils.http import BaseUrlSession
 
+from tests.api.mocks import MemoryCache
+
 
 def make_session_class(*bases):
     return type('TestSession', bases, {})
@@ -430,7 +432,7 @@ class TestResponseCaching(unittest.TestCase):
             with DWaveAPIClient(endpoint='https://mock',
                                 cache=dict(enabled=True,
                                            default_maxage=5,
-                                           store_factory=lambda **kw: {}),
+                                           store_factory=lambda **kw: MemoryCache()),
                                 session_class=self.session_class) as client:
                 self.assertTrue(client.session._cache_enabled)
                 self.assertEqual(client.session._default_maxage, 5)
@@ -531,7 +533,7 @@ class TestResponseCaching(unittest.TestCase):
               request_headers={'If-None-Match': etag_b}, json=data_bb,
               headers={'ETag': etag_bb, 'Content-Type': ct_bb})
 
-        store = {}
+        store = MemoryCache()
 
         with DWaveAPIClient(endpoint=endpoint, cache=dict(enabled=True, store_factory=lambda **kw: store),
                             history_size=1, session_class=self.session_class) as client:
@@ -617,7 +619,7 @@ class TestResponseCaching(unittest.TestCase):
               request_headers={'If-None-Match': etag}, status_code=304,
               headers={'ETag': etag, 'Cache-Control': f'public, max-age={maxage}'})
 
-        store = {}
+        store = MemoryCache()
         cache = dict(enabled=True, store_factory=lambda **kw: store)
 
         with DWaveAPIClient(endpoint=endpoint, cache=cache,
@@ -668,7 +670,7 @@ class TestResponseCaching(unittest.TestCase):
               request_headers={'If-None-Match': etag},
               status_code=304, headers=headers)
 
-        store = {}
+        store = MemoryCache()
         cache = dict(enabled=True, store_factory=lambda **kw: store)
 
         with DWaveAPIClient(endpoint=endpoint, cache=cache,
@@ -730,7 +732,7 @@ class TestResponseCaching(unittest.TestCase):
         m.get(f"{endpoint}/{path}", json=data,
               headers={'ETag': etag, 'Cache-Control': 'no-store'})
 
-        store = {}
+        store = MemoryCache()
         cache = dict(enabled=True, store_factory=lambda **kw: store)
 
         with DWaveAPIClient(endpoint=endpoint, cache=cache,
@@ -761,7 +763,7 @@ class TestResponseCaching(unittest.TestCase):
               request_headers={'If-None-Match': etag}, status_code=304,
               headers={'ETag': etag, 'Cache-Control': f'no-cache, max-age=100'})
 
-        store = {}
+        store = MemoryCache()
         cache = dict(enabled=True, store_factory=lambda **kw: store)
 
         with DWaveAPIClient(endpoint=endpoint, cache=cache,
@@ -795,7 +797,7 @@ class TestResponseCaching(unittest.TestCase):
 
         m.get(f"{endpoint}/{path}", json=data)
 
-        store = {}
+        store = MemoryCache()
         maxage = 10
         cache = dict(enabled=True, default_maxage=maxage, store_factory=lambda **kw: store)
 
