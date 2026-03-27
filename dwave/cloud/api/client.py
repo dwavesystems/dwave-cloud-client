@@ -206,6 +206,8 @@ class PayloadCompressingSessionMixin:
             def get_chunks(f, chunk_size):
                 while chunk := f.read(chunk_size):
                     yield chunk
+                if hasattr(f, 'close'):
+                    f.close()
             chunks = get_chunks(data, chunk_size)
 
         else:
@@ -534,7 +536,8 @@ class CachingSessionMixin:
                 content = response.content
                 # note: when value is a file-like object (read=True),
                 # JSON serialization is skipped by `diskcache.Cache.{get,set}`.
-                self._store.set(key=key_data, value=io.BytesIO(content), read=True)
+                with io.BytesIO(content) as value:
+                    self._store.set(key=key_data, value=value, read=True)
                 logger.debug("cache_write (data): %r <- (%d bytes)",
                              key_data, len(content))
 
