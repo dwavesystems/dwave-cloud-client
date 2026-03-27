@@ -380,7 +380,7 @@ class CachingSessionMixin:
                 * ``store_factory`` (callable):
                     A callable that constructs a cache storage (with a Mapping
                     interface). Default factory creates a ``diskcache.Cache``
-                    with pickle serialization and database residing under the
+                    with JSON serialization and a database residing under the
                     ``home`` base directory.
 
     :meth:`CachingSession.request` accepts the following keyword arguments,
