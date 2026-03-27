@@ -469,6 +469,8 @@ class CachingSessionMixin:
         if not callable(store_factory):
             raise ValueError("A callable object required for 'store_factory'.")
         self._store = store_factory(config=config, **store_params)
+        if not (hasattr(self._store, 'get') and hasattr(self._store, 'set')):
+            raise ValueError("Provided 'store_factory' returned an invalid store.")
 
         logger.debug("[%s] configured cache: (enabled=%r, default_maxage=%r, store=%r)",
                      type(self).__name__, self._cache_enabled, self._default_maxage, self._store)

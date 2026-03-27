@@ -73,7 +73,7 @@ class TestConfig(unittest.TestCase):
                       headers={'Custom': 'Field 123'},
                       verify=False,
                       proxies={'https': 'http://proxy.com'},
-                      cache=dict(enabled=True, store_factory=lambda **kw: 1))
+                      cache=dict(enabled=True, store_factory=lambda **kw: MemoryCache()))
 
         with DWaveAPIClient(**config) as client:
             session = client.session
@@ -88,7 +88,7 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(session.verify, config['verify'])
             self.assertEqual(session.proxies, config['proxies'])
             self.assertEqual(session._cache_enabled, True)
-            self.assertEqual(session._store, 1)
+            self.assertEqual(session._store, {})
 
             # verify Retry object config
             retry = session.get_adapter('https://').max_retries
@@ -496,11 +496,18 @@ class TestResponseCaching(unittest.TestCase):
         ({}, ),
         (None, ),
     ])
-    def test_invalid_store_factory(self, factory):
-        with self.assertRaises(ValueError):
-            DWaveAPIClient(endpoint='https://mock',
-                           cache=dict(enabled=True, store_factory=factory),
-                           session_class=self.session_class)
+    def test_invalid_store_factory(self, obj):
+        with self.subTest("invalid factory"):
+            with self.assertRaises(ValueError):
+                DWaveAPIClient(endpoint='https://mock',
+                            cache=dict(enabled=True, store_factory=obj),
+                            session_class=self.session_class)
+
+        with self.subTest("invalid factory product"):
+            with self.assertRaises(ValueError):
+                DWaveAPIClient(endpoint='https://mock',
+                            cache=dict(enabled=True, store_factory=lambda **kw: obj),
+                            session_class=self.session_class)
 
     @requests_mock.Mocker()
     def test_conditional_requests_with_no_cache_control(self, m):
