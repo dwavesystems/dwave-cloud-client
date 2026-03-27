@@ -27,6 +27,7 @@ class _Cache(diskcache.Cache):
 
     def __init__(self, dbname=diskcache.core.DBNAME, **kwargs):
         self.dbname = dbname
+        kwargs.setdefault('disk', diskcache.JSONDisk)
         super().__init__(**kwargs)
 
     @property
