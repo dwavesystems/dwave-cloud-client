@@ -581,26 +581,25 @@ class CachingSessionMixin:
         key_data = hashlib.sha256(repr(key).encode('utf8')).hexdigest()
         key_meta = f"{key_data}:meta"
 
-        def make_response(meta, raw):
+        def make_response(meta, content):
             res = requests.Response()
             res.status_code = 200
-            res.raw = raw
+            res._content = content
             res.headers['content-type'] = meta.get('content_type')
             return res
 
-        def get_file_size(f):
-            if hasattr(f, "seek") and f.seekable():
-                size = f.seek(0, os.SEEK_END)
-                f.seek(0)
-                return size
-
         meta = self._store.get(key_meta)
-        raw = self._store.get(key=key_data, read=True)
+        # note: we need to force the file interface (with read=True) to avoid JSON
+        # deserialization. We read it immediately, so we can close the file.
+        if raw := self._store.get(key_data, read=True):
+            content = raw.read()
+            raw.close()
+        else:
+            content = None
 
-        if not refresh and meta and raw:
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug("cache_read (meta): %r = %r", key_meta, meta)
-                logger.debug("cache_read (data): %r -> (%r bytes)", key_data, get_file_size(raw))
+        if not refresh and meta and content:
+            logger.debug("cache_read (meta): %r = %r", key_meta, meta)
+            logger.debug("cache_read (data): %r -> (%r bytes)", key_data, len(content))
 
             # respect max-age from response cache-control
             maxage = meta.get('maxage')
@@ -610,7 +609,7 @@ class CachingSessionMixin:
 
             if epochnow() - meta['created'] < maxage:
                 logger.debug(f'cache hit within maxage ({maxage} seconds)')
-                return make_response(meta, raw)
+                return make_response(meta, content)
 
             # validate with conditional request if possible
             if etag := meta.get('etag'):
@@ -624,7 +623,7 @@ class CachingSessionMixin:
                 # we know SAPI only uses weak validators
                 logger.debug('resource "not modified", using cached value')
                 self._update_cache(res, key_meta=key_meta, only_meta=True)
-                return make_response(meta, raw)
+                return make_response(meta, content)
 
             else:
                 logger.debug('resource modified, updating cache')
