@@ -206,6 +206,8 @@ class PayloadCompressingSessionMixin:
             def get_chunks(f, chunk_size):
                 while chunk := f.read(chunk_size):
                     yield chunk
+                if hasattr(f, 'close'):
+                    f.close()
             chunks = get_chunks(data, chunk_size)
 
         else:
@@ -380,7 +382,7 @@ class CachingSessionMixin:
                 * ``store_factory`` (callable):
                     A callable that constructs a cache storage (with a Mapping
                     interface). Default factory creates a ``diskcache.Cache``
-                    with pickle serialization and database residing under the
+                    with JSON serialization and a database residing under the
                     ``home`` base directory.
 
     :meth:`CachingSession.request` accepts the following keyword arguments,
@@ -421,7 +423,7 @@ class CachingSessionMixin:
 
         # defer import and construction until needed
         import diskcache
-        return diskcache.Cache(directory=directory, **kwargs)
+        return diskcache.Cache(disk=diskcache.JSONDisk, directory=directory, **kwargs)
 
     # default cache config
     _default_cache_config = ExtendedCacheConfig(
@@ -469,6 +471,8 @@ class CachingSessionMixin:
         if not callable(store_factory):
             raise ValueError("A callable object required for 'store_factory'.")
         self._store = store_factory(config=config, **store_params)
+        if not (hasattr(self._store, 'get') and hasattr(self._store, 'set')):
+            raise ValueError("Provided 'store_factory' returned an invalid store.")
 
         logger.debug("[%s] configured cache: (enabled=%r, default_maxage=%r, store=%r)",
                      type(self).__name__, self._cache_enabled, self._default_maxage, self._store)
@@ -529,7 +533,11 @@ class CachingSessionMixin:
             logger.debug("cache_write (meta): %r = %r", key_meta, meta)
 
             if not only_meta:
-                content = self._store[key_data] = response.content
+                content = response.content
+                # note: when value is a file-like object (read=True),
+                # JSON serialization is skipped by `diskcache.Cache.{get,set}`.
+                with io.BytesIO(content) as value:
+                    self._store.set(key=key_data, value=value, read=True)
                 logger.debug("cache_write (data): %r <- (%d bytes)",
                              key_data, len(content))
 
@@ -579,16 +587,22 @@ class CachingSessionMixin:
         def make_response(meta, content):
             res = requests.Response()
             res.status_code = 200
-            res.raw = io.BytesIO(content)
+            res._content = content
             res.headers['content-type'] = meta.get('content_type')
             return res
 
         meta = self._store.get(key_meta)
-        content = self._store.get(key_data)
+        # note: we need to force the file interface (with read=True) to avoid JSON
+        # deserialization. We read it immediately, so we can close the file.
+        if raw := self._store.get(key_data, read=True):
+            content = raw.read()
+            raw.close()
+        else:
+            content = None
 
         if not refresh and meta and content:
             logger.debug("cache_read (meta): %r = %r", key_meta, meta)
-            logger.debug("cache_read (data): %r -> (%d bytes)", key_data, len(content))
+            logger.debug("cache_read (data): %r -> (%r bytes)", key_data, len(content))
 
             # respect max-age from response cache-control
             maxage = meta.get('maxage')
@@ -816,7 +830,7 @@ class DWaveAPIClient:
         # response version strict mode validation, see :class:`VersionedAPISession`
         'version_strict_mode': True,
 
-        # enable conditional requests and response caching, see :class:`CachingSession`
+        # control conditional requests and response caching, see :class:`CachingSession`
         'cache': dict(enabled=False),       # type: CachingSession.ExtendedCacheConfig
 
         # api deprecation message handling, see :class:`DeprecationAwareSessionMixin`
