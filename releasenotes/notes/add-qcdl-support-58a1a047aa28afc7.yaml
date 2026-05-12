@@ -1,0 +1,4 @@
+---
+features:
+  - |
+    Add support for gate-model quantum circuit (QCDL) solvers in SAPI.
