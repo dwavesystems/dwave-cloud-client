@@ -23,6 +23,7 @@ __all__ = [
     'qpu_chimera_solver_data', 'qpu_pegasus_solver_data', 'qpu_zephyr_solver_data',
     'unstructured_solver_data', 'hybrid_bqm_solver_data', 'hybrid_dqm_solver_data',
     'hybrid_cqm_solver_data', 'hybrid_nl_solver_data', 'qpu_problem_timing_data',
+    'qcdl_solver_data',
 ]
 
 
