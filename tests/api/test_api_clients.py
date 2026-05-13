@@ -872,7 +872,7 @@ class TestDeprecationMessageParsing(unittest.TestCase):
         self.mocker = requests_mock.Mocker()
 
         # structured field date is in integer seconds
-        now = datetime.datetime.now().replace(microsecond=0)
+        now = datetime.datetime.now(tz=datetime.timezone.utc).replace(microsecond=0)
 
         self.dep_id = 'dep-1'
         self.dep_params = dict(

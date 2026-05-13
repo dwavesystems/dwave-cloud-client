@@ -11,7 +11,7 @@ werkzeug>=3.1.0,<4
 typing-extensions>=4.5.0,<5
 authlib>=1.2,<2
 orjson>=3.11
-http-sf>=1.0.4
+http-sf>=1.2.1
 
 # bring in py312 semantics of importlib.metadata.entry_points()
 importlib_metadata>=5.0.0
