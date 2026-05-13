@@ -439,3 +439,19 @@ def hybrid_nl_solver_data(**kwargs) -> dict:
     )
     params.update(**kwargs)
     return unstructured_solver_data(**params)
+
+
+def qcdl_solver_data(**kwargs) -> dict:
+    params = dict(
+        name="qcdl_mock_solver",
+        description="QCDL mock solver",
+        supported_problem_types=["qcdl"],
+        # solver-specific properties (mock values)
+        max_shots=10000,
+        parameters=dict(
+            shots="Number of times the circuit is executed",
+            time_limit="Maximum run time in seconds",
+        ),
+    )
+    params.update(**kwargs)
+    return unstructured_solver_data(**params)
