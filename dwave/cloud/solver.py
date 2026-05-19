@@ -1623,6 +1623,24 @@ class QCDLSolver(BaseUnstructuredSolver):
     def _encode_problem_for_upload(self, qcdl, **kwargs):
         return orjson.dumps(qcdl)
 
+    @property
+    def minimal_job(self) -> tuple[Any, dict]:
+        """Return a minimal QCDL circuit that can be submitted (and solved)."""
+        qcdl = {
+            'program': {
+                'statements': [
+                    {'op': 'h', 'name': None, 'args': ['q0']},
+                    {'op': 'measure', 'name': None, 'args': ['q0']},
+                ],
+                'signature': {
+                    'qubits_used': ['q0'],
+                }
+            },
+            'procedures': {}
+        }
+        params = dict()
+        return qcdl, params
+
     def sample_qcdl(self, qcdl, label=None, **params):
         """Sample from the specified :term:`QCDL`.
 
