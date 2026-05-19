@@ -1603,10 +1603,89 @@ class StructuredSolver(BaseSolver):
         return sampling_time + programming_time
 
 
+class QCDLSolver(BaseUnstructuredSolver):
+    """Class for D-Wave QCDL gate-model solvers.
+
+    This class provides the :term:`QCDL` upload and submit methods and
+    encapsulates the solver description returned from the D-Wave cloud API.
+
+    Args:
+        client (:class:`~dwave.cloud.client.Client`):
+            Client that manages access to this solver.
+
+        data (`dict`):
+            Data from the server describing this solver.
+    """
+
+    _handled_problem_types = {"qcdl"}
+    _handled_encoding_formats = {"binary-ref"}
+
+    def _encode_problem_for_upload(self, qcdl, **kwargs):
+        return orjson.dumps(qcdl)
+
+    @property
+    def minimal_job(self) -> tuple[Any, dict]:
+        """Return a minimal QCDL circuit that can be submitted (and solved)."""
+        qcdl = {
+            'program': {
+                'statements': [
+                    {'op': 'h', 'name': None, 'args': ['q0']},
+                    {'op': 'measure', 'name': None, 'args': ['q0']},
+                ],
+                'signature': {
+                    'qubits_used': ['q0'],
+                }
+            },
+            'procedures': {}
+        }
+        params = dict()
+        return qcdl, params
+
+    def sample_qcdl(self, qcdl, label=None, **params):
+        """Sample from the specified :term:`QCDL`.
+
+        Args:
+            qcdl (dict/str):
+                A quantum circuit in a Quantum Circuit Description Language
+                (QCDL) dict, or a reference to one (Problem ID returned by the
+                :meth:`.upload_qcdl` method).
+
+            label (str, optional):
+                Problem label you can optionally tag submissions with for ease
+                of identification.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
+
+        Returns:
+            :class:`~dwave.cloud.computation.Future`
+
+        """
+        return self.sample_problem(qcdl, label=label, **params)
+
+    def upload_qcdl(self, qcdl):
+        r"""Upload the specified :term:`QCDL` circuit to SAPI, returning a
+        Problem ID that can be used to submit the circuit to this solver.
+
+        Args:
+            qcdl (dict/bytes-like/file-like):
+                A quantum circuit QCDL dict, given either as a ``dict``, or as
+                raw data (encoded serialized circuit) in either a file-like or
+                a bytes-like object.
+
+        Returns:
+            :class:`concurrent.futures.Future`\ [str]:
+                Problem ID in a Future. Problem ID can be used to submit
+                problems by reference.
+
+        """
+        return self.upload_problem(qcdl)
+
+
 # for backwards compatibility:
 Solver = StructuredSolver
 UnstructuredSolver = BQMSolver
 
 # list of all available solvers, ordered according to loading attempt priority
 # (more specific first)
-available_solvers = [StructuredSolver, BQMSolver, CQMSolver, DQMSolver, NLSolver]
+available_solvers = [StructuredSolver, BQMSolver, CQMSolver, DQMSolver, NLSolver, QCDLSolver]

@@ -282,6 +282,11 @@ class TestSolverDataMocks(unittest.TestCase):
         self.assertIn('maximum_number_of_nodes', data['properties'])
         self.assertIn('maximum_number_of_states', data['properties'])
 
+        data = mocks.qcdl_solver_data()
+        self.assertListEqual(data['properties']['supported_problem_types'], ['qcdl'])
+        self.assertIn('max_shots', data['properties'])
+        self.assertIn('time_limit', data['properties']['parameters'])
+
 
 if __name__ == '__main__':
     unittest.main()

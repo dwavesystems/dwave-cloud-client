@@ -23,6 +23,7 @@ __all__ = [
     'qpu_chimera_solver_data', 'qpu_pegasus_solver_data', 'qpu_zephyr_solver_data',
     'unstructured_solver_data', 'hybrid_bqm_solver_data', 'hybrid_dqm_solver_data',
     'hybrid_cqm_solver_data', 'hybrid_nl_solver_data', 'qpu_problem_timing_data',
+    'qcdl_solver_data',
 ]
 
 
@@ -436,6 +437,22 @@ def hybrid_nl_solver_data(**kwargs) -> dict:
         num_nodes_state_size_multiplier=1e-12,
         state_size_multiplier=1e-10,
         time_constant=1e-02,
+    )
+    params.update(**kwargs)
+    return unstructured_solver_data(**params)
+
+
+def qcdl_solver_data(**kwargs) -> dict:
+    params = dict(
+        name="qcdl_mock_solver",
+        description="QCDL mock solver",
+        supported_problem_types=["qcdl"],
+        # solver-specific properties (mock values)
+        max_shots=10000,
+        parameters=dict(
+            shots="Number of times the circuit is executed",
+            time_limit="Maximum run time in seconds",
+        ),
     )
     params.update(**kwargs)
     return unstructured_solver_data(**params)

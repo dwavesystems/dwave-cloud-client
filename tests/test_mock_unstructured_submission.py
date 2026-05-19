@@ -16,6 +16,8 @@
 
 import io
 import unittest
+import zlib
+from pathlib import Path
 from unittest import mock
 
 import numpy
@@ -25,9 +27,10 @@ from parameterized import parameterized
 from dwave.cloud.client import Client
 from dwave.cloud.solver import (
     StructuredSolver, BaseUnstructuredSolver, UnstructuredSolver,
-    BQMSolver, CQMSolver, DQMSolver, NLSolver)
+    BQMSolver, CQMSolver, DQMSolver, NLSolver, QCDLSolver)
 from dwave.cloud.concurrency import Present
-from dwave.cloud.testing.mocks import qpu_pegasus_solver_data, hybrid_nl_solver_data
+from dwave.cloud.testing.mocks import (
+    qpu_pegasus_solver_data, hybrid_nl_solver_data, qcdl_solver_data)
 
 from tests.api.mocks import choose_reply
 
@@ -408,6 +411,95 @@ class TestNLSolver(unittest.TestCase):
 
                 # verify decoding works
                 fut = solver.sample_nlm(model, upload_params=upload_params)
+                self.assertEqual(fut.problem_type, problem_type)
+                self.assertEqual(fut.timing, timing_info)
+                self.assertEqual(fut.answer_data.read(), mock_answer_data)
+
+
+class TestQCDLSolver(unittest.TestCase):
+
+    def setUp(self):
+        self.mock_qcdl_solver = QCDLSolver(client=None, data=qcdl_solver_data())
+        self.mock_qpu_solver = StructuredSolver(client=None, data=qpu_pegasus_solver_data(2))
+        self.solvers = [self.mock_qpu_solver, self.mock_qcdl_solver]
+        self.client = Client(endpoint='endpoint', token='token')
+        self.client._fetch_solvers = lambda **kw: self.solvers
+
+    def shutDown(self):
+        self.client.close()
+
+    def assertSolvers(self, container, members):
+        self.assertEqual(set(container), set(members))
+
+    def test_get_solvers(self):
+        self.assertSolvers(self.client.get_solvers(), self.solvers)
+
+    def test_nl_solver_selection(self):
+        solvers = self.client.get_solvers(supported_problem_types__issubset={'qcdl'})
+        self.assertSolvers(solvers, [self.mock_qcdl_solver])
+
+    def test_sample_qcdl_smoke_test(self):
+        # a simple qcdl
+        with open(Path(__file__).parent / 'fixtures/qcdl.json') as fp:
+            qcdl = orjson.loads(fp.read())
+
+        problem_type = 'qcdl'
+        timing_info = {'charge_time': 1, 'run_time': 2}
+        num_shots = 10
+        mock_answer_data = orjson.dumps({
+            'num_shots': num_shots,
+            'num_qubits': 2,
+            'measurements': {},
+            'executed_qcdl': qcdl
+        })
+
+        # use a global mocked session, so we can modify it on the fly
+        session = mock.Mock()
+        setattr(session, '__enter__', mock.Mock())
+        setattr(session, '__exit__', mock.Mock())
+        session.__enter__.return_value = session
+        session.__exit__.return_value = None
+        session.get.return_value.iter_content.return_value = iter([mock_answer_data])
+
+        # mock the upload worker on client only, still testing the solver upload path
+        mock_problem_id = 'mock-problem-id'
+        def mock_upload(_, file, **kwargs):
+            self.assertEqual(kwargs, {})
+            return Present(result=mock_problem_id)
+
+        def mock_post(path, data, headers=None, **kwargs):
+            # decode submitted data
+            if headers is None:
+                headers = {}
+            encoding = headers.get('Content-Encoding', 'identity').lower()
+            if encoding == 'deflate':
+                data = zlib.decompress(data)
+            problems = orjson.loads(data)
+
+            # verify request
+            self.assertTrue(isinstance(problems, list) and len(problems) == 1)
+            self.assertEqual(problems[0].get('params', {}).get('num_shots'), num_shots)
+            self.assertEqual(problems[0].get('type'), problem_type)
+
+            # return mock answer data
+            answer_url = f'/problems/{mock_problem_id}/answer/data/'
+            return choose_reply(path, {
+                'problems/': complete_reply_binary_ref(
+                    answer_url, id_=mock_problem_id, type_=problem_type,
+                    timing=timing_info),
+                answer_url: mock_answer_data,
+            })
+
+        session.post = mock_post
+
+        # construct a functional solver by mocking client and api response data
+        with mock.patch.multiple(Client, create_session=lambda self: session,
+                                 upload_problem_encoded=mock_upload):
+            with Client(endpoint='endpoint', token='token') as client:
+                solver = QCDLSolver(client, qcdl_solver_data())
+
+                # verify decoding works
+                fut = solver.sample_qcdl(qcdl, num_shots=num_shots)
                 self.assertEqual(fut.problem_type, problem_type)
                 self.assertEqual(fut.timing, timing_info)
                 self.assertEqual(fut.answer_data.read(), mock_answer_data)
