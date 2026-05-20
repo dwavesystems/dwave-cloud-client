@@ -89,10 +89,6 @@ if TYPE_CHECKING:
 class BaseSolver:
     """Base class for a general D-Wave solver.
 
-    This class provides :term:`Ising`, :term:`QUBO` and :term:`BQM` sampling
-    methods and encapsulates the solver description returned from the D-Wave
-    cloud API.
-
     Args:
         client (:class:`Client`):
             Client that manages access to this solver.
@@ -221,19 +217,6 @@ class BaseSolver:
         else:
             raise ValueError("Don't know how to decode %r answer format" % fmt)
 
-    # Sampling methods
-    def sample_ising(self, linear, quadratic, **params):
-        raise NotImplementedError
-
-    def sample_qubo(self, qubo, **params):
-        raise NotImplementedError
-
-    def sample_bqm(self, bqm, **params):
-        raise NotImplementedError
-
-    def upload_bqm(self, bqm):
-        raise NotImplementedError
-
     # Derived properties
 
     @property
@@ -295,22 +278,9 @@ class BaseSolver:
             return self.name.startswith('hybrid')
 
 
-class BaseUnstructuredSolver(BaseSolver):
-    """Base class for D-Wave unstructured solvers.
-
-    This class provides :term:`Ising`, :term:`QUBO` and :term:`BQM` sampling
-    methods and encapsulates the solver description returned from the D-Wave
-    cloud API.
-
-    Args:
-        client (:class:`~dwave.cloud.client.Client`):
-            Client that manages access to this solver.
-
-        data (`dict`):
-            Data from the server describing this solver.
-
-    Note:
-        Events are not yet dispatched from unstructured solvers.
+class QuadraticUnstructuredSolverMixin:
+    """Implements quadratic problem solver interface by providing Ising/QUBO
+    sampling methods for solvers that support sampling from a :class:`~dimod.BQM`.
     """
 
     def sample_ising(self, linear, quadratic, offset=0, label=None, **params):
@@ -347,8 +317,8 @@ class BaseUnstructuredSolver(BaseSolver):
         try:
             import dimod
         except ImportError: # pragma: no cover
-            raise RuntimeError("Can't use unstructured solver without dimod. "
-                               "Re-install the library with bqm/cqm/dqm support.")
+            raise RuntimeError("Can't use unstructured quadratic solver without dimod. "
+                               "Re-install the library with bqm support.")
 
         bqm = dimod.BinaryQuadraticModel.from_ising(linear, quadratic, offset)
         return self.sample_bqm(bqm, label=label, **params)
@@ -382,11 +352,32 @@ class BaseUnstructuredSolver(BaseSolver):
         try:
             import dimod
         except ImportError: # pragma: no cover
-            raise RuntimeError("Can't use unstructured solver without dimod. "
-                               "Re-install the library with bqm/cqm/dqm support.")
+            raise RuntimeError("Can't use unstructured quadratic solver without dimod. "
+                               "Re-install the library with bqm support.")
 
         bqm = dimod.BinaryQuadraticModel.from_qubo(qubo, offset)
         return self.sample_bqm(bqm, label=label, **params)
+
+
+class BaseUnstructuredSolver(BaseSolver):
+    """Base class for D-Wave unstructured solvers.
+
+    Implements :meth:`.upload_problem` and :meth:`.sample_problem`.
+
+    To implement support for a specific solver (type), a subclass has to
+    provide problem encoders for upload and sample operations by implementing both
+    :meth:`._encode_problem_for_upload` and :meth:`._encode_problem_for_submission`.
+
+    Args:
+        client (:class:`~dwave.cloud.client.Client`):
+            Client that manages access to this solver.
+
+        data (`dict`):
+            Data from the server describing this solver.
+
+    Note:
+        Events are not yet dispatched from unstructured solvers.
+    """
 
     def _encode_problem_for_upload(self, problem, **kwargs):
         """Encode problem for upload to solver.
@@ -543,7 +534,7 @@ class BaseUnstructuredSolver(BaseSolver):
         return computation
 
 
-class BQMSolver(BaseUnstructuredSolver):
+class BQMSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
     """Class for D-Wave unstructured binary quadratic model solvers.
 
     This class provides :term:`Ising`, :term:`QUBO` and :term:`BQM` sampling
@@ -610,7 +601,7 @@ class BQMSolver(BaseUnstructuredSolver):
         return self.upload_problem(bqm)
 
 
-class DQMSolver(BaseUnstructuredSolver):
+class DQMSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
     """Class for D-Wave unstructured discrete quadratic model solvers.
 
     This class provides a :term:`DQM` sampling
@@ -714,7 +705,7 @@ class DQMSolver(BaseUnstructuredSolver):
         return self.upload_problem(dqm)
 
 
-class CQMSolver(BaseUnstructuredSolver):
+class CQMSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
     """Class for D-Wave unstructured constrained quadratic model solvers.
 
     This class provides a :term:`CQM` sampling method and encapsulates the
@@ -793,7 +784,7 @@ class CQMSolver(BaseUnstructuredSolver):
         return self.upload_problem(cqm)
 
 
-class NLSolver(BaseUnstructuredSolver):
+class NLSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
     """Nonlinear solver interface.
 
     This class provides a :term:`nonlinear model` sampling method and encapsulates
@@ -961,7 +952,7 @@ class StructuredSolver(BaseSolver):
         # Create a set of default parameters for the queries
         self._params = {}
 
-        # Add derived properties specific for this solver
+        # Add derived properties specific for this solver class
         self.derived_properties.update({'lower_noise', 'num_active_qubits', 'version', 'graph_id'})
 
     def __repr__(self):
