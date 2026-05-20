@@ -217,6 +217,23 @@ class BaseSolver:
         else:
             raise ValueError("Don't know how to decode %r answer format" % fmt)
 
+    # Sampling methods
+
+    def sample_problem(self,
+                       problem: Any,
+                       *,
+                       label: str | None = None,
+                       problem_type: str | None = None,
+                       upload_params: dict | None = None,
+                       **sample_params: Any,
+                       ) -> Future:
+        """Sample from the specified problem."""
+        raise NotImplementedError
+
+    def upload_problem(self, problem: Any, **kwargs: Any):
+        """Encode and upload the specified problem."""
+        raise NotImplementedError
+
     # Derived properties
 
     @property
@@ -318,7 +335,7 @@ class QuadraticUnstructuredSolverMixin:
             import dimod
         except ImportError: # pragma: no cover
             raise RuntimeError("Can't use unstructured quadratic solver without dimod. "
-                               "Re-install the library with bqm support.")
+                               "Re-install the library with 'bqm' support.")
 
         bqm = dimod.BinaryQuadraticModel.from_ising(linear, quadratic, offset)
         return self.sample_bqm(bqm, label=label, **params)
@@ -353,7 +370,7 @@ class QuadraticUnstructuredSolverMixin:
             import dimod
         except ImportError: # pragma: no cover
             raise RuntimeError("Can't use unstructured quadratic solver without dimod. "
-                               "Re-install the library with bqm support.")
+                               "Re-install the library with 'bqm' support.")
 
         bqm = dimod.BinaryQuadraticModel.from_qubo(qubo, offset)
         return self.sample_bqm(bqm, label=label, **params)
@@ -1222,6 +1239,50 @@ class StructuredSolver(BaseSolver):
 
         return self._sample(problem_type, linear, quadratic, bqm.offset,
                             params, label=label, undirected_biases=True)
+
+    def sample_problem(self,
+                       problem: tuple[list | dict[int, float],
+                                      dict[tuple[int, int], float],
+                                      float],
+                       *,
+                       problem_type: Literal['ising', 'qubo'] = 'ising',
+                       undirected_biases: bool = False,
+                       label: str | None = None,
+                       upload_params: dict | None = None,
+                       **sample_params: Any,
+                       ) -> Future:
+        """Sample from the specified problem.
+
+        Args:
+            problem:
+                Tuple with linear/quadratic terms of the model and the offset.
+
+            problem_type:
+                Problem type, one of the handled problem types by the solver.
+
+            undirected_biases:
+                Are (quadratic) biases specified on undirected edges? For
+                triangular or symmetric matrix of quadratic biases set it to
+                ``True``.
+
+            label:
+                Problem label you can optionally tag submissions with for ease
+                of identification.
+
+            upload_params:
+                Optional upload/encode parameters, not used by structured solvers.
+
+            **sample_params:
+                Sampling parameters, solver-specific.
+
+        Returns:
+            Response in a future.
+
+        """
+        linear, quadratic, offset = problem
+        return self._sample(type_=problem_type, linear=linear, quadratic=quadratic,
+                            offset=offset, undirected_biases=undirected_biases,
+                            label=label, params=sample_params)
 
     @dispatches_events('sample')
     def _sample(self, type_, linear, quadratic, offset, params,
