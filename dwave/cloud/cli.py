@@ -407,7 +407,7 @@ def _sample(solver, problem, params, output):
     """Blocking sample call with error handling and using custom printer."""
 
     try:
-        response = solver.sample_ising(*problem, **params)
+        response = solver.sample_problem(problem, **params)
         problem_id = response.wait_id()
         output("Submitted problem ID: {problem_id}", problem_id=problem_id)
         response.result()
@@ -531,12 +531,8 @@ def ping(*, config_file, profile, endpoint, region, client_type, solver_def,
     client, solver = _get_client_solver(config, output)
 
     # generate problem
-    if hasattr(solver, 'nodes'):
-        # structured solver: use the first existing node
-        problem = ({min(solver.nodes): 0}, {})
-    else:
-        # unstructured solver doesn't constrain problem graph
-        problem = ({0: 1}, {})
+    problem, min_params = solver.minimal_problem
+    params = min_params | params
 
     t1 = timer()
     response = _sample(solver, problem, params, output)
@@ -697,7 +693,7 @@ def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
 
     t1 = timer()
     response = _sample(
-        solver, problem=(linear, quadratic), params=params, output=output)
+        solver, problem=(linear, quadratic, 0.0), params=params, output=output)
 
     t2 = timer()
 

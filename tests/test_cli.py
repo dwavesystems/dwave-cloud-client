@@ -18,11 +18,10 @@ import os
 import tempfile
 import unittest
 import warnings
-from functools import partial, wraps
+from functools import wraps
 from pathlib import Path
 from unittest import mock
 
-import diskcache
 from click.testing import CliRunner
 from parameterized import parameterized
 
@@ -287,7 +286,7 @@ class TestCli(unittest.TestCase):
         with mock.patch('dwave.cloud.cli.Client') as m:
             # mock returned solver
             client = m.from_config.return_value
-            client.get_solver.return_value.nodes = [5, 7, 3]
+            client.get_solver.return_value.minimal_problem = (({3: 0}, {}, 0.0), {})
 
             runner = CliRunner()
             with runner.isolated_filesystem():
@@ -316,8 +315,8 @@ class TestCli(unittest.TestCase):
 
             # sampling method called on solver with correct params?
             solver = client.get_solver.return_value
-            solver.sample_ising.assert_called_with(
-                {3: 0}, {}, label=label, **params)
+            solver.sample_problem.assert_called_with(
+                ({3: 0}, {}, 0.0), label=label, **params)
 
             # verify output contains timing data
             self.assertIn('Wall clock time', result.output)
@@ -365,8 +364,8 @@ class TestCli(unittest.TestCase):
 
             # sampling method called on solver?
             s = c.get_solver.return_value
-            s.sample_ising.assert_called_with(
-                {0: 0}, {(0, 4): 1}, num_reads=10, label=label)
+            s.sample_problem.assert_called_with(
+                ({0: 0}, {(0, 4): 1}, 0.0), num_reads=10, label=label)
 
             # verify output contains timing data
             self.assertIn('Wall clock time', result.output)
