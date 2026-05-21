@@ -152,6 +152,13 @@ class TestUnstructuredSolver(unittest.TestCase):
                 numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
                 numpy.testing.assert_array_equal(fut.num_occurrences, ss.record.num_occurrences)
 
+                # universal sample_problem interface
+                fut = solver.sample_problem(bqm)
+                numpy.testing.assert_array_equal(fut.sampleset, ss)
+                numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
+                numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
+                numpy.testing.assert_array_equal(fut.num_occurrences, ss.record.num_occurrences)
+
                 # ising sampling
                 lin, quad, _ = bqm.to_ising()
                 ss = dimod.ExactSolver().sample_ising(lin, quad)
@@ -227,6 +234,11 @@ class TestUnstructuredSolver(unittest.TestCase):
                 numpy.testing.assert_array_equal(fut.sampleset, ss)
                 numpy.testing.assert_array_equal(fut.problem_type, problem_type)
 
+                # universal sample_problem interface
+                fut = solver.sample_problem(cqm)
+                numpy.testing.assert_array_equal(fut.sampleset, ss)
+                numpy.testing.assert_array_equal(fut.problem_type, problem_type)
+
     def test_sample_dqm_smoke_test(self):
         """Construction of and sampling from an unstructured DQM solver works."""
 
@@ -270,6 +282,11 @@ class TestUnstructuredSolver(unittest.TestCase):
 
                 # verify decoding works
                 fut = solver.sample_dqm(dqm)
+                numpy.testing.assert_array_equal(fut.sampleset, ss)
+                numpy.testing.assert_array_equal(fut.problem_type, problem_type)
+
+                # universal sample_problem interface
+                fut = solver.sample_problem(dqm)
                 numpy.testing.assert_array_equal(fut.sampleset, ss)
                 numpy.testing.assert_array_equal(fut.problem_type, problem_type)
 
@@ -384,7 +401,12 @@ class TestNLSolver(unittest.TestCase):
         setattr(session, '__exit__', mock.Mock())
         session.__enter__.return_value = session
         session.__exit__.return_value = None
-        session.get.return_value.iter_content.return_value = iter([mock_answer_data])
+        # make sure each get request gets a fresh iterator over mock answer data
+        def mock_answer(*args, **kwargs):
+            response = mock.Mock()
+            response.iter_content.return_value = iter([mock_answer_data])
+            return response
+        session.get.side_effect = mock_answer
 
         # mock the upload worker on client only, still testing the solver upload path
         mock_problem_id = 'mock-problem-id'
@@ -395,7 +417,7 @@ class TestNLSolver(unittest.TestCase):
 
         # construct a functional solver by mocking client and api response data
         with mock.patch.multiple(Client, create_session=lambda self: session,
-                                 upload_problem_encoded=mock_upload):
+                                 upload_problem_encoded=mock_upload) as mocker:
             with Client(endpoint='endpoint', token='token') as client:
                 solver = NLSolver(client, hybrid_nl_solver_data())
 
@@ -411,6 +433,14 @@ class TestNLSolver(unittest.TestCase):
 
                 # verify decoding works
                 fut = solver.sample_nlm(model, upload_params=upload_params)
+                self.assertEqual(fut.problem_type, problem_type)
+                self.assertEqual(fut.timing, timing_info)
+                self.assertEqual(fut.answer_data.read(), mock_answer_data)
+
+                session.get.reset_mock()
+
+                # universal sample_problem interface
+                fut = solver.sample_problem(model, upload_params=upload_params)
                 self.assertEqual(fut.problem_type, problem_type)
                 self.assertEqual(fut.timing, timing_info)
                 self.assertEqual(fut.answer_data.read(), mock_answer_data)
@@ -459,7 +489,12 @@ class TestQCDLSolver(unittest.TestCase):
         setattr(session, '__exit__', mock.Mock())
         session.__enter__.return_value = session
         session.__exit__.return_value = None
-        session.get.return_value.iter_content.return_value = iter([mock_answer_data])
+        # make sure each get request gets a fresh iterator over mock answer data
+        def mock_answer(*args, **kwargs):
+            response = mock.Mock()
+            response.iter_content.return_value = iter([mock_answer_data])
+            return response
+        session.get.side_effect = mock_answer
 
         # mock the upload worker on client only, still testing the solver upload path
         mock_problem_id = 'mock-problem-id'
@@ -500,6 +535,12 @@ class TestQCDLSolver(unittest.TestCase):
 
                 # verify decoding works
                 fut = solver.sample_qcdl(qcdl, num_shots=num_shots)
+                self.assertEqual(fut.problem_type, problem_type)
+                self.assertEqual(fut.timing, timing_info)
+                self.assertEqual(fut.answer_data.read(), mock_answer_data)
+
+                # universal sample_problem interface
+                fut = solver.sample_problem(qcdl, num_shots=num_shots)
                 self.assertEqual(fut.problem_type, problem_type)
                 self.assertEqual(fut.timing, timing_info)
                 self.assertEqual(fut.answer_data.read(), mock_answer_data)

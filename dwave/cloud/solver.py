@@ -1255,7 +1255,7 @@ class StructuredSolver(BaseSolver):
 
         Args:
             problem:
-                Tuple with linear/quadratic terms of the model and the offset.
+                A 3-tuple with linear/quadratic terms of the model and the offset.
 
             problem_type:
                 Problem type, one of the handled problem types by the solver.
@@ -1278,6 +1278,11 @@ class StructuredSolver(BaseSolver):
         Returns:
             Response in a future.
 
+        Note:
+            :meth:`.sample_problem` accepts the native problem formulation for a
+            solver, and for structured QPU solvers that's typically the Ising
+            form. Calling ``sample_problem()`` with the default arguments is
+            equivallent to calling :meth:`.sample_ising`.
         """
         linear, quadratic, offset = problem
         return self._sample(type_=problem_type, linear=linear, quadratic=quadratic,

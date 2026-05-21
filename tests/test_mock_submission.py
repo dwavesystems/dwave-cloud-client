@@ -40,7 +40,7 @@ from dwave.cloud.exceptions import (
     SolverFailureError, CanceledFutureError, SolverError,
     InvalidAPIResponseError, UseAfterCloseError)
 from dwave.cloud.solver import Solver
-from dwave.cloud.utils.qubo import evaluate_ising
+from dwave.cloud.utils.qubo import evaluate_ising, reformat_qubo_as_ising
 from dwave.cloud.utils.time import utcrel
 
 from tests.api.mocks import StructuredSapiMockResponses, choose_reply
@@ -125,6 +125,10 @@ class MockSubmissionBaseTests(MockSubmissionBase):
                 with self.assertRaises(InvalidAPIResponseError):
                     results.samples
 
+                results = solver.sample_problem((linear, quadratic, 0.0))
+                with self.assertRaises(InvalidAPIResponseError):
+                    results.samples
+
     def test_submit_ising_ok_reply(self):
         """Handle a normal query and response."""
 
@@ -144,8 +148,11 @@ class MockSubmissionBaseTests(MockSubmissionBase):
 
                 linear, quadratic = self.sapi.problem
                 params = dict(num_reads=100)
-                results = solver.sample_ising(linear, quadratic, **params)
 
+                results = solver.sample_ising(linear, quadratic, **params)
+                self._check(results, linear, quadratic, **params)
+
+                results = solver.sample_problem((linear, quadratic, 0.0), **params)
                 self._check(results, linear, quadratic, **params)
 
     @unittest.skipUnless(dimod, "dimod required for 'Solver.sample_bqm'")
@@ -168,10 +175,12 @@ class MockSubmissionBaseTests(MockSubmissionBase):
 
                 h, J = self.sapi.problem
                 bqm = dimod.BinaryQuadraticModel.from_ising(h, J)
-
                 params = dict(num_reads=100)
-                results = solver.sample_bqm(bqm, **params)
 
+                results = solver.sample_bqm(bqm, **params)
+                self._check(results, h, J, **params)
+
+                results = solver.sample_problem((h, J, 0), problem_type='ising', **params)
                 self._check(results, h, J, **params)
 
     def test_submit_qubo_ok_reply(self):
@@ -204,6 +213,13 @@ class MockSubmissionBaseTests(MockSubmissionBase):
                 params = dict(num_reads=100)
 
                 results = solver.sample_qubo(qubo, offset, **params)
+
+                # make sure energies are correct in raw results
+                for energy, sample in zip(results.energies, results.samples):
+                    self.assertEqual(energy, evaluate_ising({}, qubo, sample, offset=offset))
+
+                linear, quadratic = reformat_qubo_as_ising(qubo)
+                results = solver.sample_problem((linear, quadratic, offset), problem_type='qubo', **params)
 
                 # make sure energies are correct in raw results
                 for energy, sample in zip(results.energies, results.samples):
