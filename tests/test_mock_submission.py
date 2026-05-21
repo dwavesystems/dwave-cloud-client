@@ -104,6 +104,33 @@ class MockSubmissionBase(_QueryTest):
 class MockSubmissionBaseTests(MockSubmissionBase):
     """Test connecting and some related failure modes."""
 
+    def test_submit_minimal_problem_smoke(self):
+        """Get a minimal problem for a solver and submit it."""
+
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda path, **kwargs: choose_reply(path, {
+                'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
+            session.get = lambda path, **kwargs: choose_reply(path, {
+                'problems/123/': self.sapi.complete_reply(id='123')})
+            return session
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client(**self.config) as client:
+                solver = Solver(client, self.sapi.solver.data)
+
+                problem, params = solver.minimal_problem
+                linear, quadratic, offset = problem
+
+                self.assertEqual(linear, {min(solver.nodes): 0})
+                self.assertEqual(offset, 0.0)
+
+                results = solver.sample_problem(problem, **params)
+                results.result()
+                self.assertGreater(len(results.num_occurrences), 0)
+
     def test_submit_null_reply(self):
         """Get an error when the server's response is incomplete."""
 
