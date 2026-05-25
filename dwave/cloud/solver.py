@@ -593,10 +593,10 @@ class BQMSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
             from dimod import BinaryQuadraticModel
         except ImportError: # pragma: no cover
             raise RuntimeError(
-                "dimod package with support for DiscreteQuadraticModel required."
-                "Re-install the library with 'dqm' support.")
+                "dimod package with support for BinaryQuadraticModel required."
+                "Re-install the library with 'bqm' support.")
 
-        bqm = BinaryQuadraticModel.from_ising({0: 1}, {})
+        bqm = BinaryQuadraticModel.from_ising({}, {(0, 1): 1})
         params = {}
         try:
             params.update(time_limit=self.properties['minimum_time_limit'][0][1])
@@ -814,7 +814,7 @@ class CQMSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
                 "dimod package with support for ConstrainedQuadraticModel required."
                 "Re-install the library with 'cqm' support.")
 
-        cqm = ConstrainedQuadraticModel.from_bqm(dimod.BQM.from_ising({0: 1}, {}))
+        cqm = ConstrainedQuadraticModel.from_bqm(dimod.BQM.from_ising({}, {(0, 1): 1}))
 
         params = {}
         try:
@@ -921,7 +921,7 @@ class NLSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
                                "Re-install the library with 'nlm' support.")
 
         model = Model()
-        x = model.list(10)
+        x = model.list(3)
         model.minimize(x.sum())
 
         # note: minimum time limit is not exposed via properties, but value >0 is required
@@ -1348,7 +1348,7 @@ class StructuredSolver(BaseSolver):
         """A small binary quadratic problem accepted by the :meth:`.sample_problem`
         method, together with a set of required parameter values.
         """
-        problem = ({min(self.nodes): 0}, {}, 0.0)
+        problem = ({}, {min(self.edges): 1}, 0.0)
         params = {}
         return problem, params
 
@@ -1791,25 +1791,6 @@ class QCDLSolver(BaseUnstructuredSolver):
 
     def _encode_problem_for_upload(self, qcdl, **kwargs):
         return orjson.dumps(qcdl)
-
-    @property
-    def minimal_problem(self) -> tuple['dwave.optimization.Model', dict]:
-        """A small :class:`~dwave.optimization.Model` accepted by the
-        :meth:`.sample_problem` method, together with a set of required
-        parameter values.
-        """
-        try:
-            from dwave.optimization import Model
-        except ImportError: # pragma: no cover
-            raise RuntimeError("Can't sample from nonlinear model without dwave-optimization. "
-                               "Re-install the library with 'nlm' support.")
-
-        model = Model()
-        x = model.list(10)
-        model.minimize(x.sum())
-        params = {}
-
-        return model, params
 
     @property
     def minimal_problem(self) -> tuple[dict, dict]:
