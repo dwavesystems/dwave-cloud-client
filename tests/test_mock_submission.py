@@ -40,7 +40,7 @@ from dwave.cloud.exceptions import (
     SolverFailureError, CanceledFutureError, SolverError,
     InvalidAPIResponseError, UseAfterCloseError)
 from dwave.cloud.solver import Solver
-from dwave.cloud.utils.qubo import evaluate_ising
+from dwave.cloud.utils.qubo import evaluate_ising, reformat_qubo_as_ising
 from dwave.cloud.utils.time import utcrel
 
 from tests.api.mocks import StructuredSapiMockResponses, choose_reply
@@ -104,6 +104,34 @@ class MockSubmissionBase(_QueryTest):
 class MockSubmissionBaseTests(MockSubmissionBase):
     """Test connecting and some related failure modes."""
 
+    def test_submit_minimal_problem_smoke(self):
+        """Get a minimal problem for a solver and submit it."""
+
+        # each thread can have its instance of a session because
+        # the mocked responses are stateless
+        def create_mock_session(client):
+            session = mock.Mock()
+            session.post = lambda path, **kwargs: choose_reply(path, {
+                'problems/': [self.sapi.complete_no_answer_reply(id='123')]})
+            session.get = lambda path, **kwargs: choose_reply(path, {
+                'problems/123/': self.sapi.complete_reply(id='123')})
+            return session
+
+        with mock.patch.object(Client, 'create_session', create_mock_session):
+            with Client(**self.config) as client:
+                solver = Solver(client, self.sapi.solver.data)
+
+                problem, params = solver.minimal_problem
+                linear, quadratic, offset = problem
+
+                self.assertEqual(linear, {})
+                self.assertEqual(quadratic, {min(solver.edges): 1})
+                self.assertEqual(offset, 0.0)
+
+                results = solver.sample_problem(problem, **params)
+                results.result()
+                self.assertGreater(len(results.num_occurrences), 0)
+
     def test_submit_null_reply(self):
         """Get an error when the server's response is incomplete."""
 
@@ -122,6 +150,10 @@ class MockSubmissionBaseTests(MockSubmissionBase):
                 linear, quadratic = self.sapi.problem
                 results = solver.sample_ising(linear, quadratic)
 
+                with self.assertRaises(InvalidAPIResponseError):
+                    results.samples
+
+                results = solver.sample_problem((linear, quadratic, 0.0))
                 with self.assertRaises(InvalidAPIResponseError):
                     results.samples
 
@@ -144,8 +176,11 @@ class MockSubmissionBaseTests(MockSubmissionBase):
 
                 linear, quadratic = self.sapi.problem
                 params = dict(num_reads=100)
-                results = solver.sample_ising(linear, quadratic, **params)
 
+                results = solver.sample_ising(linear, quadratic, **params)
+                self._check(results, linear, quadratic, **params)
+
+                results = solver.sample_problem((linear, quadratic, 0.0), **params)
                 self._check(results, linear, quadratic, **params)
 
     @unittest.skipUnless(dimod, "dimod required for 'Solver.sample_bqm'")
@@ -168,10 +203,12 @@ class MockSubmissionBaseTests(MockSubmissionBase):
 
                 h, J = self.sapi.problem
                 bqm = dimod.BinaryQuadraticModel.from_ising(h, J)
-
                 params = dict(num_reads=100)
-                results = solver.sample_bqm(bqm, **params)
 
+                results = solver.sample_bqm(bqm, **params)
+                self._check(results, h, J, **params)
+
+                results = solver.sample_problem((h, J, 0), problem_type='ising', **params)
                 self._check(results, h, J, **params)
 
     def test_submit_qubo_ok_reply(self):
@@ -204,6 +241,13 @@ class MockSubmissionBaseTests(MockSubmissionBase):
                 params = dict(num_reads=100)
 
                 results = solver.sample_qubo(qubo, offset, **params)
+
+                # make sure energies are correct in raw results
+                for energy, sample in zip(results.energies, results.samples):
+                    self.assertEqual(energy, evaluate_ising({}, qubo, sample, offset=offset))
+
+                linear, quadratic = reformat_qubo_as_ising(qubo)
+                results = solver.sample_problem((linear, quadratic, offset), problem_type='qubo', **params)
 
                 # make sure energies are correct in raw results
                 for energy, sample in zip(results.energies, results.samples):

@@ -271,6 +271,28 @@ class Submission(_QueryTest):
             numpy.testing.assert_array_almost_equal(
                 bqm.energies(sampleset), sampleset.record.energy)
 
+    def test_submit_minimal_problem(self):
+        """Submit a minimal problem using the standard interface."""
+
+        with Client(**config) as client:
+            solver = client.get_solver()
+
+            problem, params = solver.minimal_problem
+            params.update(num_reads=100)
+
+            response = solver.sample_problem(problem, **params)
+            sampleset = response.sampleset
+
+            self.assertEqual(sampleset.wait_id(), sampleset.info['problem_id'])
+            self.assertEqual(response.id, sampleset.info['problem_id'])
+
+            # Did we get the right number of samples?
+            self.assertEqual(100, sum(response.num_occurrences))
+
+            # Make sure the number of occurrences and energies are all correct
+            numpy.testing.assert_array_almost_equal(
+                dimod.BQM.from_ising(*problem).energies(sampleset), sampleset.record.energy)
+
     @unittest.skipUnless(dimod, "dimod required for 'Solver.sample_bqm'")
     def test_all_sampling_methods_are_consistent(self):
         """Submit Ising/QUBO/BQM and verify the results are consistent."""
@@ -516,6 +538,33 @@ class UnstructuredSubmission(unittest.TestCase):
 
             model.states.from_file(f.answer_data)
             self.assertGreater(model.states.size(), 0)
+
+    @parameterized.expand([
+        ("bqm", ),
+        ("cqm", ),
+        ("dqm", ),
+        ("nl", ),
+        # TODO: add after QCDL deployed to prod
+        #("qcdl", ),
+    ])
+    def test_sample_minimal_problem(self, problem_type):
+
+        # use default config; skip loading config file, assume token in env
+        with Client.from_config(config_file=False) as client:
+            solver = client.get_solver(supported_problem_types__contains=problem_type)
+            problem, params = solver.minimal_problem
+
+            f = solver.sample_problem(problem, **params)
+            f.result()
+
+            self.assertEqual(f.problem_type, problem_type)
+            if f.answer_data is None:
+                # bqm/cqm/dqm
+                self.assertIsInstance(f.sampleset, dimod.SampleSet)
+                self.assertEqual(f.sampleset.info.get('problem_id'), f.wait_id())
+            else:
+                # nlm, qcdl
+                self.assertGreater(len(f.answer_data.read()), 0)
 
 
 @unittest.skipUnless(config, "No live server configuration available.")

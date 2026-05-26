@@ -1,0 +1,9 @@
+---
+features:
+  - |
+    Introduce ``Solver.minimal_problem``, a new solver property that returns a
+    minimal problem accepted by the solver, together with a set of parameter
+    values required to successfully submit the problem to SAPI.
+  - |
+    Expand the solver interface to include ``sample_problem()`` and
+    ``upload_problem()`` (previously available only on unstructured solvers).

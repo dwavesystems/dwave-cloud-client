@@ -89,10 +89,6 @@ if TYPE_CHECKING:
 class BaseSolver:
     """Base class for a general D-Wave solver.
 
-    This class provides :term:`Ising`, :term:`QUBO` and :term:`BQM` sampling
-    methods and encapsulates the solver description returned from the D-Wave
-    cloud API.
-
     Args:
         client (:class:`Client`):
             Client that manages access to this solver.
@@ -222,16 +218,31 @@ class BaseSolver:
             raise ValueError("Don't know how to decode %r answer format" % fmt)
 
     # Sampling methods
-    def sample_ising(self, linear, quadratic, **params):
+
+    def sample_problem(self,
+                       problem: Any,
+                       *,
+                       label: str | None = None,
+                       problem_type: str | None = None,
+                       upload_params: dict | None = None,
+                       **sample_params: Any,
+                       ) -> Future:
+        """Sample from the specified problem."""
         raise NotImplementedError
 
-    def sample_qubo(self, qubo, **params):
+    def upload_problem(self, problem: Any, **kwargs: Any):
+        """Encode and upload the specified problem."""
         raise NotImplementedError
 
-    def sample_bqm(self, bqm, **params):
-        raise NotImplementedError
+    @property
+    def minimal_problem(self) -> tuple[Any, dict]:
+        """A small problem accepted by the solver's :meth:`.sample_problem`,
+        together with a set of required parameter values.
 
-    def upload_bqm(self, bqm):
+        Example:
+            problem, params = solver.minimal_problem
+            solver.sample_problem(problem, **params)
+        """
         raise NotImplementedError
 
     # Derived properties
@@ -295,22 +306,9 @@ class BaseSolver:
             return self.name.startswith('hybrid')
 
 
-class BaseUnstructuredSolver(BaseSolver):
-    """Base class for D-Wave unstructured solvers.
-
-    This class provides :term:`Ising`, :term:`QUBO` and :term:`BQM` sampling
-    methods and encapsulates the solver description returned from the D-Wave
-    cloud API.
-
-    Args:
-        client (:class:`~dwave.cloud.client.Client`):
-            Client that manages access to this solver.
-
-        data (`dict`):
-            Data from the server describing this solver.
-
-    Note:
-        Events are not yet dispatched from unstructured solvers.
+class QuadraticUnstructuredSolverMixin:
+    """Implements quadratic problem solver interface by providing Ising/QUBO
+    sampling methods for solvers that support sampling from a :class:`~dimod.BQM`.
     """
 
     def sample_ising(self, linear, quadratic, offset=0, label=None, **params):
@@ -347,8 +345,8 @@ class BaseUnstructuredSolver(BaseSolver):
         try:
             import dimod
         except ImportError: # pragma: no cover
-            raise RuntimeError("Can't use unstructured solver without dimod. "
-                               "Re-install the library with bqm/cqm/dqm support.")
+            raise RuntimeError("Can't use unstructured quadratic solver without dimod. "
+                               "Re-install the library with 'bqm' support.")
 
         bqm = dimod.BinaryQuadraticModel.from_ising(linear, quadratic, offset)
         return self.sample_bqm(bqm, label=label, **params)
@@ -382,11 +380,32 @@ class BaseUnstructuredSolver(BaseSolver):
         try:
             import dimod
         except ImportError: # pragma: no cover
-            raise RuntimeError("Can't use unstructured solver without dimod. "
-                               "Re-install the library with bqm/cqm/dqm support.")
+            raise RuntimeError("Can't use unstructured quadratic solver without dimod. "
+                               "Re-install the library with 'bqm' support.")
 
         bqm = dimod.BinaryQuadraticModel.from_qubo(qubo, offset)
         return self.sample_bqm(bqm, label=label, **params)
+
+
+class BaseUnstructuredSolver(BaseSolver):
+    """Base class for D-Wave unstructured solvers.
+
+    Implements :meth:`.upload_problem` and :meth:`.sample_problem`.
+
+    To implement support for a specific solver (type), a subclass has to
+    provide problem encoders for upload and sample operations by implementing both
+    :meth:`._encode_problem_for_upload` and :meth:`._encode_problem_for_submission`.
+
+    Args:
+        client (:class:`~dwave.cloud.client.Client`):
+            Client that manages access to this solver.
+
+        data (`dict`):
+            Data from the server describing this solver.
+
+    Note:
+        Events are not yet dispatched from unstructured solvers.
+    """
 
     def _encode_problem_for_upload(self, problem, **kwargs):
         """Encode problem for upload to solver.
@@ -543,7 +562,7 @@ class BaseUnstructuredSolver(BaseSolver):
         return computation
 
 
-class BQMSolver(BaseUnstructuredSolver):
+class BQMSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
     """Class for D-Wave unstructured binary quadratic model solvers.
 
     This class provides :term:`Ising`, :term:`QUBO` and :term:`BQM` sampling
@@ -563,6 +582,28 @@ class BQMSolver(BaseUnstructuredSolver):
 
     def _encode_problem_for_upload(self, bqm, **kwargs):
         return bqm.to_file()
+
+    @property
+    def minimal_problem(self) -> tuple['dimod.BinaryQuadraticModel', dict]:
+        """A small :class:`~dimod.BinaryQuadraticModel` accepted by the
+        :meth:`.sample_problem` method, together with a set of required
+        parameter values.
+        """
+        try:
+            from dimod import BinaryQuadraticModel
+        except ImportError: # pragma: no cover
+            raise RuntimeError(
+                "dimod package with support for BinaryQuadraticModel required."
+                "Re-install the library with 'bqm' support.")
+
+        bqm = BinaryQuadraticModel.from_ising({}, {(0, 1): 1})
+        params = {}
+        try:
+            params.update(time_limit=self.properties['minimum_time_limit'][0][1])
+        except (KeyError, IndexError):
+            pass
+
+        return bqm, params
 
     def sample_bqm(self, bqm, label=None, **params):
         """Sample from the specified :term:`BQM`.
@@ -610,7 +651,7 @@ class BQMSolver(BaseUnstructuredSolver):
         return self.upload_problem(bqm)
 
 
-class DQMSolver(BaseUnstructuredSolver):
+class DQMSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
     """Class for D-Wave unstructured discrete quadratic model solvers.
 
     This class provides a :term:`DQM` sampling
@@ -655,12 +696,38 @@ class DQMSolver(BaseUnstructuredSolver):
     def _encode_problem_for_upload(self, dqm, **kwargs):
         return dqm.to_file()
 
+    @property
+    def minimal_problem(self) -> tuple['dimod.DiscreteQuadraticModel', dict]:
+        """A small :class:`~dimod.DiscreteQuadraticModel` accepted by the
+        :meth:`.sample_problem` method, together with a set of required
+        parameter values.
+        """
+        try:
+            from dimod import DiscreteQuadraticModel
+        except ImportError: # pragma: no cover
+            raise RuntimeError(
+                "dimod package with support for DiscreteQuadraticModel required."
+                "Re-install the library with 'dqm' support.")
+
+        dqm = DiscreteQuadraticModel()
+        u = dqm.add_variable(2)
+        v = dqm.add_variable(2)
+        dqm.set_quadratic(u, v, {(0, 1): 1})
+
+        params = {}
+        try:
+            params.update(time_limit=self.properties['minimum_time_limit'][0][1])
+        except (KeyError, IndexError):
+            pass
+
+        return dqm, params
+
     def sample_bqm(self, bqm, label=None, **params):
         """Use for testing only."""
 
         # to sample BQM problems, we need to convert them to DQM
         if isinstance(bqm, str):
-            # unless bqm already uploaded
+            # unless dqm already uploaded
             dqm = bqm
         else:
             dqm = self._bqm_to_dqm(bqm)
@@ -714,7 +781,7 @@ class DQMSolver(BaseUnstructuredSolver):
         return self.upload_problem(dqm)
 
 
-class CQMSolver(BaseUnstructuredSolver):
+class CQMSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
     """Class for D-Wave unstructured constrained quadratic model solvers.
 
     This class provides a :term:`CQM` sampling method and encapsulates the
@@ -733,6 +800,29 @@ class CQMSolver(BaseUnstructuredSolver):
 
     def _encode_problem_for_upload(self, cqm, **kwargs):
         return cqm.to_file()
+
+    @property
+    def minimal_problem(self) -> tuple['dimod.ConstrainedQuadraticModel', dict]:
+        """A small :class:`~dimod.ConstrainedQuadraticModel` accepted by the
+        :meth:`.sample_problem` method, together with a set of required
+        parameter values.
+        """
+        try:
+            from dimod import ConstrainedQuadraticModel
+        except ImportError: # pragma: no cover
+            raise RuntimeError(
+                "dimod package with support for ConstrainedQuadraticModel required."
+                "Re-install the library with 'cqm' support.")
+
+        cqm = ConstrainedQuadraticModel.from_bqm(dimod.BQM.from_ising({}, {(0, 1): 1}))
+
+        params = {}
+        try:
+            params.update(time_limit=self.properties['minimum_time_limit_s'])
+        except (KeyError, IndexError):
+            pass
+
+        return cqm, params
 
     def sample_bqm(self, bqm, label=None, **params):
         """Use for testing."""
@@ -793,7 +883,7 @@ class CQMSolver(BaseUnstructuredSolver):
         return self.upload_problem(cqm)
 
 
-class NLSolver(BaseUnstructuredSolver):
+class NLSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
     """Nonlinear solver interface.
 
     This class provides a :term:`nonlinear model` sampling method and encapsulates
@@ -817,6 +907,27 @@ class NLSolver(BaseUnstructuredSolver):
         encode_params = {k: v for k, v in kwargs.items()
                          if k in {'max_num_states', 'only_decision'}}
         return model.to_file(**encode_params)
+
+    @property
+    def minimal_problem(self) -> tuple['dwave.optimization.Model', dict]:
+        """A small :class:`~dwave.optimization.Model` accepted by the
+        :meth:`.sample_problem` method, together with a set of required
+        parameter values.
+        """
+        try:
+            from dwave.optimization import Model
+        except ImportError: # pragma: no cover
+            raise RuntimeError("Can't sample from nonlinear model without dwave-optimization. "
+                               "Re-install the library with 'nlm' support.")
+
+        model = Model()
+        x = model.list(3)
+        model.minimize(x.sum())
+
+        # note: minimum time limit is not exposed via properties, but value >0 is required
+        params = dict(time_limit=1)
+
+        return model, params
 
     def sample_bqm(self,
                    bqm: 'dimod.BQM',
@@ -961,7 +1072,7 @@ class StructuredSolver(BaseSolver):
         # Create a set of default parameters for the queries
         self._params = {}
 
-        # Add derived properties specific for this solver
+        # Add derived properties specific for this solver class
         self.derived_properties.update({'lower_noise', 'num_active_qubits', 'version', 'graph_id'})
 
     def __repr__(self):
@@ -1231,6 +1342,64 @@ class StructuredSolver(BaseSolver):
 
         return self._sample(problem_type, linear, quadratic, bqm.offset,
                             params, label=label, undirected_biases=True)
+
+    @property
+    def minimal_problem(self) -> tuple[tuple[dict, dict, float], dict]:
+        """A small binary quadratic problem accepted by the :meth:`.sample_problem`
+        method, together with a set of required parameter values.
+        """
+        problem = ({}, {min(self.edges): 1}, 0.0)
+        params = {}
+        return problem, params
+
+    def sample_problem(self,
+                       problem: tuple[list | dict[int, float],
+                                      dict[tuple[int, int], float],
+                                      float],
+                       *,
+                       problem_type: Literal['ising', 'qubo'] = 'ising',
+                       undirected_biases: bool = False,
+                       label: str | None = None,
+                       upload_params: dict | None = None,
+                       **sample_params: Any,
+                       ) -> Future:
+        """Sample from the specified problem.
+
+        Args:
+            problem:
+                A 3-tuple with linear/quadratic terms of the model and the offset.
+
+            problem_type:
+                Problem type, one of the handled problem types by the solver.
+
+            undirected_biases:
+                Are (quadratic) biases specified on undirected edges? For
+                triangular or symmetric matrix of quadratic biases set it to
+                ``True``.
+
+            label:
+                Problem label you can optionally tag submissions with for ease
+                of identification.
+
+            upload_params:
+                Optional upload/encode parameters, not used by structured solvers.
+
+            **sample_params:
+                Sampling parameters, solver-specific.
+
+        Returns:
+            Response in a future.
+
+        Note:
+            :meth:`.sample_problem` accepts the native problem formulation for a
+            solver, and for structured QPU solvers that's typically the Ising
+            form. Calling ``sample_problem()`` with the default arguments is
+            equivallent to calling :meth:`.sample_ising`.
+        """
+        linear, quadratic, offset = problem
+        return self._sample(type_=problem_type, linear=linear, quadratic=quadratic,
+                            offset=offset, undirected_biases=undirected_biases,
+                            label=label, params=sample_params)
 
     @dispatches_events('sample')
     def _sample(self, type_, linear, quadratic, offset, params,
@@ -1624,8 +1793,10 @@ class QCDLSolver(BaseUnstructuredSolver):
         return orjson.dumps(qcdl)
 
     @property
-    def minimal_job(self) -> tuple[Any, dict]:
-        """Return a minimal QCDL circuit that can be submitted (and solved)."""
+    def minimal_problem(self) -> tuple[dict, dict]:
+        """A small QCDL circuit accepted by the :meth:`.sample_problem` method,
+        together with a set of required parameter values.
+        """
         qcdl = {
             'program': {
                 'statements': [

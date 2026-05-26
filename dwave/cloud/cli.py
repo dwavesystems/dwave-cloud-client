@@ -19,6 +19,7 @@ import orjson
 import shutil
 import subprocess
 from collections import abc
+from collections.abc import Callable
 from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps, partial
@@ -32,7 +33,9 @@ import requests.exceptions
 
 from dwave.cloud import api
 from dwave.cloud.client import Client
-from dwave.cloud.solver import StructuredSolver, BaseUnstructuredSolver
+from dwave.cloud.computation import Future
+from dwave.cloud.solver import (
+    StructuredSolver, QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver)
 from dwave.cloud.utils.cli import default_text_input, strtrunc, CLIError
 from dwave.cloud.utils.dist import (
     get_contrib_packages, get_distribution, PackageNotFoundError, VersionNotFoundError)
@@ -403,11 +406,13 @@ def _get_client_solver(config, output=None):
     return (client, solver)
 
 
-def _sample(solver, problem, params, output):
+def _sample(sample: Callable[[], Future],
+            output: Callable[..., None],
+            ) -> Future:
     """Blocking sample call with error handling and using custom printer."""
 
     try:
-        response = solver.sample_ising(*problem, **params)
+        response = sample()
         problem_id = response.wait_id()
         output("Submitted problem ID: {problem_id}", problem_id=problem_id)
         response.result()
@@ -531,15 +536,12 @@ def ping(*, config_file, profile, endpoint, region, client_type, solver_def,
     client, solver = _get_client_solver(config, output)
 
     # generate problem
-    if hasattr(solver, 'nodes'):
-        # structured solver: use the first existing node
-        problem = ({min(solver.nodes): 0}, {})
-    else:
-        # unstructured solver doesn't constrain problem graph
-        problem = ({0: 1}, {})
+    problem, min_params = solver.minimal_problem
+    params = min_params | params
 
     t1 = timer()
-    response = _sample(solver, problem, params, output)
+    sample = partial(solver.sample_problem, problem=problem, **params)
+    response = _sample(sample, output)
 
     t2 = timer()
     output("\nWall clock time:")
@@ -664,20 +666,25 @@ def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
     t0 = timer()
     client, solver = _get_client_solver(config, output)
 
+    _, minimal_params = solver.minimal_problem
+    params = minimal_params | params
+
+    if not isinstance(solver, (StructuredSolver, QuadraticUnstructuredSolverMixin)):
+        raise CLIError(f"Ising sampling not supported for solver: {solver!r}", code=99)
+
+    if isinstance(solver, BaseUnstructuredSolver):
+        try:
+            import dimod
+        except ImportError: # pragma: no cover
+            raise RuntimeError("Can't sample from unstructured solver without dimod. "
+                               "Re-install the library with 'bqm' support.")
+
     if random_problem:
         if isinstance(solver, StructuredSolver):
             linear, quadratic = generate_random_ising_problem(solver)
-
-        elif isinstance(solver, BaseUnstructuredSolver):
-            try:
-                from dimod.generators import uniform
-            except ImportError: # pragma: no cover
-                raise RuntimeError("Can't sample from unstructured solver without dimod. "
-                                   "Re-install the library with 'bqm' support.")
-            linear, quadratic, _ = uniform(problem_size, 'SPIN').to_ising()
-
         else:
-            raise CLIError(f"Unhandled solver type: {solver!r}", code=99)
+            bqm = dimod.generators.uniform(problem_size, 'SPIN')
+            linear, quadratic, _ = bqm.to_ising()
 
     else:
         try:
@@ -691,13 +698,14 @@ def sample(*, config_file, profile, endpoint, region, client_type, solver_def,
         except Exception as e:
             raise CLIError(f"Invalid couplings: {e}", code=99)
 
+    problem = (linear, quadratic, 0.0)
     output("Using biases: {linear}", linear=list(linear.items()), maxlen=maxlen)
     output("Using couplings: {quadratic}", quadratic=list(quadratic.items()), maxlen=maxlen)
     output("Sampling parameters: {sampling_params}", sampling_params=params)
 
     t1 = timer()
-    response = _sample(
-        solver, problem=(linear, quadratic), params=params, output=output)
+    sample = partial(solver.sample_ising, *problem, **params)
+    response = _sample(sample, output)
 
     t2 = timer()
 

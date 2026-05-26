@@ -30,7 +30,9 @@ from dwave.cloud.solver import (
     BQMSolver, CQMSolver, DQMSolver, NLSolver, QCDLSolver)
 from dwave.cloud.concurrency import Present
 from dwave.cloud.testing.mocks import (
-    qpu_pegasus_solver_data, hybrid_nl_solver_data, qcdl_solver_data)
+    hybrid_bqm_solver_data, hybrid_cqm_solver_data, hybrid_dqm_solver_data,
+    hybrid_nl_solver_data, qcdl_solver_data, qpu_pegasus_solver_data,
+)
 
 from tests.api.mocks import choose_reply
 
@@ -44,18 +46,6 @@ try:
 except ImportError:
     NLModel = None
 
-
-def unstructured_solver_data(problem_type='bqm', solver_name='test-unstructured-solver'):
-    return {
-        "properties": {
-            "supported_problem_types": [problem_type],
-            "parameters": {"num_reads": "Number of samples to return."}
-        },
-        "identity": {
-            "name": solver_name,
-        },
-        "description": "A test unstructured solver"
-    }
 
 def complete_reply_bq(sampleset, id_="problem-id", type_='bqm', label=None):
     """Reply with the sampleset as a solution."""
@@ -128,10 +118,10 @@ class TestUnstructuredSolver(unittest.TestCase):
         with mock.patch.multiple(Client, create_session=lambda self: session,
                                  upload_problem_encoded=mock_upload):
             with Client(endpoint='endpoint', token='token') as client:
-                solver = BQMSolver(client, unstructured_solver_data())
+                solver = BQMSolver(client, hybrid_bqm_solver_data())
 
                 # make sure this still works
-                _ = UnstructuredSolver(client, unstructured_solver_data())
+                _ = UnstructuredSolver(client, hybrid_bqm_solver_data())
 
                 # direct bqm sampling
                 ss = dimod.ExactSolver().sample(bqm)
@@ -151,6 +141,18 @@ class TestUnstructuredSolver(unittest.TestCase):
                 numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
                 numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
                 numpy.testing.assert_array_equal(fut.num_occurrences, ss.record.num_occurrences)
+
+                # universal sample_problem interface
+                fut = solver.sample_problem(bqm)
+                numpy.testing.assert_array_equal(fut.sampleset, ss)
+                numpy.testing.assert_array_equal(fut.samples, ss.record.sample)
+                numpy.testing.assert_array_equal(fut.energies, ss.record.energy)
+                numpy.testing.assert_array_equal(fut.num_occurrences, ss.record.num_occurrences)
+
+                # minimal_problem smoke
+                problem, params = solver.minimal_problem
+                self.assertIsInstance(problem, dimod.BQM)
+                self.assertIn("time_limit", params)
 
                 # ising sampling
                 lin, quad, _ = bqm.to_ising()
@@ -214,7 +216,7 @@ class TestUnstructuredSolver(unittest.TestCase):
         with mock.patch.multiple(Client, create_session=lambda self: session,
                                  upload_problem_encoded=mock_upload):
             with Client(endpoint='endpoint', token='token') as client:
-                solver = CQMSolver(client, unstructured_solver_data(problem_type=problem_type))
+                solver = CQMSolver(client, hybrid_cqm_solver_data())
 
                 # use bqm for mock response (for now)
                 ss = dimod.ExactSolver().sample(dimod.BQM.empty('SPIN'))
@@ -226,6 +228,16 @@ class TestUnstructuredSolver(unittest.TestCase):
                 fut = solver.sample_cqm(cqm)
                 numpy.testing.assert_array_equal(fut.sampleset, ss)
                 numpy.testing.assert_array_equal(fut.problem_type, problem_type)
+
+                # universal sample_problem interface
+                fut = solver.sample_problem(cqm)
+                numpy.testing.assert_array_equal(fut.sampleset, ss)
+                numpy.testing.assert_array_equal(fut.problem_type, problem_type)
+
+                # minimal_problem smoke
+                problem, params = solver.minimal_problem
+                self.assertIsInstance(problem, dimod.CQM)
+                self.assertIn("time_limit", params)
 
     def test_sample_dqm_smoke_test(self):
         """Construction of and sampling from an unstructured DQM solver works."""
@@ -260,7 +272,7 @@ class TestUnstructuredSolver(unittest.TestCase):
         with mock.patch.multiple(Client, create_session=lambda self: session,
                                  upload_problem_encoded=mock_upload):
             with Client(endpoint='endpoint', token='token') as client:
-                solver = DQMSolver(client, unstructured_solver_data(problem_type=problem_type))
+                solver = DQMSolver(client, hybrid_dqm_solver_data())
 
                 # use bqm for mock response (for now)
                 ss = dimod.ExactSolver().sample(dimod.BQM.empty('SPIN'))
@@ -272,6 +284,16 @@ class TestUnstructuredSolver(unittest.TestCase):
                 fut = solver.sample_dqm(dqm)
                 numpy.testing.assert_array_equal(fut.sampleset, ss)
                 numpy.testing.assert_array_equal(fut.problem_type, problem_type)
+
+                # universal sample_problem interface
+                fut = solver.sample_problem(dqm)
+                numpy.testing.assert_array_equal(fut.sampleset, ss)
+                numpy.testing.assert_array_equal(fut.problem_type, problem_type)
+
+                # minimal_problem smoke
+                problem, params = solver.minimal_problem
+                self.assertIsInstance(problem, dimod.DQM)
+                self.assertIn("time_limit", params)
 
     def test_upload_failure(self):
         """Submit should gracefully fail if upload as part of submit fails."""
@@ -291,7 +313,7 @@ class TestUnstructuredSolver(unittest.TestCase):
         with mock.patch.object(Client, 'create_session', lambda self: session):
             with Client(endpoint='endpoint', token='token') as client:
                 with mock.patch.object(BaseUnstructuredSolver, 'upload_problem', mock_upload):
-                    solver = UnstructuredSolver(client, unstructured_solver_data())
+                    solver = UnstructuredSolver(client, hybrid_bqm_solver_data())
 
                     # direct bqm sampling
                     ss = dimod.ExactSolver().sample(bqm)
@@ -321,7 +343,7 @@ class TestUnstructuredSolver(unittest.TestCase):
         with mock.patch.object(Client, 'create_session', lambda self: session):
             with Client(endpoint='endpoint', token='token') as client:
                 with mock.patch.object(BaseUnstructuredSolver, 'upload_problem', mock_upload):
-                    solver = BQMSolver(client, unstructured_solver_data())
+                    solver = BQMSolver(client, hybrid_bqm_solver_data())
 
                     futs = [solver.sample_bqm(bqm) for _ in range(100)]
 
@@ -384,7 +406,12 @@ class TestNLSolver(unittest.TestCase):
         setattr(session, '__exit__', mock.Mock())
         session.__enter__.return_value = session
         session.__exit__.return_value = None
-        session.get.return_value.iter_content.return_value = iter([mock_answer_data])
+        # make sure each get request gets a fresh iterator over mock answer data
+        def mock_answer(*args, **kwargs):
+            response = mock.Mock()
+            response.iter_content.return_value = iter([mock_answer_data])
+            return response
+        session.get.side_effect = mock_answer
 
         # mock the upload worker on client only, still testing the solver upload path
         mock_problem_id = 'mock-problem-id'
@@ -395,7 +422,7 @@ class TestNLSolver(unittest.TestCase):
 
         # construct a functional solver by mocking client and api response data
         with mock.patch.multiple(Client, create_session=lambda self: session,
-                                 upload_problem_encoded=mock_upload):
+                                 upload_problem_encoded=mock_upload) as mocker:
             with Client(endpoint='endpoint', token='token') as client:
                 solver = NLSolver(client, hybrid_nl_solver_data())
 
@@ -414,6 +441,19 @@ class TestNLSolver(unittest.TestCase):
                 self.assertEqual(fut.problem_type, problem_type)
                 self.assertEqual(fut.timing, timing_info)
                 self.assertEqual(fut.answer_data.read(), mock_answer_data)
+
+                session.get.reset_mock()
+
+                # universal sample_problem interface
+                fut = solver.sample_problem(model, upload_params=upload_params)
+                self.assertEqual(fut.problem_type, problem_type)
+                self.assertEqual(fut.timing, timing_info)
+                self.assertEqual(fut.answer_data.read(), mock_answer_data)
+
+                # minimal_problem smoke
+                problem, params = solver.minimal_problem
+                self.assertIsInstance(problem, NLModel)
+                self.assertIn("time_limit", params)
 
 
 class TestQCDLSolver(unittest.TestCase):
@@ -459,7 +499,12 @@ class TestQCDLSolver(unittest.TestCase):
         setattr(session, '__exit__', mock.Mock())
         session.__enter__.return_value = session
         session.__exit__.return_value = None
-        session.get.return_value.iter_content.return_value = iter([mock_answer_data])
+        # make sure each get request gets a fresh iterator over mock answer data
+        def mock_answer(*args, **kwargs):
+            response = mock.Mock()
+            response.iter_content.return_value = iter([mock_answer_data])
+            return response
+        session.get.side_effect = mock_answer
 
         # mock the upload worker on client only, still testing the solver upload path
         mock_problem_id = 'mock-problem-id'
@@ -503,6 +548,17 @@ class TestQCDLSolver(unittest.TestCase):
                 self.assertEqual(fut.problem_type, problem_type)
                 self.assertEqual(fut.timing, timing_info)
                 self.assertEqual(fut.answer_data.read(), mock_answer_data)
+
+                # universal sample_problem interface
+                fut = solver.sample_problem(qcdl, num_shots=num_shots)
+                self.assertEqual(fut.problem_type, problem_type)
+                self.assertEqual(fut.timing, timing_info)
+                self.assertEqual(fut.answer_data.read(), mock_answer_data)
+
+                # minimal_problem smoke
+                problem, params = solver.minimal_problem
+                self.assertIsInstance(problem, dict)
+                self.assertIsInstance(params, dict)
 
 
 class TestProblemLabel(unittest.TestCase):
@@ -558,7 +614,7 @@ class TestProblemLabel(unittest.TestCase):
         with mock.patch.multiple(Client, create_session=lambda self: session,
                                  upload_problem_encoded=mock_upload):
             with Client(endpoint='endpoint', token='token') as client:
-                solver = BQMSolver(client, unstructured_solver_data())
+                solver = BQMSolver(client, hybrid_bqm_solver_data())
 
                 problems = [("sample_ising", (bqm.linear, bqm.quadratic)),
                             ("sample_qubo", (bqm.quadratic,)),
@@ -597,7 +653,7 @@ class TestProblemLabel(unittest.TestCase):
         with mock.patch.multiple(Client, create_session=lambda self: session,
                                  upload_problem_encoded=mock_upload):
             with Client(endpoint='endpoint', token='token') as client:
-                solver = BQMSolver(client, unstructured_solver_data())
+                solver = BQMSolver(client, hybrid_bqm_solver_data())
 
                 # construct mock response
                 ss = dimod.ExactSolver().sample(bqm)
@@ -645,7 +701,7 @@ class TestAnswerDownloadFromBinaryRef(unittest.TestCase):
         with mock.patch.multiple(Client, create_session=lambda _: session,
                                  upload_problem_encoded=mock_upload):
             with Client(endpoint='endpoint', token='token') as client:
-                solver = CQMSolver(client, unstructured_solver_data(problem_type=problem_type))
+                solver = CQMSolver(client, hybrid_cqm_solver_data())
 
                 # solver has to support binary-ref
                 solver._handled_encoding_formats.add('binary-ref')
@@ -727,7 +783,7 @@ class TestSerialization(unittest.TestCase):
         with mock.patch.multiple(Client, create_session=lambda self: session,
                                  upload_problem_encoded=mock_upload):
             with Client(endpoint='endpoint', token='token') as client:
-                solver = BQMSolver(client, unstructured_solver_data())
+                solver = BQMSolver(client, hybrid_bqm_solver_data())
 
                 problems = [("sample_ising", (bqm.linear, bqm.quadratic)),
                             ("sample_qubo", (bqm.quadratic,)),
