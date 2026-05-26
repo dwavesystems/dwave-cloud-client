@@ -316,7 +316,7 @@ class TestCli(unittest.TestCase):
             # sampling method called on solver with correct params?
             solver = client.get_solver.return_value
             solver.sample_problem.assert_called_with(
-                ({3: 0}, {}, 0.0), label=label, **params)
+                problem=({3: 0}, {}, 0.0), label=label, **params)
 
             # verify output contains timing data
             self.assertIn('Wall clock time', result.output)
@@ -332,43 +332,53 @@ class TestCli(unittest.TestCase):
         profile = 'profile'
         client = 'qpu'
         solver = '{"qpu": true}'
-        biases = '[0]'
-        couplings = '{(0, 4): 1}'
+        biases = '{1: 0}'
+        couplings = '{(1, 2): 1}'
         num_reads = '10'
         label = 'label'
 
         with mock.patch('dwave.cloud.cli.Client') as m:
+            # mock returned solver
+            s = solver_object("qpu")
+            with mock.patch.object(s, "sample_ising") as sample_ising:
+                c = m.from_config.return_value
+                c.get_solver.return_value = s
 
-            runner = CliRunner()
-            with runner.isolated_filesystem():
-                touch(config_file)
-                result = runner.invoke(cli, ['sample',
-                                             config_file_option, config_file,
-                                             '--profile', profile,
-                                             '--client', client,
-                                             '--solver', solver,
-                                             '--label', label,
-                                             '-h', biases,
-                                             '-j', couplings,
-                                             '-n', num_reads])
+                runner = CliRunner()
+                with runner.isolated_filesystem():
+                    touch(config_file)
+                    result = runner.invoke(cli, ['sample',
+                                                config_file_option, config_file,
+                                                '--profile', profile,
+                                                '--client', client,
+                                                '--solver', solver,
+                                                '--label', label,
+                                                '-h', biases,
+                                                '-j', couplings,
+                                                '-n', num_reads])
 
-            # proper arguments passed to Client.from_config?
-            m.from_config.assert_called_with(
-                config_file=config_file, profile=profile,
-                endpoint=None, region=None,
-                client=client, solver=solver)
+                # proper arguments passed to Client.from_config?
+                expected_config = dict(
+                    config_file=config_file, profile=profile,
+                    endpoint=None, region=None,
+                    client=client, solver=solver)
+                call = m.from_config.call_args.kwargs
+                self.assertEqual(call, expected_config)
 
-            # get solver called?
-            c = m.from_config.return_value
-            c.get_solver.assert_called_with()
+                m.from_config.assert_called_with(
+                    config_file=config_file, profile=profile,
+                    endpoint=None, region=None,
+                    client=client, solver=solver)
 
-            # sampling method called on solver?
-            s = c.get_solver.return_value
-            s.sample_problem.assert_called_with(
-                ({0: 0}, {(0, 4): 1}, 0.0), num_reads=10, label=label)
+                # get solver called?
+                c.get_solver.assert_called_with()
 
-            # verify output contains timing data
-            self.assertIn('Wall clock time', result.output)
+                # sampling method called on solver?
+                sample_ising.assert_called_with(
+                    {1: 0}, {(1, 2): 1}, 0.0, num_reads=10, label=label)
+
+                # verify output contains timing data
+                self.assertIn('Wall clock time', result.output)
 
         self.assertEqual(result.exit_code, 0)
 

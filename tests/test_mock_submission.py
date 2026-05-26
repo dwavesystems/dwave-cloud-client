@@ -124,7 +124,8 @@ class MockSubmissionBaseTests(MockSubmissionBase):
                 problem, params = solver.minimal_problem
                 linear, quadratic, offset = problem
 
-                self.assertEqual(linear, {min(solver.nodes): 0})
+                self.assertEqual(linear, {})
+                self.assertEqual(quadratic, {min(solver.edges): 1})
                 self.assertEqual(offset, 0.0)
 
                 results = solver.sample_problem(problem, **params)
