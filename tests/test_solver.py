@@ -19,6 +19,7 @@ Note:
     These are all aggregate tests, not really testing single units.
 """
 
+import inspect
 import random
 import unittest
 import warnings
@@ -33,6 +34,7 @@ except ImportError:
     dimod = None
 
 import dwave.cloud.computation
+import dwave.cloud.solver
 from dwave.cloud.client import Client
 from dwave.cloud.exceptions import (
     CanceledFutureError, SolverFailureError, InvalidProblemError)
@@ -40,6 +42,31 @@ from dwave.cloud.utils.qubo import evaluate_ising, generate_random_ising_problem
 
 
 from tests import config
+
+
+class TypeHints(unittest.TestCase):
+
+    @parameterized.expand([
+        (dwave.cloud.solver.QuadraticUnstructuredSolverMixin, 'sample_ising'),
+        (dwave.cloud.solver.QuadraticUnstructuredSolverMixin, 'sample_qubo'),
+        (dwave.cloud.solver.BaseUnstructuredSolver, 'sample_problem'),
+        (dwave.cloud.solver.BQMSolver, 'sample_bqm'),
+        (dwave.cloud.solver.DQMSolver, 'sample_bqm'),
+        (dwave.cloud.solver.DQMSolver, 'sample_dqm'),
+        (dwave.cloud.solver.CQMSolver, 'sample_bqm'),
+        (dwave.cloud.solver.CQMSolver, 'sample_cqm'),
+        (dwave.cloud.solver.NLSolver, 'sample_problem'),
+        (dwave.cloud.solver.StructuredSolver, 'sample_ising'),
+        (dwave.cloud.solver.StructuredSolver, 'sample_qubo'),
+        (dwave.cloud.solver.StructuredSolver, 'sample_bqm'),
+        (dwave.cloud.solver.StructuredSolver, '_sample'),
+        (dwave.cloud.solver.QCDLSolver, 'sample_qcdl'),
+    ])
+    def test_sample_methods_return_future(self, cls, method_name):
+        method = getattr(cls, method_name)
+        annotation = inspect.signature(method).return_annotation
+
+        self.assertIs(annotation, dwave.cloud.computation.Future)
 
 
 @unittest.skipUnless(config, "No live server configuration available.")
