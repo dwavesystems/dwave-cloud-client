@@ -95,10 +95,10 @@ def config_file_options(exists=True):
 
 
 def solver_options(fn):
-    """Decorate `fn` with `--client` and `--solver` options."""
+    """Decorate `fn` with `--client`/`-c` and `--solver`/`-s` options."""
 
     fn = click.option(
-        '--client', 'client_type', default=None,
+        '--client', '-c', 'client_type', default=None,
         type=click.Choice(['base', 'qpu', 'sw', 'hybrid'], case_sensitive=False),
         help='Client type used [default: from config]')(fn)
     fn = click.option(
