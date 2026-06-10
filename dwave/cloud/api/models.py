@@ -234,7 +234,7 @@ class ProblemCancelError(BatchItemError):
 
 
 # region info on metadata api
-class Region(BaseModel):
+class Region(_DictMixin, BaseModel):
     code: str
     name: str
     endpoint: str

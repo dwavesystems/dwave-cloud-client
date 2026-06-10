@@ -1316,3 +1316,47 @@ def cache_purge(*, config_file, profile, output):
                 shutil.rmtree(path)
 
     output("Cache purged.")
+
+
+@cli.group()
+def region():
+    """Get available regions."""
+
+
+@region.command(name='ls')
+@config_file_options()
+@click.option('--metadata-api-endpoint', metavar='URL', type=str, default=None,
+              help='Metadata API endpoint [default: from config]')
+@click.option('--verbose', '-v', default=False, is_flag=True,
+              help='Increase output verbosity')
+@json_output
+@raw_output
+@standardized_output
+def region_list(*, config_file, profile, metadata_api_endpoint, verbose,
+                json_output, raw_output, output):
+    """List regions."""
+
+    config = validate_config_v1(load_config(config_file=config_file, profile=profile))
+
+    if metadata_api_endpoint:
+        config.metadata_api_endpoint = metadata_api_endpoint
+
+    if verbose:
+        output("Using Metadata API endpoint: {metadata_api_endpoint}",
+            metadata_api_endpoint=config.metadata_api_endpoint)
+
+    regions = get_regions(config)
+
+    if verbose:
+        output("Retrieved {num_regions} regions.\n", num_regions=len(regions))
+
+    if json_output or raw_output:
+        rs = [r.dict() for r in regions]
+        output("{regions}", regions=rs, raw=orjson.dumps(rs))
+    else:
+        # ~YAML output
+        for region in regions:
+            output("Region: {name}", name=region.name)
+            output("  Code: {code}", code=region.code)
+            output("  Endpoint: {endpoint}", endpoint=region.endpoint)
+            output()
