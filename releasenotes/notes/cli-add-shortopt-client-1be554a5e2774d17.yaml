@@ -1,0 +1,8 @@
+---
+features:
+  - |
+    Add CLI flag ``-c`` as an alias for ``--client``.
+
+    Note that ``-c`` (previously short for ``--config-file``) was deprecated in
+    0.8.5, and removed in 0.10.0, so that it could be repurposed as a short form
+    of ``--client``.

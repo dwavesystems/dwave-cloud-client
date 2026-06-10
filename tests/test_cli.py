@@ -22,6 +22,7 @@ from functools import wraps
 from pathlib import Path
 from unittest import mock
 
+import orjson
 from click.testing import CliRunner
 from parameterized import parameterized
 
@@ -30,7 +31,7 @@ from dwave.cloud.config import load_config
 from dwave.cloud.config.models import validate_config_v1
 from dwave.cloud.testing import isolated_environ
 from dwave.cloud.auth.creds import Credentials, CREDS_FILENAME
-from dwave.cloud.api.models import LeapProject
+from dwave.cloud.api.models import LeapProject, Region
 from dwave.cloud.api.resources import Regions
 
 from tests import config, test_config_path, test_config_profile
@@ -776,12 +777,101 @@ class TestCacheCli(unittest.TestCase):
                 self.assertIn(str(creds_path), result.output)
 
 
+class TestRegionCli(unittest.TestCase):
+
+    def setUp(self):
+        self.env = isolated_environ(empty=True)
+        self.env.start()
+
+    def tearDown(self):
+        self.env.stop()
+
+    def test_region_ls(self):
+        config_file = 'dwave.conf'
+        profile = 'profile'
+        metadata_api_endpoint = 'https://metadata'
+        regions = [Region(code='aaa', name='A', endpoint='https://a'),
+                   Region(code='bbb', name='B', endpoint='https://b')]
+
+        with mock.patch('dwave.cloud.cli.get_regions', return_value=regions) as m:
+            runner = CliRunner()
+
+            with self.subTest("default call"):
+                with runner.isolated_filesystem():
+                    touch(config_file)
+
+                    result = runner.invoke(cli, ['region', 'ls',
+                                                '--config-file', config_file])
+
+                # verify default metadata api used
+                m.assert_called_once()
+                config = m.call_args_list[0].args[0]
+                self.assertIn('/metadata/v', config.metadata_api_endpoint)
+
+                # verify exit code and stdout printout
+                self.assertEqual(result.exit_code, 0)
+                self.assertEqual(result.output.count('Region:'), 2)
+                self.assertIn('Region: A', result.output)
+                self.assertIn('Region: B', result.output)
+
+            m.reset_mock()
+
+            with self.subTest("use metadata api from config"):
+                with runner.isolated_filesystem():
+                    # create config
+                    with open(config_file, 'w') as fp:
+                        fp.write("\n".join([
+                            f"[{profile}]",
+                            f"metadata_api_endpoint = {metadata_api_endpoint}"]))
+
+                    result = runner.invoke(cli, ['region', 'ls',
+                                                '--config-file', config_file,
+                                                '--profile', profile])
+
+                m.assert_called_once()
+                config = m.call_args_list[0].args[0]
+                self.assertEqual(config.metadata_api_endpoint, metadata_api_endpoint)
+
+            m.reset_mock()
+
+            with self.subTest("use metadata api from command line"):
+                with runner.isolated_filesystem():
+                    touch(config_file)
+
+                    result = runner.invoke(cli, ['region', 'ls',
+                                                '--config-file', config_file,
+                                                '--metadata-api-endpoint', metadata_api_endpoint])
+
+                m.assert_called_once()
+                config = m.call_args_list[0].args[0]
+                self.assertEqual(config.metadata_api_endpoint, metadata_api_endpoint)
+
+            with self.subTest("--raw output"):
+                with runner.isolated_filesystem():
+                    touch(config_file)
+
+                    result = runner.invoke(cli, ['region', 'ls',
+                                                '--config-file', config_file,
+                                                '--raw'])
+
+                rs = orjson.dumps([r.dict() for r in regions]).decode('ascii')
+                self.assertEqual(result.output.strip(), rs)
+
+
+
 @unittest.skipUnless(config, "No live server configuration available.")
 class TestCliLive(unittest.TestCase):
 
     def test_ping(self):
         runner = CliRunner()
         result = runner.invoke(cli, ['ping',
+                                     '--config-file', test_config_path,
+                                     '--profile', test_config_profile])
+        self.assertEqual(result.exit_code, 0)
+
+    def test_region_ls(self):
+        runner = CliRunner()
+        result = runner.invoke(cli, ['region', 'ls',
                                      '--config-file', test_config_path,
                                      '--profile', test_config_profile])
         self.assertEqual(result.exit_code, 0)
