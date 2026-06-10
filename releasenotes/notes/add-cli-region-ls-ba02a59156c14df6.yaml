@@ -1,0 +1,4 @@
+---
+features:
+  - |
+    Add ``dwave region ls`` CLI command to list available regions.
