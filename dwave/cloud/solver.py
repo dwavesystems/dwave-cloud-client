@@ -311,7 +311,7 @@ class QuadraticUnstructuredSolverMixin:
     sampling methods for solvers that support sampling from a :class:`~dimod.BQM`.
     """
 
-    def sample_ising(self, linear, quadratic, offset=0, label=None, **params):
+    def sample_ising(self, linear, quadratic, offset=0, label=None, **params) -> Future:
         """Sample from the specified :term:`Ising` model.
 
         Args:
@@ -351,7 +351,7 @@ class QuadraticUnstructuredSolverMixin:
         bqm = dimod.BinaryQuadraticModel.from_ising(linear, quadratic, offset)
         return self.sample_bqm(bqm, label=label, **params)
 
-    def sample_qubo(self, qubo, offset=0, label=None, **params):
+    def sample_qubo(self, qubo, offset=0, label=None, **params) -> Future:
         """Sample from the specified :term:`QUBO`.
 
         Args:
@@ -514,7 +514,7 @@ class BaseUnstructuredSolver(BaseSolver):
 
     @dispatches_events('sample')
     def sample_problem(self, problem, problem_type=None, label=None,
-                       upload_params=None, **sample_params):
+                       upload_params=None, **sample_params) -> Future:
         """Sample from the specified problem.
 
         Args:
@@ -605,7 +605,7 @@ class BQMSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
 
         return bqm, params
 
-    def sample_bqm(self, bqm, label=None, **params):
+    def sample_bqm(self, bqm, label=None, **params) -> Future:
         """Sample from the specified :term:`BQM`.
 
         Args:
@@ -722,7 +722,7 @@ class DQMSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
 
         return dqm, params
 
-    def sample_bqm(self, bqm, label=None, **params):
+    def sample_bqm(self, bqm, label=None, **params) -> Future:
         """Use for testing only."""
 
         # to sample BQM problems, we need to convert them to DQM
@@ -735,7 +735,7 @@ class DQMSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
         # TODO: convert sampleset back
         return self.sample_dqm(dqm, label=label, **params)
 
-    def sample_dqm(self, dqm, label=None, **params):
+    def sample_dqm(self, dqm, label=None, **params) -> Future:
         """Sample from the specified :term:`DQM`.
 
         Args:
@@ -824,7 +824,7 @@ class CQMSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
 
         return cqm, params
 
-    def sample_bqm(self, bqm, label=None, **params):
+    def sample_bqm(self, bqm, label=None, **params) -> Future:
         """Use for testing."""
         try:
             import dimod
@@ -837,7 +837,7 @@ class CQMSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
 
         return self.sample_cqm(cqm, label=label, **params)
 
-    def sample_cqm(self, cqm, label=None, **params):
+    def sample_cqm(self, cqm, label=None, **params) -> Future:
         """Sample from the specified :term:`CQM`.
 
         Args:
@@ -994,7 +994,7 @@ class NLSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
         return self.sample_problem(
             model, label=label, upload_params=upload_params, **sample_params)
 
-    def sample_problem(self, *args, **kwargs):
+    def sample_problem(self, *args, **kwargs) -> Future:
         sf = SpooledTemporaryFile(max_size=1e8, mode='w+b')
         # backport a fix for bpo-26175, https://github.com/python/cpython/pull/29560.
         # to make sure `zipfile` works with `SpooledTemporaryFile` in Python < 3.11
@@ -1200,7 +1200,7 @@ class StructuredSolver(BaseSolver):
 
     # Sampling methods
 
-    def sample_ising(self, linear, quadratic, offset=0, label=None, **params):
+    def sample_ising(self, linear, quadratic, offset=0, label=None, **params) -> Future:
         """Sample from the specified :term:`Ising` model.
 
         Args:
@@ -1254,7 +1254,7 @@ class StructuredSolver(BaseSolver):
         # ising model so we can just directly call `_sample`.
         return self._sample('ising', linear, quadratic, offset, params, label=label)
 
-    def sample_qubo(self, qubo, offset=0, label=None, **params):
+    def sample_qubo(self, qubo, offset=0, label=None, **params) -> Future:
         """Sample from the specified :term:`QUBO`.
 
         Args:
@@ -1303,7 +1303,7 @@ class StructuredSolver(BaseSolver):
         linear, quadratic = reformat_qubo_as_ising(qubo)
         return self._sample('qubo', linear, quadratic, offset, params, label=label)
 
-    def sample_bqm(self, bqm, label=None, **params):
+    def sample_bqm(self, bqm, label=None, **params) -> Future:
         """Sample from the specified :term:`BQM`.
 
         Args:
@@ -1403,7 +1403,7 @@ class StructuredSolver(BaseSolver):
 
     @dispatches_events('sample')
     def _sample(self, type_, linear, quadratic, offset, params,
-                label=None, undirected_biases=False):
+            label=None, undirected_biases=False) -> Future:
         """Internal method for `sample_ising`, `sample_qubo` and `sample_bqm`.
 
         Args:
@@ -1812,7 +1812,7 @@ class QCDLSolver(BaseUnstructuredSolver):
         params = dict()
         return qcdl, params
 
-    def sample_qcdl(self, qcdl, label=None, **params):
+    def sample_qcdl(self, qcdl, label=None, **params) -> Future:
         """Sample from the specified :term:`QCDL`.
 
         Args:
