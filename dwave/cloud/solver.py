@@ -1790,6 +1790,16 @@ class QCDLSolver(BaseUnstructuredSolver):
     _handled_encoding_formats = {"binary-ref"}
 
     def _encode_problem_for_upload(self, qcdl, **kwargs):
+        if callable(qcdl):
+            qcdl = qcdl()
+
+        if hasattr(qcdl, 'model_dump') and callable(qcdl.model_dump):
+            # handle Qcdl (pydantic model) serialization
+            qcdl = qcdl.model_dump()
+
+        if not isinstance(qcdl, abc.Mapping):
+            raise TypeError("Unsupported 'qcdl' type")
+
         return orjson.dumps(qcdl)
 
     @property
@@ -1812,16 +1822,25 @@ class QCDLSolver(BaseUnstructuredSolver):
         params = dict()
         return qcdl, params
 
-    def sample_qcdl(self, qcdl, label=None, **params):
+    def sample_qcdl(self,
+                    qcdl: abc.Mapping[str, Any] \
+                          | abc.Callable[[], abc.Mapping[str, Any] | 'dwave.gate.qcdl.Qcdl'] \
+                          | 'dwave.gate.qcdl.Qcdl' \
+                          | str, \
+                    label: str | None = None,
+                    **params: Any,
+                    ) -> Future:
         """Sample from the specified :term:`QCDL`.
 
         Args:
-            qcdl (dict/str):
+            qcdl:
                 A quantum circuit in a Quantum Circuit Description Language
-                (QCDL) dict, or a reference to one (Problem ID returned by the
-                :meth:`.upload_qcdl` method).
+                (QCDL) dict, model (:class:`~dwave.gate.qcdl.qcdl_model.Qcdl`),
+                a callable that returns one, or a reference to an uploaded
+                problem (Problem ID, as returned by the :meth:`.upload_qcdl`
+                method).
 
-            label (str, optional):
+            label:
                 Problem label you can optionally tag submissions with for ease
                 of identification.
 
