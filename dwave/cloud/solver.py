@@ -27,6 +27,7 @@ You can list all solvers available to a :class:`~dwave.cloud.client.Client` with
 :func:`~dwave.cloud.client.Client.get_solver` method.
 
 """
+from __future__ import annotations
 
 import io
 import concurrent.futures
@@ -38,7 +39,7 @@ import weakref
 from collections import abc
 from functools import partial, cached_property
 from tempfile import SpooledTemporaryFile
-from typing import Any, Literal, Optional, Union, TYPE_CHECKING
+from typing import Any, BinaryIO, Literal, Optional, TYPE_CHECKING, TypeAlias, Union
 
 from dwave.cloud.api.models import (
     SolverConfiguration, SolverIdentity, SolverVersion)
@@ -84,6 +85,9 @@ if TYPE_CHECKING:
         _Vartype = Union[_Type, dimod.typing.VartypeLike]
     except AttributeError:  # dimod not installed or too old
         _Vartype = _Type
+
+    # QCDL support
+    from dwave.gate.qcdl.qcdl_models import Qcdl
 
 
 class BaseSolver:
@@ -1772,6 +1776,12 @@ class StructuredSolver(BaseSolver):
         return sampling_time + programming_time
 
 
+""":class:`dwave.gate.qcdl.qcdl_models.Qcdl`, or a compatible type."""
+QCDLLike: TypeAlias = "Qcdl" \
+                      "| abc.Mapping[str, Any]" \
+                      "| abc.Callable[[], Qcdl | abc.Mapping[str, Any]]"
+
+
 class QCDLSolver(BaseUnstructuredSolver):
     """Class for D-Wave QCDL gate-model solvers.
 
@@ -1789,7 +1799,7 @@ class QCDLSolver(BaseUnstructuredSolver):
     _handled_problem_types = {"qcdl"}
     _handled_encoding_formats = {"binary-ref"}
 
-    def _encode_problem_for_upload(self, qcdl, **kwargs):
+    def _encode_problem_for_upload(self, qcdl: QCDLLike, **kwargs):
         if callable(qcdl):
             qcdl = qcdl()
 
@@ -1823,10 +1833,7 @@ class QCDLSolver(BaseUnstructuredSolver):
         return qcdl, params
 
     def sample_qcdl(self,
-                    qcdl: abc.Mapping[str, Any] \
-                          | abc.Callable[[], abc.Mapping[str, Any] | 'dwave.gate.qcdl.Qcdl'] \
-                          | 'dwave.gate.qcdl.Qcdl' \
-                          | str, \
+                    qcdl: QCDLLike | str,
                     label: str | None = None,
                     **params: Any,
                     ) -> Future:
@@ -1848,20 +1855,20 @@ class QCDLSolver(BaseUnstructuredSolver):
                 Parameters for the sampling method, solver-specific.
 
         Returns:
-            :class:`~dwave.cloud.computation.Future`
+            Remote computation in a :class:`~dwave.cloud.computation.Future`.
 
         """
         return self.sample_problem(qcdl, label=label, **params)
 
-    def upload_qcdl(self, qcdl):
+    def upload_qcdl(self, qcdl: QCDLLike | BinaryIO) -> Future:
         r"""Upload the specified :term:`QCDL` circuit to SAPI, returning a
         Problem ID that can be used to submit the circuit to this solver.
 
         Args:
-            qcdl (dict/bytes-like/file-like):
-                A quantum circuit QCDL dict, given either as a ``dict``, or as
-                raw data (encoded serialized circuit) in either a file-like or
-                a bytes-like object.
+            qcdl:
+                A quantum circuit QCDL, given either as a :data:`.QCDLLike`, or
+                as raw data (encoded serialized circuit) in either a file-like
+                or a bytes-like object.
 
         Returns:
             :class:`concurrent.futures.Future`\ [str]:

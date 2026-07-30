@@ -38,6 +38,9 @@ extras_require = {
     # nlm support
     'nlm': ['dwave-optimization>=0.1.0,<0.5', 'numpy>=1.20.0'],
 
+    # qcdl (type checking) support
+    'qcdl': ['dwave-gate>=0.4'],
+
     # testing mocks
     'mocks': ['dwave-graphs>=1'],
 }
