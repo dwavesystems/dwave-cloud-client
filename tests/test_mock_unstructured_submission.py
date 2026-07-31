@@ -486,12 +486,6 @@ class TestQCDLSolver(unittest.TestCase):
             encoded = self.mock_qcdl_solver._encode_problem_for_upload(qcdl)
             self.assertEqual(encoded, expected)
 
-        with self.subTest("callable -> dict"):
-            def program():
-                return qcdl
-            encoded = self.mock_qcdl_solver._encode_problem_for_upload(program)
-            self.assertEqual(encoded, expected)
-
         with self.subTest("pydantic-like"):
             class Model:
                 def model_dump(self, **kwargs):
@@ -499,14 +493,14 @@ class TestQCDLSolver(unittest.TestCase):
             encoded = self.mock_qcdl_solver._encode_problem_for_upload(Model())
             self.assertEqual(encoded, expected)
 
-        with self.subTest("callable -> pydantic-like"):
+        with self.subTest("callable: not supported"):
             class Model:
                 def model_dump(self, **kwargs):
                     return qcdl
             def program():
                 return Model()
-            encoded = self.mock_qcdl_solver._encode_problem_for_upload(program)
-            self.assertEqual(encoded, expected)
+            with self.assertRaises(TypeError):
+                self.mock_qcdl_solver._encode_problem_for_upload(program)
 
     def test_sample_qcdl_smoke_test(self):
         # a simple qcdl
