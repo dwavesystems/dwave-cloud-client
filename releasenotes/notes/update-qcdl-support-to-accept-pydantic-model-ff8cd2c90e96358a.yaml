@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Extend ``QCDLSolver``'s ``sample_qcdl`` and ``upload_qcdl`` to accept
+    QCDLs expressed as a Pydantic model (``dwave.gate.qcdl.Qcdl``).

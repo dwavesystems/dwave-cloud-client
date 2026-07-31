@@ -478,6 +478,30 @@ class TestQCDLSolver(unittest.TestCase):
         solvers = self.client.get_solvers(supported_problem_types__issubset={'qcdl'})
         self.assertSolvers(solvers, [self.mock_qcdl_solver])
 
+    def test_qcdl_encoding(self):
+        qcdl, _ = self.mock_qcdl_solver.minimal_problem
+        expected = orjson.dumps(qcdl)
+
+        with self.subTest("dict"):
+            encoded = self.mock_qcdl_solver._encode_problem_for_upload(qcdl)
+            self.assertEqual(encoded, expected)
+
+        with self.subTest("pydantic-like"):
+            class Model:
+                def model_dump(self, **kwargs):
+                    return qcdl
+            encoded = self.mock_qcdl_solver._encode_problem_for_upload(Model())
+            self.assertEqual(encoded, expected)
+
+        with self.subTest("callable: not supported"):
+            class Model:
+                def model_dump(self, **kwargs):
+                    return qcdl
+            def program():
+                return Model()
+            with self.assertRaises(TypeError):
+                self.mock_qcdl_solver._encode_problem_for_upload(program)
+
     def test_sample_qcdl_smoke_test(self):
         # a simple qcdl
         with open(Path(__file__).parent / 'fixtures/qcdl.json') as fp:
