@@ -31,33 +31,51 @@ class TestModels(unittest.TestCase):
     def setUpClass(cls):
         cls.sapi = StructuredSapiMockResponses()
 
-    def test_solver_models(self):
+    @parameterized.expand([
+        (False, ),
+        (True, 'unknown_top_level_field', 'value'),
+    ])
+    def test_solver_models(self, include_extra, extra_field_name=None, extra_field_value=None):
         with self.subTest('structured solver'):
             name = 'qpu-solver'
             graph_id = '01abcd1234'
-            solver = models.SolverConfiguration(**structured_solver_data(name, graph_id))
+            data = structured_solver_data(name, graph_id)
+            if include_extra:
+                data[extra_field_name] = extra_field_value
+            solver = models.SolverConfiguration(**data)
             self.assertIsNotNone(solver.get('identity'))
             self.assertEqual(solver.identity.name, name)
             self.assertEqual(solver.identity.version.graph_id, graph_id)
             self.assertIsNotNone(solver.get('properties'))
             self.assertEqual(solver.properties['category'], 'qpu')
+            if include_extra:
+                self.assertEqual(getattr(solver, extra_field_name), extra_field_value)
 
         with self.subTest('unstructured solver'):
             name = 'hybrid-solver'
-            solver = models.SolverConfiguration(**unstructured_solver_data(name))
+            data = unstructured_solver_data(name)
+            if include_extra:
+                data[extra_field_name] = extra_field_value
+            solver = models.SolverConfiguration(**data)
             self.assertEqual(solver.identity.name, name)
             self.assertIsNone(solver.identity.version)
             self.assertEqual(solver.properties['category'], 'hybrid')
+            if include_extra:
+                self.assertEqual(getattr(solver, extra_field_name), extra_field_value)
 
         with self.subTest('filtered configuration contains identity'):
             name = 'qpu-solver'
             graph_id = '01abcd1234'
             data = structured_solver_data(name, graph_id)
             filtered_data = dict(identity=data['identity'])
+            if include_extra:
+                filtered_data[extra_field_name] = extra_field_value
             solver = models.SolverConfiguration(**filtered_data)
             self.assertEqual(solver.identity.name, name)
             self.assertEqual(solver.identity.version.graph_id, graph_id)
             self.assertIsNone(solver.get('properties'))
+            if include_extra:
+                self.assertEqual(getattr(solver, extra_field_name), extra_field_value)
 
     def test_solver_identity_model(self):
         # test validation, construction and basic serialization with `.dict()`/`str()`
@@ -142,40 +160,56 @@ class TestModels(unittest.TestCase):
         with self.subTest('from model to model via string'):
             self.assertEqual(models.SolverIdentity.from_id(identity.to_id()), identity)
 
-    def test_problem_models(self):
+    @parameterized.expand([
+        (dict(), ),
+        (dict(extra_field='value'), ),
+    ])
+    def test_problem_models(self, extras):
+        def _validate_extras(model):
+            if not extras:
+                return
+            for key, val in extras.items():
+                self.assertEqual(getattr(model, key), val)
+
         with self.subTest('ProblemStatus'):
-            status = models.ProblemStatus(**self.sapi.complete_no_answer_reply())
+            status = models.ProblemStatus(**self.sapi.complete_no_answer_reply(**extras))
+            _validate_extras(status)
 
         with self.subTest('ProblemStatusWithAnswer'):
-            status = models.ProblemStatusWithAnswer(**self.sapi.complete_reply())
+            status = models.ProblemStatusWithAnswer(**self.sapi.complete_reply(**extras))
+            _validate_extras(status)
 
         with self.subTest('ProblemAnswer'):
             answer = models.ProblemAnswer(**self.sapi.answer)
 
         with self.subTest('ProblemStatusMaybeWithAnswer'):
-            s1 = models.ProblemStatusMaybeWithAnswer(**self.sapi.complete_no_answer_reply())
-            s2 = models.ProblemStatusMaybeWithAnswer(**self.sapi.complete_reply())
+            s1 = models.ProblemStatusMaybeWithAnswer(**self.sapi.complete_no_answer_reply(**extras))
+            s2 = models.ProblemStatusMaybeWithAnswer(**self.sapi.complete_reply(**extras))
             self.assertEqual(s1.id, s2.id)
             self.assertIsNone(s1.answer)
             self.assertEqual(s2.answer, answer)
+            _validate_extras(s1)
+            _validate_extras(s2)
 
         with self.subTest('ProblemData'):
-            data = models.ProblemData(**self.sapi.problem_data())
+            data = models.ProblemData(**self.sapi.problem_data(**extras))
+            _validate_extras(data)
 
         with self.subTest('ProblemMetadata'):
-            metadata = models.ProblemMetadata(**self.sapi.problem_metadata())
-
+            metadata = models.ProblemMetadata(**self.sapi.problem_metadata(**extras))
             self.assertEqual(metadata.label, status.label)
             self.assertEqual(metadata.status, status.status)
+            _validate_extras(metadata)
 
         with self.subTest('ProblemInfo'):
-            info = models.ProblemInfo(**self.sapi.problem_info())
+            info = models.ProblemInfo(**self.sapi.problem_info(**extras))
+            _validate_extras(info)
             info = models.ProblemInfo(**self.sapi.problem_info(answer=None))
 
         with self.subTest('ProblemJob'):
             job = models.ProblemJob.from_info(info)
 
-            self.assertEqual(job.data, data)
+            self.assertEqual(job.data, info.data)
             self.assertEqual(job.params, info.params)
             self.assertEqual(job.solver, status.solver)
             self.assertEqual(job.type, status.type)

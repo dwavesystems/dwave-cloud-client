@@ -71,14 +71,16 @@ class _DictEqualityMixin:
         return super().__eq__(other)
 
 
-class SolverVersion(_DictMixin, _DictEqualityMixin, BaseModel):
-    # allow additional version specifiers in the future
+class ResponseBaseModel(BaseModel):
+    # allow additional fields, so that additive API changes don't break response parsing
     model_config = ConfigDict(extra='allow')
 
+
+class SolverVersion(_DictMixin, _DictEqualityMixin, ResponseBaseModel):
     graph_id: Optional[str] = None              # QPU solvers require graph_id
 
 
-class SolverIdentity(_DictMixin, _DictEqualityMixin, BaseModel):
+class SolverIdentity(_DictMixin, _DictEqualityMixin, ResponseBaseModel):
     name: str
     version: Optional[SolverVersion] = None     # only QPU solvers have `version` structure
 
@@ -99,7 +101,7 @@ class SolverIdentity(_DictMixin, _DictEqualityMixin, BaseModel):
         return cls(**dwave.cloud.config.loaders._solver_id_as_identity(id))
 
 
-class SolverCompleteConfiguration(BaseModel):
+class SolverCompleteConfiguration(ResponseBaseModel):
     identity: SolverIdentity
     status: str
     description: str
@@ -107,10 +109,8 @@ class SolverCompleteConfiguration(BaseModel):
     avg_load: float
 
 
-class SolverFilteredConfiguration(BaseModel):
+class SolverFilteredConfiguration(ResponseBaseModel):
     # no required fields, and no ignored fields
-    model_config = ConfigDict(extra='allow')
-
     identity: Optional[SolverIdentity] = None
 
 
@@ -121,7 +121,7 @@ class SolverConfiguration(_RootGetterMixin, _RootSetterMixin, RootModel):
     root: Union[SolverCompleteConfiguration, SolverFilteredConfiguration]
 
 
-class ProblemInitialStatus(BaseModel):
+class ProblemInitialStatus(ResponseBaseModel):
     id: str
     type: constants.ProblemType
     solver: SolverIdentity
@@ -134,7 +134,7 @@ class ProblemStatus(ProblemInitialStatus):
     solved_on: Optional[datetime] = None
 
 
-class StructuredProblemAnswer(BaseModel):
+class StructuredProblemAnswer(ResponseBaseModel):
     format: constants.AnswerEncodingFormat = constants.AnswerEncodingFormat.QP
     active_variables: str
     energies: str
@@ -144,12 +144,12 @@ class StructuredProblemAnswer(BaseModel):
     num_variables: int
 
 
-class UnstructuredProblemAnswer(BaseModel):
+class UnstructuredProblemAnswer(ResponseBaseModel):
     format: constants.AnswerEncodingFormat = constants.AnswerEncodingFormat.BQ
     data: dict
 
 
-class UnstructuredProblemAnswerBinaryRef(BaseModel):
+class UnstructuredProblemAnswerBinaryRef(ResponseBaseModel):
     format: constants.AnswerEncodingFormat = constants.AnswerEncodingFormat.BINARY_REF
     auth_method: constants.BinaryRefAuthMethod = constants.BinaryRefAuthMethod.SAPI_TOKEN
     url: str
@@ -171,14 +171,14 @@ class ProblemStatusMaybeWithAnswer(ProblemStatus):
     answer: Optional[ProblemAnswer] = None
 
 
-class StructuredProblemData(BaseModel):
+class StructuredProblemData(ResponseBaseModel):
     format: constants.ProblemEncodingFormat = constants.ProblemEncodingFormat.QP
     lin: str
     quad: str
     offset: float = 0.0
 
 
-class UnstructuredProblemData(BaseModel):
+class UnstructuredProblemData(ResponseBaseModel):
     format: constants.ProblemEncodingFormat = constants.ProblemEncodingFormat.REF
     data: str
 
@@ -187,7 +187,7 @@ class ProblemData(_RootGetterMixin, RootModel):
     root: Union[StructuredProblemData, UnstructuredProblemData]
 
 
-class ProblemMetadata(BaseModel):
+class ProblemMetadata(ResponseBaseModel):
     solver: SolverIdentity
     type: constants.ProblemType
     label: Optional[str] = None
@@ -198,7 +198,7 @@ class ProblemMetadata(BaseModel):
     messages: Optional[list[dict]] = None
 
 
-class ProblemInfo(BaseModel):
+class ProblemInfo(ResponseBaseModel):
     id: str
     data: ProblemData
     params: dict[str, AnyIncludingNumpy]
@@ -206,7 +206,7 @@ class ProblemInfo(BaseModel):
     answer: Optional[ProblemAnswer] = None          # missing unless problem status is COMPLETED
 
 
-class ProblemJob(BaseModel):
+class ProblemJob(ResponseBaseModel):
     data: ProblemData
     params: dict[str, AnyIncludingNumpy]
     solver: SolverIdentity
@@ -222,7 +222,7 @@ class ProblemJob(BaseModel):
                    label=info.metadata.label)
 
 
-class BatchItemError(BaseModel):
+class BatchItemError(ResponseBaseModel):
     error_code: int
     error_msg: str
 
@@ -234,7 +234,7 @@ class ProblemCancelError(BatchItemError):
 
 
 # region info on metadata api
-class Region(_DictMixin, BaseModel):
+class Region(_DictMixin, ResponseBaseModel):
     code: str
     name: str
     endpoint: str
@@ -252,36 +252,36 @@ class Region(_DictMixin, BaseModel):
 
 # LeapAPI types, provisional
 
-class LeapProject(BaseModel):
+class LeapProject(ResponseBaseModel):
     id: int
     name: str
     code: str
 
-class _LeapProjectWrapper(BaseModel):
+class _LeapProjectWrapper(ResponseBaseModel):
     project: LeapProject
 
 # LeapAPI / account / active project response
-class _LeapActiveProjectResponse(BaseModel):
+class _LeapActiveProjectResponse(ResponseBaseModel):
     data: _LeapProjectWrapper
 
 # LeapAPI / account / projects response
-class _LeapProjectsWrapper(BaseModel):
+class _LeapProjectsWrapper(ResponseBaseModel):
     projects: list[_LeapProjectWrapper]
 
-class _LeapProjectsResponse(BaseModel):
+class _LeapProjectsResponse(ResponseBaseModel):
     data: _LeapProjectsWrapper
 
 # LeapAPI / account / token response
-class _LeapTokenWrapper(BaseModel):
+class _LeapTokenWrapper(ResponseBaseModel):
     token: Optional[str]
 
-class _LeapProjectTokenResponse(BaseModel):
+class _LeapProjectTokenResponse(ResponseBaseModel):
     data: _LeapTokenWrapper
 
 
 # Leap deprecation messages
 
-class DeprecationMessage(_DictMixin, BaseModel):
+class DeprecationMessage(_DictMixin, ResponseBaseModel):
     id: str
     context: constants.DeprecationContext
     deprecated: Optional[datetime] = None

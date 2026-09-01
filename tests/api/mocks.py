@@ -264,13 +264,17 @@ class StructuredSapiMockResponses(SapiMockResponses):
 
     def problem_data(self,
                      solver: StructuredSolver = None,
-                     problem: tuple[dict, dict] = None) -> dict:
+                     problem: tuple[dict, dict] = None,
+                     **kwargs) -> dict:
         if solver is None:
             solver = self.solver
         if problem is None:
             problem = self.problem
         linear, quadratic = problem
-        return encode_problem_as_qp(solver, linear, quadratic)
+
+        response = encode_problem_as_qp(solver, linear, quadratic)
+        response.update(**kwargs)
+        return response
 
     def __init__(self, **kwargs):
         kwargs.setdefault('solver', StructuredSolver(client=None, data=qpu_clique_solver_data(5)))
