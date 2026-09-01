@@ -68,7 +68,7 @@ except ImportError:
 __all__ = [
     'BaseSolver', 'StructuredSolver',
     'BaseUnstructuredSolver', 'UnstructuredSolver',
-    'Solver', 'BQMSolver', 'CQMSolver', 'DQMSolver', 'NLSolver',
+    'Solver', 'BQMSolver', 'CQMSolver', 'DQMSolver', 'NLSolver', 'QCDLSolver',
 ]
 
 logger = logging.getLogger(__name__)

@@ -81,6 +81,7 @@ class ProblemType(str, _OpenEnumMixin, enum.Enum):
     CQM = "cqm"
     DQM = "dqm"
     NL = "nl"
+    QCDL = "qcdl"
 
 
 class DeprecationContext(str, _OpenEnumMixin, enum.Enum):
