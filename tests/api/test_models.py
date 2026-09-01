@@ -213,3 +213,15 @@ class TestConstants(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             Color("BLUE")
+
+    @parameterized.expand([
+        (constants.ProblemStatus, "PENDING"),
+        (constants.ProblemEncodingFormat, "qp"),
+        (constants.AnswerEncodingFormat, "binary-ref"),
+        (constants.BinaryRefAuthMethod, "sapi-token"),
+        (constants.ProblemType, "ising"),
+        (constants.DeprecationContext, "api"),
+    ])
+    def test_sapi_enums_are_open(self, cls, known):
+        self.assertEqual(cls(known), known)
+        self.assertEqual(cls("UNKNOWN"), "UNKNOWN")

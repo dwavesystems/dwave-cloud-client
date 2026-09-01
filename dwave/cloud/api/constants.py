@@ -39,7 +39,7 @@ class _OpenEnumMixin:
         return member
 
 
-class ProblemStatus(str, enum.Enum):
+class ProblemStatus(str, _OpenEnumMixin, enum.Enum):
     """Solver API problem status values.
 
     Initially a problem is in the PENDING state. When the D-Wave system starts
@@ -58,23 +58,23 @@ class ProblemStatus(str, enum.Enum):
     CANCELLED = "CANCELLED"
 
 
-class ProblemEncodingFormat(str, enum.Enum):
+class ProblemEncodingFormat(str, _OpenEnumMixin, enum.Enum):
     QP = "qp"
     BQ = "bq"   # deprecated for submission
     REF = "ref"
 
 
-class AnswerEncodingFormat(str, enum.Enum):
+class AnswerEncodingFormat(str, _OpenEnumMixin, enum.Enum):
     QP = "qp"
     BQ = "bq"   # dimod (de-)serialization-based
     BINARY_REF = "binary-ref"
 
 
-class BinaryRefAuthMethod(str, enum.Enum):
+class BinaryRefAuthMethod(str, _OpenEnumMixin, enum.Enum):
     SAPI_TOKEN = "sapi-token"
 
 
-class ProblemType(str, enum.Enum):
+class ProblemType(str, _OpenEnumMixin, enum.Enum):
     ISING = "ising"
     QUBO = "qubo"
     BQM = "bqm"
@@ -83,7 +83,7 @@ class ProblemType(str, enum.Enum):
     NL = "nl"
 
 
-class DeprecationContext(str, enum.Enum):
+class DeprecationContext(str, _OpenEnumMixin, enum.Enum):
     API = "api"                 # API changes such as endpoints, data structures, and headers
     FEATURE = "feature"         # solver feature is deprecated
     PARAMETER = "parameter"     # solver parameter is deprecated

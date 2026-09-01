@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Use open enums for SAPI-returned constants to ensure additive SAPI changes
+    don't crash client-side response validation.
