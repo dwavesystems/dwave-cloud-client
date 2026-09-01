@@ -14,10 +14,12 @@
 
 import unittest
 
+from enum import Enum
+
 from pydantic import ValidationError
 from parameterized import parameterized
 
-from dwave.cloud.api import models
+from dwave.cloud.api import constants, models
 from dwave.cloud.testing.mocks import structured_solver_data, unstructured_solver_data
 
 from tests.api.mocks import StructuredSapiMockResponses
@@ -178,3 +180,36 @@ class TestModels(unittest.TestCase):
             self.assertEqual(job.solver, status.solver)
             self.assertEqual(job.type, status.type)
             self.assertEqual(job.label, status.label)
+
+
+class TestConstants(unittest.TestCase):
+
+    def test_open_enum(self):
+        class Color(str, constants._OpenEnumMixin, Enum):
+            RED = "RED"
+
+        with self.subTest("standard string enum"):
+            red = Color("RED")
+            self.assertEqual(red.value, "RED")
+            self.assertEqual(red.name, "RED")
+            self.assertEqual(red, "RED")
+
+        with self.subTest("unknown value added"):
+            blue = Color("BLUE")
+            self.assertEqual(blue.value, "BLUE")
+            self.assertEqual(blue.name, "BLUE")
+            self.assertEqual(blue, "BLUE")
+
+        with self.subTest("comparison of unknown values"):
+            another = Color("BLUE")
+            self.assertEqual(blue, another)
+            self.assertIs(blue, another)
+
+    def test_closed_enum(self):
+        class Color(str, Enum):
+            RED = "RED"
+
+        self.assertEqual(Color("RED").value, "RED")
+
+        with self.assertRaises(ValueError):
+            Color("BLUE")

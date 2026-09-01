@@ -20,6 +20,25 @@ DEFAULT_API_MEDIA_TYPE = 'application/vnd.dwave+json'
 DEFAULT_API_RESPONSE_VERSION = '1.0.0'
 
 
+class _OpenEnumMixin:
+    """Extends :class:`enum.Enum` to handle unknown values.
+
+    Instead of failing when we receive an unknown enum from SAPI, we'll create
+    a its enum value on the fly.
+
+    See: protobuf's `open enum <https://protobuf.dev/programming-guides/enum/>`_.
+    """
+
+    @classmethod
+    def _missing_(cls, value):
+        member = str.__new__(cls, value)
+        member._name_ = str(value).upper()
+        member._value_ = value
+        # cache it so identity comparison works on repeat values
+        cls._value2member_map_[value] = member
+        return member
+
+
 class ProblemStatus(str, enum.Enum):
     """Solver API problem status values.
 
