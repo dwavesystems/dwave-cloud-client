@@ -219,7 +219,7 @@ class TestModels(unittest.TestCase):
 class TestConstants(unittest.TestCase):
 
     def test_open_enum(self):
-        class Color(str, constants._OpenEnumMixin, Enum):
+        class Color(constants._OpenStrEnumMixin, str, Enum):
             RED = "RED"
 
         with self.subTest("standard string enum"):
