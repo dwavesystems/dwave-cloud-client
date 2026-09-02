@@ -1,0 +1,8 @@
+---
+features:
+  - |
+    Use open enums for SAPI-returned constants to ensure additive SAPI changes
+    don't crash client-side response validation.
+  - |
+    Allow unknown fields on models for SAPI-returned responses to allow additive
+    SAPI changes.
