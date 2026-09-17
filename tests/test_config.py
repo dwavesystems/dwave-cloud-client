@@ -32,7 +32,7 @@ from dwave.cloud.config.loaders import (
     _solver_id_as_identity, _solver_identity_as_id)
 from dwave.cloud.config.constants import DEFAULT_METADATA_API_ENDPOINT
 from dwave.cloud.config.exceptions import ConfigFileParseError, ConfigFileReadError
-from dwave.cloud.config.models import ClientConfig, PollingStrategy
+from dwave.cloud.config.models import ClientConfig, PollingStrategy, CacheFallbackStrategy
 from dwave.cloud.config.models import validate_config_v1, load_config_v1, dump_config_v1
 from dwave.cloud.testing import isolated_environ
 
@@ -606,21 +606,27 @@ class TestConfigModel(unittest.TestCase):
                      get_field=lambda config: config.cert,
                      model_value=model_value)
 
+    cache_default = {"enabled": False, "home": get_cache_dir(), "fallback": "memory"}
+
     @parameterized.expand([
-        ("default", {}, {"enabled": False, "home": get_cache_dir()}),
-        ("disabled", {"cache_enabled": False}, {"enabled": False, "home": get_cache_dir()}),
-        ("enabled", {"cache_enabled": True}, {"enabled": True, "home": get_cache_dir()}),
-        ("set home", {"cache_home": "/path/to/cache"}, {"enabled": False, "home": "/path/to/cache"}),
-        ("set all enabled", {"cache_enabled": True, "cache_home": "/path/to/cache"}, {"enabled": True, "home": "/path/to/cache"}),
-        ("set all disabled", {"cache_enabled": False, "cache_home": "/path/to/cache"}, {"enabled": False, "home": "/path/to/cache"}),
+        ("default", {}, cache_default),
+        ("disabled", {"cache_enabled": False}, cache_default),
+        ("enabled", {"cache_enabled": True}, cache_default | {"enabled": True}),
+        ("set home", {"cache_home": "/path/to/cache"}, cache_default | {"home": "/path/to/cache"}),
+        ("set all enabled", {"cache_enabled": True, "cache_home": "/path/to/cache"}, cache_default | {"enabled": True, "home": "/path/to/cache"}),
+        ("set all disabled", {"cache_enabled": False, "cache_home": "/path/to/cache"}, cache_default | {"enabled": False, "home": "/path/to/cache"}),
+        # fallback
+        ("fallback", {"cache_fallback": "fail"}, cache_default | {"fallback": "fail"}),
+        ("fallback enum", {"cache_fallback": CacheFallbackStrategy.DISABLE}, cache_default | {"fallback": "disable"}),
+        ("fallback enum", {"cache_fallback": "memory"}, cache_default | {"fallback": CacheFallbackStrategy.MEMORY}),
         # model-level validation
-        ("disabled via home off", {"cache_home": "off"}, {"enabled": False, "home": None}),
-        ("disabled via home disabled", {"cache_home": "disabled"}, {"enabled": False, "home": None}),
-        ("default via home default", {"cache_home": "default"}, {"enabled": True, "home": get_cache_dir()}),
+        ("disabled via home off", {"cache_home": "off"}, cache_default | {"enabled": False, "home": None}),
+        ("disabled via home disabled", {"cache_home": "disabled"}, cache_default | {"enabled": False, "home": None}),
+        ("default via home default", {"cache_home": "default"}, cache_default | {"enabled": True}),
         # model-level validation overrides
-        ("override via home off", {"cache_enabled": True, "cache_home": "off"}, {"enabled": False, "home": None}),
-        ("override via home disabled", {"cache_enabled": True, "cache_home": "disabled"}, {"enabled": False, "home": None}),
-        ("override via home default", {"cache_enabled": False, "cache_home": "default"}, {"enabled": True, "home": get_cache_dir()}),
+        ("override via home off", {"cache_enabled": True, "cache_home": "off"}, cache_default | {"enabled": False, "home": None}),
+        ("override via home disabled", {"cache_enabled": True, "cache_home": "disabled"}, cache_default | {"enabled": False, "home": None}),
+        ("override via home default", {"cache_enabled": False, "cache_home": "default"}, cache_default | {"enabled": True, "home": get_cache_dir()}),
     ])
     def test_cache(self, name, raw_config, model_value):
         self._verify(raw_config=raw_config,

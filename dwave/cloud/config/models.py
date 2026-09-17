@@ -31,7 +31,7 @@ from dwave.cloud.config.loaders import (
 )
 
 __all__ = ['RequestRetryConfig', 'ClientConfig',
-           'BackoffPollingSchedule', 'LongPollingSchedule',
+           'BackoffPollingSchedule', 'LongPollingSchedule', 'CacheFallbackStrategy',
            'validate_config_v1', 'dump_config_v1', 'load_config_v1']
 
 logger = logging.getLogger(__name__)
@@ -127,6 +127,21 @@ class LongPollingSchedule(BaseModel):
     pause: Optional[float] = 0.0
 
 
+class CacheFallbackStrategy(str, enum.Enum):
+    """Fallback when cache config is invalid (e.g. configured cache location
+    is read-only).
+    """
+
+    #: disable cache
+    DISABLE = "disable"
+
+    #: explicit and hard failure
+    FAIL = "fail"
+
+    #: in-memory local cache
+    MEMORY = "memory"
+
+
 class CacheConfig(BaseModel):
     """Client cache configuration."""
     # keeping it simple for now
@@ -138,6 +153,9 @@ class CacheConfig(BaseModel):
     #: to `homebase.user_cache_dir` otherwise
     #: Note: `home` sentinel values take precedence over `enabled`
     home: Annotated[str | None, Field(default_factory=get_cache_dir)]
+
+    #: cache fallback in case `home`-based disk cache is inaccessible
+    fallback: CacheFallbackStrategy = CacheFallbackStrategy.MEMORY
 
     @model_validator(mode='after')
     def process_home_sentinels(self):
@@ -399,6 +417,7 @@ _V1_CONFIG_DEFAULTS = {
     # cache config
     'cache_enabled': False,
     'cache_home': None,
+    'cache_fallback': 'memory',
 }
 
 def load_config_v1(raw_config: dict, defaults: Optional[dict] = None) -> ClientConfig:
