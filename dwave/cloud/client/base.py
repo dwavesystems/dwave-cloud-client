@@ -256,6 +256,15 @@ class Client(object):
 
             .. versionadded:: 0.14.2
 
+        cache_fallback (str, optional):
+            Fallback strategy in case primary cache is unavailable (e.g. ``cache_home``
+            points to a read-only file system). Defaults to ``"memory"``, meaning
+            a short-lived in-memory storage is used. Set to ``"disable"`` to
+            disable caching if primary cache access fails or to ``"fail"`` to
+            explicitly hard-fail with a ``RuntimeError``.
+
+            .. versionadded:: 0.14.9
+
         defaults (dict, optional):
             Defaults for the client instance that override the class
             :attr:`.Client.DEFAULTS`.
@@ -355,6 +364,7 @@ class Client(object):
         # cache conf
         'cache_enabled': True,
         'cache_home': None,
+        'cache_fallback': 'memory',
     }
 
     # Number of problems to include in a submit/status query

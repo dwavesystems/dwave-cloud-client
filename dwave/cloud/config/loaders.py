@@ -49,6 +49,7 @@ ENV_OPTION_MAP = {
     'DWAVE_API_HEADERS': 'headers',
     'DWAVE_CACHE_ENABLED': 'cache_enabled',
     'DWAVE_CACHE_HOME': 'cache_home',
+    'DWAVE_CACHE_FALLBACK': 'cache_fallback',
     'DWAVE_LEAP_API_ENDPOINT': 'leap_api_endpoint',
     'DWAVE_LEAP_CLIENT_ID': 'leap_client_id',
     'DWAVE_METADATA_API_ENDPOINT': 'metadata_api_endpoint',
@@ -539,7 +540,8 @@ def load_config(config_file: Optional[Union[str, bool]] = None,
     ``DWAVE_API_CLIENT``, ``DWAVE_API_REGION``, ``DWAVE_API_ENDPOINT``,
     ``DWAVE_API_TOKEN``, ``DWAVE_API_SOLVER``, ``DWAVE_API_PROXY``,
     ``DWAVE_API_HEADERS``, ``DWAVE_LEAP_API_ENDPOINT``, ``DWAVE_LEAP_CLIENT_ID``,
-    ``DWAVE_METADATA_API_ENDPOINT``, ``DWAVE_CACHE_ENABLED``, ``DWAVE_CACHE_HOME``.
+    ``DWAVE_METADATA_API_ENDPOINT``, ``DWAVE_CACHE_ENABLED``, ``DWAVE_CACHE_HOME``,
+    ``DWAVE_CACHE_FALLBACK``.
 
     Environment variables are described in :mod:`dwave.cloud.config`.
 
