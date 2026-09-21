@@ -31,12 +31,11 @@ from dwave.cloud.api.constants import DeprecationContext
 from dwave.cloud.api.client import (
     DWaveAPIClient, SolverAPIClient, MetadataAPIClient, LeapAPIClient,
     LoggingSessionMixin, PayloadCompressingSessionMixin,
-    VersionedAPISessionMixin, CachingSessionMixin, DeprecationAwareSessionMixin)
+    VersionedAPISessionMixin, CachingSessionMixin, DeprecationAwareSessionMixin,
+    _MemoryCache as MemoryCache)
 from dwave.cloud.config import ClientConfig, constants, validate_config_v1
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.utils.http import BaseUrlSession
-
-from tests.api.mocks import MemoryCache
 
 
 def make_session_class(*bases):

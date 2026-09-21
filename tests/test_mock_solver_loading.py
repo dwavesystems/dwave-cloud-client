@@ -21,14 +21,13 @@ from urllib.parse import urlencode
 
 import requests_mock
 
+from dwave.cloud.api.client import _MemoryCache as MemoryCache
 from dwave.cloud.client import Client
 from dwave.cloud.client.qpu import Client as QPUClient
 from dwave.cloud.client.sw import Client as SoftwareClient
 from dwave.cloud.client.hybrid import Client as HybridClient
 from dwave.cloud.solver import Solver
 from dwave.cloud.exceptions import *
-
-from tests.api.mocks import MemoryCache
 
 
 def solver_data(name, status="ONLINE", avg_load=0.1, cat='qpu', incomplete=False, subset='all', graph_id='1'):

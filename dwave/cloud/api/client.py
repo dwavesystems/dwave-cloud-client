@@ -362,6 +362,41 @@ class VersionedAPISession(VersionedAPISessionMixin, PayloadCompressingSession):
     pass
 
 
+# fallback in-memory cache with diskcache-compatible interface
+class _MemoryCache(dict):
+    """In-memory cache with API partially compatible with ``diskcache``.
+
+    Implemented as a thin wrapper around ``dict`` that adds a subset of diskcache
+    API that's used in the cloud-client. Namely, methods: ``.get(..., read: bool)``
+    and `.set(..., read: bool)``.
+    """
+
+    def get(self, key, default=None, read=False, **kwargs):
+        """Retrieve value from cache. If `key` is missing, return `default`.
+
+        When `read` is True, return a file handle to value.
+
+        Note: other diskcache arguments are ignored.
+        """
+        value = super().get(key, default)
+        if value is not None and read:
+            value = io.BytesIO(value)
+        return value
+
+    def set(self, key, value, read=False, **kwargs):
+        """Set `key` and `value` item in cache.
+
+        When `read` is `True`, `value` should be a file-like object opened
+        for reading in binary mode.
+
+        Note: other diskcache arguments are ignored.
+        """
+        if read:
+            value = value.read()
+        self[key] = value
+        return True
+
+
 class CachingSessionMixin:
     """A :class:`requests.Session` mixin that caches responses and uses
     conditional requests for smart cache updates.
@@ -413,20 +448,6 @@ class CachingSessionMixin:
         default_maxage: float
         store_factory: abc.Callable[..., abc.Mapping]
 
-    # fallback in-memory cache with diskcache-compatible interface
-    class _InMemoryCache(dict):
-        def get(self, key, default=None, read=False, **kwargs):
-            value = super().get(key, default)
-            if value is not None and read:
-                value = io.BytesIO(value)
-            return value
-
-        def set(self, key, value, read=False, **kwargs):
-            if read:
-                value = value.read()
-            self[key] = value
-            return True
-
     @staticmethod
     def _default_store_factory(*, config: ExtendedCacheConfig, **kwargs) -> abc.Mapping | None:
         if not config.get('enabled'):
@@ -475,7 +496,7 @@ class CachingSessionMixin:
                 case CacheFallbackStrategy.DISABLE:
                     return None
                 case CacheFallbackStrategy.MEMORY:
-                    store = self._InMemoryCache()
+                    store = _MemoryCache()
 
         if not (hasattr(store, 'get') and hasattr(store, 'set')):
             raise ValueError("Provided 'store_factory' returned an invalid store.")
