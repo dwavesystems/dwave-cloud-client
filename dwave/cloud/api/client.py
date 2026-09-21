@@ -479,9 +479,9 @@ class CachingSessionMixin:
         if not callable(store_factory):
             raise ValueError("A callable object required for 'store_factory'.")
 
-        fallback = config.get('fallback')
-        if fallback not in CacheFallbackStrategy:
-            raise ValueError(f"Invalid cache store fallback: {fallback!r}.")
+        # note: value containment check on enum requires py312+,
+        # so we coerce to validate; raises ValueError on failure
+        fallback = CacheFallbackStrategy(config.get('fallback'))
 
         try:
             store = store_factory(config=config, **store_params)
