@@ -23,7 +23,7 @@ import warnings
 import zlib
 from collections import deque, namedtuple, abc
 from collections.abc import Iterable
-from typing import IO, Optional, TypedDict, TYPE_CHECKING, Union
+from typing import Any, BinaryIO, IO, Optional, TypedDict, TYPE_CHECKING, Union
 
 import http_sf
 import orjson
@@ -371,7 +371,12 @@ class _MemoryCache(dict):
     and `.set(..., read: bool)``.
     """
 
-    def get(self, key, default=None, read=False, **kwargs):
+    def get(self,
+            key: str,
+            default: Any | bytes | None = None,
+            read: bool = False,
+            **kwargs
+            ) -> Any | BinaryIO:
         """Retrieve value from cache. If `key` is missing, return `default`.
 
         When `read` is True, return a file handle to value.
@@ -383,7 +388,12 @@ class _MemoryCache(dict):
             value = io.BytesIO(value)
         return value
 
-    def set(self, key, value, read=False, **kwargs):
+    def set(self,
+            key: str,
+            value: Any | BinaryIO,
+            read: bool = False,
+            **kwargs
+            ) -> bool:
         """Set `key` and `value` item in cache.
 
         When `read` is `True`, `value` should be a file-like object opened
@@ -444,7 +454,7 @@ class CachingSessionMixin:
     class ExtendedCacheConfig(TypedDict, total=False):
         enabled: bool
         home: str | None
-        fallback: str | None
+        fallback: str | CacheFallbackStrategy | None
         default_maxage: float
         store_factory: abc.Callable[..., abc.Mapping]
 
@@ -474,7 +484,8 @@ class CachingSessionMixin:
         store_factory=_default_store_factory
     )
 
-    def _create_store(self, config: ExtendedCacheConfig, **store_params):
+    def _create_store(self, config: ExtendedCacheConfig, **store_params) -> abc.Mapping | None:
+        # create cache store based on `config`, applying a fallback if `config.store_factory` fails
         store_factory = config.get('store_factory')
         if not callable(store_factory):
             raise ValueError("A callable object required for 'store_factory'.")
