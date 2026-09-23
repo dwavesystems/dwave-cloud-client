@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import datetime
 import json
 import tempfile
@@ -31,12 +32,12 @@ from dwave.cloud.api.constants import DeprecationContext
 from dwave.cloud.api.client import (
     DWaveAPIClient, SolverAPIClient, MetadataAPIClient, LeapAPIClient,
     LoggingSessionMixin, PayloadCompressingSessionMixin,
-    VersionedAPISessionMixin, CachingSessionMixin, DeprecationAwareSessionMixin)
+    VersionedAPISessionMixin, CachingSessionMixin, DeprecationAwareSessionMixin,
+    _MemoryCache as MemoryCache)
 from dwave.cloud.config import ClientConfig, constants, validate_config_v1
+from dwave.cloud.config.models import CacheFallbackStrategy
 from dwave.cloud.package_info import __packagename__, __version__
 from dwave.cloud.utils.http import BaseUrlSession
-
-from tests.api.mocks import MemoryCache
 
 
 def make_session_class(*bases):
@@ -500,14 +501,80 @@ class TestResponseCaching(unittest.TestCase):
         with self.subTest("invalid factory"):
             with self.assertRaises(ValueError):
                 DWaveAPIClient(endpoint='https://mock',
-                            cache=dict(enabled=True, store_factory=obj),
-                            session_class=self.session_class)
+                               cache=dict(enabled=True, store_factory=obj),
+                               session_class=self.session_class)
 
         with self.subTest("invalid factory product"):
             with self.assertRaises(ValueError):
                 DWaveAPIClient(endpoint='https://mock',
-                            cache=dict(enabled=True, store_factory=lambda **kw: obj),
-                            session_class=self.session_class)
+                               cache=dict(enabled=True, store_factory=lambda **kw: obj),
+                               session_class=self.session_class)
+
+    @staticmethod
+    def _invalid_factory(**kwargs):
+        raise OSError("cache store inaccessible")
+
+    @parameterized.expand([
+        (None, ),
+        ('memory', ),
+        (CacheFallbackStrategy.MEMORY, ),
+    ])
+    def test_cache_fallback_memory(self, fallback):
+        cache = dict(enabled=True, store_factory=self._invalid_factory)
+        if fallback is not None:
+            cache.update(fallback=fallback)
+        with DWaveAPIClient(endpoint='https://mock', cache=cache,
+                            session_class=self.session_class) as client:
+            self.assertTrue(client.session._cache_enabled)
+            self.assertIsInstance(client.session._store, MemoryCache)
+
+    @parameterized.expand([
+        ('disable', ),
+        (CacheFallbackStrategy.DISABLE, ),
+    ])
+    def test_cache_fallback_disable(self, fallback):
+        cache = dict(enabled=True, fallback=fallback,
+                     store_factory=self._invalid_factory)
+        with DWaveAPIClient(endpoint='https://mock', cache=cache,
+                            session_class=self.session_class) as client:
+            self.assertFalse(client.session._cache_enabled)
+            self.assertIsNone(client.session._store)
+
+    @parameterized.expand([
+        ('fail', ),
+        (CacheFallbackStrategy.FAIL, ),
+    ])
+    def test_cache_fallback_fail(self, fallback):
+        cache = dict(enabled=True, fallback=fallback,
+                     store_factory=self._invalid_factory)
+        with self.assertRaises(RuntimeError):
+            DWaveAPIClient(endpoint='https://mock', cache=cache,
+                           session_class=self.session_class)
+
+    def test_cache_fallback_on_inaccessible_cache_home(self):
+        with tempfile.NamedTemporaryFile() as f:
+            # default store factory fails, as cache home parent is a file
+            home = os.path.join(f.name, 'cache')
+
+            with self.subTest("memory fallback by default"):
+                with DWaveAPIClient(endpoint='https://mock',
+                                    cache=dict(enabled=True, home=home),
+                                    session_class=self.session_class) as client:
+                    self.assertTrue(client.session._cache_enabled)
+                    self.assertIsInstance(client.session._store, MemoryCache)
+
+            with self.subTest("disable fallback"):
+                with DWaveAPIClient(endpoint='https://mock',
+                                    cache=dict(enabled=True, home=home, fallback='disable'),
+                                    session_class=self.session_class) as client:
+                    self.assertFalse(client.session._cache_enabled)
+                    self.assertIsNone(client.session._store)
+
+            with self.subTest("fail fallback"):
+                with self.assertRaises(RuntimeError):
+                    DWaveAPIClient(endpoint='https://mock',
+                                   cache=dict(enabled=True, home=home, fallback='fail'),
+                                   session_class=self.session_class)
 
     @requests_mock.Mocker()
     def test_conditional_requests_with_no_cache_control(self, m):
@@ -859,6 +926,90 @@ class TestResponseCaching(unittest.TestCase):
                 self.assertEqual(r.json(), data)
 
                 self.assertTrue(m.called)
+
+    @requests_mock.Mocker()
+    def test_caching_on_memory_fallback(self, m):
+        # verify the fallback memory store supports the full caching workflow
+
+        endpoint = 'https://mock'
+        path = 'path-a'
+        etag = 'etag-a'
+        data = {"a": 1}
+        ct = 'application/json; version=a'
+
+        m.get(f"{endpoint}/{path}", json=data,
+              headers={'ETag': etag, 'Content-Type': ct})
+        m.get(f"{endpoint}/{path}",
+              request_headers={'If-None-Match': etag}, status_code=304,
+              headers={'ETag': etag, 'Content-Type': ct})
+
+        with DWaveAPIClient(endpoint=endpoint,
+                            cache=dict(enabled=True, store_factory=self._invalid_factory),
+                            history_size=1, session_class=self.session_class) as client:
+
+            store = client.session._store
+            self.assertIsInstance(store, MemoryCache)
+
+            with self.subTest("cache miss"):
+                self.assertEqual(len(store), 0)
+
+                r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+                self.assertEqual(r.headers.get('content-type'), ct)
+
+                self.assertTrue(m.called)
+                self.assertEqual(len(store), 2)     # data + meta
+
+            with self.subTest("cache hit"):
+                m.reset_mock()
+
+                r = client.session.get(path, maxage_=10)
+                self.assertEqual(r.json(), data)
+                self.assertEqual(r.headers.get('content-type'), ct)
+
+                # if mock not called, data came from cache
+                self.assertFalse(m.called)
+
+            with self.subTest("cache validate, not modified"):
+                m.reset_mock()
+
+                r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+                self.assertEqual(r.headers.get('content-type'), ct)
+
+                self.assertTrue(m.called)
+                self.assertEqual(client.session.history[-1].response.status_code, 304)
+
+            with self.subTest("cache refreshed"):
+                m.reset_mock()
+
+                r = client.session.get(path, maxage_=10, refresh_=True)
+                self.assertEqual(r.json(), data)
+                self.assertEqual(r.headers.get('content-type'), ct)
+
+                self.assertTrue(m.called)
+
+    @requests_mock.Mocker()
+    def test_requests_work_when_cache_disabled_on_fallback(self, m):
+        endpoint = 'https://mock'
+        path = 'path-a'
+        data = {"a": 1}
+
+        m.get(f"{endpoint}/{path}", json=data,
+              headers={'ETag': 'etag-a', 'Content-Type': 'application/json'})
+
+        cache = dict(enabled=True, fallback='disable',
+                     store_factory=self._invalid_factory)
+
+        with DWaveAPIClient(endpoint=endpoint, cache=cache,
+                            session_class=self.session_class) as client:
+
+            # requests are not cached, but they do work
+            for _ in range(2):
+                r = client.session.get(path)
+                self.assertEqual(r.json(), data)
+
+            self.assertEqual(m.call_count, 2)
 
 
 @parameterized_class(("session_class", ), [

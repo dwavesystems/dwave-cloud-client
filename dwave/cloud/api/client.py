@@ -23,7 +23,7 @@ import warnings
 import zlib
 from collections import deque, namedtuple, abc
 from collections.abc import Iterable
-from typing import IO, Optional, TypedDict, TYPE_CHECKING, Union
+from typing import Any, BinaryIO, IO, Optional, TypedDict, TYPE_CHECKING, Union
 
 import http_sf
 import orjson
@@ -35,6 +35,7 @@ from packaging.specifiers import SpecifierSet
 import dwave.cloud.config
 from dwave.cloud.api import exceptions
 from dwave.cloud.api.models import DeprecationMessage
+from dwave.cloud.config.models import CacheFallbackStrategy
 from dwave.cloud.utils.exception import is_caused_by
 from dwave.cloud.utils.http import PretimedHTTPAdapter, BaseUrlSessionMixin, default_user_agent
 from dwave.cloud.utils.time import epochnow
@@ -361,6 +362,51 @@ class VersionedAPISession(VersionedAPISessionMixin, PayloadCompressingSession):
     pass
 
 
+# fallback in-memory cache with diskcache-compatible interface
+class _MemoryCache(dict):
+    """In-memory cache with API partially compatible with ``diskcache``.
+
+    Implemented as a thin wrapper around ``dict`` that adds a subset of diskcache
+    API that's used in the cloud-client. Namely, methods: ``.get(..., read: bool)``
+    and `.set(..., read: bool)``.
+    """
+
+    def get(self,
+            key: str,
+            default: Any | bytes | None = None,
+            read: bool = False,
+            **kwargs
+            ) -> Any | BinaryIO:
+        """Retrieve value from cache. If `key` is missing, return `default`.
+
+        When `read` is True, return a file handle to value.
+
+        Note: other diskcache arguments are ignored.
+        """
+        value = super().get(key, default)
+        if value is not None and read:
+            value = io.BytesIO(value)
+        return value
+
+    def set(self,
+            key: str,
+            value: Any | BinaryIO,
+            read: bool = False,
+            **kwargs
+            ) -> bool:
+        """Set `key` and `value` item in cache.
+
+        When `read` is `True`, `value` should be a file-like object opened
+        for reading in binary mode.
+
+        Note: other diskcache arguments are ignored.
+        """
+        if read:
+            value = value.read()
+        self[key] = value
+        return True
+
+
 class CachingSessionMixin:
     """A :class:`requests.Session` mixin that caches responses and uses
     conditional requests for smart cache updates.
@@ -374,6 +420,9 @@ class CachingSessionMixin:
 
                 * ``home`` (str):
                     Path to cache base directory.
+
+                * ``fallback`` (str/:class:`~dwave.cloud.config.models.CacheFallbackStrategy`):
+                    Cache store fallback strategy when ``store_factory`` fails.
 
                 * ``default_maxage`` (float):
                     Default response maxage, in case server response
@@ -405,6 +454,7 @@ class CachingSessionMixin:
     class ExtendedCacheConfig(TypedDict, total=False):
         enabled: bool
         home: str | None
+        fallback: str | CacheFallbackStrategy | None
         default_maxage: float
         store_factory: abc.Callable[..., abc.Mapping]
 
@@ -429,9 +479,40 @@ class CachingSessionMixin:
     _default_cache_config = ExtendedCacheConfig(
         enabled=False,
         home=None,          # resolved to `get_cache_dir()` if cache is enabled
+        fallback=CacheFallbackStrategy.MEMORY,
         default_maxage=0,
         store_factory=_default_store_factory
     )
+
+    def _create_store(self, config: ExtendedCacheConfig, **store_params) -> abc.Mapping | None:
+        # create cache store based on `config`, applying a fallback if `config.store_factory` fails
+        store_factory = config.get('store_factory')
+        if not callable(store_factory):
+            raise ValueError("A callable object required for 'store_factory'.")
+
+        # note: value containment check on enum requires py312+,
+        # so we coerce to validate; raises ValueError on failure
+        fallback = CacheFallbackStrategy(config.get('fallback'))
+
+        try:
+            store = store_factory(config=config, **store_params)
+        except Exception as exc:
+            logger.debug("[%s] cache store create failed (store_factory=%r, fallback=%r): %r",
+                         type(self).__name__, store_factory, fallback, exc)
+            logger.debug("[%s] using cache fallback: %s", type(self).__name__, fallback)
+
+            match fallback:
+                case CacheFallbackStrategy.FAIL:
+                    raise RuntimeError("Failed to create/access cache!")
+                case CacheFallbackStrategy.DISABLE:
+                    return None
+                case CacheFallbackStrategy.MEMORY:
+                    store = _MemoryCache()
+
+        if not (hasattr(store, 'get') and hasattr(store, 'set')):
+            raise ValueError("Provided 'store_factory' returned an invalid store.")
+
+        return store
 
     def __init__(self, cache: ExtendedCacheConfig | bool | None = None, **kwargs):
         if cache is None:
@@ -467,12 +548,9 @@ class CachingSessionMixin:
             raise ValueError("A non-negative real value required for 'default_maxage'.")
         self._default_maxage = default_maxage
 
-        store_factory = config.get('store_factory')
-        if not callable(store_factory):
-            raise ValueError("A callable object required for 'store_factory'.")
-        self._store = store_factory(config=config, **store_params)
-        if not (hasattr(self._store, 'get') and hasattr(self._store, 'set')):
-            raise ValueError("Provided 'store_factory' returned an invalid store.")
+        self._store = self._create_store(config, **store_params)
+        if self._store is None:
+            self._cache_enabled = False
 
         logger.debug("[%s] configured cache: (enabled=%r, default_maxage=%r, store=%r)",
                      type(self).__name__, self._cache_enabled, self._default_maxage, self._store)

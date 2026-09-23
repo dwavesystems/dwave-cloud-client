@@ -1,0 +1,20 @@
+---
+features:
+  - |
+    Add cache fallback strategy, used when the primary (disk) cache is
+    unavailable, e.g. when ``cache_home`` points to a read-only file system.
+
+    The fallback is configurable with the ``cache_fallback`` configuration
+    parameter and the ``DWAVE_CACHE_FALLBACK`` environment variable, and in
+    the low-level interface with the ``fallback`` cache config option on
+    ``CachingSession``. Supported strategies are: ``memory`` (the default),
+    where a short-lived in-memory store is used instead, ``disable``, where
+    caching is turned off for the session, and ``fail``, where cache store
+    creation failure is propagated as a ``RuntimeError``.
+
+    See `#760 <https://github.com/dwavesystems/dwave-cloud-client/issues/760>`_.
+fixes:
+  - |
+    Client instantiation no longer fails when the cache location is
+    inaccessible (e.g. a read-only home directory); by default, caching now
+    falls back to an in-memory store.
