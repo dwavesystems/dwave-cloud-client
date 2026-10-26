@@ -14,7 +14,7 @@
 
 import unittest
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import ValidationError
 from parameterized import parameterized
@@ -219,7 +219,7 @@ class TestModels(unittest.TestCase):
 class TestConstants(unittest.TestCase):
 
     def test_open_enum(self):
-        class Color(constants._OpenStrEnumMixin, str, Enum):
+        class Color(constants._OpenStrEnumMixin, StrEnum):
             RED = "RED"
 
         with self.subTest("standard string enum"):
@@ -240,7 +240,7 @@ class TestConstants(unittest.TestCase):
             self.assertIs(blue, another)
 
     def test_closed_enum(self):
-        class Color(str, Enum):
+        class Color(StrEnum):
             RED = "RED"
 
         self.assertEqual(Color("RED").value, "RED")
