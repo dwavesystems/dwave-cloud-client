@@ -1,0 +1,4 @@
+---
+upgrade:
+  - |
+    Upgrade your Python to 3.11+. We no longer support Python 3.10 and below.
