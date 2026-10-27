@@ -16,15 +16,9 @@ import struct
 import base64
 import warnings
 from collections import abc
-from typing import Union
+from typing import NotRequired, TypedDict, Union
 
-try:
-    # note: TypedDict is available in py38+, but NotRequired only in py311+
-    from typing import NotRequired, TypedDict
-except ImportError:
-    from typing_extensions import NotRequired, TypedDict
-
-from dwave.cloud.utils.qubo import uniform_get, active_qubits
+from dwave.cloud.utils.qubo import active_qubits
 
 __all__ = [
     'encode_problem_as_qp', 'decode_qp', 'decode_qp_numpy', 'decode_qp_problem',
