@@ -19,8 +19,7 @@
 """
 
 import time
-from datetime import datetime, timedelta
-from dateutil.tz import UTC
+from datetime import datetime, timedelta, UTC
 
 __all__ = ['datetime_to_timestamp', 'utcnow', 'epochnow', 'utcrel', 'tictoc']
 

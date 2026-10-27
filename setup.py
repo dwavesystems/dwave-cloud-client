@@ -15,7 +15,7 @@ python_requires = '>=3.11'
 # Package requirements, minimal pinning
 install_requires = ['requests[socks]>=2.25,<3', 'urllib3>=1.26,<3',
                     'pydantic>=2,<3', 'homebase>=1.0,<2',
-                    'click>=8.2,<9', 'python-dateutil>=2.7,<3', 'plucky>=0.4.3,<0.5',
+                    'click>=8.2,<9', 'plucky>=0.4.3,<0.5',
                     'diskcache>=5.2.1,<6', 'packaging>=19', 'werkzeug>=3.1.0,<4',
                     'authlib>=1.2,<2',
                     'importlib_metadata>=5.0.0',    # can be dropped in py312+

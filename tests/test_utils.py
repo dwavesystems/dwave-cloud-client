@@ -29,8 +29,7 @@ import unittest
 import uuid
 import warnings
 from collections import OrderedDict
-from datetime import datetime
-from dateutil.tz import UTC
+from datetime import datetime, UTC
 from functools import partial, wraps
 from itertools import count
 from typing import Union
