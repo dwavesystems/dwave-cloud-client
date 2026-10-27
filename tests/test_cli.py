@@ -42,8 +42,7 @@ def ignored_warnings(fn):
     """Ignores warnings during the execution of the decorated function."""
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        with warnings.catch_warnings(action="ignore"):
             return fn(*args, **kwargs)
     return wrapper
 
