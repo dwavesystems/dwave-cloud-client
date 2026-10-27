@@ -29,8 +29,7 @@ import unittest
 import uuid
 import warnings
 from collections import OrderedDict
-from datetime import datetime
-from dateutil.tz import UTC
+from datetime import datetime, UTC
 from functools import partial, wraps
 from itertools import count
 from typing import Union
@@ -735,9 +734,7 @@ class TestDeprecatedDecorator(unittest.TestCase):
         def f(a, b):
             return a, b
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-
+        with warnings.catch_warnings(action="ignore"):
             self.assertEqual(f(1, b=2), (1, 2))
 
     def test_warning_raised(self):
@@ -1110,9 +1107,7 @@ def capture_stderr(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
         # ensure warnings (on stderr) do not interfere with the expected output
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-
+        with warnings.catch_warnings(action="ignore"):
             # redirect sys.stderr to a BytesIO stream
             stream = io.TextIOWrapper(io.BytesIO())
             with contextlib.redirect_stderr(stream) as output:

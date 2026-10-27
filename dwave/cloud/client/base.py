@@ -49,14 +49,14 @@ import codecs
 import concurrent.futures
 import zlib
 
-from itertools import chain, zip_longest
-from functools import partial, wraps
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+from functools import partial, wraps
+from itertools import chain, zip_longest
 from typing import Optional, Union
 
 import orjson
-from dateutil.parser import parse as parse_datetime
 from plucky import pluck
 
 from dwave.cloud import api
@@ -1469,10 +1469,10 @@ class Client(object):
                     future._cancel_sent = True
 
             if not future.time_received and message.get('submitted_on'):
-                future.time_received = parse_datetime(message['submitted_on'])
+                future.time_received = datetime.fromisoformat(message['submitted_on'])
 
             if not future.time_solved and message.get('solved_on'):
-                future.time_solved = parse_datetime(message['solved_on'])
+                future.time_solved = datetime.fromisoformat(message['solved_on'])
 
             if status == self.STATUS_COMPLETE:
                 # TODO: find a better way to differentiate between

@@ -34,10 +34,9 @@ import functools
 import weakref
 
 from concurrent.futures import TimeoutError
-from dateutil.parser import parse
 
 from dwave.cloud.exceptions import InvalidAPIResponseError
-from dwave.cloud.utils.time import utcnow, datetime_to_timestamp
+from dwave.cloud.utils.time import utcnow
 
 # Use numpy if available for fast decoding
 try:
@@ -137,9 +136,6 @@ class Future(object):
         # Track how long it took us to parse the data
         self.parse_time = None
 
-        # approx. server-client clocks difference in seconds
-        self.clock_diff = None
-
         # Data from the server before it is parsed
         self._message = None
 
@@ -221,16 +217,6 @@ class Future(object):
     def _remove_event(self, event):
         """Remove a completion event from this future."""
         self._other_events.remove(event)
-
-    def _set_clock_diff(self, server_response, localtime_of_response):
-        """Calculate and set the `.clock_diff`, based on headers from a server
-        response, and the local time of response received.
-        """
-        try:
-            server_time = datetime_to_timestamp(parse(server_response.headers['date']))
-        except:
-            server_time = 0
-        self.clock_diff = abs(server_time - localtime_of_response)
 
     def _notify_uploaded(self, **metadata):
         self._data_id = metadata.get('problem_data_id')

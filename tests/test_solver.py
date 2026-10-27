@@ -103,8 +103,7 @@ class _QueryTest(unittest.TestCase):
         self.assertEqual(100, sum(results.num_occurrences))
 
         # verify .occurrences property still works, although is deprecated
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        with warnings.catch_warnings(action="ignore"):
             self.assertEqual(100, sum(results.num_occurrences))
 
         # offset is optional

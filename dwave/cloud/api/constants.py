@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import enum
+from enum import StrEnum
 
 
 # Default API version
@@ -41,8 +41,7 @@ class _OpenStrEnumMixin:
         return member
 
 
-# TODO: replace (str, Enum) with StrEnum when we drop py310
-class ProblemStatus(_OpenStrEnumMixin, str, enum.Enum):
+class ProblemStatus(_OpenStrEnumMixin, StrEnum):
     """Solver API problem status values.
 
     Initially a problem is in the PENDING state. When the D-Wave system starts
@@ -61,23 +60,23 @@ class ProblemStatus(_OpenStrEnumMixin, str, enum.Enum):
     CANCELLED = "CANCELLED"
 
 
-class ProblemEncodingFormat(_OpenStrEnumMixin, str, enum.Enum):
+class ProblemEncodingFormat(_OpenStrEnumMixin, StrEnum):
     QP = "qp"
     BQ = "bq"   # deprecated for submission
     REF = "ref"
 
 
-class AnswerEncodingFormat(_OpenStrEnumMixin, str, enum.Enum):
+class AnswerEncodingFormat(_OpenStrEnumMixin, StrEnum):
     QP = "qp"
     BQ = "bq"   # dimod (de-)serialization-based
     BINARY_REF = "binary-ref"
 
 
-class BinaryRefAuthMethod(_OpenStrEnumMixin, str, enum.Enum):
+class BinaryRefAuthMethod(_OpenStrEnumMixin, StrEnum):
     SAPI_TOKEN = "sapi-token"
 
 
-class ProblemType(_OpenStrEnumMixin, str, enum.Enum):
+class ProblemType(_OpenStrEnumMixin, StrEnum):
     ISING = "ising"
     QUBO = "qubo"
     BQM = "bqm"
@@ -87,7 +86,7 @@ class ProblemType(_OpenStrEnumMixin, str, enum.Enum):
     QCDL = "qcdl"
 
 
-class DeprecationContext(_OpenStrEnumMixin, str, enum.Enum):
+class DeprecationContext(_OpenStrEnumMixin, StrEnum):
     API = "api"                 # API changes such as endpoints, data structures, and headers
     FEATURE = "feature"         # solver feature is deprecated
     PARAMETER = "parameter"     # solver parameter is deprecated

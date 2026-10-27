@@ -16,10 +16,10 @@ from __future__ import annotations
 
 import ast
 import copy
-import enum
 import logging
 import orjson
 from collections import abc
+from enum import StrEnum
 from typing import Optional, Union, Literal, Any, Annotated
 
 import urllib3
@@ -91,7 +91,7 @@ class RequestRetryConfig(BaseModel, GetterMixin):
         return retry
 
 
-class PollingStrategy(str, enum.Enum):
+class PollingStrategy(StrEnum):
     BACKOFF = "backoff"
     LONG_POLLING = "long-polling"
 
@@ -127,7 +127,7 @@ class LongPollingSchedule(BaseModel):
     pause: Optional[float] = 0.0
 
 
-class CacheFallbackStrategy(str, enum.Enum):
+class CacheFallbackStrategy(StrEnum):
     """Fallback when cache config is invalid (e.g. configured cache location
     is read-only).
     """
