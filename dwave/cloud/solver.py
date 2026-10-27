@@ -999,16 +999,8 @@ class NLSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
             model, label=label, upload_params=upload_params, **sample_params)
 
     def sample_problem(self, *args, **kwargs):
-        sf = SpooledTemporaryFile(max_size=1e8, mode='w+b')
-        # backport a fix for bpo-26175, https://github.com/python/cpython/pull/29560.
-        # to make sure `zipfile` works with `SpooledTemporaryFile` in Python < 3.11
-        if not hasattr(sf, 'seekable'):
-            # of all the methods fixed in the above PR, only seekable is actually
-            # ever used in `zipfile`.
-            sf.seekable = lambda: sf._file.seekable()
-
         future = super().sample_problem(*args, **kwargs)
-        future._answer_data = sf
+        future._answer_data = SpooledTemporaryFile(max_size=1e8, mode='w+b')
 
         return future
 
