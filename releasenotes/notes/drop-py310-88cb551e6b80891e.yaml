@@ -2,3 +2,7 @@
 upgrade:
   - |
     Upgrade your Python to 3.11+. We no longer support Python 3.10 and below.
+  - |
+    Removed support for server/client clock drift detection, as well as the
+    ``Future.clock_diff`` attribute. We don't use clock drift detection ever
+    since we removed the "ETA polling" support in 2020.
