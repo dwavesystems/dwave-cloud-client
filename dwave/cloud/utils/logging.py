@@ -90,29 +90,14 @@ def parse_loglevel(level_name: Union[str, int],
     """Resolve numeric and symbolic log level names to numeric levels."""
 
     try:
-        level_name = str(level_name or '').strip().lower()
+        level_name = str(level_name or '').strip().upper()
     except:
         return default
-
-    # note: in py 3.11+ we can use `logging.getLevelNamesMapping()` instead
-    known_levels = {
-        'notset': logging.NOTSET,
-        'debug': logging.DEBUG,
-        'info': logging.INFO,
-        'warning': logging.WARNING,
-        'warn': logging.WARNING,
-        'error': logging.ERROR,
-        'critical': logging.CRITICAL,
-        'fatal': logging.CRITICAL
-    }
-
-    # support TRACE level, but make sure this function works without it
-    if hasattr(logging, 'TRACE'):
-        known_levels.update(trace=logging.TRACE)
 
     try:
         level = int(level_name)
     except ValueError:
+        known_levels = logging.getLevelNamesMapping()
         level = known_levels.get(level_name, default)
 
     return level

@@ -10,4 +10,4 @@ other:
   - |
     Simplify code by using Python 3.11+ features where possible: ``StrEnum``,
     drop ``typing-extensions`` and ``python-dateutil`` in favor of stdlib
-    functions.
+    functions, remove some dead code and 3.11 feature backports.
