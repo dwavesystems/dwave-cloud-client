@@ -28,7 +28,7 @@ from timeit import default_timer as timer
 from typing import Optional
 
 import click
-import diskcache
+import diskcache_community as diskcache
 import requests.exceptions
 
 from dwave.cloud import api

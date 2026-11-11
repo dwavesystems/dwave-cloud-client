@@ -1,0 +1,10 @@
+---
+fixes:
+  - |
+    Never load a disk cache entry stored with ``pickle``. The API response
+    cache, auth credentials and ``cached.ondisk`` now read through
+    ``SafeJSONDisk``, which treats such an entry as a cache miss.
+upgrade:
+  - |
+    The ``diskcache`` dependency is replaced with ``diskcache-community``
+    5.8.x.

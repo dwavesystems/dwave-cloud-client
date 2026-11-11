@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
+import diskcache_community as diskcache
+
 from dwave.cloud.auth.creds import (
     Credentials, _get_creds_paths, _get_default_creds_path, CREDS_FILENAME)
-from dwave.cloud.auth._creds import _Cache
 
 
 class TestCredentials(unittest.TestCase):
@@ -41,10 +43,20 @@ class TestCredentials(unittest.TestCase):
         default = _get_default_creds_path()
         self.assertGreater(len(default), 0)
 
-    def test_cache_subclass_smoke(self):
-        dbname = 'custom.db'
-        cache = _Cache(dbname=dbname)
-        self.assertEqual(cache.dbname, dbname)
+    def test_creds_filename(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir).joinpath(CREDS_FILENAME).resolve()
+
+            with Credentials(creds_file=path) as creds:
+                self.assertIsInstance(creds.disk, diskcache.SafeJSONDisk)
+                creds['token'] = 'value'
+
+            with Credentials(creds_file=path) as creds:
+                self.assertEqual(creds['token'], 'value')
+
+            names = os.listdir(tmpdir)
+            self.assertIn(CREDS_FILENAME, names)
+            self.assertNotIn(diskcache.core.DBNAME, names)
 
     def setUp(self):
         self.default_file = Path('/path/to/creds.db').resolve()

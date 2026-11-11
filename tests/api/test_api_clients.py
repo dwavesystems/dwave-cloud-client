@@ -21,7 +21,7 @@ import uuid
 import unittest
 import zlib
 
-import diskcache
+import diskcache_community as diskcache
 import http_sf
 import requests
 import requests_mock
@@ -42,6 +42,15 @@ from dwave.cloud.utils.http import BaseUrlSession
 
 def make_session_class(*bases):
     return type('TestSession', bases, {})
+
+
+class Planted:
+
+    def __init__(self, path):
+        self.path = path
+
+    def __reduce__(self):
+        return (os.mkdir, (self.path, ))
 
 
 class TestConfig(unittest.TestCase):
@@ -575,6 +584,60 @@ class TestResponseCaching(unittest.TestCase):
                     DWaveAPIClient(endpoint='https://mock',
                                    cache=dict(enabled=True, home=home, fallback='fail'),
                                    session_class=self.session_class)
+
+    @unittest.skipIf(os.name == 'nt' or os.geteuid() == 0,
+                     "needs POSIX permissions that apply to the user")
+    def test_cache_fallback_on_read_only_cache(self):
+        with tempfile.TemporaryDirectory() as home:
+            directory = os.path.join(home, 'api')
+            with diskcache.Cache(directory) as cache:
+                cache['key'] = 'value'
+
+            os.chmod(directory, 0o555)
+            try:
+                with self.subTest("memory fallback by default"):
+                    with DWaveAPIClient(endpoint='https://mock',
+                                        cache=dict(enabled=True, home=home),
+                                        session_class=self.session_class) as client:
+                        self.assertTrue(client.session._cache_enabled)
+                        self.assertIsInstance(client.session._store, MemoryCache)
+
+                with self.subTest("fail fallback"):
+                    with self.assertRaises(RuntimeError):
+                        DWaveAPIClient(endpoint='https://mock',
+                                       cache=dict(enabled=True, home=home, fallback='fail'),
+                                       session_class=self.session_class)
+            finally:
+                os.chmod(directory, 0o700)
+
+    @requests_mock.Mocker()
+    def test_pickled_cache_entries_are_a_miss(self, m):
+        endpoint = 'https://mock'
+        path = 'path'
+        data = {"a": 1}
+
+        m.get(f"{endpoint}/{path}", json=data,
+              headers={'Cache-Control': 'max-age=3600'})
+
+        with tempfile.TemporaryDirectory() as home:
+            marker = os.path.join(home, 'marker')
+            cache = dict(enabled=True, home=home)
+
+            with DWaveAPIClient(endpoint=endpoint, cache=cache,
+                                session_class=self.session_class) as client:
+                self.assertEqual(client.session.get(path).json(), data)
+                directory = client.session._store.directory
+
+            with diskcache.Cache(directory, disk=diskcache.Disk) as writer:
+                for key in list(writer):
+                    writer.set(key, Planted(marker))
+
+            with DWaveAPIClient(endpoint=endpoint, cache=cache,
+                                session_class=self.session_class) as client:
+                self.assertEqual(client.session.get(path).json(), data)
+
+            self.assertFalse(os.path.exists(marker))
+            self.assertEqual(m.call_count, 2)
 
     @requests_mock.Mocker()
     def test_conditional_requests_with_no_cache_control(self, m):
