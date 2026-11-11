@@ -1,0 +1,6 @@
+---
+other:
+  - |
+    Adapt live tests for new SAPI behavior: the ``get-problem-info`` endpoint
+    now returns the complete set of parameters, including the default values,
+    not just what was user-specified when submitting the problem.

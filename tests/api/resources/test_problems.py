@@ -247,7 +247,8 @@ class ProblemResourcesBaseTests(abc.ABC):
         self.assertEqual(info.data, self.problem_data)
 
         # params
-        self.assertEqual(info.params, self.params)
+        for k, v in self.params.items():
+            self.assertEqual(info.params.get(k), v)
 
         # metadata
         self.assertIsInstance(info.metadata, models.ProblemMetadata)
