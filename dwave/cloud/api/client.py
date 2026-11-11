@@ -472,8 +472,13 @@ class CachingSessionMixin:
             directory = os.path.join(home, 'api')
 
         # defer import and construction until needed
-        import diskcache
-        return diskcache.Cache(disk=diskcache.JSONDisk, directory=directory, **kwargs)
+        import diskcache_community as diskcache
+        store = diskcache.Cache(disk=diskcache.SafeJSONDisk.with_options(on_error='miss'),
+                                directory=directory, **kwargs)
+        if store.read_only:
+            store.close()
+            raise OSError(f"cache directory {directory!r} is read-only")
+        return store
 
     # default cache config
     _default_cache_config = ExtendedCacheConfig(

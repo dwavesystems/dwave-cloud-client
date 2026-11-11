@@ -18,7 +18,8 @@ import logging
 from pathlib import Path
 from typing import Optional, Type, Union
 
-from dwave.cloud.auth._creds import _Cache
+import diskcache_community as diskcache
+
 from dwave.cloud.config import get_configfile_paths, get_default_configfile_path
 
 __all__ = ['Credentials']
@@ -42,7 +43,7 @@ def _get_default_creds_path() -> str:
     return get_default_configfile_path(filename=CREDS_FILENAME)
 
 
-class Credentials(_Cache):
+class Credentials(diskcache.Cache):
     """Proxy to an on-disk credentials SQLite database.
 
     Use :class:`Credentials` dictionary interface for transparent reads and
@@ -108,6 +109,9 @@ class Credentials(_Cache):
                      f"creds_file={self.creds_file!r} and create={create!r}.")
 
         directory = self.creds_file.parent if create else None
-        super().__init__(directory=directory, dbname=CREDS_FILENAME)
+        super().__init__(
+            directory=directory,
+            dbname=CREDS_FILENAME,
+            disk=diskcache.SafeJSONDisk.with_options(on_error='miss'))
 
         logger.debug(f"{type(self).__name__} db loaded from {self.directory!r}.")

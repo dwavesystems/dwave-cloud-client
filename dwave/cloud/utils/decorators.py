@@ -300,8 +300,9 @@ class cached:
         # also, by postponing sqlite3 connect we enable easier post-fork re-init
         # (see https://www.sqlite.org/faq.html#q6)
         def store_initializer():
-            import diskcache
-            return diskcache.Cache(disk=diskcache.JSONDisk, directory=directory,
+            import diskcache_community as diskcache
+            return diskcache.Cache(disk=diskcache.SafeJSONDisk.with_options(on_error='miss'),
+                                   directory=directory,
                                    disk_compress_level=compression_level)
 
         return cls(store=store_initializer, **kwargs)
