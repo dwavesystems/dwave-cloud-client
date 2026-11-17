@@ -51,6 +51,7 @@ from dwave.cloud.coders import (
 from dwave.cloud.computation import Future
 from dwave.cloud.concurrency import Present
 from dwave.cloud.events import dispatches_events
+from dwave.cloud.utils.graph import graph_digest
 from dwave.cloud.utils.qubo import reformat_qubo_as_ising
 
 # Use numpy if available for fast encoding/decoding
@@ -1151,6 +1152,19 @@ class StructuredSolver(BaseSolver):
     def undirected_edges(self) -> set[tuple[int, int]]:
         """The edges in this solver's graph, with each edge represented only once."""
         return {edge for edge in self.edges if edge[0] < edge[1]}
+
+    @staticmethod
+    def compute_graph_id(solver: StructuredSolver) -> str:
+        """Compute graph_id from solver's working graph.
+
+        Args:
+            solver: Structured solver.
+
+        Returns:
+            Solver's working graph digest. Corresponds to :attr:`.graph_id`
+            property for public SAPI solvers.
+        """
+        return graph_digest(solver._encoding_qubits, solver._encoding_couplers)
 
     def max_num_reads(self, **params):
         """Returns the maximum number of reads for the given solver parameters.
