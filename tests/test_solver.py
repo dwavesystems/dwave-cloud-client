@@ -95,6 +95,16 @@ class PropertyLoading(unittest.TestCase):
                                  solver.properties['num_reads_range'][1])
 
 
+@unittest.skipUnless(config, "No live server configuration available.")
+class GraphDigest(unittest.TestCase):
+    """Verify graph_id calculation matches the public solvers."""
+
+    def test_graph_id(self):
+        with Client(**config) as client:
+            for solver in client.get_solvers(qpu=True):
+                self.assertEqual(solver.graph_id, solver.compute_graph_id(solver))
+
+
 class _QueryTest(unittest.TestCase):
     def _submit_and_check(self, solver, linear, quad, **kwargs):
         results = solver.sample_ising(linear, quad, num_reads=100, **kwargs)
