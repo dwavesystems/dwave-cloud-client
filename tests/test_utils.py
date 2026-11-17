@@ -41,12 +41,20 @@ import requests
 import requests_mock
 from parameterized import parameterized
 
+try:
+    import dwave.graphs
+except ImportError:
+    _graphs = False
+else:
+    _graphs = True
+
 from dwave.cloud.utils.coders import coerce_numpy_to_python
 from dwave.cloud.utils.cli import default_text_input
 from dwave.cloud.utils.decorators import aliasdict, cached, deprecated, retried
 from dwave.cloud.utils.dist import (
     get_contrib_packages, get_distribution, PackageNotFoundError, VersionNotFoundError)
 from dwave.cloud.utils.exception import hasinstance, exception_chain, is_caused_by
+from dwave.cloud.utils.graph import graph_digest
 from dwave.cloud.utils.http import (
     user_agent, default_user_agent, platform_tags, BaseUrlSessionMixin)
 from dwave.cloud.utils.logging import (
@@ -1240,5 +1248,28 @@ class TestLoggingHelpers(unittest.TestCase):
         self.assertEqual(get_caller_name(1), inspect.stack()[1].function)
 
 
-if __name__ == '__main__':
-    unittest.main()
+class TestGraphDigest(unittest.TestCase):
+
+    def test_edge_cases(self):
+        self.assertEqual(graph_digest([], []), '0100000000')
+
+        with self.assertRaises(ValueError):
+            graph_digest([], [], version=2)
+
+    def test_small_sorted(self):
+        qubits = [1, 2, 3]
+        couplers = [[1, 2], [2, 3]]
+        digest = graph_digest(qubits, couplers)
+        self.assertEqual(digest, '0111439a77')
+
+    def test_small_unsorted(self):
+        qubits = [3, 1, 2]
+        couplers = [[2, 3], [1, 2]]
+        digest = graph_digest(qubits, couplers)
+        self.assertEqual(digest, '0111439a77')
+
+    @unittest.skipUnless(_graphs, "dwave-graphs required for zephyr generator")
+    def test_zephyr(self):
+        graph = dwave.graphs.zephyr_graph(12)
+        digest = graph_digest(graph.nodes, graph.edges)
+        self.assertEqual(digest, '01c49c240d')

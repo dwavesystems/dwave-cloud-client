@@ -32,6 +32,8 @@ _GRAPH_DIGEST_V1_LENGTH = 8
 
 
 def _polynomial_rolling_hash(graph: Iterable[int], prime_base: int, modulo: int) -> int:
+    # note: for current production solvers, the code below runs in order of 10ms;
+    # 100x speed-up should be possible with cpp/cython
     value = 0
     for node in graph:
         value = (value * prime_base + node) % modulo
