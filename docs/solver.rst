@@ -26,6 +26,7 @@ Methods
    :toctree: generated
 
    StructuredSolver.check_problem
+   StructuredSolver.compute_graph_id
    StructuredSolver.estimate_qpu_access_time
    StructuredSolver.max_num_reads
    StructuredSolver.reformat_parameters

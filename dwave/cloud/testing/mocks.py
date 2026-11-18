@@ -17,6 +17,8 @@ import itertools
 import random
 from typing import Optional
 
+from dwave.cloud.utils.graph import graph_digest
+
 __all__ = [
     'solver_configuration_data',
     'structured_solver_data', 'qpu_clique_solver_data',
@@ -79,11 +81,6 @@ def structured_solver_data(name: str = None,
     if name is None:
         name = uuid_name()
 
-    if graph_id is None:
-        graph_id = uuid_name()[:10]
-
-    identity = dict(name=name, version=dict(graph_id=graph_id))
-
     if properties is None:
         # TODO: add more default properties?
         properties = {
@@ -110,6 +107,11 @@ def structured_solver_data(name: str = None,
 
     if couplers is None:
         couplers = []
+
+    if graph_id is None:
+        graph_id = graph_digest(qubits, couplers)
+
+    identity = dict(name=name, version=dict(graph_id=graph_id))
 
     properties.update({
         "qubits": qubits,
@@ -141,7 +143,7 @@ def qpu_clique_solver_data(size: int, **kwargs) -> dict:
 
     params = dict(
         name=f"clique_{size}q_mock",
-        graph_id=f"clique_{size}",
+        graph_id=graph_digest(qubits, couplers),
         description=f"A {size}-qubit mock QPU solver with clique topology",
         qubits=qubits,
         couplers=couplers,
@@ -186,7 +188,7 @@ def qpu_chimera_solver_data(m: int,
 
     params = dict(
         name=f"chimera_{num_qubits}q_mock",
-        graph_id=f"chimera_{num_qubits}",
+        graph_id=graph_digest(qubits, couplers),
         description=f"A {num_qubits}-qubit mock QPU solver with chimera topology",
         qubits=qubits,
         couplers=couplers,
@@ -229,7 +231,7 @@ def qpu_pegasus_solver_data(m: int,
 
     params = dict(
         name=f"pegasus_{num_qubits}q_mock",
-        graph_id=f"pegasus_{num_qubits}",
+        graph_id=graph_digest(qubits, couplers),
         description=f"A {num_qubits}-qubit mock QPU solver with pegasus topology",
         qubits=qubits,
         couplers=couplers,
@@ -267,7 +269,7 @@ def qpu_zephyr_solver_data(m: int,
 
     params = dict(
         name=f"zephyr_{num_qubits}q_mock",
-        graph_id=f"zephyr_{num_qubits}",
+        graph_id=graph_digest(qubits, couplers),
         description=f"A {num_qubits}-qubit mock QPU solver with zephyr topology",
         qubits=qubits,
         couplers=couplers,

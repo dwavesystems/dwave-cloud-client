@@ -25,6 +25,7 @@ except ImportError:
 from dwave.cloud.client import Client
 from dwave.cloud.solver import StructuredSolver
 from dwave.cloud.testing import mocks
+from dwave.cloud.utils.graph import graph_digest
 
 try:
     C16 = StructuredSolver(data=mocks.qpu_chimera_solver_data(16), client=None)
@@ -65,6 +66,16 @@ class TestCheckProblem(unittest.TestCase):
         bqm = dimod.generators.ran_r(1, list(self.solver.edges))
         h = list(bqm.linear.values())   # h as list is still supported
         self.assertTrue(self.solver.check_problem(h, bqm.quadratic))
+
+
+@parameterized_class(("solver", ), solvers)
+class TestGraphDigest(unittest.TestCase):
+
+    def test_graph_id(self):
+        self.assertEqual(
+            StructuredSolver.compute_graph_id(self.solver),
+            graph_digest(sorted(self.solver.nodes), sorted(self.solver.undirected_edges))
+        )
 
 
 class TestReformatParameters(unittest.TestCase):

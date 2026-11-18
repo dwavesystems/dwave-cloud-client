@@ -1,0 +1,7 @@
+---
+features:
+  - |
+    Add a QPU working graph digest calculation utility,
+    ``dwave.cloud.utils.graph.graph_digest`` and
+    ``dwave.cloud.solver.StucturedSolver.compute_graph_id``.
+    See `#748 <https://github.com/dwavesystems/dwave-cloud-client/issues/748>`_.
