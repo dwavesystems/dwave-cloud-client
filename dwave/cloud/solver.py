@@ -937,7 +937,26 @@ class NLSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
                    bqm: 'dimod.BQM',
                    label: Optional[str] = None,
                    **params) -> Future:
-        """Use just for testing."""
+        """Solve the specified :term:`BQM` using Stride's QuadraticModel.
+
+        Args:
+            bqm (:class:`~dimod.BinaryQuadraticModel`):
+                A binary quadratic model.
+
+            label (str, optional):
+                Problem label you can optionally tag submissions with for ease
+                of identification.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
+
+        Returns:
+            :class:`~dwave.cloud.computation.Future`
+
+        Note:
+            To use this method, both dimod and dwave-optimization packages have
+            to be installed.
+        """
         try:
             import dimod
         except ImportError: # pragma: no cover
