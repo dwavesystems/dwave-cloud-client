@@ -37,7 +37,7 @@ import orjson
 import warnings
 import weakref
 from collections import abc
-from functools import partial, cached_property
+from functools import cache, cached_property, partial
 from tempfile import SpooledTemporaryFile
 from typing import Any, BinaryIO, Literal, Optional, TYPE_CHECKING, TypeAlias, Union
 
@@ -937,26 +937,73 @@ class NLSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
                    bqm: 'dimod.BQM',
                    label: Optional[str] = None,
                    **params) -> Future:
-        """Use just for testing."""
+        """Solve the specified :term:`BQM` using Stride's QuadraticModel.
+
+        Args:
+            bqm (:class:`~dimod.BinaryQuadraticModel`):
+                A binary quadratic model.
+
+            label (str, optional):
+                Problem label you can optionally tag submissions with for ease
+                of identification.
+
+            **params:
+                Parameters for the sampling method, solver-specific.
+
+        Returns:
+            :class:`~dwave.cloud.computation.Future`
+
+        Note:
+            To use this method, both dimod and dwave-optimization packages have
+            to be installed.
+        """
         try:
             import dimod
         except ImportError: # pragma: no cover
             raise RuntimeError("Can't sample from 'bqm' without dimod. "
                                "Re-install the library with 'bqm' support.")
         try:
-            from dwave.optimization.generators import _from_constrained_quadratic_model
+            from dwave.optimization import Model
         except ImportError: # pragma: no cover
             raise RuntimeError("Can't sample from nonlinear model without dwave-optimization. "
                                "Re-install the library with 'nlm' support.")
 
-        # cqm to model generator requires binary bqm
+        # we need a qubo for stride's quadratic model
+        bqm_orig = bqm
+        bqm, mapping = bqm_orig.relabel_variables_as_integers(inplace=False)
         bqm.change_vartype(dimod.BINARY, inplace=True)
 
-        # TODO: simplify when a public BQM -> Model generator is added to dwave-optimization
-        cqm = dimod.CQM.from_bqm(bqm)
-        nlm = _from_constrained_quadratic_model(cqm)
+        # build a quadratic model
+        model = Model()
+        x = model.binary(bqm.num_variables)
+        Q, offset = bqm.to_qubo()
+        qm = model.quadratic_model(x, Q)
+        model.minimize(qm)
 
-        return self.sample_nlm(nlm, label=label, **params)
+        future = self.sample_nlm(model, label=label, **params)
+
+        @cache
+        def _sampleset():
+            future._load_result()
+
+            # reconstruct original bqm sample(set) from the received model states
+            model.states.from_file(future.answer_data)
+            samples = [x.state(i) for i in range(model.states.size())]
+
+            sampleset = dimod.SampleSet.from_samples_bqm(
+                (samples, bqm.variables), bqm)
+
+            sampleset.relabel_variables(mapping, inplace=True)
+            sampleset.change_vartype(bqm_orig.vartype)
+
+            return sampleset
+
+        # XXX: Short-circuit sampleset construction in the `computation.Future`
+        # class, as it only supports "qp"/"bq" sampleset decoding currently.
+        # FIX: specialize Future for each solver type.
+        future._sampleset = _sampleset
+
+        return future
 
     def sample_nlm(self,
                    model: Union['dwave.optimization.Model', io.IOBase, str],

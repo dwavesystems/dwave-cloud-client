@@ -1,0 +1,7 @@
+---
+fixes:
+  - |
+    Fix ``dwave.cloud.solver.NLSolver.sample_bqm()``. It used to rely on an
+    early (and now defunct) internal method of dwave-optimization to build a
+    quadratic stride model from the input BQM.
+    See `#770 <https://github.com/dwavesystems/dwave-cloud-client/issues/770>`_.
