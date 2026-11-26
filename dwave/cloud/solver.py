@@ -950,6 +950,8 @@ class NLSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
                                "Re-install the library with 'nlm' support.")
 
         # we need a qubo for stride's quadratic model
+        bqm_orig = bqm
+        bqm, mapping = bqm_orig.relabel_variables_as_integers(inplace=False)
         bqm.change_vartype(dimod.BINARY, inplace=True)
 
         # build a quadratic model
@@ -959,7 +961,30 @@ class NLSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
         qm = model.quadratic_model(x, Q)
         model.minimize(qm)
 
-        return self.sample_nlm(model, label=label, **params)
+        future = self.sample_nlm(model, label=label, **params)
+
+        @cache
+        def _sampleset():
+            future._load_result()
+
+            # reconstruct original bqm sample(set) from the received model states
+            model.states.from_file(future.answer_data)
+            samples = [x.state(i) for i in range(model.states.size())]
+
+            sampleset = dimod.SampleSet.from_samples_bqm(
+                (samples, bqm.variables), bqm)
+
+            sampleset.relabel_variables(mapping, inplace=True)
+            sampleset.change_vartype(bqm_orig.vartype)
+
+            return sampleset
+
+        # XXX: Short-circuit sampleset construction in the `computation.Future`
+        # class, as it only supports "qp"/"bq" sampleset decoding currently.
+        # FIX: specialize Future for each solver type.
+        future._sampleset = _sampleset
+
+        return future
 
     def sample_nlm(self,
                    model: Union['dwave.optimization.Model', io.IOBase, str],
