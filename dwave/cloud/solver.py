@@ -37,7 +37,7 @@ import orjson
 import warnings
 import weakref
 from collections import abc
-from functools import partial, cached_property
+from functools import cache, cached_property, partial
 from tempfile import SpooledTemporaryFile
 from typing import Any, BinaryIO, Literal, Optional, TYPE_CHECKING, TypeAlias, Union
 
@@ -944,19 +944,22 @@ class NLSolver(QuadraticUnstructuredSolverMixin, BaseUnstructuredSolver):
             raise RuntimeError("Can't sample from 'bqm' without dimod. "
                                "Re-install the library with 'bqm' support.")
         try:
-            from dwave.optimization.generators import _from_constrained_quadratic_model
+            from dwave.optimization import Model
         except ImportError: # pragma: no cover
             raise RuntimeError("Can't sample from nonlinear model without dwave-optimization. "
                                "Re-install the library with 'nlm' support.")
 
-        # cqm to model generator requires binary bqm
+        # we need a qubo for stride's quadratic model
         bqm.change_vartype(dimod.BINARY, inplace=True)
 
-        # TODO: simplify when a public BQM -> Model generator is added to dwave-optimization
-        cqm = dimod.CQM.from_bqm(bqm)
-        nlm = _from_constrained_quadratic_model(cqm)
+        # build a quadratic model
+        model = Model()
+        x = model.binary(bqm.num_variables)
+        Q, offset = bqm.to_qubo()
+        qm = model.quadratic_model(x, Q)
+        model.minimize(qm)
 
-        return self.sample_nlm(nlm, label=label, **params)
+        return self.sample_nlm(model, label=label, **params)
 
     def sample_nlm(self,
                    model: Union['dwave.optimization.Model', io.IOBase, str],
